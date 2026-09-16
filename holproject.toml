@@ -1,0 +1,13 @@
+[holbuild]
+minimum_version = "0.11.2"
+
+[project]
+name = "solidity-hol"
+version = "0.0.1"
+
+[build]
+roots = ["solidityHolScript.sml"]
+
+[dependencies.verifereum]
+git = "https://github.com/verifereum/verifereum.git"
+rev = "1b6508cefacfd54f78437fb72d7962503ddbe96c"
