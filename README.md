@@ -43,7 +43,8 @@ Solidity compiler and EVM revisions. The repository is intended to evolve with
 upstream Solidity rather than describe only one permanently fixed release.
 
 See [docs/design.md](docs/design.md) for the current design, implementation
-stages, and open questions.
+stages, and open questions. Reviews of relevant active semantics projects are
+collected in [docs/related-work/](docs/related-work/README.md).
 
 ## Status
 
