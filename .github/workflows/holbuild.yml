@@ -1,0 +1,97 @@
+name: holbuild
+
+on:
+  workflow_dispatch:
+  pull_request:
+  merge_group:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-polyml
+        id: polyml
+
+      - name: Read minimum holbuild version
+        id: holbuild-version
+        run: |
+          holbuild_ref="$(python3 - <<'PY'
+          import tomllib
+          with open("holproject.toml", "rb") as f:
+              print("v" + tomllib.load(f)["holbuild"]["minimum_version"])
+          PY
+          )"
+          echo "ref=$holbuild_ref" >> "$GITHUB_OUTPUT"
+
+      - uses: ./.github/actions/setup-holbuild
+        id: holbuild
+        with:
+          holbuild-ref: ${{ steps.holbuild-version.outputs.ref }}
+
+      - name: Report holbuild version
+        run: holbuild --version
+
+      - name: Configure holbuild cache
+        run: echo "HOLBUILD_CACHE=$HOME/.cache/holbuild" >> "$GITHUB_ENV"
+
+      - name: Compute cache keys
+        id: cache-key
+        run: |
+          toolchain_key="holbuild-v1-toolchain-${{ runner.os }}-${{ runner.arch }}-${{ steps.polyml.outputs.polyml-rev }}-${{ steps.holbuild.outputs.holbuild-rev }}"
+          build_prefix="holbuild-v1-project-${{ runner.os }}-${{ runner.arch }}-${{ steps.polyml.outputs.polyml-rev }}-${{ steps.holbuild.outputs.holbuild-rev }}-${{ hashFiles('holproject.toml') }}"
+          snapshot_key="${build_prefix}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}"
+          echo "toolchain-key=$toolchain_key" >> "$GITHUB_OUTPUT"
+          echo "build-prefix=$build_prefix" >> "$GITHUB_OUTPUT"
+          echo "snapshot-key=$snapshot_key" >> "$GITHUB_OUTPUT"
+
+      - name: Restore latest compatible project snapshot
+        id: cache-project
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.cache/holbuild
+          key: ${{ steps.cache-key.outputs.snapshot-key }}
+          restore-keys: |
+            ${{ steps.cache-key.outputs.build-prefix }}-
+
+      - name: Restore toolchain cache
+        if: steps.cache-project.outputs.cache-matched-key == ''
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.cache/holbuild
+          key: ${{ steps.cache-key.outputs.toolchain-key }}
+
+      - name: Build HOL toolchain
+        run: holbuild buildhol
+
+      - name: Save toolchain cache
+        uses: actions/cache/save@v6
+        continue-on-error: true
+        with:
+          path: ~/.cache/holbuild
+          key: ${{ steps.cache-key.outputs.toolchain-key }}
+
+      - name: Build project roll-up
+        env:
+          TMPDIR: ${{ runner.temp }}
+        run: holbuild --verbose -j"$(nproc)" build solidityHolTheory
+
+      - name: Save project snapshot
+        if: always()
+        uses: actions/cache/save@v6
+        continue-on-error: true
+        with:
+          path: ~/.cache/holbuild
+          key: ${{ steps.cache-key.outputs.snapshot-key }}

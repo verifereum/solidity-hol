@@ -1,0 +1,50 @@
+name: Setup holbuild
+description: Check out pinned holbuild, build it, and add it to PATH
+
+inputs:
+  holbuild-ref:
+    description: holbuild git revision or tag to use
+    required: true
+
+outputs:
+  holbuild-rev:
+    description: Resolved holbuild revision
+    value: ${{ steps.version.outputs.holbuild-rev }}
+
+runs:
+  using: composite
+  steps:
+    - name: Cache holbuild checkout and build
+      uses: actions/cache@v6
+      with:
+        path: ~/holbuild
+        key: holbuild-tool-${{ runner.os }}-${{ runner.arch }}-${{ inputs.holbuild-ref }}
+
+    - name: Clone holbuild
+      shell: bash
+      run: |
+        if [ ! -d "$HOME/holbuild/.git" ]; then
+          git clone https://github.com/HOL-Theorem-Prover/holbuild.git "$HOME/holbuild"
+        fi
+
+    - name: Check out holbuild revision
+      shell: bash
+      run: |
+        cd "$HOME/holbuild"
+        git fetch origin "${{ inputs.holbuild-ref }}"
+        git checkout --detach "${{ inputs.holbuild-ref }}"
+
+    - name: Resolve holbuild revision
+      id: version
+      shell: bash
+      run: |
+        cd "$HOME/holbuild"
+        echo "holbuild-rev=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+    - name: Build holbuild
+      shell: bash
+      run: make -C "$HOME/holbuild"
+
+    - name: Add holbuild to PATH
+      shell: bash
+      run: echo "$HOME/holbuild/bin" >> "$GITHUB_PATH"

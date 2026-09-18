@@ -1,0 +1,57 @@
+name: Setup Poly/ML
+description: Build or restore Poly/ML and add it to PATH
+
+inputs:
+  polyml-tag:
+    description: Poly/ML git tag to use
+    required: false
+    default: v5.9.2
+
+outputs:
+  polyml-rev:
+    description: Resolved Poly/ML revision
+    value: ${{ steps.version.outputs.polyml-rev }}
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve Poly/ML version
+      id: version
+      shell: bash
+      run: |
+        rev=$(git ls-remote https://github.com/polyml/polyml.git "refs/tags/${{ inputs.polyml-tag }}" | cut -f1)
+        if [[ ! "$rev" =~ ^[0-9a-f]{40}$ ]]; then
+          echo "Could not resolve Poly/ML tag ${{ inputs.polyml-tag }}: $rev" >&2
+          exit 1
+        fi
+        echo "polyml-rev=$rev" >> "$GITHUB_OUTPUT"
+
+    - name: Restore Poly/ML cache
+      id: cache-polyml
+      uses: actions/cache/restore@v6
+      with:
+        path: ~/polyml-install
+        key: polyml-${{ runner.os }}-${{ runner.arch }}-${{ steps.version.outputs.polyml-rev }}
+
+    - name: Build Poly/ML
+      if: steps.cache-polyml.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        src="$RUNNER_TEMP/polyml-src"
+        git clone -b "${{ inputs.polyml-tag }}" --depth 1 https://github.com/polyml/polyml.git "$src"
+        cd "$src"
+        ./configure --prefix="$HOME/polyml-install"
+        make -j"$(nproc)"
+        make install
+
+    - name: Save Poly/ML cache
+      if: steps.cache-polyml.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v6
+      continue-on-error: true
+      with:
+        path: ~/polyml-install
+        key: polyml-${{ runner.os }}-${{ runner.arch }}-${{ steps.version.outputs.polyml-rev }}
+
+    - name: Add Poly/ML to PATH
+      shell: bash
+      run: echo "$HOME/polyml-install/bin" >> "$GITHUB_PATH"
