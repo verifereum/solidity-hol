@@ -43,10 +43,13 @@ Solidity compiler and EVM revisions. The repository is intended to evolve with
 upstream Solidity rather than describe only one permanently fixed release.
 
 See [docs/design.md](docs/design.md) for the current design, implementation
-stages, and open questions. Reviews of relevant active semantics projects are
-collected in [docs/related-work/](docs/related-work/README.md).
+stages, and open questions. The initial compiler profile is documented in
+[docs/profiles.md](docs/profiles.md), and the current compiler-AST observations
+are recorded in [docs/frontend-boundary.md](docs/frontend-boundary.md). Reviews
+of relevant active semantics projects are collected in
+[docs/related-work/](docs/related-work/README.md).
 
 ## Status
 
-The project is currently in its design and initial setup phase. No supported
-Solidity subset has been implemented yet.
+The project is currently in its design and frontend-reconnaissance phase. No
+supported Solidity subset has been implemented yet.

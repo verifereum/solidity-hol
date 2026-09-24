@@ -44,6 +44,9 @@ jobs:
       - name: Report holbuild version
         run: holbuild --version
 
+      - name: Test compiler artifact exporter
+        run: python3 -m unittest discover -s tests -p 'test_*.py' -v
+
       - name: Configure holbuild cache
         run: echo "HOLBUILD_CACHE=$HOME/.cache/holbuild" >> "$GITHUB_ENV"
 
