@@ -6,4 +6,5 @@
  *)
 Theory solidityHol
 Ancestors
+  solidityAST
   verifereum
