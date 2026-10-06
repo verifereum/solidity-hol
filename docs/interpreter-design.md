@@ -5,7 +5,9 @@ Status: proposal for review, not an implementation commitment.
 This note refines the external-interaction questions in [design.md](design.md).
 It records inspected implementation evidence and identifies decisions to make
 before expanding the Solidity interpreter. It does not specify all core syntax,
-reference representations, or evaluation schedules yet.
+reference representations, or evaluation schedules yet. A first build-checked
+implementation checkpoint is recorded in
+[implementation-blueprint.md](implementation-blueprint.md).
 
 ## Evidence and revision scope
 
@@ -106,9 +108,11 @@ and code-deposit constraints. `run_create` is a transaction-entry helper, not a
 standalone source-level CREATE opcode API.
 
 The execution functions return option-valued results through `OWHILE`. We must
-retain the distinction between EVM failure and inability to obtain a valid
-execution result. This review has not established the precise termination
-hypotheses for every proposed adapter input.
+retain the distinction between EVM failure and adapter/domain errors. Follow-up
+inspection and the implementation checkpoint established that the pinned
+`vfmDecreasesGasTheory.run_call_eq_tr` unconditionally gives a `SOME` result for
+`run_call`; its gas-based totality does not require source fuel. Well-formedness
+and checkpoint hypotheses for preservation results remain separate obligations.
 
 ## Additional context: Vyper-HOL issue #98
 

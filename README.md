@@ -51,5 +51,8 @@ of relevant active semantics projects are collected in
 
 ## Status
 
-The project is currently in its design and frontend-reconnaissance phase. No
-supported Solidity subset has been implemented yet.
+The project has a build-checked core/state blueprint and executable concrete EVM
+boundary experiments, alongside compiler frontend reconnaissance. No supported
+Solidity subset or source interpreter has been implemented yet. See
+[docs/implementation-blueprint.md](docs/implementation-blueprint.md) for artifacts,
+validation commands, limitations, and next gates.
