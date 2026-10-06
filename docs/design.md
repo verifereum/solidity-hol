@@ -67,9 +67,25 @@ its elaboration.
 
 ## Primary execution model
 
+A proposed refinement of the external-call boundary, based on inspection of
+Vyper-HOL and the pinned Verifereum implementation, is recorded in
+[interpreter-design.md](interpreter-design.md). Its alternatives remain subject
+to review; they are not additional settled design decisions.
+
 The primary semantics will be a deterministic, fuel-indexed definitional
 interpreter. Fuel makes the definition total in HOL despite Solidity permitting
 unbounded loops and recursive internal calls.
+
+Fuel uses a recursive-depth discipline, not a globally consumed source-step
+budget. Recursive evaluator calls receive a smaller bound; sibling computations
+receive the same available bound rather than threading a remaining-fuel counter.
+Loops and recursive internal calls must pass through fuel-decreasing evaluation.
+Delegated bytecode execution uses Verifereum's execution machinery, not source
+fuel. Fuel is used only where needed to establish termination in HOL, not as a general
+execution-cost budget. Independently terminating helpers, including bounded
+aggregate copying, use their own structural or well-founded termination
+arguments without fuel. Minimal sufficient decrement points remain to be
+specified with the evaluator equations.
 
 Source-level fuel is proof and execution machinery, not EVM gas:
 
@@ -123,9 +139,12 @@ Solidity compiler profile. Compiler-faithful elaboration should make the chosen
 schedule explicit in the core AST, for example through ordered core forms or
 temporary bindings. Thus the same surface AST may elaborate differently for
 legacy and IR compiler profiles without making the interpreter nondeterministic.
-Call extraction and other normalization must preserve the source construct's
-schedule; ordering only the residual expression is insufficient after an
-effectful child has been hoisted.
+Elaboration fixes these schedules through explicit ordered core operations and
+temporary bindings; the interpreter does not choose profile-dependent operand
+orders. Expression evaluation, destination capture, and writes/reference binding/
+content copying remain distinguishable operations. Call extraction and other
+normalization must preserve the source construct's schedule; ordering only the
+residual expression is insufficient after an effectful child has been hoisted.
 
 Future work should define a conservative order-independence or commutation
 condition and prove that canonical and profile-specific schedules agree for
@@ -193,27 +212,26 @@ addressable heap with stable reference identity, not immutable aggregate values.
 
 Some operations also require normalized source type or layout information that
 cannot be recovered from a raw 256-bit word, including narrow signed cleanup,
-enum validation, fixed-bytes alignment, ABI encoding, and packed storage. It
-remains open whether scalar values carry this information directly or receive
-it from typed AST operations, but references will necessarily carry suitable
-location and layout descriptors.
+enum validation, fixed-bytes alignment, ABI encoding, and packed storage. Scalar runtime values retain value categories but receive source type
+information from typed core operations rather than carrying widths, signedness,
+or bounds themselves. Bindings retain declared types; references carry suitable
+location, type and layout descriptors. Validated annotations and a separate
+runtime typing relation must justify these assumptions.
 
 ## Calls and EVM interaction
 
 The Solidity interpreter evaluates source-level call operands and performs the
-appropriate ABI encoding. Instead of hard-wiring a particular EVM entry point
-throughout the evaluator, external calls and creation should cross a small,
-functional request/response interface. The interpreter can produce a free
-interaction computation whose requests contain the call kind, caller-visible
-world snapshot, calldata or init code, value, gas parameters, and other required
-context. A handler supplies a response and resumes the deterministic
-continuation.
+appropriate ABI encoding. External calls and creation cross a small,
+functional request/response interface implemented by a named, fixed Verifereum
+adapter. Requests contain the call kind, calldata or init code, value, gas
+parameters, and required execution context. The evaluator invokes the adapter
+and continues with its response over the shared EVM world state.
 
-Verifereum will be the canonical executable handler for this interface, over the
-shared EVM world state. Tests may also use fail-closed scripted handlers, and
-future compositional results may quantify over permitted responses. This
-functional interaction layer is not a nondeterministic or relational primary
-semantics.
+The primary evaluator is not parameterized by arbitrary handlers and does not
+produce a free interaction tree. Explicit suspension or handler parameterization
+may be reconsidered if a concrete proof or execution requirement justifies it.
+Keeping EVM integration in one adapter avoids scattering EVM entry-point details
+throughout the evaluator without making the execution boundary replaceable.
 
 Verifereum should own EVM mechanisms including:
 
@@ -404,8 +422,6 @@ The following issues remain deliberately unresolved:
 - treatment of inline assembly and Yul;
 - the exact versioning granularity and compatibility policy for AST schemas;
 - handling optimizer- or bug-dependent compiler behavior;
-- whether scalar runtime values carry source types or obtain them from typed
-  operations; and
 - the final observational equivalence used by compiler-correctness theorems.
 
 Changes to these choices should be recorded here with their consequences for
