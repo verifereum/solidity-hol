@@ -11,9 +11,12 @@ remain authoritative. No importer or source evaluator has been implemented.
 | `syntax/solidityCoreScript.sml` | Candidate ordered core, scalar/reference values, captured targets, procedures and control outcomes |
 | `semantics/solidityStateScript.sml` | Candidate source state, separate gas evidence, observable EVM projection and frame completion |
 | `semantics/solidityEVMCallScript.sml` | Concrete CALL/CREATE boundary experiment reusing pinned Verifereum |
+| `semantics/solidityEVMBoundaryPropsScript.sml` | General well-formedness/transaction preservation and conditional storage preservation |
 | `tests/solidityEVMCallTestScript.sml` | CALL, STATICCALL, DELEGATECALL, precompile and failure witnesses |
 | `tests/solidityEVMCreateTestScript.sml` | CREATE/CREATE2 installation, revert and collision witnesses |
 | `tests/solidityEVMFrameTestScript.sml` | Nested rollback and sequential transient-storage witnesses |
+| `tests/solidityEVMReentryTestScript.sml` | Coherent deployed-bytecode reentry and resumed world observation |
+| `tests/solidityEVMBookkeepingTestScript.sml` | Nonempty bookkeeping, original/current storage and caller-tail witnesses |
 
 All are ancestors of the project roll-up:
 
@@ -152,7 +155,12 @@ source fuel is added. Well-formedness is still required for upstream preservatio
 laws. The generic CALL fixture has a proved `wf_state` condition on code and
 stack sizes; the nested outer-rollback fixture is separately proved well formed.
 Do not infer preservation hypotheses for arbitrary caller checkpoints from
-termination alone.
+termination alone. `solidityEVMBoundaryPropsTheory` now derives boundary
+well-formedness preservation and unconditional transaction-parameter preservation.
+It also exposes entered-subtree untouched-storage preservation with the exact
+upstream checkpoint/access premises. See
+[source-evm-adapter-contract.md](source-evm-adapter-contract.md) for the source
+adapter's required inputs and entry/exit correspondence obligations.
 
 ### Executed proof witnesses
 
@@ -175,11 +183,18 @@ termination alone.
   changes through genuine nested EVM checkpoints.
 - Two calls with the same transaction state preserve transient storage. The
   harness supplies the second operand stack, but resets no transaction fields.
+- Nonempty seeded accesses, domain data, transient storage and pending deletions
+  survive success/revert. Saved current storage and transaction-original storage
+  remain distinct; caller-tail metadata and an untouched slot are retained.
+- Deployed A/B bytecode performs A -> B -> A reentry, then resumed outer A reads
+  the callback's storage change and returns it. Both the initial invocation and
+  the boundary state reached by its actual prefix are proved well formed.
 
 Fixtures use bounded gas to test EVM mechanics. They make no compiler-equivalent
 source gas claims. Exact gas/refunds/access-state laws, further domain and
-value-transfer edge cases, bytecode reentry and full source correspondence need
-additional witnesses/proofs. Creation fixtures execute real initcode but do not
+value-transfer edge cases and full source correspondence need additional
+witnesses/proofs. The reentry and bookkeeping witnesses are concrete finite
+checks, not universal checkpoint/tail preservation or source simulation theorems. Creation fixtures execute real initcode but do not
 constitute Solidity constructor/deployment semantics.
 
 ## Next gates and escalation points
@@ -191,8 +206,9 @@ constitute Solidity constructor/deployment semantics.
    copy termination without fuel, including recursive-type restrictions.
 4. Implement the minimal evaluator across loops/internal calls/modifier wrappers
    and prove fuel stability. Only then broaden source feature coverage.
-5. Add value-transfer, domain-abort, reentry and bookkeeping witnesses to the
-   adapter experiment and derive preservation under exact upstream hypotheses.
+5. Extend value-transfer/domain-abort coverage and prove the remaining
+   checkpoint/tail/access laws under exact upstream hypotheses. Reentry and
+   seeded-bookkeeping witnesses now exist; source correspondence is still open.
 
 Milestone 1 is a compiled blueprint with schematic evaluator contracts, not a
 complete interpreter interface. Milestone 2 has a working concrete boundary
