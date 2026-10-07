@@ -51,8 +51,12 @@ of relevant active semantics projects are collected in
 
 ## Status
 
-The project has a build-checked core/state blueprint and executable concrete EVM
-boundary experiments, alongside compiler frontend reconnaissance. No supported
-Solidity subset or source interpreter has been implemented yet. See
-[docs/implementation-blueprint.md](docs/implementation-blueprint.md) for artifacts,
-validation commands, limitations, and next gates.
+The project now has an executable ordered-core interpreter with typed scalar
+operations, control flow, recursive internal calls and modifier-wrapper witnesses.
+It runs hand-written core programs; no importer, admitted Solidity subset or
+source/compiler correspondence is established yet. Reference/layout and external
+adapter integration remain incomplete. See
+[docs/interpreter-checkpoint.md](docs/interpreter-checkpoint.md) for capabilities,
+proofs, validation and next gates. The earlier core/state blueprint and concrete
+EVM experiments are recorded in
+[docs/implementation-blueprint.md](docs/implementation-blueprint.md).

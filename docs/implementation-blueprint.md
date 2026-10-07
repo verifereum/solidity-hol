@@ -2,7 +2,11 @@
 
 This is a **build-checked architectural blueprint and concrete EVM experiment**,
 not a supported Solidity subset. The decisions in [interpreter-design.md](interpreter-design.md)
-remain authoritative. No importer or source evaluator has been implemented.
+remain authoritative. This document records the original merged checkpoint,
+which had no importer or source evaluator. The subsequent executable core
+interpreter is described in [interpreter-checkpoint.md](interpreter-checkpoint.md);
+the evaluator signatures and next gates below are historical proposals, not a
+claim that the interpreter is still absent.
 
 ## Buildable artifacts
 

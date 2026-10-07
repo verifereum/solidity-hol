@@ -9,4 +9,5 @@ Ancestors
   solidityAST solidityCore solidityState solidityEVMCall solidityEVMBoundaryProps
   solidityEVMCallTest solidityEVMCreateTest solidityEVMFrameTest
   solidityEVMReentryTest solidityEVMBookkeepingTest
+  solidityValue solidityInterpreter solidityInterpreterTest
   verifereum
