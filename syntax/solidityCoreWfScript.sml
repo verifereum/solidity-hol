@@ -125,12 +125,19 @@ End
 
 (* Values *)
 
+(* The n-bit two's complement range when signed, otherwise [0, 2 ** n). *)
+Definition integer_in_range_def:
+  integer_in_range signed n (i : int) ⇔
+    if signed then -&(2 ** (n - 1)) ≤ i ∧ i < &(2 ** (n - 1))
+    else 0 ≤ i ∧ i < &(2 ** n)
+End
+
 Definition elementary_scalar_has_type_def:
   (elementary_scalar_has_type BoolT (BoolValue _) ⇔ T) ∧
   (elementary_scalar_has_type (UintT n) (IntegerValue i) ⇔
-    0 ≤ i ∧ i < &(2 ** n)) ∧
+    integer_in_range F n i) ∧
   (elementary_scalar_has_type (IntT n) (IntegerValue i) ⇔
-    -&(2 ** (n - 1)) ≤ i ∧ i < &(2 ** (n - 1))) ∧
+    integer_in_range T n i) ∧
   (elementary_scalar_has_type (AddressT _) (AddressValue _) ⇔ T) ∧
   (elementary_scalar_has_type (FixedBytesT n) (BytesValue bs) ⇔
     LENGTH bs = n) ∧
@@ -467,6 +474,15 @@ Proof
   imp_res_tac ALOOKUP_MEM >>
   gvs[EVERY_MEM] >>
   first_x_assum drule >> simp[]
+QED
+
+Theorem wf_core_environment_user_value:
+  wf_core_environment env ∧ lookup_user_value env id = SOME u ⇒
+    is_elementary_type u
+Proof
+  rw[wf_core_environment_def, lookup_user_value_def, AllCaseEqs()] >>
+  imp_res_tac ALOOKUP_MEM >> gvs[EVERY_MEM] >>
+  first_x_assum drule >> simp[wf_type_declaration_def]
 QED
 
 Theorem wf_core_program_lookup:

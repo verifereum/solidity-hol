@@ -11,6 +11,8 @@ remain authoritative. No importer or source evaluator has been implemented.
 | `syntax/solidityCoreScript.sml` | Candidate ordered core, scalar/reference values, captured targets, procedures and control outcomes |
 | `syntax/solidityCoreWfScript.sml` | Static environment and well-formedness checker for the pure fragment: typed atoms, operations, scoped statements, procedures and programs |
 | `tests/solidityCoreWfTestScript.sml` | Positive and negative well-formedness witnesses |
+| `semantics/solidityScalarScript.sml` | Scalar operator and conversion semantics over canonical values, cv-translated, with canonicality theorems |
+| `tests/solidityScalarTestScript.sml` | Scalar operator, panic and conversion witnesses, proved by `EVAL_TAC` and `cv_eval` |
 | `semantics/solidityStateScript.sml` | Candidate source state, separate gas evidence, observable EVM projection and frame completion |
 | `semantics/solidityEVMCallScript.sml` | Concrete CALL/CREATE boundary experiment reusing pinned Verifereum |
 | `semantics/solidityEVMBoundaryPropsScript.sml` | General well-formedness/transaction preservation and conditional storage preservation |
@@ -45,9 +47,22 @@ default-initialises them and fall-through returns their current values;
 `RevertStmt` carries a constant `BytesValue` of any length as raw revert data; a
 loop prelude is not a loop body, so `break`/`continue` there are rejected;
 targets are lexically scoped like bindings, so a runtime target map is saved and
-restored per scope or capture overwrites; and every `ScalarOperation` operand
-shares the operation's type, which shifts and exponentiation will relax. Type
-declarations accompany a `core_program` rather than living in it.
+restored per scope or capture overwrites; and a `ScalarOperation`'s type is its
+left operand's type, with `scalar_operator_signature` giving every operand's
+type: shift amounts and exponents are `uint256`, so elaboration widens a
+narrower unsigned right operand. Type declarations accompany a `core_program`
+rather than living in it.
+
+The scalar layer in `semantics/solidityScalarScript.sml` adds three more.
+`eval_scalar_operation` and `eval_conversion` return a `scalar_outcome`
+(`ScalarOk`, `ScalarPanic` with the panic code, or `ScalarInvalid`), which the
+evaluator maps onto `PanicCompletion` and `InvalidCompletion`. Values are
+canonical (an `IntegerValue` is the mathematical integer and fixed bytes hold
+exactly their width), so "typed cleanup" is wrapping into the target's range,
+proved as the canonicality theorems, and cleanup of raw EVM words belongs to
+the ABI/storage boundary. `eval_conversion` takes the source type as well as
+the target: the evaluator reads it from the binding for a `BoundAtom` and sets
+it to the target type for a `ConstantAtom`.
 
 Capture statements produce entries in a separate target map. The core then
 explicitly writes a scalar, binds a reference (including memory reference
