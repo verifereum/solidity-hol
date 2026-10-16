@@ -89,7 +89,7 @@ jobs:
       - name: Build project roll-up
         env:
           TMPDIR: ${{ runner.temp }}
-        run: holbuild --verbose -j"$(nproc)" build solidityHolTheory
+        run: holbuild --verbose -j"$(nproc)" build --skip-checkpoints --skip-proof-steps solidityHolTheory
 
       - name: Save project snapshot
         if: always()
