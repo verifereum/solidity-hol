@@ -228,21 +228,33 @@ Definition is_equality_type_def[simp]:
   (is_equality_type ty ⇔ is_ordered_type ty)
 End
 
-(* The operation's sol_type is the type of every operand; comparisons yield
- * BoolT. The arithmetic mode is irrelevant for comparison and bitwise
- * operators. Shifts and exponentiation, whose right operand may be any
- * unsigned integer type in solc, will need a per-operator operand signature
- * when they join core_operator.
+(* The operation's sol_type is the left operand's type. The signature gives
+ * every operand's type and the result type: comparisons yield BoolT, and the
+ * shift amount and exponent are uint256. The arithmetic mode only matters for
+ * operators that can overflow.
  *)
-Definition scalar_operator_result_def:
-  scalar_operator_result op ty =
+Definition scalar_operator_signature_def:
+  scalar_operator_signature op ty =
     case op of
-      EqualOp => if is_equality_type ty then SOME BoolT else NONE
-    | LessThanOp => if is_ordered_type ty then SOME BoolT else NONE
-    | BitAndOp => if is_bitwise_type ty then SOME ty else NONE
-    | BitOrOp => if is_bitwise_type ty then SOME ty else NONE
-    | BitXorOp => if is_bitwise_type ty then SOME ty else NONE
-    | _ => if is_integer_type ty then SOME ty else NONE
+      AddOp => if is_integer_type ty then SOME ([ty; ty], ty) else NONE
+    | SubtractOp => if is_integer_type ty then SOME ([ty; ty], ty) else NONE
+    | MultiplyOp => if is_integer_type ty then SOME ([ty; ty], ty) else NONE
+    | DivideOp => if is_integer_type ty then SOME ([ty; ty], ty) else NONE
+    | RemainderOp => if is_integer_type ty then SOME ([ty; ty], ty) else NONE
+    | ExponentOp =>
+        if is_integer_type ty then SOME ([ty; UintT 256], ty) else NONE
+    | ShiftLeftOp =>
+        if is_bitwise_type ty then SOME ([ty; UintT 256], ty) else NONE
+    | ShiftRightOp =>
+        if is_bitwise_type ty then SOME ([ty; UintT 256], ty) else NONE
+    | EqualOp => if is_equality_type ty then SOME ([ty; ty], BoolT) else NONE
+    | LessThanOp => if is_ordered_type ty then SOME ([ty; ty], BoolT) else NONE
+    | BitAndOp => if is_bitwise_type ty then SOME ([ty; ty], ty) else NONE
+    | BitOrOp => if is_bitwise_type ty then SOME ([ty; ty], ty) else NONE
+    | BitXorOp => if is_bitwise_type ty then SOME ([ty; ty], ty) else NONE
+    | NegateOp => (case ty of IntT _ => SOME ([ty], ty) | _ => NONE)
+    | BitNotOp => if is_bitwise_type ty then SOME ([ty], ty) else NONE
+    | BoolNotOp => if ty = BoolT then SOME ([ty], ty) else NONE
 End
 
 (* Explicit elementary conversions as solc admits them, including the identity
@@ -294,10 +306,12 @@ End
 Definition wf_core_operation_def:
   (wf_core_operation env ctx annotation
      (ScalarOperation ty mode op args) ⇔
-    core_scalar_type env ty ∧ LENGTH args = 2 ∧
-    EVERY (wf_core_atom env ctx (SingleType ty)) args ∧
-    case scalar_operator_result op ty of
-      SOME result => annotation = SingleType result
+    core_scalar_type env ty ∧
+    case scalar_operator_signature op ty of
+      SOME (operand_tys, result) =>
+        LIST_REL (λoperand_ty a. wf_core_atom env ctx (SingleType operand_ty) a)
+          operand_tys args ∧
+        annotation = SingleType result
     | NONE => F) ∧
   (wf_core_operation env ctx annotation (ConvertOperation ty a) ⇔
     annotation = SingleType ty ∧
