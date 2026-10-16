@@ -36,7 +36,18 @@ Type annotations distinguish ordinary Solidity types from product types for
 intermediate tuples/multiple return values. Tuple construction/projection is
 explicit. `solidityCoreWfScript.sml` checks these annotations for the pure
 fragment; reference operations and external calls are rejected until their
-validation rules exist.
+validation rules exist. The checker fixes conventions that the evaluator and
+elaborator inherit: bindings hold elementary, enum and user-defined value types
+only, with function and contract values deferred; a `ConvertOperation` on a
+constant is the literal/default-initialisation form and checks membership only;
+return bindings are in scope from procedure entry, so the evaluator
+default-initialises them and fall-through returns their current values;
+`RevertStmt` carries a constant `BytesValue` of any length as raw revert data; a
+loop prelude is not a loop body, so `break`/`continue` there are rejected;
+targets are lexically scoped like bindings, so a runtime target map is saved and
+restored per scope or capture overwrites; and every `ScalarOperation` operand
+shares the operation's type, which shifts and exponentiation will relax. Type
+declarations accompany a `core_program` rather than living in it.
 
 Capture statements produce entries in a separate target map. The core then
 explicitly writes a scalar, binds a reference (including memory reference
@@ -74,8 +85,10 @@ copy_contents  : core_environment -> sol_type -> sol_type
                     -> reference -> reference -> source_state -> copy_result
 ```
 
-`core_environment` must supply validated declarations, resolved procedures,
-source types and layout descriptors. Navigation/copy result types must preserve
+`core_environment` supplies validated declarations and resolved procedures;
+binding types travel in the checking context and on runtime bindings, and
+layout descriptors belong to the stage-3 reference/layout environment.
+Navigation/copy result types must preserve
 state and report panic or invalid input distinctly. They are deliberately not
 invented as total-success operations in this checkpoint.
 

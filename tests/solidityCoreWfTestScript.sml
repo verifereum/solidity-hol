@@ -166,10 +166,37 @@ Definition convert_proc_def:
   |>
 End
 
+(* scope(n): a prelude binding used in the loop body; tuple construction and
+ * projection.
+ *)
+Definition scope_proc_def:
+  scope_proc = <|
+    procedure_id := AstId 110;
+    parameters := [(AstId 111, u256)];
+    return_bindings := [(AstId 112, u256)];
+    body := [
+      WhileStmt
+        [DefineStmt (AstId 113) (SingleType BoolT)
+           (ScalarOperation u256 UncheckedArithmetic LessThanOp
+              [BoundAtom (AstId 111); ConstantAtom (IntegerValue 3)])]
+        (BoundAtom (AstId 113))
+        [DefineStmt (AstId 114) (SingleType BoolT)
+           (ScalarOperation BoolT UncheckedArithmetic EqualOp
+              [BoundAtom (AstId 113); ConstantAtom (BoolValue T)]);
+         BreakStmt];
+      DefineStmt (AstId 115) (ProductType [SingleType u256; SingleType BoolT])
+        (TupleOperation [BoundAtom (AstId 111); ConstantAtom (BoolValue F)]);
+      DefineStmt (AstId 116) (SingleType BoolT)
+        (TupleComponentOperation 1 (BoundAtom (AstId 115)));
+      ReturnStmt [BoundAtom (AstId 111)]
+    ]
+  |>
+End
+
 Definition test_program_def:
   test_program = <|
     procedures := [add_proc; count_proc; pair_proc; first_proc; fact_proc;
-                   wrapper_proc; void_proc; convert_proc];
+                   wrapper_proc; void_proc; convert_proc; scope_proc];
     entry_procedure := AstId 6
   |>
 End
@@ -350,6 +377,136 @@ QED
 Theorem undeclared_struct_field_rejected:
   ¬wf_type_declaration test_env
      (StructDeclaration [(AstId 1, StructT (AstId 12345))])
+Proof
+  EVAL_TAC
+QED
+
+Theorem enum_bound_admitted:
+  wf_type_declaration test_env (EnumDeclaration 256)
+Proof
+  EVAL_TAC
+QED
+
+(* Scope exit: prelude and body bindings, and a target captured in a branch,
+ * are gone afterwards.
+ *)
+Theorem prelude_binding_escape_rejected:
+  ¬wf_core_procedure test_env (with_body [
+     WhileStmt [DefineStmt (AstId 82) (SingleType BoolT)
+                  (ConvertOperation BoolT (ConstantAtom (BoolValue F)))]
+       (BoundAtom (AstId 82)) [];
+     IfStmt (BoundAtom (AstId 82)) [] []])
+Proof
+  EVAL_TAC
+QED
+
+Theorem body_binding_escape_rejected:
+  ¬wf_core_procedure test_env (with_body [
+     WhileStmt [] (ConstantAtom (BoolValue F))
+       [DefineStmt (AstId 82) (SingleType u256)
+          (ConvertOperation u256 (ConstantAtom (IntegerValue 1)))];
+     ReturnStmt [BoundAtom (AstId 82)]])
+Proof
+  EVAL_TAC
+QED
+
+Theorem branch_target_escape_rejected:
+  ¬wf_core_procedure test_env (with_body [
+     IfStmt (ConstantAtom (BoolValue T))
+       [CaptureBindingStmt (AstId 82) (AstId 81)] [];
+     WriteScalarStmt (AstId 82) u256 (BoundAtom (AstId 80))])
+Proof
+  EVAL_TAC
+QED
+
+(* Tuples *)
+
+Theorem tuple_index_out_of_range_rejected:
+  ¬wf_core_procedure test_env (with_body [
+     DefineStmt (AstId 82) (ProductType [SingleType u256; SingleType BoolT])
+       (TupleOperation [BoundAtom (AstId 80); ConstantAtom (BoolValue F)]);
+     DefineStmt (AstId 83) (SingleType u256)
+       (TupleComponentOperation 2 (BoundAtom (AstId 82)))])
+Proof
+  EVAL_TAC
+QED
+
+Theorem product_constant_rejected:
+  ¬wf_core_procedure test_env (with_body [
+     DefineStmt (AstId 82) (ProductType [ProductType []; SingleType u256])
+       (TupleOperation [ConstantAtom (IntegerValue 0); BoundAtom (AstId 80)])])
+Proof
+  EVAL_TAC
+QED
+
+Theorem product_capture_rejected:
+  ¬wf_core_procedure test_env (with_body [
+     DefineStmt (AstId 82) (ProductType []) (TupleOperation []);
+     CaptureBindingStmt (AstId 83) (AstId 82)])
+Proof
+  EVAL_TAC
+QED
+
+(* Operator and conversion tables *)
+
+Theorem arithmetic_on_bool_rejected:
+  ¬wf_core_procedure test_env (with_body [
+     DefineStmt (AstId 82) (SingleType BoolT)
+       (ScalarOperation BoolT CheckedArithmetic AddOp
+          [ConstantAtom (BoolValue T); ConstantAtom (BoolValue F)])])
+Proof
+  EVAL_TAC
+QED
+
+Theorem arithmetic_on_address_rejected:
+  ¬wf_core_procedure test_env (with_body [
+     DefineStmt (AstId 82) (SingleType (AddressT NonpayableAddress))
+       (ScalarOperation (AddressT NonpayableAddress) CheckedArithmetic AddOp
+          [ConstantAtom (AddressValue 0w); ConstantAtom (AddressValue 0w)])])
+Proof
+  EVAL_TAC
+QED
+
+Theorem bitwise_on_bool_rejected:
+  ¬wf_core_procedure test_env (with_body [
+     DefineStmt (AstId 82) (SingleType BoolT)
+       (ScalarOperation BoolT UncheckedArithmetic BitAndOp
+          [ConstantAtom (BoolValue T); ConstantAtom (BoolValue F)])])
+Proof
+  EVAL_TAC
+QED
+
+Theorem operand_count_rejected:
+  ¬wf_core_procedure test_env (with_body [
+     DefineStmt (AstId 82) (SingleType u256)
+       (ScalarOperation u256 CheckedArithmetic AddOp [BoundAtom (AstId 80)])])
+Proof
+  EVAL_TAC
+QED
+
+Theorem enum_to_signed_rejected:
+  ¬wf_core_procedure test_env (with_body [
+     DefineStmt (AstId 82) (SingleType (EnumT (AstId 900)))
+       (ConvertOperation (EnumT (AstId 900)) (ConstantAtom (IntegerValue 1)));
+     DefineStmt (AstId 83) (SingleType (IntT 8))
+       (ConvertOperation (IntT 8) (BoundAtom (AstId 82)))])
+Proof
+  EVAL_TAC
+QED
+
+Theorem bytes_width_mismatch_rejected:
+  ¬wf_core_procedure test_env (with_body [
+     DefineStmt (AstId 82) (SingleType (UintT 8))
+       (ConvertOperation (UintT 8) (ConstantAtom (IntegerValue 1)));
+     DefineStmt (AstId 83) (SingleType (FixedBytesT 2))
+       (ConvertOperation (FixedBytesT 2) (BoundAtom (AstId 82)))])
+Proof
+  EVAL_TAC
+QED
+
+Theorem contract_parameter_rejected:
+  ¬wf_core_procedure test_env
+     (with_body [] with parameters := [(AstId 80, ContractT (AstId 1))])
 Proof
   EVAL_TAC
 QED
