@@ -9,6 +9,8 @@ remain authoritative. No importer or source evaluator has been implemented.
 | Theory | Purpose |
 | --- | --- |
 | `syntax/solidityCoreScript.sml` | Candidate ordered core, scalar/reference values, captured targets, procedures and control outcomes |
+| `syntax/solidityCoreWfScript.sml` | Static environment and well-formedness checker for the pure fragment: typed atoms, operations, scoped statements, procedures and programs |
+| `tests/solidityCoreWfTestScript.sml` | Positive and negative well-formedness witnesses |
 | `semantics/solidityStateScript.sml` | Candidate source state, separate gas evidence, observable EVM projection and frame completion |
 | `semantics/solidityEVMCallScript.sml` | Concrete CALL/CREATE boundary experiment reusing pinned Verifereum |
 | `semantics/solidityEVMBoundaryPropsScript.sml` | General well-formedness/transaction preservation and conditional storage preservation |
@@ -32,7 +34,20 @@ witnesses are proved by `cv_eval`, not merely evaluated outside HOL.
 Effects are named by `DefineStmt`; its operands are pure constants or bindings.
 Type annotations distinguish ordinary Solidity types from product types for
 intermediate tuples/multiple return values. Tuple construction/projection is
-explicit. These annotations are not yet checked by a well-formedness predicate.
+explicit. `solidityCoreWfScript.sml` checks these annotations for the pure
+fragment; reference operations and external calls are rejected until their
+validation rules exist. The checker fixes conventions that the evaluator and
+elaborator inherit: bindings hold elementary, enum and user-defined value types
+only, with function and contract values deferred; a `ConvertOperation` on a
+constant is the literal/default-initialisation form and checks membership only;
+return bindings are in scope from procedure entry, so the evaluator
+default-initialises them and fall-through returns their current values;
+`RevertStmt` carries a constant `BytesValue` of any length as raw revert data; a
+loop prelude is not a loop body, so `break`/`continue` there are rejected;
+targets are lexically scoped like bindings, so a runtime target map is saved and
+restored per scope or capture overwrites; and every `ScalarOperation` operand
+shares the operation's type, which shifts and exponentiation will relax. Type
+declarations accompany a `core_program` rather than living in it.
 
 Capture statements produce entries in a separate target map. The core then
 explicitly writes a scalar, binds a reference (including memory reference
@@ -70,8 +85,10 @@ copy_contents  : core_environment -> sol_type -> sol_type
                     -> reference -> reference -> source_state -> copy_result
 ```
 
-`core_environment` must supply validated declarations, resolved procedures,
-source types and layout descriptors. Navigation/copy result types must preserve
+`core_environment` supplies validated declarations and resolved procedures;
+binding types travel in the checking context and on runtime bindings, and
+layout descriptors belong to the stage-3 reference/layout environment.
+Navigation/copy result types must preserve
 state and report panic or invalid input distinctly. They are deliberately not
 invented as total-success operations in this checkpoint.
 
@@ -202,8 +219,9 @@ constitute Solidity constructor/deployment semantics.
 1. Review the candidate representations before extending the core vocabulary.
 2. Resolve concrete context supply and gas evidence against Vyper-HOL #98; do
    not silently choose a synthetic source-frame EVM context or fixed gas policy.
-3. Define core well-formedness and the reference/layout environments; establish
-   copy termination without fuel, including recursive-type restrictions.
+3. Define the reference/layout environments and extend core well-formedness
+   to them; establish copy termination without fuel, including recursive-type
+   restrictions.
 4. Implement the minimal evaluator across loops/internal calls/modifier wrappers
    and prove fuel stability. Only then broaden source feature coverage.
 5. Extend value-transfer/domain-abort coverage and prove the remaining

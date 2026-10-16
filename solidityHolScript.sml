@@ -6,7 +6,8 @@
  *)
 Theory solidityHol
 Ancestors
-  solidityAST solidityCore solidityState solidityEVMCall solidityEVMBoundaryProps
+  solidityAST solidityCore solidityCoreWf solidityState solidityEVMCall
+  solidityEVMBoundaryProps solidityCoreWfTest
   solidityEVMCallTest solidityEVMCreateTest solidityEVMFrameTest
   solidityEVMReentryTest solidityEVMBookkeepingTest
   verifereum

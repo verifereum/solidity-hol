@@ -97,15 +97,17 @@ QED
 Theorem bookkeeping_fixture_well_formed:
   LENGTH child_code ≤ 24576 ⇒ wf_state (bookkeeping_fixture child_code)
 Proof
-  rw[bookkeeping_fixture_def, nested_call_fixture_def, call_fixture_def,
-     call_operands_def, boundary_opcode_def, opcode_def,
-     wf_state_def, wf_context_def, all_accounts_def, wf_accounts_def,
-     wf_account_state_def, stack_room_ok_def, gas_stack_ok_def,
-     outputTo_consistent_stack_def, outputTo_consistent_ctx_def,
-     initial_context_def, initial_msg_params_def, fixture_tx_def,
-     empty_return_destination_def, update_account_def, lookup_account_def,
-     empty_accounts_def, empty_account_state_def, stack_limit_def,
-     context_limit_def, APPLY_UPDATE_THM]
+  strip_tac
+  \\ simp[bookkeeping_fixture_def, nested_call_fixture_def, call_fixture_def,
+          call_operands_def, boundary_opcode_def, opcode_def,
+          initial_context_def, initial_msg_params_def, fixture_tx_def,
+          empty_return_destination_def]
+  \\ rw[wf_state_def, stack_limit_def, context_limit_def]
+  \\ rw[wf_context_def, stack_room_ok_def, gas_stack_ok_def]
+  \\ rw[outputTo_consistent_stack_def, outputTo_consistent_ctx_def]
+  \\ rw[all_accounts_def, wf_accounts_def, wf_account_state_def,
+        update_account_def, lookup_account_def, empty_accounts_def,
+        empty_account_state_def, APPLY_UPDATE_THM]
   \\ rw[]
   \\ Cases_on ‘i’
   \\ fs[unused_gas_def]
