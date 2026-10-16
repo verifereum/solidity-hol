@@ -9,6 +9,8 @@ remain authoritative. No importer or source evaluator has been implemented.
 | Theory | Purpose |
 | --- | --- |
 | `syntax/solidityCoreScript.sml` | Candidate ordered core, scalar/reference values, captured targets, procedures and control outcomes |
+| `syntax/solidityCoreWfScript.sml` | Static environment and well-formedness checker for the pure fragment: typed atoms, operations, scoped statements, procedures and programs |
+| `tests/solidityCoreWfTestScript.sml` | Positive and negative well-formedness witnesses |
 | `semantics/solidityStateScript.sml` | Candidate source state, separate gas evidence, observable EVM projection and frame completion |
 | `semantics/solidityEVMCallScript.sml` | Concrete CALL/CREATE boundary experiment reusing pinned Verifereum |
 | `semantics/solidityEVMBoundaryPropsScript.sml` | General well-formedness/transaction preservation and conditional storage preservation |
@@ -32,7 +34,9 @@ witnesses are proved by `cv_eval`, not merely evaluated outside HOL.
 Effects are named by `DefineStmt`; its operands are pure constants or bindings.
 Type annotations distinguish ordinary Solidity types from product types for
 intermediate tuples/multiple return values. Tuple construction/projection is
-explicit. These annotations are not yet checked by a well-formedness predicate.
+explicit. `solidityCoreWfScript.sml` checks these annotations for the pure
+fragment; reference operations and external calls are rejected until their
+validation rules exist.
 
 Capture statements produce entries in a separate target map. The core then
 explicitly writes a scalar, binds a reference (including memory reference
@@ -202,8 +206,9 @@ constitute Solidity constructor/deployment semantics.
 1. Review the candidate representations before extending the core vocabulary.
 2. Resolve concrete context supply and gas evidence against Vyper-HOL #98; do
    not silently choose a synthetic source-frame EVM context or fixed gas policy.
-3. Define core well-formedness and the reference/layout environments; establish
-   copy termination without fuel, including recursive-type restrictions.
+3. Define the reference/layout environments and extend core well-formedness
+   to them; establish copy termination without fuel, including recursive-type
+   restrictions.
 4. Implement the minimal evaluator across loops/internal calls/modifier wrappers
    and prove fuel stability. Only then broaden source feature coverage.
 5. Extend value-transfer/domain-abort coverage and prove the remaining

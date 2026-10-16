@@ -2,15 +2,19 @@
  *
  * Only the pure fragment is admitted: scalar/convert/tuple/internal-call
  * definitions, local capture and scalar writes, and structured control flow.
- * Reference navigation, reads, copies and external calls are rejected until
- * their validation rules exist (stage 3 onwards).
+ * Bindings hold value types other than function types: elementary types,
+ * enums, user-defined value types and contract types, which are integers and
+ * addresses at runtime. Function values are deferred together with indirect
+ * calls. Reference navigation, reads, copies and external calls are rejected
+ * until their validation rules exist (stage 3 onwards).
  *)
 Theory solidityCoreWf
 Ancestors
   solidityCore alist list option
 
-(* Struct fields are recorded for stage 3; recursive-struct restrictions and
- * layout descriptors are not checked yet.
+(* Type declarations accompany a core_program rather than living inside it;
+ * the elaborator must emit both. Struct fields are recorded for stage 3;
+ * recursive-struct restrictions and layout descriptors are not checked yet.
  *)
 Datatype:
   core_type_declaration
@@ -22,16 +26,14 @@ End
 Datatype:
   core_environment = <|
     procedures : (ast_id # core_procedure) list;
-    type_declarations : (ast_id # core_type_declaration) list;
-    layouts : layout_id list
+    type_declarations : (ast_id # core_type_declaration) list
   |>
 End
 
 Definition core_program_environment_def:
   core_program_environment decls (prog : core_program) = <|
     procedures := MAP (λp. (p.procedure_id, p)) prog.procedures;
-    type_declarations := decls;
-    layouts := []
+    type_declarations := decls
   |>
 End
 
@@ -87,10 +89,16 @@ Termination
   WF_REL_TAC ‘measure (sol_type_size o SND)’
 End
 
-(* Stage 2 bindings, parameters and returns are value types only. *)
+Definition is_function_type_def:
+  (is_function_type (FunctionT _ _ _ _) ⇔ T) ∧
+  (is_function_type _ ⇔ F)
+End
+
+(* Stage 2 bindings, parameters and returns are non-function value types. *)
 Definition core_scalar_type_def:
   core_scalar_type env ty ⇔
-    is_value_type ty ∧ valid_type_shape ty ∧ declared_type_ok env ty
+    is_value_type ty ∧ ¬is_function_type ty ∧ valid_type_shape ty ∧
+    declared_type_ok env ty
 End
 
 (* ProductType is reserved for tuples and multiple returns: never singleton. *)
@@ -103,13 +111,14 @@ Termination
 End
 
 Definition wf_type_declaration_def:
-  (wf_type_declaration (EnumDeclaration members) ⇔
+  (wf_type_declaration env (EnumDeclaration members) ⇔
     0 < members ∧ members ≤ 256) ∧
-  (wf_type_declaration (UserValueDeclaration ty) ⇔
+  (wf_type_declaration env (UserValueDeclaration ty) ⇔
     is_elementary_type ty ∧ valid_type_shape ty) ∧
-  (wf_type_declaration (StructDeclaration fields) ⇔
+  (wf_type_declaration env (StructDeclaration fields) ⇔
     fields ≠ [] ∧ ALL_DISTINCT (MAP FST fields) ∧
-    EVERY (λ(_, ty). valid_type_shape ty ∧ outer_location_free ty) fields)
+    EVERY (λ(_, ty). valid_type_shape ty ∧ outer_location_free ty ∧
+                     declared_type_ok env ty) fields)
 End
 
 (* Values *)
@@ -126,7 +135,7 @@ Definition elementary_scalar_has_type_def:
   (elementary_scalar_has_type _ _ ⇔ F)
 End
 
-(* Function mutability is not yet checked against the target procedure. *)
+(* Function types never reach this relation: core_scalar_type excludes them. *)
 Definition scalar_has_type_def:
   scalar_has_type env ty s ⇔
     case ty of
@@ -140,17 +149,6 @@ Definition scalar_has_type_def:
          | NONE => F)
     | ContractT _ =>
         (case s of AddressValue _ => T | _ => F)
-    | FunctionT InternalFn _ parameters returns =>
-        (case s of
-           InternalFunctionValue f =>
-             (case lookup_procedure env f of
-                SOME p => MAP SND p.parameters = parameters ∧
-                          MAP SND p.return_bindings = returns
-              | NONE => F)
-         | _ => F)
-    | FunctionT ExternalFn _ _ _ =>
-        (case s of ExternalFunctionValue _ selector => LENGTH selector = 4
-                 | _ => F)
     | _ => elementary_scalar_has_type ty s
 End
 
@@ -238,8 +236,12 @@ Definition scalar_operator_result_def:
     | _ => if is_integer_type ty then SOME ty else NONE
 End
 
-(* Explicit elementary conversions, including the identity used for moves and
- * default initialization. Truncation/panic behaviour belongs to evaluation.
+(* Explicit elementary conversions as solc admits them, including the identity
+ * used for moves and default initialization. A payable address converts to
+ * integers and fixed bytes only through a non-payable address. Contract
+ * conversions are provisional: payability and base/derived relations need
+ * contract metadata the environment does not hold yet. Truncation/panic
+ * behaviour belongs to evaluation.
  *)
 Definition elementary_convertible_def:
   elementary_convertible src dst ⇔
@@ -253,14 +255,15 @@ Definition elementary_convertible_def:
     | (UintT m, FixedBytesT n) => m = 8 * n
     | (FixedBytesT m, UintT n) => n = 8 * m
     | (AddressT _, AddressT _) => T
-    | (AddressT _, UintT n) => n = 160
-    | (UintT m, AddressT _) => m = 160
-    | (AddressT _, FixedBytesT n) => n = 20
-    | (FixedBytesT m, AddressT _) => m = 20
+    | (AddressT NonpayableAddress, UintT n) => n = 160
+    | (UintT m, AddressT NonpayableAddress) => m = 160
+    | (AddressT NonpayableAddress, FixedBytesT n) => n = 20
+    | (FixedBytesT m, AddressT NonpayableAddress) => m = 20
     | (ContractT _, AddressT _) => T
     | (AddressT _, ContractT _) => T
     | (EnumT _, UintT _) => T
     | (UintT _, EnumT _) => T
+    | (IntT _, EnumT _) => T
     | _ => F
 End
 
@@ -416,7 +419,7 @@ Definition wf_core_environment_def:
     EVERY (λ(f, p). p.procedure_id = f ∧ wf_core_procedure env p)
       env.procedures ∧
     ALL_DISTINCT (MAP FST env.type_declarations) ∧
-    EVERY (λ(_, decl). wf_type_declaration decl) env.type_declarations
+    EVERY (λ(_, decl). wf_type_declaration env decl) env.type_declarations
 End
 
 Definition wf_core_program_def:
