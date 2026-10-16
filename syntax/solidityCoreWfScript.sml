@@ -64,7 +64,7 @@ End
 
 (* Types *)
 
-Definition is_elementary_type_def:
+Definition is_elementary_type_def[simp]:
   (is_elementary_type BoolT ⇔ T) ∧
   (is_elementary_type (UintT _) ⇔ T) ∧
   (is_elementary_type (IntT _) ⇔ T) ∧
@@ -89,7 +89,7 @@ Termination
   WF_REL_TAC ‘measure (sol_type_size o SND)’
 End
 
-Definition is_function_type_def:
+Definition is_function_type_def[simp]:
   (is_function_type (FunctionT _ _ _ _) ⇔ T) ∧
   (is_function_type _ ⇔ F)
 End
@@ -201,25 +201,31 @@ End
 
 (* Operations *)
 
-Definition is_integer_type_def:
+Definition is_integer_type_def[simp]:
   (is_integer_type (UintT _) ⇔ T) ∧
   (is_integer_type (IntT _) ⇔ T) ∧
   (is_integer_type _ ⇔ F)
 End
 
-Definition is_bitwise_type_def:
-  is_bitwise_type ty ⇔
-    is_integer_type ty ∨ (case ty of FixedBytesT _ => T | _ => F)
+Definition is_bitwise_type_def[simp]:
+  (is_bitwise_type (UintT _) ⇔ T) ∧
+  (is_bitwise_type (IntT _) ⇔ T) ∧
+  (is_bitwise_type (FixedBytesT _) ⇔ T) ∧
+  (is_bitwise_type _ ⇔ F)
 End
 
-Definition is_ordered_type_def:
-  is_ordered_type ty ⇔
-    is_integer_type ty ∨
-    (case ty of AddressT _ => T | FixedBytesT _ => T | EnumT _ => T | _ => F)
+Definition is_ordered_type_def[simp]:
+  (is_ordered_type (UintT _) ⇔ T) ∧
+  (is_ordered_type (IntT _) ⇔ T) ∧
+  (is_ordered_type (AddressT _) ⇔ T) ∧
+  (is_ordered_type (FixedBytesT _) ⇔ T) ∧
+  (is_ordered_type (EnumT _) ⇔ T) ∧
+  (is_ordered_type _ ⇔ F)
 End
 
-Definition is_equality_type_def:
-  is_equality_type ty ⇔ ty = BoolT ∨ is_ordered_type ty
+Definition is_equality_type_def[simp]:
+  (is_equality_type BoolT ⇔ T) ∧
+  (is_equality_type ty ⇔ is_ordered_type ty)
 End
 
 (* The operation's sol_type is the operand type; comparisons yield BoolT.
@@ -279,7 +285,7 @@ Definition core_convertible_def:
      | _ => F)
 End
 
-Definition call_result_type_def:
+Definition call_result_type_def[simp]:
   (call_result_type [] = ProductType []) ∧
   (call_result_type [ty] = SingleType ty) ∧
   (call_result_type tys = ProductType (MAP SingleType tys))

@@ -5,9 +5,7 @@ Ancestors
 Libs
   intLib
 
-Definition u256_def:
-  u256 = UintT 256
-End
+Overload u256 = “UintT 256”
 
 Definition test_decls_def:
   test_decls = [(AstId 900, EnumDeclaration 3);
