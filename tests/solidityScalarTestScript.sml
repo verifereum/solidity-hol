@@ -52,8 +52,27 @@ Proof
   EVAL_TAC
 QED
 
+Theorem uint8_sub_underflow_checked:
+  binop u8 checked SubtractOp 0 1 = ScalarPanic 0x11
+Proof
+  EVAL_TAC
+QED
+
 Theorem uint8_sub_underflow_unchecked:
   binop u8 unchecked SubtractOp 0 1 = ScalarOk (IntegerValue 255)
+Proof
+  EVAL_TAC
+QED
+
+Theorem int8_add_sub_overflow_checked:
+  binop i8 checked AddOp 127 1 = ScalarPanic 0x11 ∧
+  binop i8 checked SubtractOp (-128) 1 = ScalarPanic 0x11
+Proof
+  EVAL_TAC
+QED
+
+Theorem int8_sub_unchecked_wraps_across_sign:
+  binop i8 unchecked SubtractOp (-128) 1 = ScalarOk (IntegerValue 127)
 Proof
   EVAL_TAC
 QED
@@ -159,6 +178,20 @@ Proof
   EVAL_TAC
 QED
 
+Theorem int8_positive_base_boundary:
+  binop i8 checked ExponentOp 2 6 = ScalarOk (IntegerValue 64) ∧
+  binop i8 checked ExponentOp 2 7 = ScalarPanic 0x11
+Proof
+  EVAL_TAC
+QED
+
+(* (-3) ** 5 = -243 ≡ 13 (mod 256) *)
+Theorem int8_signed_base_unchecked_wraps_nonzero:
+  binop i8 unchecked ExponentOp (-3) 5 = ScalarOk (IntegerValue 13)
+Proof
+  EVAL_TAC
+QED
+
 Theorem uint8_pow_boundary:
   binop u8 checked ExponentOp 3 5 = ScalarOk (IntegerValue 243) ∧
   binop u8 checked ExponentOp 3 6 = ScalarPanic 0x11 ∧
@@ -223,6 +256,12 @@ Proof
   EVAL_TAC
 QED
 
+Theorem unsigned_shift_right_is_logical:
+  binop u8 checked ShiftRightOp 255 1 = ScalarOk (IntegerValue 127)
+Proof
+  EVAL_TAC
+QED
+
 Theorem negative_shift_amount_invalid:
   binop u8 checked ShiftLeftOp 1 (-1) = ScalarInvalid
 Proof
@@ -236,6 +275,13 @@ Theorem bytes_shifts:
   eval_scalar_operation scalar_env (FixedBytesT 2) checked ShiftRightOp
     [BytesValue [0x12w; 0x34w]; IntegerValue 4] =
     ScalarOk (BytesValue [0x01w; 0x23w])
+Proof
+  EVAL_TAC
+QED
+
+Theorem bytes_shift_by_width_clears:
+  eval_scalar_operation scalar_env (FixedBytesT 2) checked ShiftLeftOp
+    [BytesValue [1w; 2w]; IntegerValue 16] = ScalarOk (BytesValue [0w; 0w])
 Proof
   EVAL_TAC
 QED
@@ -300,6 +346,16 @@ Proof
   EVAL_TAC
 QED
 
+(* A width the type system never admits is invalid rather than computed at a
+ * width the bitwise helpers do not support.
+ *)
+Theorem invalid_width_invalid:
+  eval_scalar_operation scalar_env (UintT 512) unchecked BitAndOp
+    [IntegerValue (2 ** 300); IntegerValue (2 ** 300)] = ScalarInvalid
+Proof
+  CONV_TAC cv_eval
+QED
+
 (* Conversions *)
 
 Theorem integer_truncation_and_extension:
@@ -312,6 +368,21 @@ Theorem integer_truncation_and_extension:
   convert i8 i256 (IntegerValue (-1)) = ScalarOk (IntegerValue (-1))
 Proof
   EVAL_TAC
+QED
+
+Theorem signed_narrowing_wraps:
+  convert (IntT 16) i8 (IntegerValue 384) = ScalarOk (IntegerValue (-128)) ∧
+  convert (IntT 16) i8 (IntegerValue (-129)) = ScalarOk (IntegerValue 127)
+Proof
+  EVAL_TAC
+QED
+
+(* The translated eval_conversion; convert itself is not translated. *)
+Theorem signed_to_unsigned_translated:
+  eval_conversion scalar_env i8 u8 (IntegerValue (-1)) =
+    ScalarOk (IntegerValue 255)
+Proof
+  CONV_TAC cv_eval
 QED
 
 Theorem fixed_bytes_resize:

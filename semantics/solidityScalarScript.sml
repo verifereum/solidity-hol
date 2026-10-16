@@ -33,12 +33,6 @@ End
 
 (* Integers *)
 
-Definition integer_in_range_def:
-  integer_in_range signed n (i : int) ⇔
-    if signed then -&(2 ** (n - 1)) ≤ i ∧ i < &(2 ** (n - 1))
-    else 0 ≤ i ∧ i < &(2 ** n)
-End
-
 (* Two's complement truncation to n bits. *)
 Definition wrap_integer_def:
   wrap_integer signed n (i : int) =
@@ -97,6 +91,18 @@ Termination
   WF_REL_TAC ‘measure (FST o SND)’ >> rw[] >> irule DIV_LESS >> simp[]
 End
 
+Theorem mod_exp_exp:
+  ∀b e m. 0 < m ⇒ mod_exp b e m = b ** e MOD m
+Proof
+  recInduct mod_exp_ind >> rpt strip_tac >>
+  simp[Once mod_exp_def] >> IF_CASES_TAC >> gvs[] >>
+  Cases_on ‘EVEN e’ >> gvs[]
+  >- (gvs[EVEN_EXISTS] >> once_rewrite_tac[EXP_EXP_MULT] >> simp[])
+  >- (gvs[GSYM ODD_EVEN, ODD_EXISTS] >>
+      ‘SUC (2 * m') DIV 2 = m'’ by simp[ADD1, ADD_DIV_ADD_DIV] >>
+      simp[EXP] >> once_rewrite_tac[EXP_EXP_MULT] >> simp[])
+QED
+
 (* Exponents range over uint256, so x ** e is never built for a large e:
  * bases 0, 1 and -1 have closed forms, any other base overflows n bits once
  * e ≥ n, and unchecked results use square-and-multiply modulo 2 ** n.
@@ -129,7 +135,8 @@ Definition shift_right_def:
 End
 
 (* The binary bitwise operator of op (and, or, xor), at the two word widths
- * used here; monomorphic so that they translate to cv.
+ * used here; monomorphic so that they translate to cv. The xor fall-through
+ * is reached only from the BitAndOp/BitOrOp/BitXorOp branches of the callers.
  *)
 Definition word256_bitwise_def:
   word256_bitwise op (a : 256 word) b =
@@ -303,9 +310,18 @@ Definition eval_scalar_operation_def:
           | (BoolNotOp, [BoolValue b]) => ScalarOk (BoolValue (¬b))
           | _ =>
               (case ty of
-                 UintT n => eval_integer_operation mode F n op args
-               | IntT n => eval_integer_operation mode T n op args
-               | FixedBytesT n => eval_bytes_operation n op args
+                 UintT n =>
+                   if valid_int_width n
+                   then eval_integer_operation mode F n op args
+                   else ScalarInvalid
+               | IntT n =>
+                   if valid_int_width n
+                   then eval_integer_operation mode T n op args
+                   else ScalarInvalid
+               | FixedBytesT n =>
+                   if valid_fixed_bytes_width n
+                   then eval_bytes_operation n op args
+                   else ScalarInvalid
                | _ => ScalarInvalid)
 End
 
@@ -350,6 +366,171 @@ Definition eval_conversion_def:
     then convert_scalar env dst s
     else ScalarInvalid
 End
+
+(* Canonicality: a ScalarOk result has the signature's result type, and a
+ * conversion's result has the target type. This is the "values carry no dirty
+ * bits" invariant the evaluator's typing argument needs from this layer; no
+ * valid_type_shape hypothesis is needed because wrapping lands in range at
+ * every width.
+ *)
+
+Theorem arithmetic_result_in_range:
+  arithmetic_result mode signed n i = ScalarOk v ⇒
+  ∃j. v = IntegerValue j ∧ integer_in_range signed n j
+Proof
+  rw[arithmetic_result_def, integer_result_def, AllCaseEqs()] >>
+  simp[wrap_integer_in_range]
+QED
+
+Theorem integer_result_in_range:
+  integer_result signed n i = ScalarOk v ⇒
+  ∃j. v = IntegerValue j ∧ integer_in_range signed n j
+Proof
+  rw[integer_result_def] >> simp[wrap_integer_in_range]
+QED
+
+Theorem shift_left_in_range:
+  integer_in_range signed n (shift_left signed n x y)
+Proof
+  rw[shift_left_def, wrap_integer_in_range] >> rw[integer_in_range_def]
+QED
+
+Theorem integer_bitwise_in_range:
+  integer_in_range signed n (integer_bitwise op signed n x y)
+Proof
+  rw[integer_bitwise_def, wrap_integer_in_range]
+QED
+
+Theorem eval_integer_operation_in_range:
+  eval_integer_operation mode signed n op args = ScalarOk v ⇒
+  ∃j. v = IntegerValue j ∧ integer_in_range signed n j
+Proof
+  rw[eval_integer_operation_def, AllCaseEqs()] >>
+  gvs[integer_exponent_def, AllCaseEqs()] >>
+  metis_tac[arithmetic_result_in_range, integer_result_in_range,
+            shift_left_in_range, integer_bitwise_in_range]
+QED
+
+Theorem eval_integer_operation_not_comparison:
+  eval_integer_operation mode signed n op args = ScalarOk v ⇒
+  op ≠ EqualOp ∧ op ≠ LessThanOp ∧ op ≠ BoolNotOp
+Proof
+  rw[eval_integer_operation_def, AllCaseEqs()]
+QED
+
+Theorem bytes_bitwise_length:
+  ∀op a b. LENGTH (bytes_bitwise op a b) = MIN (LENGTH a) (LENGTH b)
+Proof
+  ho_match_mp_tac bytes_bitwise_ind >> rw[bytes_bitwise_def, MIN_DEF]
+QED
+
+Theorem bytes_not_length:
+  ∀a. LENGTH (bytes_not a) = LENGTH a
+Proof
+  Induct >> rw[bytes_not_def]
+QED
+
+Theorem num_to_bytes_length:
+  ∀n v. LENGTH (num_to_bytes n v) = n
+Proof
+  Induct >> rw[num_to_bytes_def]
+QED
+
+Theorem resize_bytes_length:
+  LENGTH (resize_bytes n bs) = n
+Proof
+  rw[resize_bytes_def, listTheory.LENGTH_TAKE_EQ]
+QED
+
+Theorem bytes_to_num_bound:
+  bytes_to_num bs < 256 ** LENGTH bs
+Proof
+  ‘∀bs acc. FOLDL (λacc b. acc * 256 + w2n (b : byte)) acc bs <
+            (acc + 1) * 256 ** LENGTH bs’ suffices_by
+    (rw[bytes_to_num_def] >>
+     first_x_assum (qspecl_then [‘bs’, ‘0’] mp_tac) >> simp[]) >>
+  Induct >> rw[EXP] >>
+  first_x_assum (qspec_then ‘acc * 256 + w2n h’ mp_tac) >>
+  ‘w2n h < 256’ by (assume_tac (Q.ISPEC ‘h : byte’ w2n_lt) >> gvs[]) >>
+  simp[] >> strip_tac >>
+  irule LESS_LESS_EQ_TRANS >> goal_assum (drule_at Any) >>
+  ‘256 * ((acc + 1) * 256 ** LENGTH bs) = (256 * (acc + 1)) * 256 ** LENGTH bs’
+    by REWRITE_TAC[MULT_ASSOC] >>
+  pop_assum SUBST1_TAC >> irule LESS_MONO_MULT >> decide_tac
+QED
+
+Theorem eval_bytes_operation_canonical:
+  scalars_have_types env tys args ∧
+  scalar_operator_signature op (FixedBytesT n) = SOME (tys, result) ∧
+  eval_bytes_operation n op args = ScalarOk v ⇒
+  ∃bs. v = BytesValue bs ∧ LENGTH bs = n ∧ result = FixedBytesT n
+Proof
+  rw[eval_bytes_operation_def, AllCaseEqs()] >>
+  gvs[scalar_operator_signature_def, scalars_have_types_def,
+      scalar_has_type_def, elementary_scalar_has_type_def,
+      bytes_bitwise_length, bytes_not_length, num_to_bytes_length]
+QED
+
+Theorem scalar_operator_signature_result:
+  scalar_operator_signature op ty = SOME (tys, result) ⇒
+  result = ty ∨ (result = BoolT ∧ (op = EqualOp ∨ op = LessThanOp))
+Proof
+  Cases_on ‘op’ >> rw[scalar_operator_signature_def, AllCaseEqs()]
+QED
+
+(* The branches of eval_scalar_operation that can succeed. *)
+Theorem eval_scalar_operation_cases:
+  eval_scalar_operation env ty mode op args = ScalarOk v ⇒
+  ∃tys result.
+    scalar_operator_signature op ty = SOME (tys, result) ∧
+    scalars_have_types env tys args ∧
+    ((∃b. v = BoolValue b ∧
+          (op = EqualOp ∨ op = LessThanOp ∨ op = BoolNotOp)) ∨
+     (∃n. ty = UintT n ∧ eval_integer_operation mode F n op args = ScalarOk v) ∨
+     (∃n. ty = IntT n ∧ eval_integer_operation mode T n op args = ScalarOk v) ∨
+     (∃n. ty = FixedBytesT n ∧ eval_bytes_operation n op args = ScalarOk v))
+Proof
+  rw[eval_scalar_operation_def, AllCaseEqs()] >> gvs[]
+QED
+
+Theorem eval_scalar_operation_canonical:
+  scalar_operator_signature op ty = SOME (tys, result) ∧
+  eval_scalar_operation env ty mode op args = ScalarOk v ⇒
+  scalar_has_type env result v
+Proof
+  strip_tac >> drule eval_scalar_operation_cases >> strip_tac >> gvs[] >>
+  TRY (gvs[scalar_operator_signature_def, scalar_has_type_def,
+           elementary_scalar_has_type_def] >> NO_TAC)
+  >- (drule eval_integer_operation_in_range >>
+      drule eval_integer_operation_not_comparison >>
+      drule scalar_operator_signature_result >>
+      rw[] >> gvs[scalar_has_type_def, elementary_scalar_has_type_def])
+  >- (drule eval_integer_operation_in_range >>
+      drule eval_integer_operation_not_comparison >>
+      drule scalar_operator_signature_result >>
+      rw[] >> gvs[scalar_has_type_def, elementary_scalar_has_type_def])
+  >- (drule_all eval_bytes_operation_canonical >>
+      rw[] >> gvs[scalar_has_type_def, elementary_scalar_has_type_def])
+QED
+
+Theorem eval_conversion_canonical:
+  wf_core_environment env ∧ eval_conversion env src dst s = ScalarOk v ⇒
+  scalar_has_type env dst v
+Proof
+  rw[eval_conversion_def] >>
+  gvs[convert_scalar_def, AllCaseEqs()] >>
+  simp[scalar_has_type_def, elementary_scalar_has_type_def,
+       wrap_integer_in_range, resize_bytes_length, num_to_bytes_length] >>
+  Cases_on ‘src’ >>
+  gvs[core_convertible_def, AllCaseEqs()] >>
+  gvs[elementary_convertible_def, AllCaseEqs()] >>
+  gvs[scalar_has_type_def, elementary_scalar_has_type_def, AllCaseEqs()]
+  >- (gvs[integer_in_range_def, AllCasePreds()] >>
+      irule LESS_LESS_EQ_TRANS >> irule_at Any w2n_lt >> simp[])
+  >- simp[integer_in_range_def, EXP_EXP_MULT, bytes_to_num_bound]
+  >- (drule_all wf_core_environment_user_value >> simp[])
+  >- (drule_all wf_core_environment_user_value >> simp[])
+QED
 
 (* cv translation, so the evaluator can run scalar steps under cv_compute. *)
 
