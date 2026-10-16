@@ -10,7 +10,8 @@ Definition u256_def:
 End
 
 Definition test_decls_def:
-  test_decls = [(AstId 900, EnumDeclaration 3)]
+  test_decls = [(AstId 900, EnumDeclaration 3);
+                (AstId 901, UserValueDeclaration (UintT 160))]
 End
 
 (* add(x, y) returns (r): r := x + y (checked). *)
@@ -139,10 +140,38 @@ Definition void_proc_def:
   |>
 End
 
+(* convert(a, p): widening, payable address to integer via address, user
+ * value type wrap and unwrap, signed integer to enum.
+ *)
+Definition convert_proc_def:
+  convert_proc = <|
+    procedure_id := AstId 9;
+    parameters := [(AstId 90, UintT 8); (AstId 91, AddressT PayableAddress)];
+    return_bindings := [(AstId 92, u256)];
+    body := [
+      DefineStmt (AstId 93) (SingleType u256)
+        (ConvertOperation u256 (BoundAtom (AstId 90)));
+      DefineStmt (AstId 94) (SingleType (AddressT NonpayableAddress))
+        (ConvertOperation (AddressT NonpayableAddress) (BoundAtom (AstId 91)));
+      DefineStmt (AstId 95) (SingleType (UintT 160))
+        (ConvertOperation (UintT 160) (BoundAtom (AstId 94)));
+      DefineStmt (AstId 96) (SingleType (UserValueT (AstId 901)))
+        (ConvertOperation (UserValueT (AstId 901)) (BoundAtom (AstId 95)));
+      DefineStmt (AstId 97) (SingleType (UintT 160))
+        (ConvertOperation (UintT 160) (BoundAtom (AstId 96)));
+      DefineStmt (AstId 98) (SingleType (IntT 8))
+        (ConvertOperation (IntT 8) (ConstantAtom (IntegerValue (-1))));
+      DefineStmt (AstId 99) (SingleType (EnumT (AstId 900)))
+        (ConvertOperation (EnumT (AstId 900)) (BoundAtom (AstId 98)));
+      ReturnStmt [BoundAtom (AstId 93)]
+    ]
+  |>
+End
+
 Definition test_program_def:
   test_program = <|
     procedures := [add_proc; count_proc; pair_proc; first_proc; fact_proc;
-                   wrapper_proc; void_proc];
+                   wrapper_proc; void_proc; convert_proc];
     entry_procedure := AstId 6
   |>
 End
@@ -226,9 +255,103 @@ Proof
   EVAL_TAC
 QED
 
+(* Nested in a loop body, so the prelude's in_loop reset is what rejects it. *)
 Theorem break_in_prelude_rejected:
   ¬wf_core_procedure test_env (with_body [
-     WhileStmt [BreakStmt] (ConstantAtom (BoolValue T)) []])
+     WhileStmt [] (ConstantAtom (BoolValue T))
+       [WhileStmt [BreakStmt] (ConstantAtom (BoolValue T)) []]])
+Proof
+  EVAL_TAC
+QED
+
+Theorem mismatched_operand_rejected:
+  ¬wf_core_procedure test_env (with_body [
+     DefineStmt (AstId 82) (SingleType BoolT)
+       (ConvertOperation BoolT (ConstantAtom (BoolValue T)));
+     DefineStmt (AstId 83) (SingleType u256)
+       (ScalarOperation u256 CheckedArithmetic AddOp
+          [BoundAtom (AstId 80); BoundAtom (AstId 82)])])
+Proof
+  EVAL_TAC
+QED
+
+Theorem nonbool_condition_rejected:
+  ¬wf_core_procedure test_env (with_body [IfStmt (BoundAtom (AstId 80)) [] []])
+Proof
+  EVAL_TAC
+QED
+
+Theorem write_type_mismatch_rejected:
+  ¬wf_core_procedure test_env (with_body [
+     CaptureBindingStmt (AstId 82) (AstId 81);
+     WriteScalarStmt (AstId 82) BoolT (ConstantAtom (BoolValue T))])
+Proof
+  EVAL_TAC
+QED
+
+Theorem bool_to_integer_rejected:
+  ¬wf_core_procedure test_env (with_body [
+     DefineStmt (AstId 82) (SingleType BoolT)
+       (ConvertOperation BoolT (ConstantAtom (BoolValue T)));
+     DefineStmt (AstId 83) (SingleType (UintT 8))
+       (ConvertOperation (UintT 8) (BoundAtom (AstId 82)))])
+Proof
+  EVAL_TAC
+QED
+
+Theorem signed_to_wider_unsigned_rejected:
+  ¬wf_core_procedure test_env (with_body [
+     DefineStmt (AstId 82) (SingleType (IntT 8))
+       (ConvertOperation (IntT 8) (ConstantAtom (IntegerValue 1)));
+     DefineStmt (AstId 83) (SingleType (UintT 16))
+       (ConvertOperation (UintT 16) (BoundAtom (AstId 82)))])
+Proof
+  EVAL_TAC
+QED
+
+Theorem signed_to_address_rejected:
+  ¬wf_core_procedure test_env (with_body [
+     DefineStmt (AstId 82) (SingleType (IntT 160))
+       (ConvertOperation (IntT 160) (ConstantAtom (IntegerValue 1)));
+     DefineStmt (AstId 83) (SingleType (AddressT NonpayableAddress))
+       (ConvertOperation (AddressT NonpayableAddress) (BoundAtom (AstId 82)))])
+Proof
+  EVAL_TAC
+QED
+
+Theorem payable_address_to_integer_rejected:
+  ¬wf_core_procedure test_env (with_body [
+     DefineStmt (AstId 82) (SingleType (AddressT PayableAddress))
+       (ConvertOperation (AddressT PayableAddress)
+          (ConstantAtom (AddressValue 0w)));
+     DefineStmt (AstId 83) (SingleType (UintT 160))
+       (ConvertOperation (UintT 160) (BoundAtom (AstId 82)))])
+Proof
+  EVAL_TAC
+QED
+
+Theorem function_parameter_rejected:
+  ¬wf_core_procedure test_env
+     (with_body [] with parameters := [(AstId 80, FunctionT InternalFn PureMut [] [])])
+Proof
+  EVAL_TAC
+QED
+
+Theorem empty_enum_rejected:
+  ¬wf_type_declaration test_env (EnumDeclaration 0)
+Proof
+  EVAL_TAC
+QED
+
+Theorem oversized_enum_rejected:
+  ¬wf_type_declaration test_env (EnumDeclaration 257)
+Proof
+  EVAL_TAC
+QED
+
+Theorem undeclared_struct_field_rejected:
+  ¬wf_type_declaration test_env
+     (StructDeclaration [(AstId 1, StructT (AstId 12345))])
 Proof
   EVAL_TAC
 QED
