@@ -2,11 +2,12 @@
  *
  * Only the pure fragment is admitted: scalar/convert/tuple/internal-call
  * definitions, local capture and scalar writes, and structured control flow.
- * Bindings hold value types other than function types: elementary types,
- * enums, user-defined value types and contract types, which are integers and
- * addresses at runtime. Function values are deferred together with indirect
- * calls. Reference navigation, reads, copies and external calls are rejected
- * until their validation rules exist (stage 3 onwards).
+ * Bindings hold elementary types, enums and user-defined value types, which
+ * are integers and addresses at runtime. Function values are deferred together
+ * with indirect calls; contract types are deferred until contract metadata
+ * (payability, bases) is in the environment. Reference navigation, reads,
+ * copies and external calls are rejected until their validation rules exist
+ * (stage 3 onwards).
  *)
 Theory solidityCoreWf
 Ancestors
@@ -80,6 +81,7 @@ Definition declared_type_ok_def:
   (declared_type_ok env (StructT id) ⇔ IS_SOME (lookup_struct env id)) ∧
   (declared_type_ok env (EnumT id) ⇔ IS_SOME (lookup_enum env id)) ∧
   (declared_type_ok env (UserValueT id) ⇔ IS_SOME (lookup_user_value env id)) ∧
+  (declared_type_ok env (ContractT _) ⇔ F) ∧
   (declared_type_ok env (FunctionT _ _ parameters returns) ⇔
     EVERY (declared_type_ok env) parameters ∧
     EVERY (declared_type_ok env) returns) ∧
@@ -147,8 +149,6 @@ Definition scalar_has_type_def:
         (case lookup_user_value env id of
            SOME underlying => elementary_scalar_has_type underlying s
          | NONE => F)
-    | ContractT _ =>
-        (case s of AddressValue _ => T | _ => F)
     | _ => elementary_scalar_has_type ty s
 End
 
@@ -228,8 +228,11 @@ Definition is_equality_type_def[simp]:
   (is_equality_type ty ⇔ is_ordered_type ty)
 End
 
-(* The operation's sol_type is the operand type; comparisons yield BoolT.
- * The arithmetic mode is irrelevant for comparison and bitwise operators.
+(* The operation's sol_type is the type of every operand; comparisons yield
+ * BoolT. The arithmetic mode is irrelevant for comparison and bitwise
+ * operators. Shifts and exponentiation, whose right operand may be any
+ * unsigned integer type in solc, will need a per-operator operand signature
+ * when they join core_operator.
  *)
 Definition scalar_operator_result_def:
   scalar_operator_result op ty =
@@ -244,10 +247,9 @@ End
 
 (* Explicit elementary conversions as solc admits them, including the identity
  * used for moves and default initialization. A payable address converts to
- * integers and fixed bytes only through a non-payable address. Contract
- * conversions are provisional: payability and base/derived relations need
- * contract metadata the environment does not hold yet. Truncation/panic
- * behaviour belongs to evaluation.
+ * integers and fixed bytes only through a non-payable address. Contract types
+ * are not admitted (declared_type_ok), so their conversions are absent.
+ * Truncation/panic behaviour belongs to evaluation.
  *)
 Definition elementary_convertible_def:
   elementary_convertible src dst ⇔
@@ -265,8 +267,6 @@ Definition elementary_convertible_def:
     | (UintT m, AddressT NonpayableAddress) => m = 160
     | (AddressT NonpayableAddress, FixedBytesT n) => n = 20
     | (FixedBytesT m, AddressT NonpayableAddress) => m = 20
-    | (ContractT _, AddressT _) => T
-    | (AddressT _, ContractT _) => T
     | (EnumT _, UintT _) => T
     | (UintT _, EnumT _) => T
     | (IntT _, EnumT _) => T
@@ -328,16 +328,21 @@ Definition wf_core_operation_def:
   (wf_core_operation env ctx annotation _ ⇔ F)
 End
 
-(* Revert payloads are provisional pre-encoded constants until ABI encoding. *)
+(* Revert payloads are provisional pre-encoded constants until ABI encoding:
+ * the BytesValue is raw revert data of any length, not a bytesN scalar.
+ *)
 Definition provisional_revert_payload_def:
   (provisional_revert_payload (ConstantAtom (BytesValue _)) ⇔ T) ∧
   (provisional_revert_payload _ ⇔ F)
 End
 
-(* Statements: lexical scopes. A block's definitions extend the context for
- * later statements in that block only; prelude definitions are visible in the
- * loop condition and body. Break/continue are only legal in a loop body, and
- * in_loop does not cross procedure boundaries.
+(* Statements: lexical scopes. A block's definitions and captures extend the
+ * context for later statements in that block only; prelude definitions are
+ * visible in the loop condition and body. Targets are therefore scoped like
+ * bindings, and a runtime target map must be saved and restored per scope, or
+ * capture must overwrite. Any single-typed binding may be captured, parameters
+ * and temporaries included. Break/continue are only legal in a loop body (a
+ * prelude is not one), and in_loop does not cross procedure boundaries.
  *)
 Definition check_core_stmts_def:
   (check_core_stmts env ctx [] = SOME ctx) ∧
@@ -410,7 +415,10 @@ Definition procedure_check_context_def:
   |>
 End
 
-(* Fall-through returns the current return bindings. *)
+(* Return bindings are in scope from entry, so the evaluator default-initialises
+ * them and a body may not define them again; fall-through returns their
+ * current values.
+ *)
 Definition wf_core_procedure_def:
   wf_core_procedure env (p : core_procedure) ⇔
     ALL_DISTINCT (MAP FST (p.parameters ++ p.return_bindings)) ∧
