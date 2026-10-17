@@ -59,10 +59,16 @@ Datatype:
   arithmetic_mode = CheckedArithmetic | UncheckedArithmetic
 End
 
+(* Other comparisons are derived: atoms are pure, so a > b is b < a and
+ * a <= b is !(b < a). Shift amounts and exponents are uint256 operands;
+ * elaboration widens a narrower unsigned right operand first.
+ *)
 Datatype:
   core_operator
-  = AddOp | SubtractOp | MultiplyOp | DivideOp | RemainderOp
+  = AddOp | SubtractOp | MultiplyOp | DivideOp | RemainderOp | ExponentOp
+  | ShiftLeftOp | ShiftRightOp
   | EqualOp | LessThanOp | BitAndOp | BitOrOp | BitXorOp
+  | NegateOp | BitNotOp | BoolNotOp
 End
 
 Datatype:

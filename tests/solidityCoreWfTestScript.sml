@@ -484,6 +484,60 @@ Proof
   EVAL_TAC
 QED
 
+Theorem extended_operators_accepted:
+  wf_core_procedure test_env (with_body [
+     DefineStmt (AstId 82) (SingleType u256)
+       (ScalarOperation u256 UncheckedArithmetic ShiftLeftOp
+          [BoundAtom (AstId 80); BoundAtom (AstId 80)]);
+     DefineStmt (AstId 83) (SingleType u256)
+       (ScalarOperation u256 CheckedArithmetic ExponentOp
+          [BoundAtom (AstId 80); ConstantAtom (IntegerValue 2)]);
+     DefineStmt (AstId 84) (SingleType BoolT)
+       (ScalarOperation u256 UncheckedArithmetic LessThanOp
+          [BoundAtom (AstId 82); BoundAtom (AstId 83)]);
+     DefineStmt (AstId 85) (SingleType BoolT)
+       (ScalarOperation BoolT UncheckedArithmetic BoolNotOp
+          [BoundAtom (AstId 84)]);
+     DefineStmt (AstId 86) (SingleType (IntT 256))
+       (ConvertOperation (IntT 256) (ConstantAtom (IntegerValue (-1))));
+     DefineStmt (AstId 87) (SingleType (IntT 256))
+       (ScalarOperation (IntT 256) CheckedArithmetic NegateOp
+          [BoundAtom (AstId 86)]);
+     DefineStmt (AstId 88) (SingleType u256)
+       (ScalarOperation u256 UncheckedArithmetic BitNotOp
+          [BoundAtom (AstId 80)])])
+Proof
+  EVAL_TAC
+QED
+
+Theorem narrow_shift_amount_rejected:
+  ¬wf_core_procedure test_env (with_body [
+     DefineStmt (AstId 82) (SingleType (UintT 8))
+       (ConvertOperation (UintT 8) (ConstantAtom (IntegerValue 1)));
+     DefineStmt (AstId 83) (SingleType u256)
+       (ScalarOperation u256 UncheckedArithmetic ShiftLeftOp
+          [BoundAtom (AstId 80); BoundAtom (AstId 82)])])
+Proof
+  EVAL_TAC
+QED
+
+Theorem negate_unsigned_rejected:
+  ¬wf_core_procedure test_env (with_body [
+     DefineStmt (AstId 82) (SingleType u256)
+       (ScalarOperation u256 CheckedArithmetic NegateOp [BoundAtom (AstId 80)])])
+Proof
+  EVAL_TAC
+QED
+
+Theorem bool_not_on_integer_rejected:
+  ¬wf_core_procedure test_env (with_body [
+     DefineStmt (AstId 82) (SingleType u256)
+       (ScalarOperation u256 UncheckedArithmetic BoolNotOp
+          [BoundAtom (AstId 80)])])
+Proof
+  EVAL_TAC
+QED
+
 Theorem enum_to_signed_rejected:
   ¬wf_core_procedure test_env (with_body [
      DefineStmt (AstId 82) (SingleType (EnumT (AstId 900)))
