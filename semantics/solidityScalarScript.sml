@@ -11,7 +11,7 @@
  *)
 Theory solidityScalar
 Ancestors
-  solidityCoreWf arithmetic integer words
+  solidityCoreWf vfmExecution byte arithmetic integer words
 Libs
   cv_transLib wordsLib intLib
 
@@ -81,37 +81,16 @@ Definition arithmetic_result_def:
          | UncheckedArithmetic => integer_result signed n i
 End
 
-Definition mod_exp_def:
-  mod_exp (b : num) (e : num) (m : num) =
-    if e = 0 then 1 MOD m
-    else
-      let h = mod_exp ((b * b) MOD m) (e DIV 2) m in
-      if EVEN e then h else (b * h) MOD m
-Termination
-  WF_REL_TAC ‘measure (FST o SND)’ >> rw[] >> irule DIV_LESS >> simp[]
-End
-
-Theorem mod_exp_exp:
-  ∀b e m. 0 < m ⇒ mod_exp b e m = b ** e MOD m
-Proof
-  recInduct mod_exp_ind >> rpt strip_tac >>
-  simp[Once mod_exp_def] >> IF_CASES_TAC >> gvs[] >>
-  Cases_on ‘EVEN e’ >> gvs[]
-  >- (gvs[EVEN_EXISTS] >> once_rewrite_tac[EXP_EXP_MULT] >> simp[])
-  >- (gvs[GSYM ODD_EVEN, ODD_EXISTS] >>
-      ‘SUC (2 * m') DIV 2 = m'’ by simp[ADD1, ADD_DIV_ADD_DIV] >>
-      simp[EXP] >> once_rewrite_tac[EXP_EXP_MULT] >> simp[])
-QED
-
 (* Exponents range over uint256, so x ** e is never built for a large e:
  * bases 0, 1 and -1 have closed forms, any other base overflows n bits once
- * e ≥ n, and unchecked results use square-and-multiply modulo 2 ** n.
+ * e ≥ n, and unchecked results use verifereum's square-and-multiply modexp
+ * modulo 2 ** n (modexp_exp gives its meaning).
  *)
 Definition integer_exponent_def:
   integer_exponent mode signed n (x : int) (e : num) =
     case mode of
       UncheckedArithmetic =>
-        integer_result signed n (&mod_exp (Num (x % &(2 ** n))) e (2 ** n))
+        integer_result signed n (&modexp (Num (x % &(2 ** n))) e (2 ** n) 1)
     | CheckedArithmetic =>
         if x = 0 then arithmetic_result mode signed n (if e = 0 then 1 else 0)
         else if x = 1 then arithmetic_result mode signed n 1
@@ -229,14 +208,15 @@ End
 
 (* Fixed bytes *)
 
+(* Big-endian views of byteTheory's little-endian num_of_bytes and
+ * bytes_of_num (both cv-translated in cv_std). *)
 Definition bytes_to_num_def:
-  bytes_to_num (bs : byte list) = FOLDL (λacc b. acc * 256 + w2n b) 0 bs
+  bytes_to_num (bs : byte list) = num_of_bytes (REVERSE bs)
 End
 
 (* Big-endian encoding of v mod 256 ** k in exactly k bytes. *)
 Definition num_to_bytes_def:
-  (num_to_bytes 0 (v : num) = [] : byte list) ∧
-  (num_to_bytes (SUC k) v = num_to_bytes k (v DIV 256) ++ [n2w (v MOD 256)])
+  num_to_bytes k (v : num) = REVERSE (bytes_of_num k v)
 End
 
 (* bytesM to bytesN truncates or pads with zeros on the right. *)
@@ -431,9 +411,9 @@ Proof
 QED
 
 Theorem num_to_bytes_length:
-  ∀n v. LENGTH (num_to_bytes n v) = n
+  LENGTH (num_to_bytes n v) = n
 Proof
-  Induct >> rw[num_to_bytes_def]
+  rw[num_to_bytes_def]
 QED
 
 Theorem resize_bytes_length:
@@ -442,21 +422,19 @@ Proof
   rw[resize_bytes_def, listTheory.LENGTH_TAKE_EQ]
 QED
 
+Theorem num_of_bytes_bound:
+  ∀bs. num_of_bytes bs < 256 ** LENGTH bs
+Proof
+  Induct >> rw[num_of_bytes_def, EXP] >>
+  ‘w2n h < 256’ by (assume_tac (Q.ISPEC ‘h : byte’ w2n_lt) >> gvs[]) >>
+  decide_tac
+QED
+
 Theorem bytes_to_num_bound:
   bytes_to_num bs < 256 ** LENGTH bs
 Proof
-  ‘∀bs acc. FOLDL (λacc b. acc * 256 + w2n (b : byte)) acc bs <
-            (acc + 1) * 256 ** LENGTH bs’ suffices_by
-    (rw[bytes_to_num_def] >>
-     first_x_assum (qspecl_then [‘bs’, ‘0’] mp_tac) >> simp[]) >>
-  Induct >> rw[EXP] >>
-  first_x_assum (qspec_then ‘acc * 256 + w2n h’ mp_tac) >>
-  ‘w2n h < 256’ by (assume_tac (Q.ISPEC ‘h : byte’ w2n_lt) >> gvs[]) >>
-  simp[] >> strip_tac >>
-  irule LESS_LESS_EQ_TRANS >> goal_assum (drule_at Any) >>
-  ‘256 * ((acc + 1) * 256 ** LENGTH bs) = (256 * (acc + 1)) * 256 ** LENGTH bs’
-    by REWRITE_TAC[MULT_ASSOC] >>
-  pop_assum SUBST1_TAC >> irule LESS_MONO_MULT >> decide_tac
+  rw[bytes_to_num_def] >>
+  qspec_then ‘REVERSE bs’ mp_tac num_of_bytes_bound >> simp[]
 QED
 
 Theorem eval_bytes_operation_canonical:
