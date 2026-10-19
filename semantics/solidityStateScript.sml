@@ -13,11 +13,13 @@ Datatype:
   |>
 End
 
+(* Any single-typed binding may be captured and written (the checker's
+ * convention), so a binding records no assignability.
+ *)
 Datatype:
   source_binding = <|
     binding_type : core_value_type;
-    binding_value : runtime_value;
-    binding_assignable : bool
+    binding_value : runtime_value
   |>
 End
 
@@ -43,6 +45,10 @@ Datatype:
   |>
 End
 
+(* Scopes, heap and targets are num-keyed finite maps (scopes and targets keyed
+ * by the ast_id's number), which cv encodes as sptrees. Scopes are innermost
+ * first.
+ *)
 Datatype:
   source_state = <|
     world : source_world;
