@@ -50,6 +50,8 @@ jobs:
       - name: Configure holbuild cache
         run: echo "HOLBUILD_CACHE=$HOME/.cache/holbuild" >> "$GITHUB_ENV"
 
+      # Add SOLIDITY_PIN to the hashed inputs once the build reads it (today
+      # only docs, a comment and tools/export_solc_artifacts.py do).
       - name: Compute cache keys
         id: cache-key
         run: |
@@ -70,11 +72,24 @@ jobs:
             ${{ steps.cache-key.outputs.build-prefix }}-
 
       - name: Restore toolchain cache
+        id: cache-toolchain
         if: steps.cache-project.outputs.cache-matched-key == ''
         uses: actions/cache/restore@v6
         with:
           path: ~/.cache/holbuild
           key: ${{ steps.cache-key.outputs.toolchain-key }}
+
+      - name: Report restored caches
+        env:
+          PROJECT_CACHE_HIT: ${{ steps.cache-project.outputs.cache-hit }}
+          PROJECT_CACHE_KEY: ${{ steps.cache-project.outputs.cache-matched-key }}
+          TOOLCHAIN_CACHE_HIT: ${{ steps.cache-toolchain.outputs.cache-hit }}
+          TOOLCHAIN_CACHE_KEY: ${{ steps.cache-toolchain.outputs.cache-matched-key }}
+        run: |
+          echo "project cache hit: ${PROJECT_CACHE_HIT:-false}"
+          echo "project cache key: ${PROJECT_CACHE_KEY:-<none>}"
+          echo "toolchain cache hit: ${TOOLCHAIN_CACHE_HIT:-false}"
+          echo "toolchain cache key: ${TOOLCHAIN_CACHE_KEY:-<none>}"
 
       - name: Build HOL toolchain
         run: holbuild buildhol
@@ -98,3 +113,11 @@ jobs:
         with:
           path: ~/.cache/holbuild
           key: ${{ steps.cache-key.outputs.snapshot-key }}
+
+      - name: Verify no checkpoints remain
+        run: |
+          if find .holbuild/checkpoints \( -name '*.save' -o -name '*.save.ok' \) 2>/dev/null | grep -q .; then
+            echo "checkpoint files remained after holbuild run" >&2
+            find .holbuild/checkpoints \( -name '*.save' -o -name '*.save.ok' \) 2>/dev/null | head -50 >&2
+            exit 1
+          fi
