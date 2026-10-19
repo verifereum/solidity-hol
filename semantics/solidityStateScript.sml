@@ -13,11 +13,13 @@ Datatype:
   |>
 End
 
+(* Any single-typed binding may be captured and written (the checker's
+ * convention), so a binding records no assignability.
+ *)
 Datatype:
   source_binding = <|
     binding_type : core_value_type;
-    binding_value : runtime_value;
-    binding_assignable : bool
+    binding_value : runtime_value
   |>
 End
 
@@ -28,7 +30,7 @@ Datatype:
   heap_object = <|
     object_type : sol_type;
     object_length : num;
-    object_cells : num |-> runtime_value
+    object_cells : (num # runtime_value) list
   |>
 End
 
@@ -43,14 +45,18 @@ Datatype:
   |>
 End
 
+(* Association lists rather than num-keyed finite maps, so that states translate
+ * to cv. Scopes are innermost first; the heap may move to an sptree once it is
+ * used.
+ *)
 Datatype:
   source_state = <|
     world : source_world;
     frame : source_frame;
-    scopes : (num |-> source_binding) list;
-    heap : num |-> heap_object;
+    scopes : ((ast_id # source_binding) list) list;
+    heap : (num # heap_object) list;
     next_heap_id : num;
-    targets : num |-> captured_target
+    targets : (ast_id # captured_target) list
   |>
 End
 
