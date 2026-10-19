@@ -444,3 +444,40 @@ Theorem unsupported_conversions_invalid:
 Proof
   EVAL_TAC
 QED
+
+(* Implicit conversions (Types.cpp isImplicitlyConvertibleTo at the pin) *)
+
+Theorem implicit_conversions_admitted:
+  implicitly_convertible u8 u16 ∧
+  implicitly_convertible i8 i256 ∧
+  implicitly_convertible (FixedBytesT 1) (FixedBytesT 2) ∧
+  implicitly_convertible (AddressT PayableAddress)
+    (AddressT NonpayableAddress) ∧
+  implicitly_convertible (EnumT (AstId 900)) (EnumT (AstId 900)) ∧
+  implicitly_convertible BoolT BoolT
+Proof
+  EVAL_TAC
+QED
+
+Theorem implicit_conversions_rejected:
+  ¬implicitly_convertible u8 (IntT 16) ∧
+  ¬implicitly_convertible u16 u8 ∧
+  ¬implicitly_convertible i8 u256 ∧
+  ¬implicitly_convertible (FixedBytesT 2) (FixedBytesT 1) ∧
+  ¬implicitly_convertible (AddressT NonpayableAddress)
+    (AddressT PayableAddress) ∧
+  ¬implicitly_convertible (EnumT (AstId 900)) u8 ∧
+  ¬implicitly_convertible (UintT 64) (UserValueT (AstId 901)) ∧
+  ¬implicitly_convertible (UintT 160) (AddressT NonpayableAddress)
+Proof
+  EVAL_TAC
+QED
+
+Theorem implicit_conversions_lossless:
+  convert u8 u16 (IntegerValue 200) = ScalarOk (IntegerValue 200) ∧
+  convert i8 i256 (IntegerValue (-128)) = ScalarOk (IntegerValue (-128)) ∧
+  convert (FixedBytesT 1) (FixedBytesT 2) (BytesValue [0xABw]) =
+    ScalarOk (BytesValue [0xABw; 0w])
+Proof
+  EVAL_TAC
+QED

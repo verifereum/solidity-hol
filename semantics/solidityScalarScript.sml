@@ -510,6 +510,250 @@ Proof
   >- (drule_all wf_core_environment_user_value >> simp[])
 QED
 
+(* Progress: operations the checker admits never return ScalarInvalid on
+ * well-typed operands, and admitted conversions never do on a well-typed
+ * source value. Together with canonicality this is what the evaluator's
+ * progress argument needs from this layer.
+ *)
+
+Theorem scalars_have_types_LIST_REL:
+  ∀tys args.
+    scalars_have_types env tys args ⇔ LIST_REL (scalar_has_type env) tys args
+Proof
+  Induct >> Cases_on ‘args’ >> rw[scalars_have_types_def]
+QED
+
+Theorem scalar_has_type_cases:
+  (scalar_has_type env (UintT n) v ⇔
+     ∃i. v = IntegerValue i ∧ integer_in_range F n i) ∧
+  (scalar_has_type env (IntT n) v ⇔
+     ∃i. v = IntegerValue i ∧ integer_in_range T n i) ∧
+  (scalar_has_type env BoolT v ⇔ ∃b. v = BoolValue b) ∧
+  (scalar_has_type env (AddressT p) v ⇔ ∃a. v = AddressValue a) ∧
+  (scalar_has_type env (FixedBytesT n) v ⇔
+     ∃bs. v = BytesValue bs ∧ LENGTH bs = n) ∧
+  (scalar_has_type env (EnumT id) v ⇔
+     ∃i k. v = IntegerValue i ∧ lookup_enum env id = SOME k ∧
+           0 ≤ i ∧ i < &k) ∧
+  (scalar_has_type env (UserValueT id) v ⇔
+     ∃u. lookup_user_value env id = SOME u ∧ elementary_scalar_has_type u v)
+Proof
+  Cases_on ‘v’ >> Cases_on ‘lookup_enum env id’ >>
+  Cases_on ‘lookup_user_value env id’ >>
+  rw[scalar_has_type_def, elementary_scalar_has_type_def]
+QED
+
+Theorem arithmetic_result_not_invalid:
+  arithmetic_result mode signed n i ≠ ScalarInvalid
+Proof
+  Cases_on ‘mode’ >> rw[arithmetic_result_def, integer_result_def]
+QED
+
+Theorem integer_exponent_not_invalid:
+  integer_exponent mode signed n x e ≠ ScalarInvalid
+Proof
+  Cases_on ‘mode’ >>
+  rw[integer_exponent_def, arithmetic_result_not_invalid, integer_result_def]
+QED
+
+Theorem eval_scalar_operation_progress:
+  core_scalar_type env ty ∧
+  scalar_operator_signature op ty = SOME (tys, result) ∧
+  scalars_have_types env tys args ⇒
+  eval_scalar_operation env ty mode op args ≠ ScalarInvalid
+Proof
+  rw[scalars_have_types_LIST_REL] >>
+  Cases_on ‘ty’ >> Cases_on ‘op’ >>
+  gvs[scalar_operator_signature_def] >>
+  gvs[listTheory.LIST_REL_CONS1, core_scalar_type_def,
+      solidityASTTheory.valid_type_shape_def, scalar_has_type_cases] >>
+  rw[eval_scalar_operation_def, scalar_operator_signature_def,
+     scalars_have_types_def, scalar_has_type_cases, scalar_order_key_def,
+     eval_integer_operation_def, eval_bytes_operation_def,
+     arithmetic_result_not_invalid, integer_exponent_not_invalid,
+     integer_result_def]
+QED
+
+Theorem eval_conversion_progress:
+  core_scalar_type env dst ∧ core_convertible env src dst ∧
+  scalar_has_type env src v ⇒
+  eval_conversion env src dst v ≠ ScalarInvalid
+Proof
+  rw[eval_conversion_def, core_scalar_type_def] >>
+  Cases_on ‘dst’ >>
+  gvs[solidityASTTheory.is_value_type_def, declared_type_ok_def,
+      optionTheory.IS_SOME_EXISTS] >>
+  TRY (Cases_on ‘src’) >>
+  gvs[core_convertible_def, elementary_convertible_def, AllCaseEqs()] >>
+  TRY (Cases_on ‘v’) >>
+  gvs[scalar_has_type_cases, convert_scalar_def,
+      elementary_scalar_has_type_def, AllCaseEqs()]
+QED
+
+(* The fast paths agree with the plain definitions: integer_exponent with
+ * arithmetic on x ** e, and the capped shifts with x * 2 ** y truncated and
+ * x / 2 ** y.
+ *)
+
+Theorem power_congruence[local]:
+  ∀e. ∃q. (k * &M + &u) ** e = q * &M + &(u ** e) : int
+Proof
+  Induct >- (qexists_tac ‘0’ >> simp[int_exp]) >>
+  pop_assum strip_assume_tac >>
+  qexists_tac ‘k * q * &M + k * &(u ** e) + &u * q’ >>
+  ONCE_REWRITE_TAC [int_exp, EXP] >>
+  qpat_x_assum ‘_ = _’ (fn th => ONCE_REWRITE_TAC [th]) >>
+  ONCE_REWRITE_TAC [GSYM INT_MUL] >>
+  intLib.INT_RING_TAC
+QED
+
+Theorem wrap_integer_mod_cong:
+  i % &(2 ** n) = j % &(2 ** n) ⇒
+  wrap_integer signed n i = wrap_integer signed n j
+Proof
+  rw[wrap_integer_def]
+QED
+
+Theorem wrap_integer_modexp:
+  wrap_integer signed n (&modexp (Num (x % &(2 ** n))) e (2 ** n) 1) =
+  wrap_integer signed n (x ** e)
+Proof
+  irule wrap_integer_mod_cong >>
+  qabbrev_tac ‘M = (2 : num) ** n’ >>
+  ‘0 < M’ by simp[Abbr ‘M’] >>
+  ‘(&M : int) ≠ 0’ by simp[] >>
+  ‘0 ≤ x % &M’
+    by (mp_tac (Q.SPECL [‘x’, ‘&M’] INT_MOD_BOUNDS) >> simp[]) >>
+  qabbrev_tac ‘u = Num (x % &M)’ >>
+  ‘x % &M = &u’ by simp[Abbr ‘u’, INT_OF_NUM] >>
+  ‘x ** e = (x / &M * &M + &u) ** e’ by metis_tac[INT_DIVISION] >>
+  qspec_then ‘e’ strip_assume_tac
+    (Q.INST [‘k’ |-> ‘x / &M’] power_congruence) >>
+  simp[modexp_exp, INT_MOD_ADD_MULTIPLES, INT_MOD]
+QED
+
+Theorem large_power_out_of_range:
+  0 < n ∧ n ≤ e ∧ x ≠ 0 ∧ x ≠ 1 ∧ x ≠ -1 ⇒
+  ¬integer_in_range signed n (x ** e)
+Proof
+  strip_tac >>
+  ‘∃k. 2 ≤ k ∧ (x = &k ∨ x = -&k)’
+    by (strip_assume_tac (Q.SPEC ‘x’ INT_NUM_CASES) >> gvs[] >>
+        qexists_tac ‘n'’ >> simp[] >> CCONTR_TAC >> gvs[] >>
+        ‘n' = 1’ by decide_tac >> gvs[]) >>
+  ‘2 ** n ≤ k ** e’
+    by (irule LESS_EQ_TRANS >> qexists_tac ‘2 ** e’ >>
+        simp[EXP_BASE_LE_MONO, EXP_EXP_LE_MONO]) >>
+  ‘x ** e = &(k ** e) ∨ x ** e = -&(k ** e)’
+    by (gvs[INT_EXP] >> Cases_on ‘EVEN e’ >>
+        gvs[INT_EXP_NEG, GSYM ODD_EVEN]) >>
+  ‘(2 : num) ** n = 2 * 2 ** (n - 1)’ by (Cases_on ‘n’ >> gvs[EXP]) >>
+  qabbrev_tac ‘H = (2 : num) ** (n - 1)’ >>
+  qabbrev_tac ‘P = k ** e’ >>
+  gvs[integer_in_range_def] >> rw[] >> intLib.ARITH_TAC
+QED
+
+Theorem integer_exponent_spec:
+  0 < n ⇒
+  integer_exponent mode signed n x e = arithmetic_result mode signed n (x ** e)
+Proof
+  strip_tac >> Cases_on ‘mode’ >> rw[integer_exponent_def]
+  >- (Cases_on ‘e’ >> gvs[EXP])
+  >- gvs[INT_EXP_NEG]
+  >- gvs[INT_EXP_NEG, GSYM ODD_EVEN]
+  >- (‘¬integer_in_range signed n (x ** e)’
+        by (irule large_power_out_of_range >> simp[]) >>
+      simp[arithmetic_result_def]) >>
+  simp[arithmetic_result_def, integer_result_def, wrap_integer_modexp] >>
+  rw[wrap_integer_id]
+QED
+
+Theorem shift_left_spec:
+  shift_left signed n x y = wrap_integer signed n (x * &(2 ** y))
+Proof
+  rw[shift_left_def] >>
+  ‘&(2 ** y) = &(2 ** (y - n)) * &(2 ** n) : int’
+    by simp[INT_MUL, GSYM EXP_ADD] >>
+  ‘(x * &(2 ** y)) % &(2 ** n) = 0’
+    by (pop_assum SUBST1_TAC >> REWRITE_TAC [INT_MUL_ASSOC] >>
+        irule INT_MOD_COMMON_FACTOR >> simp[]) >>
+  rw[wrap_integer_def]
+QED
+
+Theorem shift_right_spec:
+  0 < n ∧ integer_in_range signed n x ⇒ shift_right n x y = x / &(2 ** y)
+Proof
+  rw[shift_right_def] >>
+  ‘(2 : num) ** n ≤ 2 ** y’ by simp[EXP_BASE_LE_MONO] >>
+  ‘(2 : num) ** n = 2 * 2 ** (n - 1)’ by (Cases_on ‘n’ >> gvs[EXP]) >>
+  qabbrev_tac ‘H = (2 : num) ** (n - 1)’ >>
+  qabbrev_tac ‘Y = (2 : num) ** y’ >>
+  ‘0 < Y’ by simp[Abbr ‘Y’] >>
+  gvs[integer_in_range_def] >>
+  irule INT_DIV_UNIQUE >> Cases_on ‘signed’ >> gvs[] >>
+  TRY (qexists_tac ‘x + &Y’ >> intLib.ARITH_TAC >> NO_TAC) >>
+  intLib.ARITH_TAC
+QED
+
+(* Implicit conversions never panic: integers keep their value and fixed
+ * bytes are padded with zeros on the right.
+ *)
+
+Theorem integer_in_range_mono:
+  0 < m ∧ m ≤ n ∧ integer_in_range signed m i ⇒ integer_in_range signed n i
+Proof
+  strip_tac >>
+  ‘(2 : num) ** m ≤ 2 ** n ∧ 2 ** (m - 1) ≤ 2 ** (n - 1)’
+    by simp[EXP_BASE_LE_MONO] >>
+  qabbrev_tac ‘A = (2 : num) ** m’ >> qabbrev_tac ‘B = (2 : num) ** n’ >>
+  qabbrev_tac ‘C = (2 : num) ** (m - 1)’ >>
+  qabbrev_tac ‘D = (2 : num) ** (n - 1)’ >>
+  gvs[integer_in_range_def] >> rw[] >> gvs[] >> intLib.ARITH_TAC
+QED
+
+Theorem implicit_integer_conversion_id:
+  implicitly_convertible src dst ∧ is_integer_type src ∧
+  valid_type_shape src ∧ scalar_has_type env src v ⇒
+  eval_conversion env src dst v = ScalarOk v
+Proof
+  strip_tac >>
+  ‘core_convertible env src dst’
+    by metis_tac[implicitly_convertible_explicit] >>
+  Cases_on ‘src’ >> Cases_on ‘dst’ >>
+  gvs[implicitly_convertible_def, solidityASTTheory.valid_type_shape_def,
+      solidityASTTheory.valid_int_width_def, scalar_has_type_cases] >>
+  rw[eval_conversion_def, scalar_has_type_cases, convert_scalar_def] >>
+  irule wrap_integer_id >> simp[] >>
+  irule integer_in_range_mono >> first_assum (irule_at Any) >> simp[]
+QED
+
+Theorem implicit_bytes_conversion_pads:
+  m ≤ n ∧ LENGTH bs = m ⇒
+  eval_conversion env (FixedBytesT m) (FixedBytesT n) (BytesValue bs) =
+  ScalarOk (BytesValue (bs ++ REPLICATE (n - m) 0w))
+Proof
+  rw[eval_conversion_def, core_convertible_def, elementary_convertible_def,
+     scalar_has_type_cases, convert_scalar_def, resize_bytes_def,
+     listTheory.TAKE_LENGTH_TOO_LONG]
+QED
+
+Theorem implicit_conversion_succeeds:
+  implicitly_convertible src dst ∧ scalar_has_type env src v ⇒
+  ∃w. eval_conversion env src dst v = ScalarOk w
+Proof
+  strip_tac >>
+  ‘core_convertible env src dst’
+    by metis_tac[implicitly_convertible_explicit] >>
+  simp[eval_conversion_def] >>
+  qpat_x_assum ‘implicitly_convertible _ _’ mp_tac >>
+  rw[implicitly_convertible_def]
+  >- (Cases_on ‘dst’ >>
+      gvs[scalar_has_type_cases, scalar_has_type_def,
+          elementary_scalar_has_type_def, convert_scalar_def]) >>
+  Cases_on ‘src’ >> Cases_on ‘dst’ >>
+  gvs[AllCaseEqs(), scalar_has_type_cases, convert_scalar_def]
+QED
+
 (* cv translation, so the evaluator can run scalar steps under cv_compute. *)
 
 val wrap_integer_pre_def = cv_auto_trans_pre "wrap_integer_pre" wrap_integer_def;
