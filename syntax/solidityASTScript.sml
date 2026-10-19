@@ -103,6 +103,8 @@ Definition valid_mapping_key_def:
   (valid_mapping_key (EnumT _) ⇔ T) ∧
   (valid_mapping_key (ContractT _) ⇔ T) ∧
   (valid_mapping_key (UserValueT _) ⇔ T) ∧
+  (valid_mapping_key BytesT ⇔ T) ∧
+  (valid_mapping_key StringT ⇔ T) ∧
   (valid_mapping_key _ ⇔ F)
 End
 
@@ -186,6 +188,33 @@ QED
 Theorem invalid_located_array_element:
   ¬valid_type_shape
     (ArrayT (LocatedT MemoryLoc (ArrayT (UintT 256) NONE)) NONE)
+Proof
+  EVAL_TAC
+QED
+
+Theorem valid_string_key_mapping:
+  valid_type_shape (MappingT StringT (UintT 256)) ∧
+  valid_type_shape (LocatedT StorageLoc (MappingT StringT (UintT 256)))
+Proof
+  EVAL_TAC
+QED
+
+Theorem valid_bytes_key_mapping:
+  valid_type_shape (MappingT BytesT (UintT 256)) ∧
+  valid_type_shape (LocatedT StorageLoc (MappingT BytesT (UintT 256)))
+Proof
+  EVAL_TAC
+QED
+
+Theorem invalid_array_key_mapping:
+  ¬valid_type_shape (MappingT (ArrayT (UintT 256) NONE) (UintT 256))
+Proof
+  EVAL_TAC
+QED
+
+Theorem invalid_mapping_key_mapping:
+  ¬valid_type_shape
+    (MappingT (MappingT (UintT 256) (UintT 256)) (UintT 256))
 Proof
   EVAL_TAC
 QED
