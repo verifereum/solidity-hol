@@ -74,6 +74,28 @@ Definition is_elementary_type_def[simp]:
   (is_elementary_type _ ⇔ F)
 End
 
+(* Whether a mapping is reachable through array elements and struct fields.
+ * The fuel bounds the struct nesting depth: a reachable mapping is reachable
+ * without revisiting a struct, so the number of declarations suffices and
+ * recursive structs terminate.
+ *)
+Definition mapping_reachable_def:
+  (mapping_reachable env (n : num) (MappingT _ _) ⇔ T) ∧
+  (mapping_reachable env n (ArrayT ty _) ⇔ mapping_reachable env n ty) ∧
+  (mapping_reachable env n (StructT id) ⇔
+    if n = 0 then F else
+    case lookup_struct env id of
+      SOME fields => EXISTS (mapping_reachable env (n - 1)) (MAP SND fields)
+    | NONE => F) ∧
+  (mapping_reachable env n _ ⇔ F)
+Termination
+  WF_REL_TAC ‘inv_image ($< LEX $<) (λ(env, n, ty). (n, sol_type_size ty))’
+End
+
+(* Environment-aware type validation: declared ids resolve, and memory and
+ * calldata types reach no mapping, including through struct fields.
+ * valid_type_shape checks only the type's own structure.
+ *)
 Definition declared_type_ok_def:
   (declared_type_ok env (ArrayT ty _) ⇔ declared_type_ok env ty) ∧
   (declared_type_ok env (MappingT key value) ⇔
@@ -85,7 +107,10 @@ Definition declared_type_ok_def:
   (declared_type_ok env (FunctionT _ _ parameters returns) ⇔
     EVERY (declared_type_ok env) parameters ∧
     EVERY (declared_type_ok env) returns) ∧
-  (declared_type_ok env (LocatedT _ ty) ⇔ declared_type_ok env ty) ∧
+  (declared_type_ok env (LocatedT loc ty) ⇔
+    declared_type_ok env ty ∧
+    (loc ≠ StorageLoc ⇒
+     ¬mapping_reachable env (LENGTH env.type_declarations) ty)) ∧
   (declared_type_ok env _ ⇔ T)
 Termination
   WF_REL_TAC ‘measure (sol_type_size o SND)’

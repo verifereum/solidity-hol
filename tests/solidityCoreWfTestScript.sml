@@ -387,6 +387,55 @@ Proof
   EVAL_TAC
 QED
 
+(* Reference locations: struct 910 holds a mapping, 911 reaches it through an
+ * array, 912 holds none, and 913 is recursive through a dynamic array.
+ *)
+Definition struct_env_def:
+  struct_env = core_program_environment
+    [(AstId 910, StructDeclaration [(AstId 1, MappingT u256 u256)]);
+     (AstId 911,
+      StructDeclaration [(AstId 1, ArrayT (StructT (AstId 910)) NONE)]);
+     (AstId 912, StructDeclaration [(AstId 1, u256)]);
+     (AstId 913,
+      StructDeclaration [(AstId 1, u256);
+                         (AstId 2, ArrayT (StructT (AstId 913)) NONE)])]
+    test_program
+End
+
+Theorem memory_struct_mapping_rejected:
+  ¬declared_type_ok struct_env (LocatedT MemoryLoc (StructT (AstId 910)))
+Proof
+  EVAL_TAC
+QED
+
+Theorem calldata_nested_struct_mapping_rejected:
+  ¬declared_type_ok struct_env
+     (LocatedT CalldataLoc (ArrayT (StructT (AstId 911)) NONE))
+Proof
+  EVAL_TAC
+QED
+
+Theorem memory_struct_parameter_mapping_rejected:
+  ¬declared_type_ok struct_env
+     (FunctionT InternalFn PureMut
+        [LocatedT MemoryLoc (StructT (AstId 910))] [])
+Proof
+  EVAL_TAC
+QED
+
+Theorem storage_struct_mapping_admitted:
+  declared_type_ok struct_env (LocatedT StorageLoc (StructT (AstId 911)))
+Proof
+  EVAL_TAC
+QED
+
+Theorem memory_struct_admitted:
+  declared_type_ok struct_env (LocatedT MemoryLoc (StructT (AstId 912))) ∧
+  declared_type_ok struct_env (LocatedT CalldataLoc (StructT (AstId 913)))
+Proof
+  EVAL_TAC
+QED
+
 (* Scope exit: prelude and body bindings, and a target captured in a branch,
  * are gone afterwards.
  *)

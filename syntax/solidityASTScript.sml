@@ -89,9 +89,15 @@ Definition is_reference_type_def:
   (is_reference_type _ ⇔ F)
 End
 
-Definition is_mapping_type_def:
-  (is_mapping_type (MappingT _ _) ⇔ T) ∧
-  (is_mapping_type _ ⇔ F)
+(* Whether a mapping occurs in the type's own structure, through array
+ * elements. Struct fields need the declaration environment and are checked by
+ * declared_type_ok in solidityCoreWf; a function type is a value and is not
+ * looked through.
+ *)
+Definition contains_mapping_def:
+  (contains_mapping (MappingT _ _) ⇔ T) ∧
+  (contains_mapping (ArrayT ty _) ⇔ contains_mapping ty) ∧
+  (contains_mapping _ ⇔ F)
 End
 
 Definition valid_mapping_key_def:
@@ -125,9 +131,9 @@ End
 Definition location_shape_ok_def:
   (location_shape_ok StorageLoc ty ⇔ is_reference_type ty) ∧
   (location_shape_ok MemoryLoc ty ⇔
-    is_reference_type ty ∧ ¬is_mapping_type ty) ∧
+    is_reference_type ty ∧ ¬contains_mapping ty) ∧
   (location_shape_ok CalldataLoc ty ⇔
-    is_reference_type ty ∧ ¬is_mapping_type ty)
+    is_reference_type ty ∧ ¬contains_mapping ty)
 End
 
 Definition valid_type_shape_def:
@@ -176,7 +182,7 @@ Proof
   SIMP_TAC (srw_ss())
     [valid_type_shape_def, valid_int_width_def, valid_array_length_def,
      outer_location_free_def, location_shape_ok_def, is_reference_type_def,
-     is_mapping_type_def]
+     contains_mapping_def]
 QED
 
 Theorem invalid_located_value:
@@ -215,6 +221,35 @@ QED
 Theorem invalid_mapping_key_mapping:
   ¬valid_type_shape
     (MappingT (MappingT (UintT 256) (UintT 256)) (UintT 256))
+Proof
+  EVAL_TAC
+QED
+
+Theorem valid_memory_array:
+  valid_type_shape (LocatedT MemoryLoc (ArrayT (UintT 256) (SOME 3)))
+Proof
+  EVAL_TAC
+QED
+
+Theorem valid_storage_mapping_array:
+  valid_type_shape
+    (LocatedT StorageLoc (ArrayT (MappingT (UintT 256) (UintT 256)) NONE)) ∧
+  valid_type_shape (LocatedT StorageLoc (MappingT (UintT 256) (UintT 256)))
+Proof
+  EVAL_TAC
+QED
+
+Theorem invalid_memory_mapping_array:
+  ¬valid_type_shape
+    (LocatedT MemoryLoc (ArrayT (MappingT (UintT 256) (UintT 256)) NONE))
+Proof
+  EVAL_TAC
+QED
+
+Theorem invalid_calldata_nested_mapping_array:
+  ¬valid_type_shape
+    (LocatedT CalldataLoc
+       (ArrayT (ArrayT (MappingT (UintT 256) (UintT 256)) NONE) (SOME 2)))
 Proof
   EVAL_TAC
 QED
