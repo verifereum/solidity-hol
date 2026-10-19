@@ -19,9 +19,9 @@ Definition initial_state_def:
     frame := <| self_address := 0w; code_address := 0w; sender_address := 0w;
                 call_value := 0; call_data := []; static_context := F |>;
     scopes := [];
-    heap := [];
+    heap := FEMPTY;
     next_heap_id := 0;
-    targets := []
+    targets := FEMPTY
   |>
 End
 

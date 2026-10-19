@@ -30,7 +30,7 @@ Datatype:
   heap_object = <|
     object_type : sol_type;
     object_length : num;
-    object_cells : (num # runtime_value) list
+    object_cells : num |-> runtime_value
   |>
 End
 
@@ -45,18 +45,18 @@ Datatype:
   |>
 End
 
-(* Association lists rather than num-keyed finite maps, so that states translate
- * to cv. Scopes are innermost first; the heap may move to an sptree once it is
- * used.
+(* Scopes, heap and targets are num-keyed finite maps (scopes and targets keyed
+ * by the ast_id's number), which cv encodes as sptrees. Scopes are innermost
+ * first.
  *)
 Datatype:
   source_state = <|
     world : source_world;
     frame : source_frame;
-    scopes : ((ast_id # source_binding) list) list;
-    heap : (num # heap_object) list;
+    scopes : (num |-> source_binding) list;
+    heap : num |-> heap_object;
     next_heap_id : num;
-    targets : (ast_id # captured_target) list
+    targets : num |-> captured_target
   |>
 End
 

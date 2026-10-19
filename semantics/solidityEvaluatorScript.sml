@@ -24,27 +24,25 @@ Libs
 
 (* Scopes and targets *)
 
+Definition ast_key_def:
+  ast_key (AstId n) = n
+End
+
 Definition lookup_binding_def:
   (lookup_binding x [] = NONE) ∧
   (lookup_binding x (scope :: scopes) =
-    case ALOOKUP scope x of
+    case FLOOKUP scope (ast_key x) of
       SOME b => SOME b
     | NONE => lookup_binding x scopes)
-End
-
-Definition set_binding_value_def:
-  (set_binding_value x v [] = []) ∧
-  (set_binding_value x v ((y, b) :: rest) =
-    if x = y then (y, b with binding_value := v) :: rest
-    else (y, b) :: set_binding_value x v rest)
 End
 
 (* Writes the binding in the innermost scope that holds it. *)
 Definition update_binding_def:
   (update_binding x v [] = NONE) ∧
   (update_binding x v (scope :: scopes) =
-    case ALOOKUP scope x of
-      SOME _ => SOME (set_binding_value x v scope :: scopes)
+    case FLOOKUP scope (ast_key x) of
+      SOME b =>
+        SOME ((scope |+ (ast_key x, b with binding_value := v)) :: scopes)
     | NONE =>
         (case update_binding x v scopes of
            SOME scopes' => SOME (scope :: scopes')
@@ -52,22 +50,16 @@ Definition update_binding_def:
 End
 
 Definition bind_local_def:
-  (bind_local x b [] = [[(x, b)]]) ∧
-  (bind_local x b (scope :: scopes) = ((x, b) :: scope) :: scopes)
-End
-
-Definition delete_key_def:
-  (delete_key k [] = []) ∧
-  (delete_key k ((k', v) :: rest) =
-    if k = k' then delete_key k rest else (k', v) :: delete_key k rest)
+  (bind_local x b [] = [FEMPTY |+ (ast_key x, b)]) ∧
+  (bind_local x b (scope :: scopes) = (scope |+ (ast_key x, b)) :: scopes)
 End
 
 Definition set_target_def:
-  set_target t target targets = (t, target) :: delete_key t targets
+  set_target t target targets = targets |+ (ast_key t, target)
 End
 
 Definition push_scope_def:
-  push_scope (st : source_state) = st with scopes := [] :: st.scopes
+  push_scope (st : source_state) = st with scopes := FEMPTY :: st.scopes
 End
 
 Definition pop_scopes_def:
@@ -207,20 +199,20 @@ Definition single_binding_def:
 End
 
 Definition bind_parameters_def:
-  (bind_parameters [] [] = SOME []) ∧
+  (bind_parameters [] [] = SOME FEMPTY) ∧
   (bind_parameters ((x, ty) :: params) (v :: vs) =
     case bind_parameters params vs of
-      SOME scope => SOME ((x, single_binding ty v) :: scope)
+      SOME scope => SOME (scope |+ (ast_key x, single_binding ty v))
     | NONE => NONE) ∧
   (bind_parameters _ _ = NONE)
 End
 
 Definition bind_defaults_def:
-  (bind_defaults env [] = SOME []) ∧
+  (bind_defaults env [] = SOME FEMPTY) ∧
   (bind_defaults env ((x, ty) :: rets) =
     case (default_scalar env ty, bind_defaults env rets) of
       (SOME s, SOME scope) =>
-        SOME ((x, single_binding ty (ScalarValue s)) :: scope)
+        SOME (scope |+ (ast_key x, single_binding ty (ScalarValue s)))
     | _ => NONE)
 End
 
@@ -229,7 +221,7 @@ Definition entry_scope_def:
   entry_scope env (p : core_procedure) args =
     case (bind_parameters p.parameters args, bind_defaults env p.return_bindings)
     of
-      (SOME params, SOME rets) => SOME (params ++ rets)
+      (SOME params, SOME rets) => SOME (FUNION params rets)
     | _ => NONE
 End
 
@@ -258,7 +250,7 @@ End
 
 Definition write_target_def:
   write_target t a (st : source_state) =
-    case (ALOOKUP st.targets t, eval_atom st.scopes a) of
+    case (FLOOKUP st.targets (ast_key t), eval_atom st.scopes a) of
       (SOME (BindTarget x), SOME v) =>
         (case update_binding x v st.scopes of
            SOME scopes => SOME (st with scopes := scopes)
@@ -332,7 +324,7 @@ End
 
 Definition enter_procedure_def:
   enter_procedure (st : source_state) scope =
-    st with <| scopes := [scope]; targets := [] |>
+    st with <| scopes := [scope]; targets := FEMPTY |>
 End
 
 Definition restore_caller_def:
