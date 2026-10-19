@@ -248,99 +248,161 @@ Definition pack_results_def:
   (pack_results vs = TupleValue vs)
 End
 
+(* Statements that do not run nested code *)
+
+Definition define_binding_def:
+  define_binding x ty v (st : source_state) =
+    st with scopes :=
+      bind_local x <| binding_type := ty; binding_value := v |> st.scopes
+End
+
+Definition write_target_def:
+  write_target t a (st : source_state) =
+    case (ALOOKUP st.targets t, eval_atom st.scopes a) of
+      (SOME (BindTarget x), SOME v) =>
+        (case update_binding x v st.scopes of
+           SOME scopes => SOME (st with scopes := scopes)
+         | NONE => NONE)
+    | _ => NONE
+End
+
+(* Every statement except internal calls, if and while. *)
+Definition simple_stmt_def:
+  simple_stmt env s st gas =
+    case s of
+      DefineStmt x ty op =>
+        (case eval_pure_operation env st.scopes op of
+           ValueOk v => normal_result (define_binding x ty v st) gas
+         | ValueAbrupt c => abrupt_result c st gas)
+    | CaptureBindingStmt t x =>
+        normal_result
+          (st with targets := set_target t (BindTarget x) st.targets) gas
+    | WriteScalarStmt t ty a =>
+        (case write_target t a st of
+           SOME st' => normal_result st' gas
+         | NONE => abrupt_result (InvalidCompletion "bad scalar write") st gas)
+    | ReturnStmt atoms =>
+        (case eval_atoms st.scopes atoms of
+           SOME vs => abrupt_result (ReturnCompletion vs) st gas
+         | NONE => abrupt_result (InvalidCompletion "unbound atom") st gas)
+    | BreakStmt => abrupt_result BreakCompletion st gas
+    | ContinueStmt => abrupt_result ContinueCompletion st gas
+    | RevertStmt a =>
+        (case eval_atom st.scopes a of
+           SOME (ScalarValue (BytesValue data)) =>
+             abrupt_result (RevertCompletion data) st gas
+         | _ => abrupt_result (InvalidCompletion "bad revert payload") st gas)
+    | _ => abrupt_result (InvalidCompletion "unsupported statement") st gas
+End
+
+(* Pieces of the recursive cases *)
+
+Definition branch_of_def:
+  branch_of (st : source_state) c =
+    case eval_atom st.scopes c of
+      SOME (ScalarValue (BoolValue b)) => SOME b
+    | _ => NONE
+End
+
+(* A call's returned values, packed per call_result_type, bound to x. *)
+Definition bind_call_result_def:
+  bind_call_result x ty (r : source_result) =
+    case r.completion of
+      ReturnCompletion vs =>
+        normal_result (define_binding x ty (pack_results vs) r.state)
+          r.unused_gas_evidence
+    | _ => r
+End
+
+Datatype:
+  loop_step = LoopExit | LoopNext | LoopStop
+End
+
+(* After a loop body: break leaves the loop normally, normal completion and
+ * continue go round again, anything else propagates.
+ *)
+Definition loop_after_body_def:
+  loop_after_body c =
+    case c of
+      BreakCompletion => LoopExit
+    | NormalCompletion => LoopNext
+    | ContinueCompletion => LoopNext
+    | _ => LoopStop
+End
+
+Definition enter_procedure_def:
+  enter_procedure (st : source_state) scope =
+    st with <| scopes := [scope]; targets := [] |>
+End
+
+Definition restore_caller_def:
+  restore_caller (caller : source_state) (callee : source_state) =
+    callee with <| scopes := caller.scopes; targets := caller.targets |>
+End
+
+(* A body's completion as the call's: falling through returns the current
+ * return bindings, and break/continue cannot escape a procedure.
+ *)
+Definition procedure_completion_def:
+  procedure_completion (p : core_procedure) (r : source_result) =
+    case r.completion of
+      NormalCompletion =>
+        (case read_returns r.state.scopes p.return_bindings of
+           SOME vs => ReturnCompletion vs
+         | NONE => InvalidCompletion "missing return binding")
+    | BreakCompletion => InvalidCompletion "break escaped procedure"
+    | ContinueCompletion => InvalidCompletion "continue escaped procedure"
+    | c => c
+End
+
+Theorem core_stmt1_size_list_size[local]:
+  ∀l. core_stmt1_size l = list_size core_stmt_size l
+Proof
+  Induct >>
+  simp[solidityCoreTheory.core_stmt_size_def, listTheory.list_size_def]
+QED
+
 (* The evaluator *)
 
 Definition eval_block_def:
   (eval_block (n : num) env [] st gas = normal_result st gas) ∧
-  (eval_block n env (DefineStmt x ty (InternalCallOperation f atoms) :: ss)
-     st gas =
+  (eval_block n env (s :: ss) st gas =
+    let r = eval_stmt n env s st gas in
+    if r.completion = NormalCompletion
+    then eval_block n env ss r.state r.unused_gas_evidence
+    else r) ∧
+  (eval_stmt n env (DefineStmt x ty (InternalCallOperation f atoms)) st gas =
     case eval_atoms st.scopes atoms of
-      NONE => abrupt_result (InvalidCompletion "unbound atom") st gas
-    | SOME args =>
-        let r = invoke_source n env f args st gas in
-        case r.completion of
-          ReturnCompletion vs =>
-            eval_block n env ss
-              (r.state with scopes :=
-                 bind_local x <| binding_type := ty;
-                                 binding_value := pack_results vs |>
-                   r.state.scopes)
-              r.unused_gas_evidence
-        | _ => r) ∧
-  (eval_block n env (DefineStmt x ty op :: ss) st gas =
-    case eval_pure_operation env st.scopes op of
-      ValueOk v =>
-        eval_block n env ss
-          (st with scopes :=
-             bind_local x <| binding_type := ty; binding_value := v |>
-               st.scopes)
-          gas
-    | ValueAbrupt c => abrupt_result c st gas) ∧
-  (eval_block n env (CaptureBindingStmt t x :: ss) st gas =
-    eval_block n env ss
-      (st with targets := set_target t (BindTarget x) st.targets) gas) ∧
-  (eval_block n env (WriteScalarStmt t ty a :: ss) st gas =
-    case (ALOOKUP st.targets t, eval_atom st.scopes a) of
-      (SOME (BindTarget x), SOME v) =>
-        (case update_binding x v st.scopes of
-           SOME scopes => eval_block n env ss (st with scopes := scopes) gas
-         | NONE => abrupt_result (InvalidCompletion "unbound target") st gas)
-    | _ => abrupt_result (InvalidCompletion "bad scalar write") st gas) ∧
-  (eval_block n env (IfStmt c ts es :: ss) st gas =
-    case eval_atom st.scopes c of
-      SOME (ScalarValue (BoolValue b)) =>
-        let r = pop_result (eval_block n env (if b then ts else es)
-                              (push_scope st) gas) in
-        if r.completion = NormalCompletion
-        then eval_block n env ss r.state r.unused_gas_evidence
-        else r
-    | _ => abrupt_result (InvalidCompletion "non-boolean condition") st gas) ∧
-  (eval_block n env (WhileStmt prelude c body :: ss) st gas =
+      SOME args => bind_call_result x ty (invoke_source n env f args st gas)
+    | NONE => abrupt_result (InvalidCompletion "unbound atom") st gas) ∧
+  (eval_stmt n env (IfStmt c ts es) st gas =
+    case branch_of st c of
+      SOME T => pop_result (eval_block n env ts (push_scope st) gas)
+    | SOME F => pop_result (eval_block n env es (push_scope st) gas)
+    | NONE =>
+        abrupt_result (InvalidCompletion "non-boolean condition") st gas) ∧
+  (eval_stmt n env (WhileStmt prelude c body) st gas =
+    eval_loop n env prelude c body st gas) ∧
+  (eval_stmt n env s st gas = simple_stmt env s st gas) ∧
+  (* One iteration in a pushed scope; fuel is spent on the back edge. *)
+  (eval_loop n env prelude c body st gas =
     let r1 = eval_block n env prelude (push_scope st) gas in
     if r1.completion ≠ NormalCompletion then pop_result r1 else
-    case eval_atom r1.state.scopes c of
-      SOME (ScalarValue (BoolValue F)) =>
-        eval_block n env ss (pop_result r1).state r1.unused_gas_evidence
-    | SOME (ScalarValue (BoolValue T)) =>
+    case branch_of r1.state c of
+      NONE =>
+        pop_result
+          (r1 with completion := InvalidCompletion "non-boolean condition")
+    | SOME b =>
+        if ¬b then pop_result r1 else
         let r2 = pop_result (eval_block n env body r1.state
                                r1.unused_gas_evidence) in
-        (case r2.completion of
-           BreakCompletion =>
-             eval_block n env ss r2.state r2.unused_gas_evidence
-         | NormalCompletion =>
-             if n = 0 then r2 with completion := FuelExhausted else
-             let r3 = eval_block (n - 1) env [WhileStmt prelude c body]
-                        r2.state r2.unused_gas_evidence in
-             if r3.completion = NormalCompletion
-             then eval_block n env ss r3.state r3.unused_gas_evidence
-             else r3
-         | ContinueCompletion =>
-             if n = 0 then r2 with completion := FuelExhausted else
-             let r3 = eval_block (n - 1) env [WhileStmt prelude c body]
-                        r2.state r2.unused_gas_evidence in
-             if r3.completion = NormalCompletion
-             then eval_block n env ss r3.state r3.unused_gas_evidence
-             else r3
-         | _ => r2)
-    | _ =>
-        pop_result
-          (abrupt_result (InvalidCompletion "non-boolean condition")
-             r1.state r1.unused_gas_evidence)) ∧
-  (eval_block n env (ReturnStmt atoms :: ss) st gas =
-    case eval_atoms st.scopes atoms of
-      SOME vs => abrupt_result (ReturnCompletion vs) st gas
-    | NONE => abrupt_result (InvalidCompletion "unbound atom") st gas) ∧
-  (eval_block n env (BreakStmt :: ss) st gas =
-    abrupt_result BreakCompletion st gas) ∧
-  (eval_block n env (ContinueStmt :: ss) st gas =
-    abrupt_result ContinueCompletion st gas) ∧
-  (eval_block n env (RevertStmt a :: ss) st gas =
-    case eval_atom st.scopes a of
-      SOME (ScalarValue (BytesValue data)) =>
-        abrupt_result (RevertCompletion data) st gas
-    | _ => abrupt_result (InvalidCompletion "bad revert payload") st gas) ∧
-  (eval_block n env (_ :: ss) st gas =
-    abrupt_result (InvalidCompletion "unsupported statement") st gas) ∧
+        case loop_after_body r2.completion of
+          LoopExit => r2 with completion := NormalCompletion
+        | LoopStop => r2
+        | LoopNext =>
+            if n = 0 then r2 with completion := FuelExhausted
+            else eval_loop (n - 1) env prelude c body r2.state
+                   r2.unused_gas_evidence) ∧
   (* A successful call completes with ReturnCompletion of the returned values,
    * whether the body returned explicitly or fell through.
    *)
@@ -352,32 +414,26 @@ Definition eval_block_def:
         case entry_scope env p args of
           NONE => abrupt_result (InvalidCompletion "bad arguments") st gas
         | SOME scope =>
-            let r = eval_block (n - 1) env p.body
-                      (st with <| scopes := [scope]; targets := [] |>) gas in
-            let st' = r.state with <| scopes := st.scopes;
-                                      targets := st.targets |> in
-            let c =
-              case r.completion of
-                NormalCompletion =>
-                  (case read_returns r.state.scopes p.return_bindings of
-                     SOME vs => ReturnCompletion vs
-                   | NONE => InvalidCompletion "missing return binding")
-              | BreakCompletion => InvalidCompletion "break escaped procedure"
-              | ContinueCompletion =>
-                  InvalidCompletion "continue escaped procedure"
-              | other => other in
-            abrupt_result c st' r.unused_gas_evidence)
+            let r = eval_block (n - 1) env p.body (enter_procedure st scope)
+                      gas in
+            abrupt_result (procedure_completion p r)
+              (restore_caller st r.state) r.unused_gas_evidence)
 Termination
   WF_REL_TAC ‘inv_image ($< LEX $<)
     (λx. case x of
            INL (n, env, ss, st, gas) => (n, core_stmt1_size ss)
-         | INR (n, env, f, args, st, gas) => (n, 0))’ >>
-  rw[solidityCoreTheory.core_stmt_size_def]
+         | INR (INL (n, env, s, st, gas)) => (n, core_stmt_size s)
+         | INR (INR (INL (n, env, pre, c, bd, st, gas))) =>
+             (n, core_stmt1_size pre + core_stmt1_size bd + 1)
+         | INR (INR (INR (n, env, f, args, st, gas))) => (n, 0))’ >>
+  rw[solidityCoreTheory.core_stmt_size_def, core_stmt1_size_list_size] >>
+  rename1 ‘core_atom_size a’ >> Cases_on ‘a’ >>
+  simp[solidityCoreTheory.core_atom_size_def]
 End
 
 (* cv translation, so core programs run under cv_compute. Termination of the
- * translated evaluator follows the same (fuel, statement size) order, read off
- * the cv encodings.
+ * translated evaluator follows the same (fuel, size) order, read off the cv
+ * encodings.
  *)
 
 Theorem cv_fuel_lt[local]:
@@ -398,10 +454,15 @@ Proof
   Cases_on ‘x’ >> rw[]
 QED
 
-Theorem cv_size_pair_lt[local]:
+Theorem cv_size_fst_snd_le[local]:
+  cv_size (cv_fst x) + cv_size (cv_snd x) ≤ cv_size x
+Proof
+  Cases_on ‘x’ >> rw[]
+QED
+
+Theorem cv_size_pair[local]:
   cv$c2b (cv_ispair x) ⇒
-  0 < cv_size x ∧ cv_size (cv_fst x) < cv_size x ∧
-  cv_size (cv_snd x) < cv_size x
+  cv_size x = 1 + cv_size (cv_fst x) + cv_size (cv_snd x)
 Proof
   Cases_on ‘x’ >> rw[]
 QED
@@ -411,22 +472,30 @@ local
     is_comb t andalso
     let val f = rator t
     in same_const f “cv_fst” orelse same_const f “cv_snd” end
-  fun proj_fact t =
-    if same_const (rator t) “cv_fst” then SPEC (rand t) (GEN_ALL cv_size_fst_le)
-    else SPEC (rand t) (GEN_ALL cv_size_snd_le)
+  fun proj_facts t =
+    [SPEC (rand t) (GEN_ALL cv_size_fst_le),
+     SPEC (rand t) (GEN_ALL cv_size_snd_le),
+     SPEC (rand t) (GEN_ALL cv_size_fst_snd_le)]
 in
   fun cv_size_tac (asl, w) =
-    (MAP_EVERY (assume_tac o proj_fact) (find_terms is_cv_proj w) >>
-     imp_res_tac cv_size_pair_lt >> decide_tac) (asl, w)
+    (MAP_EVERY assume_tac
+       (List.concat (map proj_facts (find_terms is_cv_proj w))) >>
+     imp_res_tac (GEN_ALL cv_size_pair) >> intLib.ARITH_TAC) (asl, w)
 end
+
+val () = cv_auto_trans simple_stmt_def;
+val () = cv_auto_trans bind_call_result_def;
+val () = cv_auto_trans procedure_completion_def;
 
 val () = cv_auto_trans_rec eval_block_def (
   WF_REL_TAC ‘inv_image ($< LEX $<)
     (λx. case x of
-           INL (n, env, ss, st, gas) => (cv$c2n n, cv_size ss)
-         | INR (n, env, f, args, st, gas) => (cv$c2n n, 0))’ >>
+           INL (n, env, ss, st, gas) => (cv$c2n n, 2 * cv_size ss)
+         | INR (INL (n, env, s, st, gas)) => (cv$c2n n, 2 * cv_size s + 1)
+         | INR (INR (INL (n, env, pre, c, bd, st, gas))) =>
+             (cv$c2n n, 2 * (cv_size pre + cv_size bd) + 1)
+         | INR (INR (INR (n, env, f, args, st, gas))) => (cv$c2n n, 0))’ >>
   rpt strip_tac >> gvs[] >>
   TRY (metis_tac[cv_fuel_lt] >> NO_TAC) >>
-  TRY (cv_size_tac >> NO_TAC) >>
-  IF_CASES_TAC >> cv_size_tac
+  cv_size_tac
 );
