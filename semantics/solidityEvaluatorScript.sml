@@ -355,13 +355,6 @@ Definition procedure_completion_def:
     | c => c
 End
 
-Theorem core_stmt1_size_list_size[local]:
-  ∀l. core_stmt1_size l = list_size core_stmt_size l
-Proof
-  Induct >>
-  simp[solidityCoreTheory.core_stmt_size_def, listTheory.list_size_def]
-QED
-
 (* The evaluator *)
 
 Definition eval_block_def:
@@ -421,67 +414,21 @@ Definition eval_block_def:
 Termination
   WF_REL_TAC ‘inv_image ($< LEX $<)
     (λx. case x of
-           INL (n, env, ss, st, gas) => (n, core_stmt1_size ss)
+           INL (n, env, ss, st, gas) => (n, list_size core_stmt_size ss)
          | INR (INL (n, env, s, st, gas)) => (n, core_stmt_size s)
          | INR (INR (INL (n, env, pre, c, bd, st, gas))) =>
-             (n, core_stmt1_size pre + core_stmt1_size bd + 1)
+             (n, list_size core_stmt_size pre +
+                 list_size core_stmt_size bd + 1)
          | INR (INR (INR (n, env, f, args, st, gas))) => (n, 0))’ >>
-  rw[solidityCoreTheory.core_stmt_size_def, core_stmt1_size_list_size] >>
+  rw[solidityCoreTheory.core_stmt_size_def, listTheory.list_size_def] >>
   rename1 ‘core_atom_size a’ >> Cases_on ‘a’ >>
   simp[solidityCoreTheory.core_atom_size_def]
 End
 
 (* cv translation, so core programs run under cv_compute. Termination of the
- * translated evaluator follows the same (fuel, size) order, read off the cv
- * encodings.
+ * translated evaluator follows a scaled (fuel, size) order on the cv encodings,
+ * strictly decreasing on every cv input.
  *)
-
-Theorem cv_fuel_lt[local]:
-  cv$c2b (cv_lt (cv$Num 0) n) ⇒ cv$c2n (cv_sub n (cv$Num 1)) < cv$c2n n
-Proof
-  Cases_on ‘n’ >> rw[]
-QED
-
-Theorem cv_size_fst_le[local]:
-  cv_size (cv_fst x) ≤ cv_size x
-Proof
-  Cases_on ‘x’ >> rw[]
-QED
-
-Theorem cv_size_snd_le[local]:
-  cv_size (cv_snd x) ≤ cv_size x
-Proof
-  Cases_on ‘x’ >> rw[]
-QED
-
-Theorem cv_size_fst_snd_le[local]:
-  cv_size (cv_fst x) + cv_size (cv_snd x) ≤ cv_size x
-Proof
-  Cases_on ‘x’ >> rw[]
-QED
-
-Theorem cv_size_pair[local]:
-  cv$c2b (cv_ispair x) ⇒
-  cv_size x = 1 + cv_size (cv_fst x) + cv_size (cv_snd x)
-Proof
-  Cases_on ‘x’ >> rw[]
-QED
-
-local
-  fun is_cv_proj t =
-    is_comb t andalso
-    let val f = rator t
-    in same_const f “cv_fst” orelse same_const f “cv_snd” end
-  fun proj_facts t =
-    [SPEC (rand t) (GEN_ALL cv_size_fst_le),
-     SPEC (rand t) (GEN_ALL cv_size_snd_le),
-     SPEC (rand t) (GEN_ALL cv_size_fst_snd_le)]
-in
-  fun cv_size_tac (asl, w) =
-    (MAP_EVERY assume_tac
-       (List.concat (map proj_facts (find_terms is_cv_proj w))) >>
-     imp_res_tac (GEN_ALL cv_size_pair) >> intLib.ARITH_TAC) (asl, w)
-end
 
 val () = cv_auto_trans simple_stmt_def;
 val () = cv_auto_trans bind_call_result_def;
@@ -495,7 +442,8 @@ val () = cv_auto_trans_rec eval_block_def (
          | INR (INR (INL (n, env, pre, c, bd, st, gas))) =>
              (cv$c2n n, 2 * (cv_size pre + cv_size bd) + 1)
          | INR (INR (INR (n, env, f, args, st, gas))) => (cv$c2n n, 0))’ >>
-  rpt strip_tac >> gvs[] >>
-  TRY (metis_tac[cv_fuel_lt] >> NO_TAC) >>
-  cv_size_tac
+  cv_termination_tac >>
+  (* a while statement's prelude and body against its encoding *)
+  rename1 ‘cv_snd (cv_snd x)’ >> Cases_on ‘x’ >> gvs[] >>
+  rename1 ‘cv_snd y’ >> Cases_on ‘y’ >> gvs[]
 );
