@@ -304,6 +304,33 @@ Definition core_convertible_def:
      | _ => F)
 End
 
+(* Implicit conversions, following isImplicitlyConvertibleTo in
+ * libsolidity/ast/Types.cpp at SOLIDITY_PIN: identity, integer widening with
+ * the same signedness (uintM to intN is never implicit), fixed bytes widening,
+ * and address payable to address. Enums, user-defined value types and bool
+ * convert implicitly only to themselves. Elaboration emits implicit
+ * conversions as explicit ConvertOperations; each is also explicit.
+ *)
+Definition implicitly_convertible_def:
+  implicitly_convertible src dst ⇔
+    src = dst ∨
+    case (src, dst) of
+      (UintT m, UintT n) => m ≤ n
+    | (IntT m, IntT n) => m ≤ n
+    | (FixedBytesT m, FixedBytesT n) => m ≤ n
+    | (AddressT PayableAddress, AddressT NonpayableAddress) => T
+    | _ => F
+End
+
+Theorem implicitly_convertible_explicit:
+  implicitly_convertible src dst ⇒ core_convertible env src dst
+Proof
+  Cases_on ‘src’ >> Cases_on ‘dst’ >>
+  rw[implicitly_convertible_def, core_convertible_def,
+     elementary_convertible_def] >>
+  gvs[AllCaseEqs()]
+QED
+
 Definition call_result_type_def[simp]:
   (call_result_type [] = ProductType []) ∧
   (call_result_type [ty] = SingleType ty) ∧
