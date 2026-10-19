@@ -13,8 +13,11 @@
  * could reach them. Within a procedure, capturing a target overwrites it.
  *
  * Gas evidence is passed through unchanged; the EVM boundary is out of scope.
- * Unsupported statements and operations, and anything the checker would reject,
- * end in InvalidCompletion.
+ * Evaluation expects well-formed pure-core programs checked against the supplied
+ * environment, with arguments matching parameter types and, for direct block
+ * evaluation, runtime bindings and targets consistent with the checking context.
+ * Dynamic guards return InvalidCompletion for some invalid inputs; they do not
+ * replace the checker or guarantee rejection of every input it rejects.
  *)
 Theory solidityEvaluator
 Ancestors
