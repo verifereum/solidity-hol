@@ -17,6 +17,10 @@ tools/export_solc_artifacts.py \
   testdata/frontend/storage_references.sol
 ```
 
+The pure-subset importer fixture
+[`testdata/frontend/expected/pure_core.json`](../testdata/frontend/expected/pure_core.json)
+is generated the same way from `testdata/frontend/pure_core.sol`.
+
 ## Boundary layers
 
 The implementation should distinguish three representations:
@@ -124,6 +128,14 @@ layout entries must resolve to compatible state-variable declarations.
 
 The selected compiler also emits `transientStorageLayout`. It is empty for the
 initial corpus, so transient layout remains unvalidated.
+
+## Normalized AST
+
+`syntax/solidityImportScript.sml` defines the second layer for the admitted
+pure subset, and `syntax/solidityImportLib.sml` imports it from an exporter
+artifact, failing closed. The theory's header lists what `valid_src_unit`
+establishes and what is left to elaboration; `tests/solidityImportTestScript.sml`
+holds the positive fixture and negative fixtures derived from it.
 
 ## Required validation
 
