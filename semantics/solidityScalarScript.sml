@@ -208,21 +208,13 @@ End
 
 (* Fixed bytes *)
 
-(* Big-endian views of byteTheory's little-endian num_of_bytes and
- * bytes_of_num (both cv-translated in cv_std). *)
-Definition bytes_to_num_def:
-  bytes_to_num (bs : byte list) = num_of_bytes (REVERSE bs)
-End
-
-(* Big-endian encoding of v mod 256 ** k in exactly k bytes. *)
+(* Fixed bytes are big-endian: vfmTypes' num_of_be_bytes reads them, and
+ * num_to_bytes k v encodes v mod 256 ** k in exactly k bytes, a view of
+ * byteTheory's little-endian bytes_of_num (cv-translated in cv_std).
+ * bytesM to bytesN truncates or pads with zeros on the right, which is
+ * vfmTypes' take_pad_0. *)
 Definition num_to_bytes_def:
   num_to_bytes k (v : num) = REVERSE (bytes_of_num k v)
-End
-
-(* bytesM to bytesN truncates or pads with zeros on the right. *)
-Definition resize_bytes_def:
-  resize_bytes n (bs : byte list) =
-    TAKE n bs ++ REPLICATE (n - LENGTH bs) (0w : byte)
 End
 
 Definition bytes_bitwise_def:
@@ -248,10 +240,10 @@ Definition eval_bytes_operation_def:
     | (BitNotOp, [BytesValue a]) => ScalarOk (BytesValue (bytes_not a))
     | (ShiftLeftOp, [BytesValue a; IntegerValue y]) =>
         ScalarOk (BytesValue (num_to_bytes n
-          (Num (shift_left F (8 * n) (&bytes_to_num a) (Num y)))))
+          (Num (shift_left F (8 * n) (&num_of_be_bytes a) (Num y)))))
     | (ShiftRightOp, [BytesValue a; IntegerValue y]) =>
         ScalarOk (BytesValue (num_to_bytes n
-          (Num (shift_right (8 * n) (&bytes_to_num a) (Num y)))))
+          (Num (shift_right (8 * n) (&num_of_be_bytes a) (Num y)))))
     | _ => ScalarInvalid
 End
 
@@ -261,7 +253,7 @@ End
 Definition scalar_order_key_def:
   (scalar_order_key (IntegerValue i) = SOME i) ∧
   (scalar_order_key (AddressValue a) = SOME (&w2n a)) ∧
-  (scalar_order_key (BytesValue bs) = SOME (&bytes_to_num bs)) ∧
+  (scalar_order_key (BytesValue bs) = SOME (&num_of_be_bytes bs)) ∧
   (scalar_order_key _ = NONE)
 End
 
@@ -319,16 +311,16 @@ Definition convert_scalar_def:
     case (dst, s) of
       (UintT n, IntegerValue i) => ScalarOk (IntegerValue (wrap_integer F n i))
     | (IntT n, IntegerValue i) => ScalarOk (IntegerValue (wrap_integer T n i))
-    | (UintT n, BytesValue bs) => ScalarOk (IntegerValue (&bytes_to_num bs))
+    | (UintT n, BytesValue bs) => ScalarOk (IntegerValue (&num_of_be_bytes bs))
     | (UintT n, AddressValue a) => ScalarOk (IntegerValue (&w2n a))
-    | (FixedBytesT n, BytesValue bs) => ScalarOk (BytesValue (resize_bytes n bs))
+    | (FixedBytesT n, BytesValue bs) => ScalarOk (BytesValue (take_pad_0 n bs))
     | (FixedBytesT n, IntegerValue i) =>
         ScalarOk (BytesValue (num_to_bytes n (Num i)))
     | (FixedBytesT n, AddressValue a) =>
         ScalarOk (BytesValue (num_to_bytes n (w2n a)))
     | (AddressT _, AddressValue a) => ScalarOk s
     | (AddressT _, IntegerValue i) => ScalarOk (AddressValue (n2w (Num i)))
-    | (AddressT _, BytesValue bs) => ScalarOk (AddressValue (n2w (bytes_to_num bs)))
+    | (AddressT _, BytesValue bs) => ScalarOk (AddressValue (n2w (num_of_be_bytes bs)))
     | (EnumT id, IntegerValue i) =>
         (case lookup_enum env id of
            SOME members =>
@@ -416,25 +408,13 @@ Proof
   rw[num_to_bytes_def]
 QED
 
-Theorem resize_bytes_length:
-  LENGTH (resize_bytes n bs) = n
+Theorem num_of_be_bytes_bound:
+  num_of_be_bytes bs < 256 ** LENGTH bs
 Proof
-  rw[resize_bytes_def, listTheory.LENGTH_TAKE_EQ]
-QED
-
-Theorem num_of_bytes_bound:
-  ∀bs. num_of_bytes bs < 256 ** LENGTH bs
-Proof
-  Induct >> rw[num_of_bytes_def, EXP] >>
-  ‘w2n h < 256’ by (assume_tac (Q.ISPEC ‘h : byte’ w2n_lt) >> gvs[]) >>
-  decide_tac
-QED
-
-Theorem bytes_to_num_bound:
-  bytes_to_num bs < 256 ** LENGTH bs
-Proof
-  rw[bytes_to_num_def] >>
-  qspec_then ‘REVERSE bs’ mp_tac num_of_bytes_bound >> simp[]
+  rw[vfmTypesTheory.num_of_be_bytes_def] >>
+  qspecl_then [‘MAP w2n (REVERSE bs)’, ‘256’] mp_tac
+    numposrepTheory.l2n_lt >>
+  simp[]
 QED
 
 Theorem eval_bytes_operation_canonical:
@@ -498,14 +478,14 @@ Proof
   rw[eval_conversion_def] >>
   gvs[convert_scalar_def, AllCaseEqs()] >>
   simp[scalar_has_type_def, elementary_scalar_has_type_def,
-       wrap_integer_in_range, resize_bytes_length, num_to_bytes_length] >>
+       wrap_integer_in_range, num_to_bytes_length] >>
   Cases_on ‘src’ >>
   gvs[core_convertible_def, AllCaseEqs()] >>
   gvs[elementary_convertible_def, AllCaseEqs()] >>
   gvs[scalar_has_type_def, elementary_scalar_has_type_def, AllCaseEqs()]
   >- (gvs[integer_in_range_def, AllCasePreds()] >>
       irule LESS_LESS_EQ_TRANS >> irule_at Any w2n_lt >> simp[])
-  >- simp[integer_in_range_def, EXP_EXP_MULT, bytes_to_num_bound]
+  >- simp[integer_in_range_def, EXP_EXP_MULT, num_of_be_bytes_bound]
   >- (drule_all wf_core_environment_user_value >> simp[])
   >- (drule_all wf_core_environment_user_value >> simp[])
 QED
@@ -733,8 +713,9 @@ Theorem implicit_bytes_conversion_pads:
   ScalarOk (BytesValue (bs ++ REPLICATE (n - m) 0w))
 Proof
   rw[eval_conversion_def, core_convertible_def, elementary_convertible_def,
-     scalar_has_type_cases, convert_scalar_def, resize_bytes_def,
-     listTheory.TAKE_LENGTH_TOO_LONG]
+     scalar_has_type_cases, convert_scalar_def, vfmTypesTheory.take_pad_0_def,
+     listTheory.TAKE_LENGTH_TOO_LONG, listTheory.PAD_RIGHT,
+     rich_listTheory.REPLICATE_GENLIST]
 QED
 
 Theorem implicit_conversion_succeeds:
