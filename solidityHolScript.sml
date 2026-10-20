@@ -12,4 +12,5 @@ Ancestors
   solidityEVMCallTest solidityEVMCreateTest solidityEVMFrameTest
   solidityEVMReentryTest solidityEVMBookkeepingTest
   solidityEvaluator solidityEvaluatorProps solidityEvaluatorTest
+  solidityCoreProgramsTest
   verifereum
