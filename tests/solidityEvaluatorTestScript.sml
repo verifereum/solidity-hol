@@ -1,5 +1,5 @@
-(* Smoke tests for the pure evaluator, run by cv_eval. The full semantics test
- * set is issue #6.
+(* Smoke tests for the pure evaluator, run by cv_eval. The semantics test set
+ * is solidityCoreProgramsTest.
  *)
 Theory solidityEvaluatorTest
 Ancestors
