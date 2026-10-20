@@ -110,11 +110,6 @@ Definition scalar_values_def:
   (scalar_values (_ :: _) = NONE)
 End
 
-Definition nth_value_def:
-  (nth_value (n : num) [] = NONE) ∧
-  (nth_value n (v :: vs) = if n = 0 then SOME v else nth_value (n - 1) vs)
-End
-
 (* The source type of a conversion: a binding's declared type, or the target
  * type for a constant (the literal/default-initialisation form).
  *)
@@ -163,7 +158,7 @@ Definition eval_pure_operation_def:
     | TupleComponentOperation n a =>
         (case eval_atom scopes a of
            SOME (TupleValue vs) =>
-             (case nth_value n vs of
+             (case oEL n vs of
                 SOME v => ValueOk v
               | NONE => ValueAbrupt (InvalidCompletion "tuple index"))
          | _ => ValueAbrupt (InvalidCompletion "not a tuple"))
