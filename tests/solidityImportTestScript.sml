@@ -42,7 +42,13 @@ Theorem pure_core_signatures:
    ("narrow", SOME [UintT 256], SOME [UintT 8; BoolT]);
    ("negate", SOME [IntT 8], SOME [IntT 8]);
    ("identity", SOME [AddressT NonpayableAddress; FixedBytesT 4],
-    SOME [AddressT NonpayableAddress; FixedBytesT 4])]
+    SOME [AddressT NonpayableAddress; FixedBytesT 4]);
+   ("guardedDivide", SOME [UintT 256], SOME [BoolT]);
+   ("badDivide", SOME [UintT 256], SOME [BoolT]);
+   ("shortCircuit", SOME [UintT 256], SOME [BoolT; UintT 256]);
+   ("panicOrder", SOME [UintT 256], SOME [UintT 256]);
+   ("argumentOrder", SOME [UintT 256], SOME [UintT 256; UintT 256]);
+   ("compoundOrder", SOME [UintT 256], SOME [UintT 256])]
 Proof
   EVAL_TAC
 QED
@@ -124,6 +130,15 @@ fun import_error name v =
   (import_source_unit v; raise Fail (name ^ ": imported"))
   handle ImportError _ => ()
 
+(* An edited unit that imports, as a cv-translated constant. *)
+fun edited_unit name v =
+  let
+    val tm = import_source_unit v
+    val def = new_definition (name ^ "_def", mk_eq (mk_var (name, type_of tm), tm))
+  in
+    cv_auto_trans def
+  end
+
 (* Unknown forms, missing annotations and unsupported features fail import. *)
 
 val () = import_error "unknown statement"
@@ -153,15 +168,15 @@ val () = import_error "inheritance"
 
 val unit_id = JSONUtil.lookupField ast "id"
 
-val duplicate_id = import_source_unit
+val () = edited_unit "duplicate_id"
   (edit_first "Literal" (set_field "id" unit_id) ast)
 
-val dangling_reference = import_source_unit
+val () = edited_unit "dangling_reference"
   (edit_first "Identifier"
      (set_field "referencedDeclaration" (JSON.INT 999999)) ast)
 
 (* The first identifier is the uint8 parameter x of add. *)
-val identifier_type_mismatch = import_source_unit
+val () = edited_unit "identifier_type_mismatch"
   (edit_first "Identifier" (type_identifier "t_uint256") ast)
 
 (* A reference to the function add used as a value. *)
@@ -169,67 +184,67 @@ val add_id =
   JSONUtil.get (ast, [JSONUtil.SEL "nodes", JSONUtil.SUB 1,
                       JSONUtil.SEL "nodes", JSONUtil.SUB 0, JSONUtil.SEL "id"])
 
-val function_as_value = import_source_unit
+val () = edited_unit "function_as_value"
   (edit_first "Identifier" (set_field "referencedDeclaration" add_id) ast)
 
-val declaration_type_mismatch = import_source_unit
+val () = edited_unit "declaration_type_mismatch"
   (edit_first "VariableDeclaration" (type_identifier "t_bool") ast)
 
-val wrong_scope = import_source_unit
+val () = edited_unit "wrong_scope"
   (edit_first "VariableDeclaration" (set_field "scope" (JSON.INT 999999)) ast)
 
-val unlinked_declaration = import_source_unit
+val () = edited_unit "unlinked_declaration"
   (edit_first "VariableDeclarationStatement"
      (set_field "assignments" (JSON.ARRAY [JSON.NULL])) ast)
 
 (* The first call is fact(n - 1). *)
-val call_arity = import_source_unit
+val () = edited_unit "call_arity"
   (edit_first "FunctionCall" (set_field "arguments" (JSON.ARRAY [])) ast)
 
 Theorem duplicate_id_rejected:
-  ¬valid_src_unit ^duplicate_id
+  ¬valid_src_unit duplicate_id
 Proof
   CONV_TAC cv_eval
 QED
 
 Theorem dangling_reference_rejected:
-  ¬valid_src_unit ^dangling_reference
+  ¬valid_src_unit dangling_reference
 Proof
   CONV_TAC cv_eval
 QED
 
 Theorem identifier_type_mismatch_rejected:
-  ¬valid_src_unit ^identifier_type_mismatch
+  ¬valid_src_unit identifier_type_mismatch
 Proof
   CONV_TAC cv_eval
 QED
 
 Theorem function_as_value_rejected:
-  ¬valid_src_unit ^function_as_value
+  ¬valid_src_unit function_as_value
 Proof
   CONV_TAC cv_eval
 QED
 
 Theorem declaration_type_mismatch_rejected:
-  ¬valid_src_unit ^declaration_type_mismatch
+  ¬valid_src_unit declaration_type_mismatch
 Proof
   CONV_TAC cv_eval
 QED
 
 Theorem wrong_scope_rejected:
-  ¬valid_src_unit ^wrong_scope
+  ¬valid_src_unit wrong_scope
 Proof
   CONV_TAC cv_eval
 QED
 
 Theorem unlinked_declaration_rejected:
-  ¬valid_src_unit ^unlinked_declaration
+  ¬valid_src_unit unlinked_declaration
 Proof
   CONV_TAC cv_eval
 QED
 
 Theorem call_arity_rejected:
-  ¬valid_src_unit ^call_arity
+  ¬valid_src_unit call_arity
 Proof
   CONV_TAC cv_eval
 QED

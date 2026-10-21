@@ -137,6 +137,18 @@ artifact, failing closed. The theory's header lists what `valid_src_unit`
 establishes and what is left to elaboration; `tests/solidityImportTestScript.sml`
 holds the positive fixture and negative fixtures derived from it.
 
+## Elaboration
+
+`semantics/solidityElaborateScript.sml` elaborates a valid unit of the pure
+subset to `core_program`. Its header lists the admitted constructs and the
+evaluation schedules, which were read from the via-IR output in
+`testdata/frontend/expected/pure_core.json`. `tests/solidityElaborateTestScript.sml`
+checks the elaborated fixture with `wf_core_program` and runs it in the
+evaluator. `tests/solidityDifferentialTestScript.sml` runs the same inputs
+through the fixture's deployed bytecode in Verifereum and requires equal
+ABI-encoded outcomes, including the probes of short-circuiting, operand and
+argument order, compound assignment, and `for`/`continue`.
+
 ## Required validation
 
 Before elaboration, a well-formed imported program should at least establish:

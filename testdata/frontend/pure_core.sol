@@ -2,7 +2,8 @@
 pragma solidity 0.8.37;
 
 // Pure-subset constructs for the importer and elaborator: locals, internal
-// calls, multiple returns, tuples, conversions and every loop form.
+// calls, multiple returns, tuples, conversions, every loop form, and probes of
+// short-circuiting and evaluation order.
 contract PureCore {
     function add(uint8 x, uint8 y) public pure returns (uint8) {
         return x + y;
@@ -72,5 +73,30 @@ contract PureCore {
 
     function identity(address a, bytes4 b) public pure returns (address, bytes4) {
         return (a, ~b);
+    }
+
+    function guardedDivide(uint256 x) public pure returns (bool) {
+        return x != 0 && 100 / x > 10;
+    }
+
+    function badDivide(uint256 x) public pure returns (bool) {
+        return x == 0 && 100 / x > 10;
+    }
+
+    function shortCircuit(uint256 x) public pure returns (bool r, uint256 calls) {
+        r = x > 5 || ++calls > 0;
+    }
+
+    function panicOrder(uint256 x) public pure returns (uint256) {
+        return (x - 1) / (x * 0);
+    }
+
+    function argumentOrder(uint256 x) public pure returns (uint256 q, uint256 r) {
+        (q, r) = divmod(x - 1, 0 / x);
+    }
+
+    function compoundOrder(uint256 x) public pure returns (uint256) {
+        x += (x = 5);
+        return x;
     }
 }

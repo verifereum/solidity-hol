@@ -38,6 +38,9 @@
 Theory solidityImport
 Ancestors
   solidityAST ASCIInumbers string integer alist cv_std
+  (* for the scalar layer's cv encodings of the AST types, so that every
+   * descendant sees one encoding *)
+  solidityScalar
 Libs
   cv_transLib
 
@@ -302,6 +305,23 @@ Proof
      AllCaseEqs()] >>
   gvs[] >> metis_tac[decode_elementary_identifier_valid]
 QED
+
+(* The elementary type, or the integer value of an integer literal type, of a
+ * typeIdentifier.
+ *)
+Definition identifier_type_def:
+  identifier_type s =
+    case decode_type_identifier s of
+      SOME (SrcType ty) => SOME ty
+    | _ => NONE
+End
+
+Definition identifier_integer_def:
+  identifier_integer s =
+    case decode_type_identifier s of
+      SOME (SrcRational i d) => if d = 1 then SOME i else NONE
+    | _ => NONE
+End
 
 (* A parameter, return or local variable: an elementary value type in the
  * default location, agreeing with its typeIdentifier.
@@ -655,6 +675,8 @@ End
 
 val () = cv_auto_trans normalize_type_name_def;
 val () = cv_auto_trans decode_type_identifier_def;
+val () = cv_auto_trans identifier_type_def;
+val () = cv_auto_trans identifier_integer_def;
 val () = cv_auto_trans variable_type_def;
 val () = cv_auto_trans call_value_type_def;
 val () = cv_auto_trans_rec expr_ids_def (

@@ -305,7 +305,7 @@ fun import_source_unit v = within v (fn v =>
        ("unit_contracts", listSyntax.mk_list (contracts, contract_ty))]
   end)
 
-fun import_artifact path source =
+fun read_artifact path =
   let
     val artifact = JSONParser.parseFile path
       handle e => fail (path ^ ": " ^ General.exnMessage e)
@@ -314,13 +314,26 @@ fun import_artifact path source =
   in
     if format <> "solidity-hol-solc-artifact-v1" then
       fail (path ^ ": unsupported artifact format " ^ format)
-    else
-      import_source_unit
-        (JSONUtil.get (artifact,
-           [JSONUtil.SEL "output", JSONUtil.SEL "sources", JSONUtil.SEL source,
-            JSONUtil.SEL "ast"])
-         handle e => fail (path ^ ": no AST for " ^ source ^ ": " ^
-                           JSONUtil.exnMessage e))
+    else artifact
   end
+
+fun artifact_deployed_bytecode path source contract =
+  JSONUtil.asString
+    (JSONUtil.get (read_artifact path,
+       [JSONUtil.SEL "output", JSONUtil.SEL "contracts", JSONUtil.SEL source,
+        JSONUtil.SEL contract, JSONUtil.SEL "evm",
+        JSONUtil.SEL "deployedBytecode", JSONUtil.SEL "object"]))
+  handle ImportError msg => raise ImportError msg
+       | e => fail (path ^ ": no deployed bytecode for " ^ contract ^ ": " ^
+                    JSONUtil.exnMessage e)
+
+fun import_artifact path source =
+  import_source_unit
+    (JSONUtil.get (read_artifact path,
+       [JSONUtil.SEL "output", JSONUtil.SEL "sources", JSONUtil.SEL source,
+        JSONUtil.SEL "ast"])
+     handle ImportError msg => raise ImportError msg
+          | e => fail (path ^ ": no AST for " ^ source ^ ": " ^
+                       JSONUtil.exnMessage e))
 
 end

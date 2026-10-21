@@ -15,4 +15,7 @@ sig
    * tools/export_solc_artifacts.py.
    *)
   val import_artifact : string -> string -> term
+
+  (* The deployed bytecode of a contract of an artifact, as hex digits. *)
+  val artifact_deployed_bytecode : string -> string -> string -> string
 end
