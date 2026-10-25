@@ -144,10 +144,9 @@ subset to `core_program`. Its header lists the admitted constructs and the
 evaluation schedules, which were read from the via-IR output in
 `testdata/frontend/expected/pure_core.json`. `tests/solidityElaborateTestScript.sml`
 checks the elaborated fixture with `wf_core_program` and runs it in the
-evaluator. `tests/solidityDifferentialTestScript.sml` runs the same inputs
-through the fixture's deployed bytecode in Verifereum and requires equal
-ABI-encoded outcomes, including the probes of short-circuiting, operand and
-argument order, compound assignment, and `for`/`continue`.
+evaluator. The differential corpus runs the same inputs, and a wider corpus of
+sources, through the deployed bytecode in Verifereum and requires equal
+ABI-encoded outcomes; see [differential-testing.md](differential-testing.md).
 
 ## Required validation
 

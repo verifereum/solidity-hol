@@ -1,0 +1,480 @@
+#!/usr/bin/env python3
+"""Run the differential regression corpus and write a report.
+
+The corpus (testdata/differential/corpus.json) lists source units with their
+committed solc artifacts and concrete calls with expected outcomes. Building
+the HOL theory solidityDifferentialCorpus imports and elaborates every unit,
+checks its core, runs each call through both the deployed bytecode and the
+evaluator, and proves one kernel-checked differential_agrees theorem per case;
+the build fails if any suite or case does not agree.
+
+Around that build this driver performs external checks that are not kernel
+checked: the corpus is well formed, every artifact records the pinned compiler
+and profile and was compiled from the current sources, the corpus theory
+stages every artifact, and, given --solc, every artifact is reproduced byte for
+byte by the pinned compiler. It writes report.json and report.md, and a
+directory of reproduction material for every failure. It exits unsuccessfully
+on any failure.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+from typing import Any
+
+import export_solc_artifacts as exporter
+
+ROOT = Path(__file__).resolve().parents[1]
+CORPUS = Path("testdata/differential/corpus.json")
+CORPUS_SCRIPT = Path("tests/solidityDifferentialCorpusScript.sml")
+CORPUS_THEORY = "solidityDifferentialCorpusTheory"
+CORPUS_FORMAT = "solidity-hol-differential-corpus-v1"
+REPORT_FORMAT = "solidity-hol-differential-report-v1"
+ARTIFACT_FORMAT = "solidity-hol-solc-artifact-v1"
+RESULT_PREFIX = "differential-result: "
+IDENTIFIER = re.compile(r"[A-Za-z][A-Za-z0-9_]*")
+DECIMAL = re.compile(r"-?[0-9]+")
+HEX = re.compile(r"0x(?:[0-9a-fA-F]{2})*")
+
+
+class CorpusError(Exception):
+    pass
+
+
+# The corpus
+
+
+def check_identifier(value: Any, what: str) -> str:
+    if not isinstance(value, str) or IDENTIFIER.fullmatch(value) is None:
+        raise CorpusError(f"{what} must be an identifier: {value!r}")
+    return value
+
+
+def check_argument(value: Any, what: str) -> None:
+    if isinstance(value, bool) or isinstance(value, int):
+        return
+    if isinstance(value, str) and (DECIMAL.fullmatch(value) or HEX.fullmatch(value)):
+        return
+    raise CorpusError(
+        f"{what} must be an integer, a boolean, a decimal string or 0x-prefixed hex: {value!r}"
+    )
+
+
+def check_expectation(value: Any, what: str) -> None:
+    if not isinstance(value, dict) or len(value) != 1:
+        raise CorpusError(f"{what} must have exactly one of return, panic and revert")
+    (kind, payload), = value.items()
+    if kind == "return":
+        if not isinstance(payload, list):
+            raise CorpusError(f"{what}.return must be a list")
+        for index, result in enumerate(payload):
+            check_argument(result, f"{what}.return[{index}]")
+    elif kind == "panic":
+        if isinstance(payload, bool) or not (
+            (isinstance(payload, int) and payload >= 0)
+            or (isinstance(payload, str) and HEX.fullmatch(payload) and payload != "0x")
+        ):
+            raise CorpusError(f"{what}.panic must be a natural number or 0x-prefixed hex")
+    elif kind == "revert":
+        if not isinstance(payload, str) or HEX.fullmatch(payload) is None:
+            raise CorpusError(f"{what}.revert must be 0x-prefixed hex")
+    else:
+        raise CorpusError(f"{what} has unknown kind {kind!r}")
+
+
+def check_fuel(value: Any, what: str) -> None:
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise CorpusError(f"{what} must be a positive integer")
+
+
+def load_corpus(path: Path) -> dict[str, Any]:
+    try:
+        corpus = exporter.read_json(path)
+    except (OSError, json.JSONDecodeError) as error:
+        raise CorpusError(f"{path}: {error}") from error
+    if not isinstance(corpus, dict) or corpus.get("format") != CORPUS_FORMAT:
+        raise CorpusError(f"{path}: format must be {CORPUS_FORMAT}")
+    check_fuel(corpus.get("fuel"), "fuel")
+    suites = corpus.get("suites")
+    if not isinstance(suites, list) or not suites:
+        raise CorpusError("suites must be a non-empty list")
+    suite_names: set[str] = set()
+    theorems: set[str] = set()
+    for suite in suites:
+        if not isinstance(suite, dict):
+            raise CorpusError("a suite must be an object")
+        name = check_identifier(suite.get("name"), "suite name")
+        if name in suite_names:
+            raise CorpusError(f"duplicate suite {name}")
+        suite_names.add(name)
+        for key in ("source", "contract", "artifact"):
+            if not isinstance(suite.get(key), str) or not suite[key]:
+                raise CorpusError(f"suite {name}: {key} must be a string")
+        cases = suite.get("cases")
+        if not isinstance(cases, list) or not cases:
+            raise CorpusError(f"suite {name}: cases must be a non-empty list")
+        case_names: set[str] = set()
+        for case in cases:
+            if not isinstance(case, dict):
+                raise CorpusError(f"suite {name}: a case must be an object")
+            case_name = check_identifier(case.get("name"), f"suite {name}: case name")
+            what = f"{name}.{case_name}"
+            if case_name in case_names:
+                raise CorpusError(f"duplicate case {what}")
+            case_names.add(case_name)
+            theorem = f"{name}_{case_name}"
+            if theorem in theorems:
+                raise CorpusError(f"case {what} repeats theorem name {theorem}")
+            theorems.add(theorem)
+            if not isinstance(case.get("function"), str) or not case["function"]:
+                raise CorpusError(f"{what}: function must be a string")
+            args = case.get("args")
+            if not isinstance(args, list):
+                raise CorpusError(f"{what}: args must be a list")
+            for index, arg in enumerate(args):
+                check_argument(arg, f"{what}.args[{index}]")
+            check_expectation(case.get("expect"), f"{what}.expect")
+            if "fuel" in case:
+                check_fuel(case["fuel"], f"{what}.fuel")
+            unknown = set(case) - {"name", "function", "args", "expect", "fuel"}
+            if unknown:
+                raise CorpusError(f"{what}: unknown fields {sorted(unknown)}")
+    return corpus
+
+
+def case_theorem(suite: dict[str, Any], case: dict[str, Any]) -> str:
+    return f"{suite['name']}_{case['name']}"
+
+
+def suite_theorems(suite: dict[str, Any]) -> list[str]:
+    prefix = f"corpus_{suite['name']}"
+    return [f"{prefix}_elaborates", f"{prefix}_program_wf"]
+
+
+# External checks
+
+
+def check(name: str, subject: str, failure: str | None) -> dict[str, str]:
+    result = {"check": name, "subject": subject, "status": "pass" if failure is None else "fail"}
+    if failure is not None:
+        result["detail"] = failure
+    return result
+
+
+def read_artifact(root: Path, path: str) -> dict[str, Any]:
+    artifact = exporter.read_json(root / path)
+    if not isinstance(artifact, dict) or artifact.get("format") != ARTIFACT_FORMAT:
+        raise CorpusError(f"{path}: format must be {ARTIFACT_FORMAT}")
+    return artifact
+
+
+def check_artifacts(root: Path, corpus: dict[str, Any]) -> list[dict[str, str]]:
+    """Profile, compiler and source freshness of every artifact, without solc."""
+    pin = (root / exporter.PIN_FILE.relative_to(exporter.ROOT)).read_text(encoding="ascii").strip()
+    profile = exporter.read_json(root / exporter.DEFAULT_PROFILE.relative_to(exporter.ROOT))
+    checks: list[dict[str, str]] = []
+    artifacts: dict[str, dict[str, Any] | None] = {}
+    for suite in corpus["suites"]:
+        path = suite["artifact"]
+        if path not in artifacts:
+            try:
+                artifacts[path] = read_artifact(root, path)
+            except (OSError, json.JSONDecodeError, CorpusError) as error:
+                artifacts[path] = None
+                checks.append(check("artifact-readable", path, str(error)))
+                continue
+            artifact = artifacts[path]
+            checks.append(check("artifact-readable", path, None))
+            recorded_pin = artifact.get("compiler", {}).get("pin")
+            checks.append(check(
+                "artifact-compiler-pin", path,
+                None if recorded_pin == pin else f"records {recorded_pin}, SOLIDITY_PIN is {pin}",
+            ))
+            checks.append(check(
+                "artifact-profile", path,
+                None if artifact.get("profile") == profile
+                else "recorded profile differs from the pinned profile",
+            ))
+        artifact = artifacts[path]
+        if artifact is None:
+            continue
+        source = suite["source"]
+        subject = f"{path}:{source}"
+        recorded = artifact.get("input", {}).get("sources", {}).get(source, {}).get("content")
+        try:
+            current = (root / source).read_text(encoding="utf-8")
+        except OSError as error:
+            checks.append(check("source-fresh", subject, str(error)))
+            continue
+        checks.append(check(
+            "source-fresh", subject,
+            None if recorded == current
+            else "the artifact was not compiled from the current source; regenerate it",
+        ))
+        bytecode = (
+            artifact.get("output", {}).get("contracts", {}).get(source, {})
+            .get(suite["contract"], {}).get("evm", {}).get("deployedBytecode", {}).get("object")
+        )
+        checks.append(check(
+            "deployed-bytecode", f"{subject}:{suite['contract']}",
+            None if isinstance(bytecode, str) and bytecode else "no deployed bytecode",
+        ))
+    return checks
+
+
+def staged_files(script: str) -> set[str]:
+    match = re.search(r"holbuild_extra_deps\s*\[(.*?)\]", script.split("fun holbuild_extra_deps", 1)[-1], re.S)
+    return set(re.findall(r'"([^"]*)"', match.group(1))) if match else set()
+
+
+def check_staging(root: Path, corpus_path: Path, corpus: dict[str, Any]) -> dict[str, str]:
+    """The corpus theory must stage the corpus and every artifact, so that
+    holbuild rebuilds it when any of them changes."""
+    staged = staged_files((root / CORPUS_SCRIPT).read_text(encoding="utf-8"))
+    wanted = {f"../{corpus_path.as_posix()}"} | {f"../{s['artifact']}" for s in corpus["suites"]}
+    missing = sorted(wanted - staged)
+    return check(
+        "corpus-staged", CORPUS_SCRIPT.as_posix(),
+        None if not missing else f"holbuild_extra_deps does not list {', '.join(missing)}",
+    )
+
+
+def reproduce_artifacts(root: Path, corpus: dict[str, Any], solc: Path, regenerate: bool) -> list[dict[str, str]]:
+    checks = []
+    for path in sorted({suite["artifact"] for suite in corpus["suites"]}):
+        try:
+            committed = read_artifact(root, path)
+            sources = [root / name for name in committed["input"]["sources"]]
+            fresh = exporter.build_artifact(solc, sources, exporter.DEFAULT_PROFILE)
+        except (OSError, KeyError, json.JSONDecodeError, CorpusError, SystemExit) as error:
+            checks.append(check("artifact-reproducible", path, str(error)))
+            continue
+        if regenerate:
+            exporter.write_json_atomic(root / path, fresh)
+            checks.append(check("artifact-regenerated", path, None))
+        else:
+            same = exporter.json_text(fresh) == (root / path).read_text(encoding="utf-8")
+            checks.append(check(
+                "artifact-reproducible", path,
+                None if same else "the pinned compiler produces a different artifact",
+            ))
+    return checks
+
+
+# The HOL run
+
+
+def parse_results(text: str) -> list[dict[str, Any]]:
+    results = []
+    for line in text.splitlines():
+        if line.startswith(RESULT_PREFIX):
+            try:
+                results.append(json.loads(line[len(RESULT_PREFIX):]))
+            except json.JSONDecodeError:
+                pass
+    return results
+
+
+def run_hol(root: Path, holbuild: str, jobs: int | None, force: bool,
+            build_args: list[str]) -> dict[str, Any]:
+    command = [holbuild]
+    if jobs is not None:
+        command += ["-j", str(jobs)]
+    command += ["build"] + (["--force=theory"] if force else []) + build_args + [CORPUS_THEORY]
+    print("+", " ".join(command), flush=True)
+    lines = []
+    try:
+        with subprocess.Popen(command, cwd=root, text=True, stdout=subprocess.PIPE,
+                              stderr=subprocess.STDOUT) as proc:
+            assert proc.stdout is not None
+            for line in proc.stdout:
+                sys.stdout.write(line)
+                lines.append(line)
+            status = proc.wait()
+    except OSError as error:
+        return {"command": command, "status": None, "error": str(error), "ran": False, "results": []}
+    output = "".join(lines)
+    logs = re.findall(r"child log: (.*)", output)
+    log = Path(logs[-1].strip()) if logs else (
+        root / ".holbuild" / "logs" / "current" / "solidity-hol" / CORPUS_THEORY / "build.log")
+    ran = bool(logs) or re.search(rf"^{CORPUS_THEORY} built$", output, re.M) is not None
+    results = []
+    if ran:
+        try:
+            results = parse_results(log.read_text(encoding="utf-8", errors="replace"))
+        except OSError:
+            results = parse_results(output)
+    return {"command": command, "status": status, "ran": ran, "results": results,
+            "log": str(log) if ran else None}
+
+
+# Reporting
+
+
+def write_reproduction(root: Path, directory: Path, suite: dict[str, Any],
+                       case: dict[str, Any] | None, result: dict[str, Any], fuel: int) -> None:
+    directory.mkdir(parents=True, exist_ok=True)
+    try:
+        artifact = read_artifact(root, suite["artifact"])
+    except (OSError, json.JSONDecodeError, CorpusError):
+        artifact = None
+    inputs = {"suite": suite["name"]}
+    inputs.update({key: suite[key] for key in ("source", "contract", "artifact")})
+    if case is not None:
+        inputs.update({"case": case["name"], "function": case["function"],
+                       "args": case["args"], "expect": case["expect"],
+                       "fuel": case.get("fuel", fuel)})
+    exporter.write_json_atomic(directory / "inputs.json", inputs)
+    exporter.write_json_atomic(directory / "outcomes.json", result)
+    if artifact is not None:
+        exporter.write_json_atomic(directory / "compiler.json", {
+            "compiler": artifact.get("compiler"),
+            "profile": artifact.get("profile"),
+            "settings": artifact.get("input", {}).get("settings"),
+        })
+        shutil.copyfile(root / suite["artifact"], directory / "artifact.json")
+        for name, source in artifact.get("input", {}).get("sources", {}).items():
+            target = directory / "sources" / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(source.get("content", ""), encoding="utf-8")
+
+
+def summarise(report: dict[str, Any]) -> str:
+    lines = ["# Differential corpus report", ""]
+    hol = report["hol"]
+    if hol is None:
+        lines.append("The HOL corpus was not run (--no-hol).")
+    else:
+        lines.append(f"HOL command: `{' '.join(hol['command'])}` (status {hol['status']}).")
+    lines += ["", "## Kernel-checked witnesses", "",
+              "Theorems of solidityDifferentialCorpusTheory, proved by the HOL kernel "
+              "(with cv_compute) when the theory was built.", "",
+              "| theorem | status |", "| --- | --- |"]
+    for witness in report["kernel_checked"]:
+        lines.append(f"| `{witness['theorem']}` | {witness['status']} |")
+    lines += ["", "## External checks", "",
+              "Performed by this driver outside the kernel.", "",
+              "| check | subject | status |", "| --- | --- | --- |"]
+    for item in report["external_checks"]:
+        status = item["status"] + (f": {item['detail']}" if "detail" in item else "")
+        lines.append(f"| {item['check']} | `{item['subject']}` | {status} |")
+    lines += ["", "## Failures", ""]
+    if not report["failures"]:
+        lines.append("None.")
+    for failure in report["failures"]:
+        lines.append(f"- {json.dumps(failure, sort_keys=True)}")
+    return "\n".join(lines) + "\n"
+
+
+def build_report(root: Path, corpus_path: Path, corpus: dict[str, Any],
+                 checks: list[dict[str, str]], hol: dict[str, Any] | None,
+                 report_dir: Path) -> dict[str, Any]:
+    failures: list[dict[str, Any]] = [
+        {"kind": "external-check", **item} for item in checks if item["status"] != "pass"
+    ]
+    kernel_checked: list[dict[str, Any]] = []
+    fuel = corpus["fuel"]
+    if hol is not None:
+        results = hol["results"]
+        suite_results = {r.get("suite"): r for r in results if r.get("kind") == "suite"}
+        case_results = {(r.get("suite"), r.get("case")): r for r in results if r.get("kind") == "case"}
+        built = hol["status"] == 0
+        for suite in corpus["suites"]:
+            suite_result = suite_results.get(suite["name"])
+            if suite_result is not None and suite_result.get("status") != "ok":
+                failures.append({"kind": "suite", **suite_result})
+                write_reproduction(root, report_dir / "failures" / suite["name"], suite, None,
+                                   suite_result, fuel)
+                continue
+            if built or suite_result is not None:
+                for theorem in suite_theorems(suite):
+                    kernel_checked.append({"theorem": theorem, "suite": suite["name"],
+                                           "status": "proved" if hol["ran"] else "proved (cached)"})
+            for case in suite["cases"]:
+                theorem = case_theorem(suite, case)
+                result = case_results.get((suite["name"], case["name"]))
+                if result is not None and result.get("status") == "agree":
+                    kernel_checked.append({"theorem": theorem, "suite": suite["name"],
+                                           "case": case["name"], "status": "proved",
+                                           "outcome": result.get("outcome")})
+                elif result is None and built and not hol["ran"]:
+                    kernel_checked.append({"theorem": theorem, "suite": suite["name"],
+                                           "case": case["name"], "status": "proved (cached)"})
+                elif result is not None:
+                    failures.append({"kind": "case", **result})
+                    write_reproduction(root, report_dir / "failures" / suite["name"] / case["name"],
+                                       suite, case, result, fuel)
+                elif hol["ran"] and suite_result is not None:
+                    failures.append({"kind": "case", "suite": suite["name"], "case": case["name"],
+                                     "status": "missing", "message": "no result was reported"})
+        if hol["status"] != 0 and not any(f["kind"] in ("suite", "case") for f in failures):
+            failures.append({"kind": "hol-build", "status": hol["status"],
+                             "message": hol.get("error", "the HOL build failed"),
+                             "log": hol.get("log")})
+    return {
+        "format": REPORT_FORMAT,
+        "corpus": corpus_path.as_posix(),
+        "hol": None if hol is None else {k: hol[k] for k in ("command", "status", "ran") if k in hol},
+        "kernel_checked": kernel_checked,
+        "external_checks": checks,
+        "failures": failures,
+    }
+
+
+def parse_args(argv: list[str] | None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--report-dir", type=Path, default=ROOT / "differential-report")
+    parser.add_argument("--solc", type=Path, help="pinned solc, to check that artifacts reproduce")
+    parser.add_argument("--regenerate", action="store_true",
+                        help="rewrite the artifacts with --solc instead of checking them")
+    parser.add_argument("--holbuild", default="holbuild")
+    parser.add_argument("-j", "--jobs", type=int)
+    parser.add_argument("--allow-cached", action="store_true",
+                        help="accept a cached corpus theory instead of rebuilding it")
+    parser.add_argument("--no-hol", action="store_true", help="run the external checks only")
+    parser.add_argument("build_args", nargs="*",
+                        help="extra holbuild build options, after --")
+    args = parser.parse_args(argv)
+    if args.regenerate and args.solc is None:
+        parser.error("--regenerate needs --solc")
+    return args
+
+
+def main(argv: list[str] | None = None, root: Path = ROOT) -> int:
+    args = parse_args(argv)
+    try:
+        corpus = load_corpus(root / CORPUS)
+    except CorpusError as error:
+        print(f"invalid corpus: {error}", file=sys.stderr)
+        return 1
+    checks: list[dict[str, str]] = []
+    if args.solc is not None:
+        checks += reproduce_artifacts(root, corpus, args.solc, args.regenerate)
+    checks += check_artifacts(root, corpus)
+    checks.append(check_staging(root, CORPUS, corpus))
+    hol = None
+    if not args.no_hol:
+        hol = run_hol(root, args.holbuild, args.jobs, not args.allow_cached, args.build_args)
+    report_dir = args.report_dir.resolve()
+    if (report_dir / "failures").exists():
+        shutil.rmtree(report_dir / "failures")
+    report = build_report(root, CORPUS, corpus, checks, hol, report_dir)
+    exporter.write_json_atomic(report_dir / "report.json", report)
+    (report_dir / "report.md").write_text(summarise(report), encoding="utf-8")
+    proved = sum(1 for w in report["kernel_checked"] if "case" in w)
+    cases = sum(len(suite["cases"]) for suite in corpus["suites"])
+    print(f"differential corpus: {proved}/{cases} cases kernel checked, "
+          f"{sum(1 for c in checks if c['status'] == 'pass')}/{len(checks)} external checks passed, "
+          f"{len(report['failures'])} failures; report in {report_dir}")
+    return 0 if not report["failures"] and (hol is None or hol["status"] == 0) else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
