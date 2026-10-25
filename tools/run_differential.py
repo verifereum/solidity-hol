@@ -201,6 +201,27 @@ def check_artifacts(root: Path, corpus: dict[str, Any]) -> list[dict[str, str]]:
                 None if artifact.get("profile") == profile
                 else "recorded profile differs from the pinned profile",
             ))
+            reported_version = artifact.get("compiler", {}).get("reportedVersion")
+            identity = (exporter.VERSION_RE.search(reported_version)
+                        if isinstance(reported_version, str) else None)
+            identity_matches = (
+                identity is not None
+                and identity.group(1) == profile["compilerVersion"]
+                and len(identity.group(2)) >= 8
+                and pin.lower().startswith(identity.group(2).lower())
+            )
+            checks.append(check(
+                "artifact-compiler-version", path,
+                None if identity_matches else
+                f"reported compiler {reported_version!r} does not match "
+                f"{profile['compilerVersion']} at {pin}",
+            ))
+            expected_settings = {**profile["settings"], "outputSelection": exporter.OUTPUT_SELECTION}
+            checks.append(check(
+                "artifact-settings", path,
+                None if artifact.get("input", {}).get("settings") == expected_settings
+                else "Standard JSON settings differ from the pinned profile and output selection",
+            ))
         artifact = artifacts[path]
         if artifact is None:
             continue
@@ -387,6 +408,9 @@ def build_report(root: Path, corpus_path: Path, corpus: dict[str, Any],
         built = hol["status"] == 0
         for suite in corpus["suites"]:
             suite_result = suite_results.get(suite["name"])
+            if suite_result is None and built and hol["ran"]:
+                suite_result = {"kind": "suite", "suite": suite["name"], "status": "missing",
+                                "message": "no suite result was reported"}
             if suite_result is not None and suite_result.get("status") != "ok":
                 failures.append({"kind": "suite", **suite_result})
                 write_reproduction(root, report_dir / "failures" / suite["name"], suite, None,
