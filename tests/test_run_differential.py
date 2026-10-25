@@ -50,9 +50,13 @@ class FakeRoot:
         pin = (ROOT / "SOLIDITY_PIN").read_text(encoding="ascii").strip()
         self.write(ARTIFACT, json.dumps({
             "format": driver.ARTIFACT_FORMAT,
-            "compiler": {"pin": pin, "reportedVersion": "Version: 0.8.37"},
+            "compiler": {"pin": pin, "reportedVersion": f"Version: 0.8.37+commit.{pin[:8]}"},
             "profile": json.loads(profile.read_text(encoding="utf-8")),
-            "input": {"settings": {}, "sources": {SOURCE: {"content": "contract A {}\n"}}},
+            "input": {
+                "settings": {**json.loads(profile.read_text(encoding="utf-8"))["settings"],
+                             "outputSelection": driver.exporter.OUTPUT_SELECTION},
+                "sources": {SOURCE: {"content": "contract A {}\n"}},
+            },
             "output": {"contracts": {SOURCE: {"A": {"evm": {"deployedBytecode": {"object": "00"}}}}}},
         }))
         self.write(driver.CORPUS_SCRIPT.as_posix(), textwrap.dedent(f"""\
@@ -133,6 +137,37 @@ class CorpusTests(unittest.TestCase):
             self.assertEqual(driver.check_staging(fake.root, driver.CORPUS, corpus())["status"],
                              "fail")
 
+    def test_detects_compiler_identity_inconsistent_with_pin_and_profile(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            fake = FakeRoot(Path(temporary))
+            path = fake.root / ARTIFACT
+            artifact = json.loads(path.read_text(encoding="utf-8"))
+            commit = artifact["compiler"]["pin"][:8]
+            for version in (f"Version: 0.8.20+commit.{commit}",
+                            "Version: 0.8.37+commit.00000000",
+                            f"Version: 0.8.37+commit.{commit[:4]}",
+                            "Version: 0.8.37", None):
+                with self.subTest(version=version):
+                    artifact["compiler"]["reportedVersion"] = version
+                    fake.write(ARTIFACT, json.dumps(artifact))
+                    checks = driver.check_artifacts(fake.root, corpus())
+                    self.assertEqual([c["check"] for c in checks if c["status"] != "pass"],
+                                     ["artifact-compiler-version"])
+
+    def test_detects_input_settings_inconsistent_with_profile(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            fake = FakeRoot(Path(temporary))
+            original = json.loads((fake.root / ARTIFACT).read_text(encoding="utf-8"))
+            for key, value in (("viaIR", False), ("evmVersion", "paris"),
+                               ("outputSelection", {})):
+                with self.subTest(setting=key):
+                    artifact = json.loads(json.dumps(original))
+                    artifact["input"]["settings"][key] = value
+                    fake.write(ARTIFACT, json.dumps(artifact))
+                    checks = driver.check_artifacts(fake.root, corpus())
+                    self.assertEqual([c["check"] for c in checks if c["status"] != "pass"],
+                                     ["artifact-settings"])
+
 
 class DriverTests(unittest.TestCase):
     def test_agreement_passes(self) -> None:
@@ -180,6 +215,46 @@ class DriverTests(unittest.TestCase):
             status, report = fake.run(fake.holbuild([SUITE_OK], 0))
             self.assertEqual(status, 1)
             self.assertEqual([f["status"] for f in report["failures"]], ["missing"])
+
+    def test_missing_suite_result_fails_without_claiming_witnesses(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            fake = FakeRoot(Path(temporary))
+            status, report = fake.run(fake.holbuild([], 0))
+            self.assertEqual(status, 1)
+            self.assertEqual([f["status"] for f in report["failures"]], ["missing"])
+            self.assertEqual(report["kernel_checked"], [])
+            self.assertTrue((fake.root / "report/failures/a/inputs.json").is_file())
+
+    def test_missing_suite_result_does_not_discard_other_suites(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            fake = FakeRoot(Path(temporary))
+            data = corpus()
+            second = {**data["suites"][0], "name": "b"}
+            data["suites"].append(second)
+            fake.write(driver.CORPUS.as_posix(), json.dumps(data))
+            status, report = fake.run(fake.holbuild([
+                SUITE_OK,
+                {"kind": "case", "suite": "a", "case": "f_returns", "status": "agree",
+                 "theorem": "a_f_returns", "outcome": RETURNED},
+            ], 0))
+            self.assertEqual(status, 1)
+            self.assertEqual([(f["suite"], f["status"]) for f in report["failures"]],
+                             [("b", "missing")])
+            self.assertEqual(len(report["kernel_checked"]), 3)
+            self.assertTrue(all(w["suite"] == "a" for w in report["kernel_checked"]))
+
+    def test_cached_build_keeps_witnesses_without_result_log(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            fake = FakeRoot(Path(temporary))
+            fake.write("holbuild", f"#!{sys.executable}\n"
+                       f"print('{driver.CORPUS_THEORY} restored from cache')\n")
+            holbuild = fake.root / "holbuild"
+            holbuild.chmod(0o755)
+            status, report = fake.run(holbuild)
+            self.assertEqual(status, 0)
+            self.assertEqual(len(report["kernel_checked"]), 3)
+            self.assertTrue(all(w["status"] == "proved (cached)"
+                                for w in report["kernel_checked"]))
 
     def test_build_failure_without_results_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
