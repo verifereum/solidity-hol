@@ -105,13 +105,16 @@ def compile_standard_json(solc: Path, compiler_input: dict[str, Any]) -> dict[st
     return output
 
 
+def json_text(value: Any) -> str:
+    return json.dumps(value, indent=2, sort_keys=True) + "\n"
+
+
 def write_json_atomic(path: Path, value: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as stream:
-            json.dump(value, stream, indent=2, sort_keys=True)
-            stream.write("\n")
+            stream.write(json_text(value))
         os.replace(temporary_name, path)
     except BaseException:
         try:
@@ -130,21 +133,20 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def main() -> None:
-    args = parse_args()
+def build_artifact(solc: Path, source_paths: list[Path], profile_path: Path) -> dict[str, Any]:
     pin = PIN_FILE.read_text(encoding="ascii").strip()
     if re.fullmatch(r"[0-9a-f]{40}", pin) is None:
         raise SystemExit(f"{PIN_FILE} must contain one lowercase 40-character SHA")
 
-    profile = read_json(args.profile)
+    profile = read_json(profile_path)
     expected_version = profile.get("compilerVersion")
     settings = profile.get("settings")
     if not isinstance(expected_version, str) or not isinstance(settings, dict):
         raise SystemExit("profile must contain compilerVersion and settings")
-    identity = compiler_identity(args.solc, expected_version, pin)
+    identity = compiler_identity(solc, expected_version, pin)
 
     sources: dict[str, dict[str, str]] = {}
-    for path in args.sources:
+    for path in source_paths:
         name = source_name(path)
         if name in sources:
             raise SystemExit(f"duplicate source name: {name}")
@@ -155,8 +157,8 @@ def main() -> None:
         "sources": dict(sorted(sources.items())),
         "settings": {**settings, "outputSelection": OUTPUT_SELECTION},
     }
-    compiler_output = compile_standard_json(args.solc, compiler_input)
-    artifact = {
+    compiler_output = compile_standard_json(solc, compiler_input)
+    return {
         "format": "solidity-hol-solc-artifact-v1",
         "compiler": {
             "pin": pin,
@@ -166,7 +168,11 @@ def main() -> None:
         "input": compiler_input,
         "output": compiler_output,
     }
-    write_json_atomic(args.output, artifact)
+
+
+def main() -> None:
+    args = parse_args()
+    write_json_atomic(args.output, build_artifact(args.solc, args.sources, args.profile))
 
 
 if __name__ == "__main__":

@@ -101,6 +101,24 @@ jobs:
           path: ~/.cache/holbuild
           key: ${{ steps.cache-key.outputs.toolchain-key }}
 
+      # A cached corpus theory was built from identical inputs, so it is
+      # accepted rather than rebuilt; failures are never cached.
+      - name: Run differential regression corpus
+        env:
+          TMPDIR: ${{ runner.temp }}
+        run: >-
+          python3 tools/run_differential.py -j"$(nproc)" --allow-cached
+          --report-dir "$RUNNER_TEMP/differential-report"
+          -- --skip-checkpoints --skip-proof-steps
+
+      - name: Upload differential report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: differential-report
+          path: ${{ runner.temp }}/differential-report
+          if-no-files-found: ignore
+
       - name: Build project roll-up
         env:
           TMPDIR: ${{ runner.temp }}
