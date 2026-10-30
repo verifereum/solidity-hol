@@ -19,6 +19,7 @@ Overload unchecked = “UncheckedArithmetic”
 Definition scalar_env_def:
   scalar_env = <|
     procedures := [];
+    state_variables := [];
     type_declarations := [(AstId 900, EnumDeclaration 3);
                           (AstId 901, UserValueDeclaration (UintT 64))]
   |>

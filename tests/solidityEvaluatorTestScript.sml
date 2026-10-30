@@ -182,6 +182,7 @@ Definition test_program_def:
     procedures := [add_proc; sum_proc; fact_proc; pair_proc; first_proc;
                    spin_proc; fail_proc; call_fail_proc; callee_proc;
                    caller_proc];
+    state_variables := [];
     entry_procedure := AstId 1
   |>
 End
@@ -263,6 +264,84 @@ QED
 
 Theorem caller_targets_survive_call:
   run 10 (AstId 100) [] = ReturnCompletion [ScalarValue (IntegerValue 9)]
+Proof
+  CONV_TAC cv_eval
+QED
+
+(* Storage: store(x) writes the uint8 state variable 200, at byte 1 of slot
+ * 0, and returns it read back. *)
+
+Definition counter_def:
+  counter = <| state_id := AstId 200; state_type := u8; state_slot := 0w;
+               state_offset := 1 |>
+End
+
+Definition store_proc_def:
+  store_proc = <|
+    procedure_id := AstId 20;
+    parameters := [(AstId 21, u8)];
+    return_bindings := [(AstId 22, u8)];
+    body := [
+      CaptureStateStmt (AstId 23) (AstId 200);
+      WriteScalarStmt (AstId 23) u8 (BoundAtom (AstId 21));
+      DefineStmt (AstId 24) (SingleType u8) (ReadStateOperation (AstId 200));
+      ReturnStmt [BoundAtom (AstId 24)]]
+  |>
+End
+
+Definition storage_program_def:
+  storage_program vs = <|
+    procedures := [store_proc];
+    state_variables := vs;
+    entry_procedure := AstId 20
+  |>
+End
+
+Definition storage_wf_def:
+  storage_wf vs ⇔
+    wf_core_program (core_program_environment [] (storage_program vs))
+      (storage_program vs)
+End
+
+Theorem storage_program_wf:
+  storage_wf [counter]
+Proof
+  EVAL_TAC
+QED
+
+(* A variable that overruns its slot, one declared twice, and an undeclared
+ * one are rejected. *)
+Theorem storage_program_not_wf:
+  ¬storage_wf [counter with state_offset := 32] ∧
+  ¬storage_wf [counter; counter] ∧
+  ¬storage_wf []
+Proof
+  EVAL_TAC
+QED
+
+Definition static_state_def:
+  static_state =
+    initial_state with frame := initial_state.frame with static_context := T
+End
+
+Definition run_store_def:
+  run_store st x =
+    (invoke_source 10 (core_program_environment [] (storage_program [counter]))
+       (AstId 20) [ScalarValue (IntegerValue x)] st []).completion
+End
+
+val () = cv_auto_trans static_state_def;
+val () = cv_auto_trans run_store_def;
+
+Theorem store_reads_back:
+  run_store initial_state 5 = ReturnCompletion [ScalarValue (IntegerValue 5)]
+Proof
+  CONV_TAC cv_eval
+QED
+
+(* The EVM halts exceptionally on SSTORE in a static frame. *)
+Theorem static_store_invalid:
+  run_store static_state 5 = InvalidCompletion "bad scalar write"
 Proof
   CONV_TAC cv_eval
 QED

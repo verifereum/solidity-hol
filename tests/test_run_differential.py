@@ -123,6 +123,19 @@ class CorpusTests(unittest.TestCase):
             with self.assertRaisesRegex(driver.CorpusError, "exactly one"):
                 driver.load_corpus(path)
 
+    def test_rejects_malformed_storage(self) -> None:
+        for storage, message in [([1], "object from slot"),
+                                 ({"0x1": 1}, "slot '0x1'"),
+                                 ({"0": -1}, r"\[0\] is not a 256-bit word"),
+                                 ({"0": "0x01" + "00" * 32}, r"\[0\] is not a 256-bit word")]:
+            case = {"name": "f", "function": "f", "args": [], "storage": storage,
+                    "expect": {"return": []}}
+            with self.subTest(storage=storage), tempfile.TemporaryDirectory() as temporary:
+                path = Path(temporary) / "corpus.json"
+                path.write_text(json.dumps(corpus([case])), encoding="utf-8")
+                with self.assertRaisesRegex(driver.CorpusError, message):
+                    driver.load_corpus(path)
+
     def test_detects_stale_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             fake = FakeRoot(Path(temporary), source="contract A { }\n")

@@ -126,6 +126,15 @@ compiler initially supplies layout calculation; Solidity-HOL interprets the
 layout when reading, writing, and capturing references. The declaration IDs in
 layout entries must resolve to compatible state-variable declarations.
 
+For value-type state variables this is implemented. The importer takes each
+contract's `storageLayout.storage` entries in declaration order, with their
+slot, byte offset and type identifier; `valid_src_unit` requires one entry per
+state variable, naming its declaration and type, and leaves the layout
+calculation itself, including that packed variables don't overlap, to the
+compiler. Elaboration copies slot and offset into the core program's
+`state_variables`. Public state variables, initialisers, constants, immutables
+and reference-type state variables are import errors.
+
 The selected compiler also emits `transientStorageLayout`. It is empty for the
 initial corpus, so transient layout remains unvalidated.
 

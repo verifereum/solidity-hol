@@ -197,6 +197,7 @@ Definition test_program_def:
   test_program = <|
     procedures := [add_proc; count_proc; pair_proc; first_proc; fact_proc;
                    wrapper_proc; void_proc; convert_proc; scope_proc];
+    state_variables := [];
     entry_procedure := AstId 6
   |>
 End
