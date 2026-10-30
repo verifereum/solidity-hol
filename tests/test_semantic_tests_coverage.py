@@ -172,6 +172,8 @@ class ClassifyTests(unittest.TestCase):
     def test_nested_mappings_are_storage_types(self) -> None:
         tid = "t_mapping$_t_int8_$_t_mapping$_t_address_$_t_bytes4_$_$"
         self.assertTrue(coverage.storage_type_supported(tid))
+        self.assertTrue(coverage.storage_type_supported("t_mapping$_t_uint160_$_t_bytes32_$"))
+        self.assertTrue(coverage.storage_type_supported("t_mapping$_t_int80_$_t_bytes16_$"))
         self.assertTrue(coverage.storage_type_supported("t_mapping$_t_address_payable_$_t_bool_$"))
         self.assertFalse(coverage.storage_type_supported("t_mapping$_t_bytes_memory_ptr_$_t_uint8_$"))
         self.assertFalse(coverage.storage_type_supported("t_mapping$_t_uint8_$_t_uint8_$junk"))

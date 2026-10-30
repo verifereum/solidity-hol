@@ -380,7 +380,7 @@ def node_blockers(node: dict[str, Any]) -> list[Blocker]:
 VALUE_TYPE = re.compile(
     r"t_(bool|address_payable|address|u?int(8|16|24|32|40|48|56|64|72|80|88|96|104|112|120"
     r"|128|136|144|152|160|168|176|184|192|200|208|216|224|232|240|248|256)"
-    r"|bytes([1-9]|[12][0-9]|3[0-2]))"
+    r"|bytes([1-9]|[12][0-9]|3[0-2]))(?=_\$_|_\$|$)"
 )
 RATIONAL = re.compile(r"t_rational_(minus_)?[0-9]+_by_[0-9]+")
 
