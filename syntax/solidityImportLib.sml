@@ -87,25 +87,20 @@ fun type_id v = mk_str (string_field (field v "typeDescriptions") "typeIdentifie
 
 fun type_name v = within v (fn v =>
   case node_type v of
-    "Mapping" =>
+    "Mapping" => con "SrcMappingTypeName"
+      [info v, type_name (field v "keyType"), type_name (field v "valueType")]
+  | "ElementaryTypeName" =>
       let
-        val key = field v "keyType"
-        (* solc omits stateMutability on an address mapping key. *)
-        val key_name =
-          if node_type key = "ElementaryTypeName" andalso
-             string_field key "name" = "address" andalso
-             not (Option.isSome (optional_field key "stateMutability"))
-          then con "SrcElementaryTypeName"
-                 [info key, mk_str "address", optionSyntax.mk_some (mk_str "nonpayable")]
-          else type_name key
+        val name = string_field v "name"
+        (* solc omits this on address keys and conversion type names. *)
+        val mutability =
+          case optional_field v "stateMutability" of
+            SOME m => SOME (JSONUtil.asString m)
+          | NONE => if name = "address" then SOME "nonpayable" else NONE
       in
-        con "SrcMappingTypeName" [info v, key_name, type_name (field v "valueType")]
+        con "SrcElementaryTypeName"
+          [info v, mk_str name, mk_opt stringSyntax.string_ty (Option.map mk_str mutability)]
       end
-  | "ElementaryTypeName" => con "SrcElementaryTypeName"
-     [info v, mk_str (string_field v "name"),
-      mk_opt stringSyntax.string_ty
-        (Option.map (mk_str o JSONUtil.asString)
-           (optional_field v "stateMutability"))]
   | other => fail (describe v ^ ": unsupported type name " ^ other))
 
 (* Expressions *)
