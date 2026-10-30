@@ -91,21 +91,22 @@ def read_test(tests_root: Path, path: Path) -> SemanticTest:
                 current = spec
                 sources[current] = []
             else:
-                source_name, _, external = spec.partition("=")
+                source_name, _, external = (part.strip() for part in spec.partition("="))
                 external = external or source_name
                 external_path = Path(os.path.normpath(path.parent / external))
                 sources[source_name] = [external_path.read_text(encoding="utf-8")]
             continue
+        if stripped.startswith("// ----"):
+            break
         if stripped.startswith("// ===="):
             in_settings = True
-        elif stripped.startswith("// ----"):
-            in_settings = False
         elif in_settings:
             setting = SETTING.match(stripped)
             if setting is None:
                 raise TestFormatError(f"{name}: malformed setting {stripped!r}")
             settings[setting.group(1)] = setting.group(2)
-        sources.setdefault(current, []).append(line)
+        else:
+            sources.setdefault(current, []).append(line)
     return SemanticTest(name, {k: "".join(v) for k, v in sources.items()}, settings)
 
 
@@ -232,7 +233,7 @@ TYPE_FEATURES = [
     ("t_type$_t_userDefinedValueType", "user-defined value types"),
     ("t_type$_t_contract", "library calls and contract-name members"),
     ("t_type$_t_super", "inheritance"),
-    ("t_type$_t_bytes", "bytes and string"),
+    ("t_type$_t_bytes_", "bytes and string"),
     ("t_type$_t_string", "bytes and string"),
     ("t_type$_t_array", "arrays"),
     ("t_type", "members of elementary type names"),
@@ -241,13 +242,15 @@ TYPE_FEATURES = [
     ("t_userDefinedValueType", "user-defined value types"),
     ("t_mapping", "mappings"),
     ("t_array", "arrays"),
-    ("t_bytes", "bytes and string"),
+    ("t_bytes_", "bytes and string"),
+    ("t_bytes", "fixed-size bytes members and indexing"),
     ("t_string", "bytes and string"),
     ("t_contract", "external calls and contract members"),
     ("t_super", "inheritance"),
     ("t_address", "address members (balance, call, transfer, …)"),
     ("t_function_event", "events"),
     ("t_function_error", "custom errors"),
+    ("t_error", "custom errors"),
     ("t_function", "function members (selector, address, …)"),
     ("t_module", "imports"),
     ("t_uint", "using for"),
@@ -266,6 +269,17 @@ BUILTINS = {
 
 
 def type_feature(type_identifier: str | None) -> str:
+    """The feature a type needs, classifying a tuple by its first component
+    outside the elementary types."""
+    if (type_identifier or "").startswith("t_tuple$_"):
+        if "$__$" in type_identifier:
+            return "tuples with empty components"
+        for component in type_identifier[len("t_tuple$_"):].split("_$_"):
+            component = component.removesuffix("_$")
+            if component.startswith("t_tuple"):
+                return "nested tuples"
+            if not (VALUE_TYPE.fullmatch(component) or RATIONAL.fullmatch(component)):
+                return type_feature(component)
     for prefix, feature in TYPE_FEATURES:
         if (type_identifier or "").startswith(prefix):
             return feature
@@ -326,17 +340,14 @@ def node_blockers(node: dict[str, Any]) -> list[Blocker]:
             found.append("try/catch")
         if node["kind"] == "structConstructorCall":
             found.append("structs")
-        elif (node["kind"] == "typeConversion"
-              and node["expression"]["nodeType"] != "ElementaryTypeNameExpression"):
-            found.append("conversions to non-elementary types")
     elif kind == "VariableDeclaration":
         if node["stateVariable"]:
             found.append("state variables")
-        elif node["constant"]:
+        if node["constant"]:
             found.append("constants")
-        elif node["mutability"] != "mutable":
+        if node["mutability"] == "immutable":
             found.append("immutables")
-        elif node.get("value") is not None:
+        if node.get("value") is not None:
             found.append("declaration values")
     elif kind == "FunctionDefinition":
         if node["kind"] != "function":
@@ -413,6 +424,9 @@ def elaboration_blockers(node: dict[str, Any]) -> list[Blocker]:
           or (kind == "BinaryOperation"
               and RATIONAL.fullmatch(node["commonType"]["typeIdentifier"]))):
         found.append("constant expressions over literals")
+    elif kind == "Literal" and node["kind"] == "number" and not RATIONAL.fullmatch(
+            node["typeDescriptions"].get("typeIdentifier") or ""):
+        found.append("literals of non-integer types")
     elif kind == "FunctionDefinition" and node["stateMutability"] != "pure":
         found.append("functions not declared pure")
     elif kind == "SourceUnit":
@@ -425,9 +439,13 @@ def elaboration_blockers(node: dict[str, Any]) -> list[Blocker]:
     return [Blocker(kind, feature, "elaboration") for feature in found]
 
 
-def callee_blockers(node: dict[str, Any], callees: set[int]) -> list[Blocker]:
+def callee_blockers(node: dict[str, Any], callees: set[int],
+                    conversions: set[int]) -> list[Blocker]:
     """Type names and function names, which the semantics admits only as the
-    callee of a conversion or a call."""
+    callee of a conversion or a call; and the callees of conversions to
+    non-elementary types, where the importer rejects those."""
+    if node["id"] in conversions and node["nodeType"] != "ElementaryTypeNameExpression":
+        return [Blocker(node["nodeType"], "conversions to non-elementary types", "import")]
     if node["id"] in callees:
         return []
     if node["nodeType"] == "ElementaryTypeNameExpression":
@@ -438,15 +456,53 @@ def callee_blockers(node: dict[str, Any], callees: set[int]) -> list[Blocker]:
     return []
 
 
+INTEGER_TYPE = re.compile(r"t_u?int[0-9]+")
+
+
+def coerced_literals(node: dict[str, Any], by_id: dict[int, dict[str, Any]]) -> list[Blocker]:
+    """Integer literals used where a value of another type is expected, which
+    elaborate_unit converts only to integer types: initial values, returned
+    values, assigned values, operands and arguments."""
+    kind = node["nodeType"]
+    expected: list[tuple[dict[str, Any] | None, dict[str, Any]]] = []
+    if kind == "VariableDeclarationStatement" and len(node["declarations"]) == 1:
+        expected.append((node.get("initialValue"), node["declarations"][0]))
+    elif kind == "Return" and node.get("expression") is not None:
+        returns = by_id.get(node.get("functionReturnParameters"), {}).get("parameters", [])
+        if len(returns) == 1:
+            expected.append((node["expression"], returns[0]))
+    elif kind == "Assignment" and node["operator"] not in ("<<=", ">>="):
+        expected.append((node["rightHandSide"], node))
+    elif kind == "BinaryOperation":
+        common = {"typeDescriptions": node["commonType"]}
+        expected.append((node["leftExpression"], common))
+        if node["operator"] not in ("<<", ">>", "**"):
+            expected.append((node["rightExpression"], common))
+    elif kind == "FunctionCall" and node["kind"] == "functionCall":
+        callee = by_id.get(node["expression"].get("referencedDeclaration"), {})
+        if callee.get("nodeType") == "FunctionDefinition":
+            expected.extend(zip(node["arguments"], callee["parameters"]["parameters"]))
+    for value, target in expected:
+        target_type = target["typeDescriptions"].get("typeIdentifier") or ""
+        if (value is not None and value["nodeType"] == "Literal"
+                and RATIONAL.fullmatch(value["typeDescriptions"].get("typeIdentifier") or "")
+                and VALUE_TYPE.fullmatch(target_type) and not INTEGER_TYPE.fullmatch(target_type)):
+            return [Blocker(kind, "literals of non-integer types", "elaboration")]
+    return []
+
+
 def scan(asts: dict[str, Any]) -> dict[int, list[Blocker]]:
     """Every node the semantics rejects, by node id, the importer's reasons
     first."""
     found: dict[int, list[Blocker]] = {}
     for ast in asts.values():
-        callees = {n["expression"]["id"] for n in nodes(ast) if n["nodeType"] == "FunctionCall"}
+        by_id = {n["id"]: n for n in nodes(ast)}
+        calls = [n for n in by_id.values() if n["nodeType"] == "FunctionCall"]
+        callees = {n["expression"]["id"] for n in calls}
+        conversions = {n["expression"]["id"] for n in calls if n["kind"] == "typeConversion"}
         for node in nodes(ast):
-            blockers = (node_blockers(node) + callee_blockers(node, callees)
-                        + elaboration_blockers(node))
+            blockers = (node_blockers(node) + callee_blockers(node, callees, conversions)
+                        + elaboration_blockers(node) + coerced_literals(node, by_id))
             if blockers:
                 found.setdefault(node["id"], []).extend(blockers)
     return found
@@ -623,7 +679,7 @@ class Report:
             f"git sparse-checkout set --no-cone {TESTS_DIR.as_posix()}",
             f"git fetch --depth 1 --filter=blob:none origin {self.pin}",
             "git checkout FETCH_HEAD && cd -",
-            "tools/semantic_tests_coverage.py ../solidity-tests --solc /path/to/solc-0.8.37",
+            "tools/semantic_tests_coverage.py ../solidity-tests --solc /path/to/solc",
             "```",
             "",
             "| outcome | tests |",

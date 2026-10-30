@@ -13,7 +13,7 @@
       "node_types": [
         "FunctionDefinition"
       ],
-      "only_blocker": 74,
+      "only_blocker": 73,
       "tests": 1270
     },
     {
@@ -22,7 +22,7 @@
       "node_types": [
         "VariableDeclaration"
       ],
-      "only_blocker": 1,
+      "only_blocker": 0,
       "tests": 683
     },
     {
@@ -52,7 +52,7 @@
         "VariableDeclaration"
       ],
       "only_blocker": 15,
-      "tests": 418
+      "tests": 413
     },
     {
       "feature": "source units without exactly one contract",
@@ -69,7 +69,7 @@
       "node_types": [
         "InlineAssembly"
       ],
-      "only_blocker": 18,
+      "only_blocker": 17,
       "tests": 266
     },
     {
@@ -126,6 +126,15 @@
       ],
       "only_blocker": 0,
       "tests": 167
+    },
+    {
+      "feature": "declaration values",
+      "first_rejection": 0,
+      "node_types": [
+        "VariableDeclaration"
+      ],
+      "only_blocker": 0,
+      "tests": 160
     },
     {
       "feature": "inheritance",
@@ -381,6 +390,15 @@
       "tests": 52
     },
     {
+      "feature": "constants",
+      "first_rejection": 5,
+      "node_types": [
+        "VariableDeclaration"
+      ],
+      "only_blocker": 0,
+      "tests": 47
+    },
+    {
       "feature": "inline arrays",
       "first_rejection": 0,
       "node_types": [
@@ -413,7 +431,8 @@
       "node_types": [
         "ErrorDefinition",
         "MemberAccess",
-        "RevertStatement"
+        "RevertStatement",
+        "TupleExpression"
       ],
       "only_blocker": 2,
       "tests": 38
@@ -437,6 +456,20 @@
       "tests": 34
     },
     {
+      "feature": "literals of non-integer types",
+      "first_rejection": 0,
+      "node_types": [
+        "Assignment",
+        "BinaryOperation",
+        "FunctionCall",
+        "Literal",
+        "Return",
+        "VariableDeclarationStatement"
+      ],
+      "only_blocker": 0,
+      "tests": 32
+    },
+    {
       "feature": "named arguments",
       "first_rejection": 7,
       "node_types": [
@@ -449,7 +482,9 @@
       "feature": "conversions to non-elementary types",
       "first_rejection": 0,
       "node_types": [
-        "FunctionCall"
+        "Identifier",
+        "IndexAccess",
+        "MemberAccess"
       ],
       "only_blocker": 0,
       "tests": 30
@@ -486,6 +521,25 @@
       ],
       "only_blocker": 0,
       "tests": 26
+    },
+    {
+      "feature": "immutables",
+      "first_rejection": 0,
+      "node_types": [
+        "VariableDeclaration"
+      ],
+      "only_blocker": 0,
+      "tests": 24
+    },
+    {
+      "feature": "members of elementary type names",
+      "first_rejection": 0,
+      "node_types": [
+        "IndexAccess",
+        "TupleExpression"
+      ],
+      "only_blocker": 0,
+      "tests": 24
     },
     {
       "feature": "abstract contracts",
@@ -526,16 +580,6 @@
       "tests": 18
     },
     {
-      "feature": "members of elementary type names",
-      "first_rejection": 0,
-      "node_types": [
-        "IndexAccess",
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 18
-    },
-    {
       "feature": "built-in erc7201",
       "first_rejection": 3,
       "node_types": [
@@ -543,6 +587,16 @@
       ],
       "only_blocker": 0,
       "tests": 14
+    },
+    {
+      "feature": "fixed-size bytes members and indexing",
+      "first_rejection": 0,
+      "node_types": [
+        "IndexAccess",
+        "MemberAccess"
+      ],
+      "only_blocker": 0,
+      "tests": 12
     },
     {
       "feature": "literal subdenominations (ether, days, \u2026)",
@@ -554,15 +608,6 @@
       "tests": 12
     },
     {
-      "feature": "constants",
-      "first_rejection": 5,
-      "node_types": [
-        "VariableDeclaration"
-      ],
-      "only_blocker": 4,
-      "tests": 11
-    },
-    {
       "feature": "receive functions",
       "first_rejection": 1,
       "node_types": [
@@ -572,22 +617,13 @@
       "tests": 7
     },
     {
-      "feature": "values of type t_tuple$_t_bool_$_t_bytes_memory_ptr_$",
+      "feature": "tuples with empty components",
       "first_rejection": 0,
       "node_types": [
         "TupleExpression"
       ],
       "only_blocker": 0,
-      "tests": 7
-    },
-    {
-      "feature": "values of type t_tuple$_t_type$_t_uint256_$_$_t_type$_t_bytes_storage_ptr_$_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 5
+      "tests": 6
     },
     {
       "feature": "built-in blobhash",
@@ -635,487 +671,10 @@
       "tests": 2
     },
     {
-      "feature": "values of type t_tuple$_t_array$_t_uint256_$dyn_memory_ptr_$_t_array$_t_uint256_$1_calldata_ptr_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 2
-    },
-    {
-      "feature": "values of type t_tuple$_t_bytes_memory_ptr_$_t_bytes_memory_ptr_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 2
-    },
-    {
-      "feature": "values of type t_tuple$_t_bytes_storage_$_t_bytes_storage_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 2
-    },
-    {
-      "feature": "values of type t_tuple$_t_string_memory_ptr_$_t_string_memory_ptr_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 2
-    },
-    {
-      "feature": "values of type t_tuple$_t_uint256_$_t_array$_t_uint256_$dyn_calldata_ptr_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 2
-    },
-    {
       "feature": "built-in mulmod",
       "first_rejection": 0,
       "node_types": [
         "Identifier"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_error",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$__$__$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$__$__$_t_uint256_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$__$_t_int256_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_array$_t_string_memory_ptr_$2_memory_ptr_$_t_array$_t_string_memory_ptr_$3_memory_ptr_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_array$_t_uint256_$dyn_calldata_ptr_$_t_array$_t_uint256_$2_calldata_ptr_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_array$_t_uint256_$dyn_memory_ptr_$_t_uint256_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_bool_$_t_struct$_T_$8_calldata_ptr_$_t_array$_t_bytes32_$2_calldata_ptr_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_bytes_memory_ptr_$_t_tuple$_t_bytes_memory_ptr_$_t_bytes_memory_ptr_$_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_enum$_E_$258_$_t_enum$_E_$258_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_int256_$__$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_mapping$_t_uint8_$_t_uint8_$_$_t_uint8_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_string_calldata_ptr_$_t_string_calldata_ptr_$_t_uint256_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_string_calldata_ptr_$_t_stringliteral_c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470_$_t_uint256_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_string_calldata_ptr_$_t_uint256_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_string_memory_ptr_$_t_stringliteral_34607c9bbfeb9c23509680f04363f298fdb0b5f9abe327304ecd1daca08cda9c_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_string_storage_$_t_string_storage_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_stringliteral_044852b2a670ade5407e78fb2863c51de9fcb96542a07186fe3aeda6bb8a116d_$_t_tuple$_t_stringliteral_c89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc6_$_t_stringliteral_ad7c5bef027816a800da1736444fb58a807ef4c9603b7848673f7e3a68eb14a5_$_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_stringliteral_4e03657aea45a94fc7d47ba826c8d667c0d1e6e33a64a036ec44f58fa12d6c45_$_t_stringliteral_48bed44d1bcd124a28c27f343a817e5f5243190d3c52bf347daf876de1dbbf77_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_stringliteral_c89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc6_$_t_stringliteral_ad7c5bef027816a800da1736444fb58a807ef4c9603b7848673f7e3a68eb14a5_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_stringliteral_fb79856d4be6e4152983d8f934d820ec61c255bb7f1581914e7da0f335bdbf33_$_t_stringliteral_fb79856d4be6e4152983d8f934d820ec61c255bb7f1581914e7da0f335bdbf33_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_struct$_S_$5_storage_$_t_struct$_S_$5_storage_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_tuple$__$__$_$__$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_tuple$__$_t_int256_$_$__$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_tuple$_t_int256_$__$_$__$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_type$_t_array$_t_uint256_$dyn_memory_ptr_$_$_t_type$_t_array$_t_uint256_$dyn_memory_ptr_$_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_type$_t_int256_$_$_t_type$_t_int256_$_$_t_type$_t_int256_$_$_t_type$_t_int256_$_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_type$_t_uint256_$_$_t_type$_t_uint256_$_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_type$_t_userDefinedValueType$_MyInt_$2_$_$_t_type$_t_userDefinedValueType$_MyInt_$2_$_$_t_type$_t_userDefinedValueType$_MyInt_$2_$_$_t_type$_t_userDefinedValueType$_MyInt_$2_$_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_uint256_$__$_t_uint256_$__$__$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_uint256_$_t_array$_t_uint256_$3_calldata_ptr_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_uint256_$_t_array$_t_uint256_$dyn_memory_ptr_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_uint256_$_t_array$_t_uint256_$dyn_memory_ptr_$_t_uint256_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_uint256_$_t_bytes_memory_ptr_$_t_uint256_$__$__$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_uint256_$_t_enum$_ActionChoices_$17_$_t_bytes32_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_uint256_$_t_function_external_nonpayable$__$returns$__$_$_t_uint256_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_uint256_$_t_stringliteral_c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_uint256_$_t_uint256_$__$_t_uint256_$_t_uint256_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_uint256_$_t_uint256_$_t_array$_t_uint256_$dyn_storage_$_t_bytes_storage_$_t_uint256_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_uint256_$_t_uint256_$_t_array$_t_uint256_$dyn_storage_ptr_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_uint256_$_t_uint256_$_t_bytes_memory_ptr_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_uint256_$_t_uint256_$_t_uint8_$_t_string_memory_ptr_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_uint32_$_t_array$_t_uint32_$dyn_storage_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_uint32_$_t_struct$_S_$11_calldata_ptr_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_uint32_$_t_struct$_S_$11_memory_ptr_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_uint8_$_t_userDefinedValueType$_MyUInt8_$3_$_t_uint8_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_userDefinedValueType$_MyInt_$2_$_t_userDefinedValueType$_MyBytes_$4_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "values of type t_tuple$_t_userDefinedValueType$_U8_$2_$_t_userDefinedValueType$_U8_$2_$",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
       ],
       "only_blocker": 0,
       "tests": 1
@@ -1124,84 +683,84 @@
   "format": "solidity-hol-semantic-tests-coverage-v1",
   "greedy_order": [
     {
-      "admitted": 74,
+      "admitted": 73,
       "feature": "functions not declared pure"
     },
     {
-      "admitted": 132,
+      "admitted": 130,
       "feature": "inline assembly"
     },
     {
-      "admitted": 164,
+      "admitted": 160,
       "feature": "bytes and string"
     },
     {
-      "admitted": 216,
+      "admitted": 200,
       "feature": "state variables"
     },
     {
-      "admitted": 292,
+      "admitted": 276,
       "feature": "arrays"
     },
     {
-      "admitted": 349,
+      "admitted": 333,
       "feature": "structs"
     },
     {
-      "admitted": 398,
+      "admitted": 375,
       "feature": "require/assert/revert"
     },
     {
-      "admitted": 431,
-      "feature": "constructors"
-    },
-    {
-      "admitted": 467,
-      "feature": "operator delete"
-    },
-    {
-      "admitted": 505,
-      "feature": "mappings"
-    },
-    {
-      "admitted": 548,
+      "admitted": 403,
       "feature": "memory arrays (new T[](n))"
     },
     {
-      "admitted": 574,
+      "admitted": 430,
+      "feature": "constructors"
+    },
+    {
+      "admitted": 470,
+      "feature": "mappings"
+    },
+    {
+      "admitted": 503,
+      "feature": "operator delete"
+    },
+    {
+      "admitted": 529,
       "feature": "msg/block/tx globals"
     },
     {
-      "admitted": 607,
+      "admitted": 561,
       "feature": "events"
     },
     {
-      "admitted": 630,
+      "admitted": 583,
       "feature": "constant expressions over literals"
     },
     {
-      "admitted": 655,
+      "admitted": 603,
+      "feature": "declaration values"
+    },
+    {
+      "admitted": 627,
       "feature": "inline arrays"
     },
     {
-      "admitted": 676,
+      "admitted": 648,
       "feature": "modifiers"
     },
     {
-      "admitted": 693,
+      "admitted": 668,
       "feature": "abi.* functions"
     },
     {
-      "admitted": 717,
+      "admitted": 689,
       "feature": "hash and signature built-ins"
     },
     {
-      "admitted": 732,
-      "feature": "contracts without functions"
-    },
-    {
-      "admitted": 748,
-      "feature": "user-defined value types"
+      "admitted": 706,
+      "feature": "custom errors"
     }
   ],
   "profile": "solc-0.8.37-via-ir-osaka",
@@ -1212,8 +771,8 @@
       "features": [
         "abi.* functions",
         "bytes and string",
-        "type names as values",
-        "values of type t_tuple$_t_type$_t_uint256_$_$_t_type$_t_bytes_storage_ptr_$_$"
+        "members of elementary type names",
+        "type names as values"
       ],
       "first": "type names as values",
       "reason": "ElementaryTypeNameExpression 13: unsupported expression ElementaryTypeNameExpression",
@@ -1323,8 +882,7 @@
         "functions not declared pure",
         "inline assembly",
         "members of elementary type names",
-        "type names as values",
-        "values of type t_tuple$_t_type$_t_array$_t_uint256_$dyn_memory_ptr_$_$_t_type$_t_array$_t_uint256_$dyn_memory_ptr_$_$"
+        "type names as values"
       ],
       "first": "arrays",
       "reason": "ArrayTypeName 12: expected ElementaryTypeName",
@@ -1336,8 +894,8 @@
       "features": [
         "abi.* functions",
         "bytes and string",
-        "type names as values",
-        "values of type t_tuple$_t_type$_t_uint256_$_$_t_type$_t_bytes_storage_ptr_$_$"
+        "members of elementary type names",
+        "type names as values"
       ],
       "first": "type names as values",
       "reason": "ElementaryTypeNameExpression 13: unsupported expression ElementaryTypeNameExpression",
@@ -1350,9 +908,9 @@
         "abi.* functions",
         "bytes and string",
         "functions not declared pure",
+        "members of elementary type names",
         "state variables",
-        "type names as values",
-        "values of type t_tuple$_t_type$_t_uint256_$_$_t_type$_t_bytes_storage_ptr_$_$"
+        "type names as values"
       ],
       "first": "state variables",
       "reason": "VariableDeclaration 2: no definition for field \"parameters\" in object",
@@ -1368,8 +926,7 @@
         "functions not declared pure",
         "members of elementary type names",
         "msg/block/tx globals",
-        "type names as values",
-        "values of type t_tuple$_t_type$_t_uint256_$_$_t_type$_t_uint256_$_$"
+        "type names as values"
       ],
       "first": "array slices",
       "reason": "IndexRangeAccess 23: unsupported expression IndexRangeAccess",
@@ -1434,8 +991,7 @@
         "require/assert/revert",
         "source units without exactly one contract",
         "this",
-        "type names as values",
-        "values of type t_tuple$_t_bool_$_t_bytes_memory_ptr_$"
+        "type names as values"
       ],
       "first": "inheritance",
       "reason": "ContractDefinition 267: inheritance is not supported",
@@ -1447,6 +1003,7 @@
       "features": [
         "abi.* functions",
         "bytes and string",
+        "declaration values",
         "external calls and contract members",
         "function members (selector, address, \u2026)",
         "function types",
@@ -1488,6 +1045,7 @@
         "abi.* functions",
         "arrays",
         "bytes and string",
+        "declaration values",
         "external calls and contract members",
         "functions not declared pure",
         "hash and signature built-ins",
@@ -1509,6 +1067,7 @@
         "bytes and string",
         "external calls and contract members",
         "functions not declared pure",
+        "literals of non-integer types",
         "this",
         "tuples of literals"
       ],
@@ -1549,6 +1108,7 @@
         "bytes and string",
         "external calls and contract members",
         "functions not declared pure",
+        "literals of non-integer types",
         "memory arrays (new T[](n))",
         "require/assert/revert",
         "this"
@@ -1563,8 +1123,8 @@
       "features": [
         "abi.* functions",
         "bytes and string",
-        "type names as values",
-        "values of type t_tuple$_t_type$_t_uint256_$_$_t_type$_t_bytes_storage_ptr_$_$"
+        "members of elementary type names",
+        "type names as values"
       ],
       "first": "abi.* functions",
       "reason": "MemberAccess 14: unsupported expression MemberAccess",
@@ -1575,8 +1135,7 @@
       "category": "import-rejected",
       "features": [
         "abi.* functions",
-        "bytes and string",
-        "values of type t_tuple$_t_bytes_memory_ptr_$_t_bytes_memory_ptr_$"
+        "bytes and string"
       ],
       "first": "abi.* functions",
       "reason": "MemberAccess 8: unsupported expression MemberAccess",
@@ -1669,6 +1228,7 @@
       "features": [
         "contract creation (new C)",
         "contracts without functions",
+        "declaration values",
         "external calls and contract members",
         "functions not declared pure",
         "imports",
@@ -1688,6 +1248,7 @@
       "features": [
         "abi.* functions",
         "bytes and string",
+        "literals of non-integer types",
         "type names as values",
         "type(\u2026)"
       ],
@@ -1701,6 +1262,7 @@
       "features": [
         "abi.* functions",
         "bytes and string",
+        "literals of non-integer types",
         "structs",
         "type names as values",
         "type(\u2026)"
@@ -1751,8 +1313,7 @@
         "arrays",
         "bytes and string",
         "functions not declared pure",
-        "structs",
-        "values of type t_tuple$_t_bool_$_t_struct$_T_$8_calldata_ptr_$_t_array$_t_bytes32_$2_calldata_ptr_$"
+        "structs"
       ],
       "first": "structs",
       "reason": "UserDefinedTypeName 12: expected ElementaryTypeName",
@@ -1859,8 +1420,7 @@
         "functions not declared pure",
         "libraries",
         "library calls and contract-name members",
-        "source units without exactly one contract",
-        "values of type t_tuple$_t_array$_t_uint256_$dyn_memory_ptr_$_t_array$_t_uint256_$1_calldata_ptr_$"
+        "source units without exactly one contract"
       ],
       "first": "arrays",
       "reason": "ArrayTypeName 25: expected ElementaryTypeName",
@@ -2167,8 +1727,7 @@
         "arrays",
         "bytes and string",
         "functions not declared pure",
-        "state variables",
-        "values of type t_tuple$_t_array$_t_uint256_$dyn_calldata_ptr_$_t_array$_t_uint256_$2_calldata_ptr_$"
+        "state variables"
       ],
       "first": "state variables",
       "reason": "VariableDeclaration 4: no definition for field \"parameters\" in object",
@@ -2194,8 +1753,7 @@
       "features": [
         "arrays",
         "bytes and string",
-        "functions not declared pure",
-        "values of type t_tuple$_t_uint256_$_t_uint256_$_t_uint8_$_t_string_memory_ptr_$"
+        "functions not declared pure"
       ],
       "first": "arrays",
       "reason": "ArrayTypeName 3: expected ElementaryTypeName",
@@ -2245,8 +1803,7 @@
         "abi.* functions",
         "arrays",
         "bytes and string",
-        "functions not declared pure",
-        "values of type t_tuple$_t_array$_t_uint256_$dyn_memory_ptr_$_t_array$_t_uint256_$1_calldata_ptr_$"
+        "functions not declared pure"
       ],
       "first": "arrays",
       "reason": "ArrayTypeName 2: expected ElementaryTypeName",
@@ -2781,6 +2338,7 @@
       "category": "import-rejected",
       "features": [
         "arrays",
+        "declaration values",
         "functions not declared pure",
         "libraries",
         "library calls and contract-name members",
@@ -2932,7 +2490,9 @@
     {
       "category": "import-rejected",
       "features": [
+        "constants",
         "contracts without functions",
+        "declaration values",
         "state variables"
       ],
       "first": "state variables",
@@ -2944,6 +2504,7 @@
       "category": "import-rejected",
       "features": [
         "contracts without functions",
+        "declaration values",
         "state variables"
       ],
       "first": "state variables",
@@ -2992,6 +2553,7 @@
         "call options ({value: \u2026, gas: \u2026})",
         "constructors",
         "contract creation (new C)",
+        "declaration values",
         "external calls and contract members",
         "functions not declared pure",
         "msg/block/tx globals",
@@ -3442,6 +3004,7 @@
       "features": [
         "array slices",
         "bytes and string",
+        "declaration values",
         "functions not declared pure",
         "inline assembly",
         "state variables"
@@ -3456,6 +3019,7 @@
       "features": [
         "array slices",
         "bytes and string",
+        "declaration values",
         "functions not declared pure",
         "state variables"
       ],
@@ -3469,6 +3033,7 @@
       "features": [
         "array slices",
         "bytes and string",
+        "declaration values",
         "functions not declared pure",
         "state variables"
       ],
@@ -3574,7 +3139,9 @@
       "category": "import-rejected",
       "features": [
         "arrays",
+        "constants",
         "constructors",
+        "declaration values",
         "functions not declared pure",
         "state variables"
       ],
@@ -3850,6 +3417,7 @@
       "features": [
         "arrays",
         "functions not declared pure",
+        "literals of non-integer types",
         "state variables"
       ],
       "first": "state variables",
@@ -4113,6 +3681,7 @@
       "category": "import-rejected",
       "features": [
         "bytes and string",
+        "declaration values",
         "functions not declared pure",
         "state variables"
       ],
@@ -4139,8 +3708,10 @@
       "features": [
         "arrays",
         "contract creation (new C)",
+        "declaration values",
         "external calls and contract members",
         "functions not declared pure",
+        "immutables",
         "memory arrays (new T[](n))",
         "require/assert/revert",
         "source units without exactly one contract",
@@ -4228,8 +3799,7 @@
       "features": [
         "arrays",
         "bytes and string",
-        "functions not declared pure",
-        "values of type t_tuple$_t_uint256_$_t_uint256_$_t_bytes_memory_ptr_$"
+        "functions not declared pure"
       ],
       "first": "arrays",
       "reason": "ArrayTypeName 3: expected ElementaryTypeName",
@@ -4263,8 +3833,7 @@
       "category": "import-rejected",
       "features": [
         "arrays",
-        "functions not declared pure",
-        "values of type t_tuple$_t_uint256_$_t_array$_t_uint256_$dyn_memory_ptr_$"
+        "functions not declared pure"
       ],
       "first": "arrays",
       "reason": "ArrayTypeName 4: expected ElementaryTypeName",
@@ -4302,8 +3871,7 @@
         "functions not declared pure",
         "inline arrays",
         "state variables",
-        "tuples of literals",
-        "values of type t_tuple$_t_uint32_$_t_array$_t_uint32_$dyn_storage_$"
+        "tuples of literals"
       ],
       "first": "state variables",
       "reason": "VariableDeclaration 3: no definition for field \"parameters\" in object",
@@ -4316,8 +3884,7 @@
         "bytes and string",
         "functions not declared pure",
         "state variables",
-        "structs",
-        "values of type t_tuple$_t_bytes_storage_$_t_bytes_storage_$"
+        "structs"
       ],
       "first": "state variables",
       "reason": "VariableDeclaration 12: no definition for field \"parameters\" in object",
@@ -4615,6 +4182,7 @@
       "features": [
         "arrays",
         "constructors",
+        "declaration values",
         "functions not declared pure",
         "inline arrays",
         "memory arrays (new T[](n))",
@@ -4630,6 +4198,7 @@
       "features": [
         "arrays",
         "constructors",
+        "declaration values",
         "functions not declared pure",
         "inline arrays",
         "memory arrays (new T[](n))",
@@ -4922,6 +4491,7 @@
       "features": [
         "bytes and string",
         "functions not declared pure",
+        "literals of non-integer types",
         "operator delete",
         "state variables"
       ],
@@ -5152,6 +4722,7 @@
       "category": "import-rejected",
       "features": [
         "arrays",
+        "declaration values",
         "external calls and contract members",
         "functions not declared pure",
         "state variables",
@@ -5230,7 +4801,7 @@
     {
       "category": "import-rejected",
       "features": [
-        "bytes and string",
+        "fixed-size bytes members and indexing",
         "functions not declared pure",
         "state variables"
       ],
@@ -5301,6 +4872,7 @@
       "features": [
         "bytes and string",
         "functions not declared pure",
+        "literals of non-integer types",
         "state variables"
       ],
       "first": "state variables",
@@ -5335,6 +4907,7 @@
       "features": [
         "arrays",
         "bytes and string",
+        "fixed-size bytes members and indexing",
         "functions not declared pure",
         "inline arrays",
         "state variables"
@@ -5347,7 +4920,8 @@
     {
       "category": "import-rejected",
       "features": [
-        "bytes and string"
+        "bytes and string",
+        "fixed-size bytes members and indexing"
       ],
       "first": "bytes and string",
       "reason": "NewExpression 9: unsupported expression NewExpression",
@@ -5445,10 +5019,10 @@
       "features": [
         "arrays",
         "bytes and string",
+        "declaration values",
         "functions not declared pure",
         "inline arrays",
-        "state variables",
-        "values of type t_tuple$_t_string_memory_ptr_$_t_string_memory_ptr_$"
+        "state variables"
       ],
       "first": "state variables",
       "reason": "VariableDeclaration 3: no definition for field \"parameters\" in object",
@@ -5473,6 +5047,7 @@
       "features": [
         "abi.* functions",
         "bytes and string",
+        "declaration values",
         "functions not declared pure",
         "inline assembly",
         "operator delete",
@@ -5560,6 +5135,7 @@
       "category": "import-rejected",
       "features": [
         "arrays",
+        "declaration values",
         "functions not declared pure",
         "inline arrays",
         "operator delete",
@@ -5757,6 +5333,7 @@
       "category": "import-rejected",
       "features": [
         "arrays",
+        "declaration values",
         "functions not declared pure",
         "require/assert/revert",
         "state variables"
@@ -5770,6 +5347,7 @@
       "category": "import-rejected",
       "features": [
         "arrays",
+        "declaration values",
         "functions not declared pure",
         "require/assert/revert",
         "state variables"
@@ -5783,6 +5361,7 @@
       "category": "import-rejected",
       "features": [
         "arrays",
+        "declaration values",
         "functions not declared pure",
         "memory arrays (new T[](n))",
         "operator delete",
@@ -5838,6 +5417,7 @@
       "features": [
         "bytes and string",
         "functions not declared pure",
+        "literals of non-integer types",
         "state variables"
       ],
       "first": "state variables",
@@ -5971,8 +5551,8 @@
         "bytes and string",
         "functions not declared pure",
         "hash and signature built-ins",
-        "type names as values",
-        "values of type t_tuple$_t_type$_t_uint256_$_$_t_type$_t_bytes_storage_ptr_$_$"
+        "members of elementary type names",
+        "type names as values"
       ],
       "first": "array slices",
       "reason": "IndexRangeAccess 17: unsupported expression IndexRangeAccess",
@@ -6078,10 +5658,9 @@
       "category": "import-rejected",
       "features": [
         "bytes and string",
+        "declaration values",
         "functions not declared pure",
-        "state variables",
-        "values of type t_tuple$_t_bytes_storage_$_t_bytes_storage_$",
-        "values of type t_tuple$_t_stringliteral_4e03657aea45a94fc7d47ba826c8d667c0d1e6e33a64a036ec44f58fa12d6c45_$_t_stringliteral_48bed44d1bcd124a28c27f343a817e5f5243190d3c52bf347daf876de1dbbf77_$"
+        "state variables"
       ],
       "first": "state variables",
       "reason": "VariableDeclaration 3: no definition for field \"parameters\" in object",
@@ -6106,6 +5685,8 @@
       "category": "import-rejected",
       "features": [
         "bytes and string",
+        "constants",
+        "declaration values",
         "functions not declared pure",
         "hash and signature built-ins",
         "state variables"
@@ -6160,6 +5741,7 @@
       "features": [
         "built-in erc7201",
         "bytes and string",
+        "declaration values",
         "free functions",
         "functions not declared pure",
         "hash and signature built-ins",
@@ -6249,6 +5831,8 @@
         "array slices",
         "built-in erc7201",
         "bytes and string",
+        "constants",
+        "declaration values",
         "free functions",
         "functions not declared pure",
         "hash and signature built-ins",
@@ -6294,6 +5878,8 @@
       "features": [
         "built-in erc7201",
         "bytes and string",
+        "constants",
+        "declaration values",
         "free functions",
         "hash and signature built-ins",
         "state variables",
@@ -6338,6 +5924,7 @@
       "features": [
         "built-in erc7201",
         "bytes and string",
+        "declaration values",
         "free functions",
         "functions not declared pure",
         "hash and signature built-ins",
@@ -6354,6 +5941,7 @@
       "features": [
         "built-in erc7201",
         "bytes and string",
+        "fixed-size bytes members and indexing",
         "free functions",
         "hash and signature built-ins",
         "require/assert/revert",
@@ -6370,6 +5958,7 @@
         "arrays",
         "built-in erc7201",
         "bytes and string",
+        "fixed-size bytes members and indexing",
         "free functions",
         "functions not declared pure",
         "hash and signature built-ins",
@@ -6648,6 +6237,7 @@
       "category": "import-rejected",
       "features": [
         "inline assembly",
+        "literals of non-integer types",
         "require/assert/revert"
       ],
       "first": "inline assembly",
@@ -6666,7 +6256,8 @@
     {
       "category": "elaboration-rejected",
       "features": [
-        "functions not declared pure"
+        "functions not declared pure",
+        "literals of non-integer types"
       ],
       "first": null,
       "reason": "elaborate_unit returned NONE for cleanup/cleanup_address_types_v2.sol",
@@ -6684,7 +6275,8 @@
     {
       "category": "import-rejected",
       "features": [
-        "inline assembly"
+        "inline assembly",
+        "literals of non-integer types"
       ],
       "first": "inline assembly",
       "reason": "InlineAssembly 16: unsupported statement InlineAssembly",
@@ -6703,7 +6295,8 @@
       "category": "elaboration-rejected",
       "features": [
         "bytes and string",
-        "functions not declared pure"
+        "functions not declared pure",
+        "literals of non-integer types"
       ],
       "first": null,
       "reason": "elaborate_unit returned NONE for cleanup/cleanup_bytes_types_v2.sol",
@@ -6815,6 +6408,8 @@
       "category": "import-rejected",
       "features": [
         "arrays",
+        "constants",
+        "declaration values",
         "state variables"
       ],
       "first": "state variables",
@@ -6825,8 +6420,11 @@
     {
       "category": "import-rejected",
       "features": [
+        "constants",
+        "declaration values",
         "functions not declared pure",
         "inline assembly",
+        "literals of non-integer types",
         "state variables"
       ],
       "first": "state variables",
@@ -6838,8 +6436,10 @@
       "category": "import-rejected",
       "features": [
         "constants",
+        "declaration values",
         "functions not declared pure",
-        "inline assembly"
+        "inline assembly",
+        "literals of non-integer types"
       ],
       "first": "inline assembly",
       "reason": "InlineAssembly 8: unsupported statement InlineAssembly",
@@ -6850,7 +6450,9 @@
       "category": "import-rejected",
       "features": [
         "bytes and string",
+        "constants",
         "contracts without functions",
+        "declaration values",
         "source units without exactly one contract",
         "state variables",
         "type(\u2026)"
@@ -6863,7 +6465,8 @@
     {
       "category": "import-rejected",
       "features": [
-        "constants"
+        "constants",
+        "declaration values"
       ],
       "first": "constants",
       "reason": "VariableDeclaration 8: unsupported source unit member VariableDeclaration",
@@ -6873,6 +6476,8 @@
     {
       "category": "import-rejected",
       "features": [
+        "constants",
+        "declaration values",
         "state variables"
       ],
       "first": "state variables",
@@ -6883,7 +6488,8 @@
     {
       "category": "import-rejected",
       "features": [
-        "constants"
+        "constants",
+        "declaration values"
       ],
       "first": "constants",
       "reason": "VariableDeclaration 8: unsupported source unit member VariableDeclaration",
@@ -6893,7 +6499,8 @@
     {
       "category": "import-rejected",
       "features": [
-        "constants"
+        "constants",
+        "declaration values"
       ],
       "first": "constants",
       "reason": "VariableDeclaration 8: unsupported source unit member VariableDeclaration",
@@ -6904,6 +6511,7 @@
       "category": "import-rejected",
       "features": [
         "constants",
+        "declaration values",
         "external calls and contract members",
         "functions not declared pure",
         "this"
@@ -6916,7 +6524,8 @@
     {
       "category": "import-rejected",
       "features": [
-        "constants"
+        "constants",
+        "declaration values"
       ],
       "first": "constants",
       "reason": "VariableDeclaration 11: unsupported source unit member VariableDeclaration",
@@ -6927,6 +6536,8 @@
       "category": "import-rejected",
       "features": [
         "bytes and string",
+        "constants",
+        "declaration values",
         "functions not declared pure",
         "state variables"
       ],
@@ -6940,9 +6551,9 @@
       "features": [
         "bytes and string",
         "constants",
+        "declaration values",
         "enums",
-        "functions not declared pure",
-        "values of type t_tuple$_t_uint256_$_t_enum$_ActionChoices_$17_$_t_bytes32_$"
+        "functions not declared pure"
       ],
       "first": "enums",
       "reason": "UserDefinedTypeName 57: expected ElementaryTypeName",
@@ -6953,7 +6564,8 @@
       "category": "import-rejected",
       "features": [
         "constant expressions over literals",
-        "constants"
+        "constants",
+        "declaration values"
       ],
       "first": "constants",
       "reason": "VariableDeclaration 8: unsupported source unit member VariableDeclaration",
@@ -6964,7 +6576,9 @@
       "category": "import-rejected",
       "features": [
         "bytes and string",
+        "constants",
         "contracts without functions",
+        "declaration values",
         "enums",
         "state variables"
       ],
@@ -6978,6 +6592,7 @@
       "features": [
         "bytes and string",
         "constants",
+        "declaration values",
         "free functions",
         "functions not declared pure",
         "imports",
@@ -6992,6 +6607,8 @@
       "category": "import-rejected",
       "features": [
         "arrays",
+        "constants",
+        "declaration values",
         "state variables"
       ],
       "first": "state variables",
@@ -7002,6 +6619,8 @@
     {
       "category": "import-rejected",
       "features": [
+        "constants",
+        "declaration values",
         "function members (selector, address, \u2026)",
         "functions not declared pure",
         "inheritance",
@@ -7018,6 +6637,7 @@
       "category": "import-rejected",
       "features": [
         "constants",
+        "declaration values",
         "free functions",
         "functions not declared pure",
         "imports",
@@ -7031,6 +6651,8 @@
     {
       "category": "import-rejected",
       "features": [
+        "constants",
+        "declaration values",
         "functions not declared pure",
         "state variables"
       ],
@@ -7198,6 +6820,7 @@
         "bytes and string",
         "constructors",
         "contract creation (new C)",
+        "declaration values",
         "external calls and contract members",
         "functions not declared pure",
         "source units without exactly one contract",
@@ -7257,6 +6880,7 @@
     {
       "category": "import-rejected",
       "features": [
+        "declaration values",
         "functions not declared pure",
         "inheritance",
         "source units without exactly one contract",
@@ -7316,6 +6940,7 @@
       "category": "import-rejected",
       "features": [
         "constructors",
+        "declaration values",
         "functions not declared pure",
         "state variables"
       ],
@@ -7343,6 +6968,7 @@
       "category": "import-rejected",
       "features": [
         "constructors",
+        "declaration values",
         "function members (selector, address, \u2026)",
         "function types",
         "functions as values",
@@ -7730,6 +7356,7 @@
         "abi.* functions",
         "functions not declared pure",
         "hash and signature built-ins",
+        "literals of non-integer types",
         "require/assert/revert"
       ],
       "first": "abi.* functions",
@@ -7796,8 +7423,7 @@
         "bytes and string",
         "conversions to non-elementary types",
         "enums",
-        "functions not declared pure",
-        "values of type t_tuple$_t_enum$_E_$258_$_t_enum$_E_$258_$"
+        "functions not declared pure"
       ],
       "first": "enums",
       "reason": "UserDefinedTypeName 261: expected ElementaryTypeName",
@@ -7903,6 +7529,7 @@
       "features": [
         "contracts without functions",
         "custom errors",
+        "declaration values",
         "functions not declared pure",
         "inheritance",
         "interfaces",
@@ -8002,8 +7629,7 @@
       "category": "import-rejected",
       "features": [
         "custom errors",
-        "require/assert/revert",
-        "values of type t_error"
+        "require/assert/revert"
       ],
       "first": "custom errors",
       "reason": "ErrorDefinition 4: no definition for field \"returnParameters\" in object",
@@ -8014,6 +7640,7 @@
       "category": "import-rejected",
       "features": [
         "custom errors",
+        "declaration values",
         "functions not declared pure",
         "require/assert/revert",
         "state variables"
@@ -8063,6 +7690,7 @@
       "category": "import-rejected",
       "features": [
         "custom errors",
+        "declaration values",
         "functions not declared pure",
         "require/assert/revert",
         "state variables"
@@ -8110,6 +7738,7 @@
       "category": "import-rejected",
       "features": [
         "bytes and string",
+        "declaration values",
         "functions not declared pure",
         "require/assert/revert",
         "state variables"
@@ -8131,6 +7760,7 @@
       "category": "import-rejected",
       "features": [
         "custom errors",
+        "declaration values",
         "functions not declared pure",
         "require/assert/revert",
         "state variables"
@@ -8186,6 +7816,7 @@
       "features": [
         "bytes and string",
         "custom errors",
+        "declaration values",
         "functions not declared pure",
         "named arguments",
         "require/assert/revert",
@@ -8336,6 +7967,7 @@
       "features": [
         "bytes and string",
         "custom errors",
+        "declaration values",
         "functions not declared pure",
         "named arguments",
         "state variables"
@@ -8471,6 +8103,7 @@
         "events",
         "functions not declared pure",
         "inline assembly",
+        "literals of non-integer types",
         "msg/block/tx globals"
       ],
       "first": "events",
@@ -8886,6 +8519,7 @@
       "category": "import-rejected",
       "features": [
         "contracts without functions",
+        "declaration values",
         "events",
         "functions not declared pure",
         "inheritance",
@@ -9310,11 +8944,14 @@
         "arrays",
         "bytes and string",
         "constant expressions over literals",
+        "constants",
+        "declaration values",
         "events",
         "functions not declared pure",
         "hash and signature built-ins",
         "inheritance",
         "literal subdenominations (ether, days, \u2026)",
+        "literals of non-integer types",
         "modifiers",
         "msg/block/tx globals",
         "operator delete",
@@ -9336,11 +8973,14 @@
       "features": [
         "bytes and string",
         "conditional expressions",
+        "constants",
+        "declaration values",
         "functions not declared pure",
         "imports",
         "inline assembly",
         "libraries",
         "library calls and contract-name members",
+        "literals of non-integer types",
         "state variables"
       ],
       "first": "libraries",
@@ -9355,8 +8995,11 @@
         "array slices",
         "arrays",
         "bytes and string",
+        "constants",
         "constructors",
+        "declaration values",
         "events",
+        "fixed-size bytes members and indexing",
         "functions not declared pure",
         "hash and signature built-ins",
         "inheritance",
@@ -9381,6 +9024,8 @@
       "features": [
         "conditional expressions",
         "constant expressions over literals",
+        "constants",
+        "declaration values",
         "imports",
         "inline assembly",
         "libraries",
@@ -9401,6 +9046,8 @@
       "features": [
         "conditional expressions",
         "constant expressions over literals",
+        "constants",
+        "declaration values",
         "imports",
         "inline assembly",
         "libraries",
@@ -9419,6 +9066,8 @@
       "features": [
         "conditional expressions",
         "constant expressions over literals",
+        "constants",
+        "declaration values",
         "free functions",
         "imports",
         "inline assembly",
@@ -9468,9 +9117,11 @@
         "bytes and string",
         "conditional expressions",
         "constant expressions over literals",
+        "fixed-size bytes members and indexing",
         "imports",
         "inline assembly",
         "libraries",
+        "literals of non-integer types",
         "memory arrays (new T[](n))",
         "structs",
         "type names as values",
@@ -9636,8 +9287,7 @@
         "fallback functions",
         "functions not declared pure",
         "state variables",
-        "this",
-        "values of type t_tuple$_t_bool_$_t_bytes_memory_ptr_$"
+        "this"
       ],
       "first": "state variables",
       "reason": "VariableDeclaration 2: no definition for field \"parameters\" in object",
@@ -9652,8 +9302,7 @@
         "fallback functions",
         "functions not declared pure",
         "state variables",
-        "this",
-        "values of type t_tuple$_t_bool_$_t_bytes_memory_ptr_$"
+        "this"
       ],
       "first": "state variables",
       "reason": "VariableDeclaration 2: no definition for field \"parameters\" in object",
@@ -9684,7 +9333,6 @@
         "overrides",
         "source units without exactly one contract",
         "this",
-        "values of type t_tuple$_t_bool_$_t_bytes_memory_ptr_$",
         "virtual functions"
       ],
       "first": "inheritance",
@@ -9703,7 +9351,6 @@
         "overrides",
         "source units without exactly one contract",
         "this",
-        "values of type t_tuple$_t_bool_$_t_bytes_memory_ptr_$",
         "virtual functions"
       ],
       "first": "inheritance",
@@ -9722,7 +9369,6 @@
         "overrides",
         "source units without exactly one contract",
         "this",
-        "values of type t_tuple$_t_bool_$_t_bytes_memory_ptr_$",
         "virtual functions"
       ],
       "first": "inheritance",
@@ -9737,8 +9383,7 @@
         "bytes and string",
         "fallback functions",
         "functions not declared pure",
-        "this",
-        "values of type t_tuple$_t_bool_$_t_bytes_memory_ptr_$"
+        "this"
       ],
       "first": "fallback functions",
       "reason": "FunctionDefinition 10: unsupported function kind fallback",
@@ -9797,6 +9442,7 @@
       "features": [
         "bytes and string",
         "contracts without functions",
+        "declaration values",
         "free functions",
         "functions not declared pure",
         "source units without exactly one contract",
@@ -9841,6 +9487,7 @@
       "features": [
         "contract creation (new C)",
         "contracts without functions",
+        "declaration values",
         "external calls and contract members",
         "free functions",
         "functions not declared pure",
@@ -9880,8 +9527,7 @@
         "arrays",
         "free functions",
         "functions not declared pure",
-        "state variables",
-        "values of type t_tuple$_t_uint256_$_t_array$_t_uint256_$dyn_calldata_ptr_$"
+        "state variables"
       ],
       "first": "free functions",
       "reason": "FunctionDefinition 60: unsupported source unit member FunctionDefinition",
@@ -9974,6 +9620,7 @@
     {
       "category": "import-rejected",
       "features": [
+        "declaration values",
         "function members (selector, address, \u2026)",
         "function types",
         "functions as values",
@@ -10034,6 +9681,7 @@
         "bytes and string",
         "external calls and contract members",
         "functions not declared pure",
+        "literals of non-integer types",
         "this"
       ],
       "first": "bytes and string",
@@ -10084,6 +9732,7 @@
         "functions not declared pure",
         "libraries",
         "library calls and contract-name members",
+        "literals of non-integer types",
         "source units without exactly one contract",
         "this"
       ],
@@ -10127,8 +9776,7 @@
         "external calls and contract members",
         "functions not declared pure",
         "memory arrays (new T[](n))",
-        "this",
-        "values of type t_tuple$_t_uint256_$_t_array$_t_uint256_$dyn_calldata_ptr_$"
+        "this"
       ],
       "first": "arrays",
       "reason": "ArrayTypeName 5: expected ElementaryTypeName",
@@ -10141,8 +9789,7 @@
         "arrays",
         "external calls and contract members",
         "functions not declared pure",
-        "this",
-        "values of type t_tuple$_t_uint256_$_t_array$_t_uint256_$3_calldata_ptr_$"
+        "this"
       ],
       "first": "arrays",
       "reason": "ArrayTypeName 5: expected ElementaryTypeName",
@@ -10179,6 +9826,7 @@
         "bytes and string",
         "call options ({value: \u2026, gas: \u2026})",
         "conversions to non-elementary types",
+        "declaration values",
         "external calls and contract members",
         "functions not declared pure",
         "source units without exactly one contract",
@@ -10383,6 +10031,7 @@
         "call options ({value: \u2026, gas: \u2026})",
         "constructors",
         "conversions to non-elementary types",
+        "declaration values",
         "external calls and contract members",
         "functions not declared pure",
         "interfaces",
@@ -10721,7 +10370,9 @@
         "abi.* functions",
         "address members (balance, call, transfer, \u2026)",
         "bytes and string",
+        "constants",
         "conversions to non-elementary types",
+        "declaration values",
         "external calls and contract members",
         "function members (selector, address, \u2026)",
         "functions not declared pure",
@@ -11176,6 +10827,7 @@
       "features": [
         "conditional expressions",
         "contract creation (new C)",
+        "declaration values",
         "external calls and contract members",
         "function members (selector, address, \u2026)",
         "functions not declared pure",
@@ -11312,6 +10964,7 @@
     {
       "category": "import-rejected",
       "features": [
+        "declaration values",
         "function members (selector, address, \u2026)",
         "function types",
         "functions as values",
@@ -11326,6 +10979,7 @@
     {
       "category": "import-rejected",
       "features": [
+        "declaration values",
         "function members (selector, address, \u2026)",
         "function types",
         "functions as values",
@@ -11467,6 +11121,7 @@
       "features": [
         "bytes and string",
         "constructors",
+        "declaration values",
         "functions not declared pure",
         "state variables"
       ],
@@ -11540,6 +11195,7 @@
       "features": [
         "constructors",
         "functions not declared pure",
+        "literals of non-integer types",
         "state variables",
         "type names as values",
         "type(\u2026)"
@@ -11552,7 +11208,9 @@
     {
       "category": "import-rejected",
       "features": [
+        "declaration values",
         "functions not declared pure",
+        "immutables",
         "state variables"
       ],
       "first": "state variables",
@@ -11565,6 +11223,7 @@
       "features": [
         "constructors",
         "functions not declared pure",
+        "immutables",
         "state variables"
       ],
       "first": "state variables",
@@ -11576,7 +11235,9 @@
       "category": "import-rejected",
       "features": [
         "constructors",
+        "declaration values",
         "functions not declared pure",
+        "immutables",
         "operator delete",
         "state variables"
       ],
@@ -11590,6 +11251,7 @@
       "features": [
         "constructors",
         "functions not declared pure",
+        "immutables",
         "state variables"
       ],
       "first": "state variables",
@@ -11601,6 +11263,8 @@
       "category": "import-rejected",
       "features": [
         "contracts without functions",
+        "declaration values",
+        "immutables",
         "state variables"
       ],
       "first": "state variables",
@@ -11613,8 +11277,10 @@
       "features": [
         "constructors",
         "contract creation (new C)",
+        "declaration values",
         "external calls and contract members",
         "functions not declared pure",
+        "immutables",
         "source units without exactly one contract",
         "state variables",
         "this",
@@ -11630,10 +11296,12 @@
       "features": [
         "bytes and string",
         "constant expressions over literals",
+        "declaration values",
         "function members (selector, address, \u2026)",
         "function types",
         "functions as values",
         "functions not declared pure",
+        "immutables",
         "inline assembly",
         "state variables"
       ],
@@ -11647,7 +11315,9 @@
       "features": [
         "bytes and string",
         "constructors",
+        "declaration values",
         "functions not declared pure",
+        "immutables",
         "inline assembly",
         "require/assert/revert",
         "state variables",
@@ -11663,7 +11333,9 @@
       "category": "import-rejected",
       "features": [
         "constructors",
+        "declaration values",
         "functions not declared pure",
+        "immutables",
         "state variables"
       ],
       "first": "state variables",
@@ -11676,6 +11348,7 @@
       "features": [
         "constructors",
         "functions not declared pure",
+        "immutables",
         "inheritance",
         "source units without exactly one contract",
         "state variables"
@@ -11693,6 +11366,7 @@
         "function types",
         "functions as values",
         "functions not declared pure",
+        "immutables",
         "state variables"
       ],
       "first": "state variables",
@@ -11709,6 +11383,7 @@
         "contract creation (new C)",
         "external calls and contract members",
         "functions not declared pure",
+        "immutables",
         "source units without exactly one contract",
         "state variables"
       ],
@@ -11721,7 +11396,9 @@
       "category": "import-rejected",
       "features": [
         "constructors",
+        "declaration values",
         "functions not declared pure",
+        "immutables",
         "inheritance",
         "library calls and contract-name members",
         "modifiers",
@@ -11738,6 +11415,7 @@
       "features": [
         "constructors",
         "functions not declared pure",
+        "immutables",
         "state variables"
       ],
       "first": "state variables",
@@ -11751,6 +11429,7 @@
         "arrays",
         "constructors",
         "functions not declared pure",
+        "immutables",
         "inline arrays",
         "state variables"
       ],
@@ -11764,6 +11443,7 @@
       "features": [
         "constructors",
         "functions not declared pure",
+        "immutables",
         "state variables"
       ],
       "first": "state variables",
@@ -11775,6 +11455,7 @@
       "category": "import-rejected",
       "features": [
         "functions not declared pure",
+        "immutables",
         "state variables"
       ],
       "first": "state variables",
@@ -11788,6 +11469,7 @@
         "arrays",
         "constructors",
         "functions not declared pure",
+        "immutables",
         "mappings",
         "memory arrays (new T[](n))",
         "state variables"
@@ -11845,6 +11527,7 @@
       "features": [
         "constructors",
         "contracts without functions",
+        "declaration values",
         "functions not declared pure",
         "inheritance",
         "source units without exactly one contract",
@@ -11859,6 +11542,7 @@
       "category": "import-rejected",
       "features": [
         "contracts without functions",
+        "declaration values",
         "functions not declared pure",
         "inheritance",
         "source units without exactly one contract",
@@ -11881,6 +11565,7 @@
       "category": "import-rejected",
       "features": [
         "constructors",
+        "declaration values",
         "functions not declared pure",
         "inheritance",
         "modifiers",
@@ -12009,7 +11694,9 @@
     {
       "category": "import-rejected",
       "features": [
+        "constants",
         "contracts without functions",
+        "declaration values",
         "functions not declared pure",
         "inheritance",
         "library calls and contract-name members",
@@ -12260,6 +11947,7 @@
       "category": "import-rejected",
       "features": [
         "contracts without functions",
+        "declaration values",
         "functions not declared pure",
         "inheritance",
         "source units without exactly one contract",
@@ -12274,6 +11962,7 @@
       "category": "import-rejected",
       "features": [
         "constructors",
+        "declaration values",
         "functions not declared pure",
         "inheritance",
         "source units without exactly one contract",
@@ -12288,6 +11977,7 @@
       "category": "import-rejected",
       "features": [
         "constructors",
+        "declaration values",
         "functions not declared pure",
         "inheritance",
         "modifiers",
@@ -12596,7 +12286,10 @@
       "category": "import-rejected",
       "features": [
         "bytes and string",
+        "constants",
+        "declaration values",
         "inline assembly",
+        "literals of non-integer types",
         "state variables"
       ],
       "first": "state variables",
@@ -12608,7 +12301,10 @@
       "category": "import-rejected",
       "features": [
         "bytes and string",
+        "constants",
+        "declaration values",
         "inline assembly",
+        "literals of non-integer types",
         "state variables"
       ],
       "first": "state variables",
@@ -13442,6 +13138,7 @@
       "category": "import-rejected",
       "features": [
         "contracts without functions",
+        "declaration values",
         "events",
         "interfaces",
         "source units without exactly one contract",
@@ -13457,11 +13154,13 @@
     {
       "category": "import-rejected",
       "features": [
+        "declaration values",
         "external calls and contract members",
         "function members (selector, address, \u2026)",
         "functions not declared pure",
         "inheritance",
         "interfaces",
+        "literals of non-integer types",
         "source units without exactly one contract",
         "state variables",
         "type(\u2026)",
@@ -14004,7 +13703,7 @@
     {
       "category": "import-rejected",
       "features": [
-        "bytes and string",
+        "fixed-size bytes members and indexing",
         "functions not declared pure",
         "libraries",
         "source units without exactly one contract",
@@ -14131,8 +13830,7 @@
         "libraries",
         "source units without exactly one contract",
         "state variables",
-        "using for",
-        "values of type t_tuple$_t_string_memory_ptr_$_t_string_memory_ptr_$"
+        "using for"
       ],
       "first": "using for",
       "reason": "UsingForDirective 24: no definition for field \"parameters\" in object",
@@ -14470,6 +14168,7 @@
       "features": [
         "constructors",
         "contract creation (new C)",
+        "declaration values",
         "external calls and contract members",
         "functions not declared pure",
         "libraries",
@@ -14751,6 +14450,8 @@
       "category": "import-rejected",
       "features": [
         "constant expressions over literals",
+        "constants",
+        "declaration values",
         "functions not declared pure",
         "literal subdenominations (ether, days, \u2026)",
         "state variables"
@@ -14787,6 +14488,8 @@
     {
       "category": "import-rejected",
       "features": [
+        "constants",
+        "declaration values",
         "functions not declared pure",
         "literal subdenominations (ether, days, \u2026)",
         "state variables"
@@ -14800,6 +14503,7 @@
       "category": "import-rejected",
       "features": [
         "contracts without functions",
+        "declaration values",
         "literal subdenominations (ether, days, \u2026)",
         "state variables"
       ],
@@ -14811,6 +14515,8 @@
     {
       "category": "import-rejected",
       "features": [
+        "constants",
+        "declaration values",
         "functions not declared pure",
         "literal subdenominations (ether, days, \u2026)",
         "state variables"
@@ -14865,6 +14571,8 @@
     {
       "category": "import-rejected",
       "features": [
+        "constants",
+        "declaration values",
         "functions not declared pure",
         "literal subdenominations (ether, days, \u2026)",
         "state variables"
@@ -14954,6 +14662,7 @@
       "category": "import-rejected",
       "features": [
         "contracts without functions",
+        "declaration values",
         "functions not declared pure",
         "inheritance",
         "modifiers",
@@ -15239,6 +14948,7 @@
       "category": "import-rejected",
       "features": [
         "bytes and string",
+        "declaration values",
         "functions not declared pure",
         "modifiers",
         "require/assert/revert",
@@ -15640,6 +15350,7 @@
       "features": [
         "constant expressions over literals",
         "contracts without functions",
+        "declaration values",
         "state variables"
       ],
       "first": "state variables",
@@ -15662,6 +15373,7 @@
       "features": [
         "constant expressions over literals",
         "contracts without functions",
+        "declaration values",
         "state variables"
       ],
       "first": "state variables",
@@ -15744,6 +15456,7 @@
       "features": [
         "constant expressions over literals",
         "contracts without functions",
+        "declaration values",
         "state variables"
       ],
       "first": "state variables",
@@ -15756,6 +15469,7 @@
       "features": [
         "constant expressions over literals",
         "contracts without functions",
+        "declaration values",
         "state variables"
       ],
       "first": "state variables",
@@ -16001,6 +15715,8 @@
       "category": "import-rejected",
       "features": [
         "constant expressions over literals",
+        "constants",
+        "declaration values",
         "free functions",
         "require/assert/revert",
         "state variables",
@@ -16054,6 +15770,7 @@
       "category": "import-rejected",
       "features": [
         "free functions",
+        "literals of non-integer types",
         "user-defined value types",
         "using for"
       ],
@@ -16068,6 +15785,7 @@
         "bytes and string",
         "constant expressions over literals",
         "constants",
+        "declaration values",
         "free functions",
         "require/assert/revert",
         "user-defined value types",
@@ -16194,8 +15912,7 @@
         "free functions",
         "inline assembly",
         "user-defined value types",
-        "using for",
-        "values of type t_tuple$_t_userDefinedValueType$_U8_$2_$_t_userDefinedValueType$_U8_$2_$"
+        "using for"
       ],
       "first": "user-defined value types",
       "reason": "UserDefinedTypeName 35: expected ElementaryTypeName",
@@ -16206,6 +15923,8 @@
       "category": "import-rejected",
       "features": [
         "constant expressions over literals",
+        "constants",
+        "declaration values",
         "free functions",
         "require/assert/revert",
         "state variables",
@@ -16611,6 +16330,7 @@
     {
       "category": "import-rejected",
       "features": [
+        "declaration values",
         "functions not declared pure",
         "inline assembly",
         "require/assert/revert",
@@ -16721,8 +16441,10 @@
         "constructors",
         "contract creation (new C)",
         "conversions to non-elementary types",
+        "declaration values",
         "external calls and contract members",
         "functions not declared pure",
+        "immutables",
         "inline assembly",
         "interfaces",
         "require/assert/revert",
@@ -16751,6 +16473,7 @@
         "bytes and string",
         "contract creation (new C)",
         "contracts without functions",
+        "declaration values",
         "external calls and contract members",
         "functions not declared pure",
         "source units without exactly one contract",
@@ -16770,8 +16493,7 @@
         "inline arrays",
         "state variables",
         "structs",
-        "tuples of literals",
-        "values of type t_tuple$_t_array$_t_string_memory_ptr_$2_memory_ptr_$_t_array$_t_string_memory_ptr_$3_memory_ptr_$"
+        "tuples of literals"
       ],
       "first": "structs",
       "reason": "StructDefinition 8: no definition for field \"parameters\" in object",
@@ -16795,8 +16517,7 @@
       "category": "elaboration-rejected",
       "features": [
         "bytes and string",
-        "tuples of literals",
-        "values of type t_tuple$_t_stringliteral_fb79856d4be6e4152983d8f934d820ec61c255bb7f1581914e7da0f335bdbf33_$_t_stringliteral_fb79856d4be6e4152983d8f934d820ec61c255bb7f1581914e7da0f335bdbf33_$"
+        "tuples of literals"
       ],
       "first": null,
       "reason": "elaborate_unit returned NONE for smoke/bytes_and_strings.sol",
@@ -16808,6 +16529,7 @@
       "features": [
         "address members (balance, call, transfer, \u2026)",
         "constructors",
+        "declaration values",
         "functions not declared pure",
         "state variables",
         "this"
@@ -16900,6 +16622,8 @@
       "category": "import-rejected",
       "features": [
         "bytes and string",
+        "constants",
+        "declaration values",
         "hash and signature built-ins",
         "state variables"
       ],
@@ -17217,6 +16941,7 @@
       "features": [
         "arrays",
         "constant expressions over literals",
+        "declaration values",
         "functions not declared pure",
         "inline arrays",
         "memory arrays (new T[](n))",
@@ -17260,6 +16985,7 @@
       "category": "import-rejected",
       "features": [
         "arrays",
+        "declaration values",
         "functions not declared pure",
         "inline arrays",
         "operator delete",
@@ -17289,6 +17015,7 @@
     {
       "category": "import-rejected",
       "features": [
+        "declaration values",
         "functions not declared pure",
         "operator delete",
         "require/assert/revert",
@@ -17316,6 +17043,7 @@
     {
       "category": "import-rejected",
       "features": [
+        "declaration values",
         "functions not declared pure",
         "operator delete",
         "require/assert/revert",
@@ -17346,6 +17074,7 @@
       "category": "import-rejected",
       "features": [
         "arrays",
+        "declaration values",
         "functions not declared pure",
         "inline arrays",
         "operator delete",
@@ -17375,6 +17104,7 @@
     {
       "category": "import-rejected",
       "features": [
+        "declaration values",
         "functions not declared pure",
         "operator delete",
         "require/assert/revert",
@@ -17402,6 +17132,7 @@
     {
       "category": "import-rejected",
       "features": [
+        "declaration values",
         "functions not declared pure",
         "operator delete",
         "require/assert/revert",
@@ -17497,6 +17228,7 @@
     {
       "category": "import-rejected",
       "features": [
+        "declaration values",
         "functions not declared pure",
         "operator delete",
         "state variables"
@@ -17523,6 +17255,7 @@
       "features": [
         "bytes and string",
         "functions not declared pure",
+        "literals of non-integer types",
         "state variables",
         "structs"
       ],
@@ -17583,6 +17316,7 @@
       "category": "import-rejected",
       "features": [
         "arrays",
+        "declaration values",
         "functions not declared pure",
         "named arguments",
         "operator delete",
@@ -17655,6 +17389,7 @@
       "category": "import-rejected",
       "features": [
         "arrays",
+        "declaration values",
         "functions not declared pure",
         "inline assembly",
         "operator delete",
@@ -17892,6 +17627,7 @@
       "category": "import-rejected",
       "features": [
         "contracts without functions",
+        "declaration values",
         "state variables"
       ],
       "first": "state variables",
@@ -18004,6 +17740,7 @@
       "category": "import-rejected",
       "features": [
         "contract creation (new C)",
+        "declaration values",
         "external calls and contract members",
         "functions not declared pure",
         "inheritance",
@@ -18021,8 +17758,10 @@
       "features": [
         "contract creation (new C)",
         "contracts without functions",
+        "declaration values",
         "external calls and contract members",
         "functions not declared pure",
+        "immutables",
         "inheritance",
         "source units without exactly one contract",
         "state variables"
@@ -18094,6 +17833,7 @@
       "category": "import-rejected",
       "features": [
         "contracts without functions",
+        "declaration values",
         "functions not declared pure",
         "inheritance",
         "source units without exactly one contract",
@@ -18124,6 +17864,7 @@
       "features": [
         "contract creation (new C)",
         "contracts without functions",
+        "declaration values",
         "external calls and contract members",
         "functions not declared pure",
         "inheritance",
@@ -18225,7 +17966,10 @@
     {
       "category": "import-rejected",
       "features": [
+        "constants",
+        "declaration values",
         "functions not declared pure",
+        "immutables",
         "require/assert/revert",
         "state variables"
       ],
@@ -18458,6 +18202,7 @@
       "features": [
         "array slices",
         "bytes and string",
+        "declaration values",
         "functions not declared pure",
         "require/assert/revert",
         "state variables",
@@ -18508,7 +18253,9 @@
       "category": "import-rejected",
       "features": [
         "bytes and string",
+        "constants",
         "constructors",
+        "declaration values",
         "functions not declared pure",
         "state variables"
       ],
@@ -18523,10 +18270,10 @@
         "abi.* functions",
         "bytes and string",
         "custom errors",
+        "declaration values",
         "events",
         "functions not declared pure",
-        "state variables",
-        "values of type t_tuple$_t_string_storage_$_t_string_storage_$"
+        "state variables"
       ],
       "first": "state variables",
       "reason": "VariableDeclaration 2: no definition for field \"parameters\" in object",
@@ -18546,10 +18293,7 @@
     {
       "category": "elaboration-rejected",
       "features": [
-        "bytes and string",
-        "values of type t_tuple$_t_string_calldata_ptr_$_t_string_calldata_ptr_$_t_uint256_$",
-        "values of type t_tuple$_t_string_calldata_ptr_$_t_stringliteral_c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470_$_t_uint256_$",
-        "values of type t_tuple$_t_string_calldata_ptr_$_t_uint256_$"
+        "bytes and string"
       ],
       "first": null,
       "reason": "elaborate_unit returned NONE for strings/empty_string_input.sol",
@@ -18841,9 +18585,11 @@
       "features": [
         "arrays",
         "contract creation (new C)",
+        "declaration values",
         "external calls and contract members",
         "function types",
         "functions not declared pure",
+        "immutables",
         "memory arrays (new T[](n))",
         "require/assert/revert",
         "source units without exactly one contract",
@@ -19129,9 +18875,7 @@
       "features": [
         "arrays",
         "functions not declared pure",
-        "structs",
-        "values of type t_tuple$_t_uint32_$_t_struct$_S_$11_calldata_ptr_$",
-        "values of type t_tuple$_t_uint32_$_t_struct$_S_$11_memory_ptr_$"
+        "structs"
       ],
       "first": "structs",
       "reason": "StructDefinition 11: no definition for field \"parameters\" in object",
@@ -19141,7 +18885,7 @@
     {
       "category": "import-rejected",
       "features": [
-        "bytes and string",
+        "fixed-size bytes members and indexing",
         "structs"
       ],
       "first": "structs",
@@ -19167,7 +18911,7 @@
       "category": "import-rejected",
       "features": [
         "arrays",
-        "bytes and string",
+        "fixed-size bytes members and indexing",
         "functions not declared pure",
         "state variables",
         "structs"
@@ -19207,6 +18951,7 @@
     {
       "category": "import-rejected",
       "features": [
+        "declaration values",
         "functions not declared pure",
         "operator delete",
         "require/assert/revert",
@@ -19253,6 +18998,7 @@
       "category": "import-rejected",
       "features": [
         "arrays",
+        "declaration values",
         "functions not declared pure",
         "inline assembly",
         "operator delete",
@@ -19372,6 +19118,7 @@
       "category": "import-rejected",
       "features": [
         "arrays",
+        "declaration values",
         "functions not declared pure",
         "require/assert/revert",
         "state variables",
@@ -19399,6 +19146,7 @@
       "category": "import-rejected",
       "features": [
         "arrays",
+        "declaration values",
         "functions not declared pure",
         "state variables",
         "structs"
@@ -19412,6 +19160,7 @@
       "category": "import-rejected",
       "features": [
         "arrays",
+        "declaration values",
         "function members (selector, address, \u2026)",
         "function types",
         "functions as values",
@@ -19664,7 +19413,7 @@
         "functions not declared pure",
         "this",
         "try/catch",
-        "values of type t_tuple$_t_uint256_$_t_function_external_nonpayable$__$returns$__$_$_t_uint256_$"
+        "tuples with empty components"
       ],
       "first": "function types",
       "reason": "FunctionTypeName 6: expected ElementaryTypeName",
@@ -19745,8 +19494,7 @@
         "structs",
         "try/catch",
         "tuples of literals",
-        "using for",
-        "values of type t_tuple$_t_uint256_$_t_stringliteral_c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470_$"
+        "using for"
       ],
       "first": "using for",
       "reason": "UsingForDirective 50: no definition for field \"parameters\" in object",
@@ -20106,12 +19854,7 @@
       "features": [
         "functions not declared pure",
         "tuples of literals",
-        "values of type t_tuple$__$__$",
-        "values of type t_tuple$__$_t_int256_$",
-        "values of type t_tuple$_t_int256_$__$",
-        "values of type t_tuple$_t_tuple$__$__$_$__$",
-        "values of type t_tuple$_t_tuple$__$_t_int256_$_$__$",
-        "values of type t_tuple$_t_tuple$_t_int256_$__$_$__$"
+        "tuples with empty components"
       ],
       "first": null,
       "reason": "elaborate_unit returned NONE for types/nested_tuples.sol",
@@ -20170,11 +19913,7 @@
     {
       "category": "import-rejected",
       "features": [
-        "bytes and string",
-        "values of type t_tuple$_t_bytes_memory_ptr_$_t_bytes_memory_ptr_$",
-        "values of type t_tuple$_t_bytes_memory_ptr_$_t_tuple$_t_bytes_memory_ptr_$_t_bytes_memory_ptr_$_$",
-        "values of type t_tuple$_t_stringliteral_044852b2a670ade5407e78fb2863c51de9fcb96542a07186fe3aeda6bb8a116d_$_t_tuple$_t_stringliteral_c89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc6_$_t_stringliteral_ad7c5bef027816a800da1736444fb58a807ef4c9603b7848673f7e3a68eb14a5_$_$",
-        "values of type t_tuple$_t_stringliteral_c89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc6_$_t_stringliteral_ad7c5bef027816a800da1736444fb58a807ef4c9603b7848673f7e3a68eb14a5_$"
+        "bytes and string"
       ],
       "first": "bytes and string",
       "reason": "IndexAccess 34: unsupported expression IndexAccess",
@@ -20303,12 +20042,11 @@
         "external calls and contract members",
         "function members (selector, address, \u2026)",
         "functions not declared pure",
+        "members of elementary type names",
         "require/assert/revert",
         "this",
         "type names as values",
-        "user-defined value types",
-        "values of type t_tuple$_t_type$_t_int256_$_$_t_type$_t_int256_$_$_t_type$_t_int256_$_$_t_type$_t_int256_$_$",
-        "values of type t_tuple$_t_type$_t_userDefinedValueType$_MyInt_$2_$_$_t_type$_t_userDefinedValueType$_MyInt_$2_$_$_t_type$_t_userDefinedValueType$_MyInt_$2_$_$_t_type$_t_userDefinedValueType$_MyInt_$2_$_$"
+        "user-defined value types"
       ],
       "first": "user-defined value types",
       "reason": "UserDefinedValueTypeDefinition 2: no definition for field \"parameters\" in object",
@@ -20379,8 +20117,7 @@
         "memory arrays (new T[](n))",
         "require/assert/revert",
         "state variables",
-        "user-defined value types",
-        "values of type t_tuple$_t_uint8_$_t_userDefinedValueType$_MyUInt8_$3_$_t_uint8_$"
+        "user-defined value types"
       ],
       "first": "state variables",
       "reason": "VariableDeclaration 25: no definition for field \"parameters\" in object",
@@ -20398,7 +20135,9 @@
     {
       "category": "import-rejected",
       "features": [
+        "constants",
         "contracts without functions",
+        "declaration values",
         "state variables",
         "user-defined value types"
       ],
@@ -20429,7 +20168,8 @@
     {
       "category": "import-rejected",
       "features": [
-        "bytes and string",
+        "declaration values",
+        "fixed-size bytes members and indexing",
         "functions not declared pure",
         "inline assembly",
         "state variables",
@@ -20444,6 +20184,7 @@
       "category": "import-rejected",
       "features": [
         "constant expressions over literals",
+        "declaration values",
         "functions not declared pure",
         "inline assembly",
         "state variables",
@@ -20479,6 +20220,8 @@
       "category": "import-rejected",
       "features": [
         "constant expressions over literals",
+        "constants",
+        "declaration values",
         "functions not declared pure",
         "libraries",
         "library calls and contract-name members",
@@ -20496,14 +20239,15 @@
       "features": [
         "bytes and string",
         "constant expressions over literals",
+        "declaration values",
         "function members (selector, address, \u2026)",
         "function types",
         "functions as values",
         "functions not declared pure",
+        "immutables",
         "inline assembly",
         "state variables",
-        "user-defined value types",
-        "values of type t_tuple$_t_userDefinedValueType$_MyInt_$2_$_t_userDefinedValueType$_MyBytes_$4_$"
+        "user-defined value types"
       ],
       "first": "state variables",
       "reason": "VariableDeclaration 12: no definition for field \"parameters\" in object",
@@ -20577,6 +20321,7 @@
       "category": "import-rejected",
       "features": [
         "custom errors",
+        "declaration values",
         "events",
         "functions not declared pure",
         "modifiers",
@@ -20645,6 +20390,7 @@
         "arrays",
         "bytes and string",
         "constant expressions over literals",
+        "declaration values",
         "functions not declared pure",
         "inline arrays",
         "inline assembly",
@@ -20940,6 +20686,7 @@
       "category": "import-rejected",
       "features": [
         "functions not declared pure",
+        "literals of non-integer types",
         "operator delete",
         "state variables"
       ],
@@ -20978,8 +20725,7 @@
         "functions not declared pure",
         "mappings",
         "state variables",
-        "tuples of literals",
-        "values of type t_tuple$_t_mapping$_t_uint8_$_t_uint8_$_$_t_uint8_$"
+        "tuples of literals"
       ],
       "first": "state variables",
       "reason": "VariableDeclaration 4: no definition for field \"parameters\" in object",
@@ -21215,6 +20961,8 @@
       "category": "import-rejected",
       "features": [
         "constant expressions over literals",
+        "constants",
+        "declaration values",
         "functions not declared pure",
         "state variables"
       ],
@@ -21338,6 +21086,7 @@
       "features": [
         "address members (balance, call, transfer, \u2026)",
         "bytes and string",
+        "fixed-size bytes members and indexing",
         "functions not declared pure",
         "state variables",
         "structs",
@@ -21365,6 +21114,7 @@
       "features": [
         "address members (balance, call, transfer, \u2026)",
         "functions not declared pure",
+        "literals of non-integer types",
         "this"
       ],
       "first": "address members (balance, call, transfer, \u2026)",
@@ -21471,13 +21221,12 @@
       "features": [
         "arrays",
         "bytes and string",
+        "declaration values",
         "functions not declared pure",
         "memory arrays (new T[](n))",
         "state variables",
         "tuples of literals",
-        "values of type t_tuple$_t_array$_t_uint256_$dyn_memory_ptr_$_t_uint256_$",
-        "values of type t_tuple$_t_uint256_$_t_bytes_memory_ptr_$_t_uint256_$__$__$",
-        "values of type t_tuple$_t_uint256_$_t_uint256_$_t_array$_t_uint256_$dyn_storage_$_t_bytes_storage_$_t_uint256_$"
+        "tuples with empty components"
       ],
       "first": "state variables",
       "reason": "VariableDeclaration 3: no definition for field \"parameters\" in object",
@@ -21491,6 +21240,7 @@
         "address members (balance, call, transfer, \u2026)",
         "bytes and string",
         "contract creation (new C)",
+        "declaration values",
         "external calls and contract members",
         "functions not declared pure",
         "require/assert/revert",
@@ -21585,6 +21335,7 @@
       "category": "import-rejected",
       "features": [
         "constructors",
+        "declaration values",
         "functions not declared pure",
         "state variables"
       ],
@@ -21597,6 +21348,7 @@
       "category": "import-rejected",
       "features": [
         "constructors",
+        "declaration values",
         "functions not declared pure",
         "inheritance",
         "source units without exactly one contract",
@@ -21665,7 +21417,8 @@
       "category": "import-rejected",
       "features": [
         "bytes and string",
-        "functions not declared pure"
+        "functions not declared pure",
+        "literals of non-integer types"
       ],
       "first": "bytes and string",
       "reason": "IndexAccess 11: unsupported expression IndexAccess",
@@ -21707,6 +21460,7 @@
       "category": "import-rejected",
       "features": [
         "contracts without functions",
+        "declaration values",
         "state variables"
       ],
       "first": "state variables",
@@ -21746,9 +21500,11 @@
         "call options ({value: \u2026, gas: \u2026})",
         "constructors",
         "contract creation (new C)",
+        "declaration values",
         "external calls and contract members",
         "functions not declared pure",
         "literal subdenominations (ether, days, \u2026)",
+        "literals of non-integer types",
         "require/assert/revert",
         "source units without exactly one contract",
         "state variables"
@@ -21768,6 +21524,7 @@
         "constructors",
         "contract creation (new C)",
         "conversions to non-elementary types",
+        "declaration values",
         "events",
         "external calls and contract members",
         "functions not declared pure",
@@ -21816,6 +21573,7 @@
         "address members (balance, call, transfer, \u2026)",
         "constructors",
         "contract creation (new C)",
+        "declaration values",
         "external calls and contract members",
         "functions not declared pure",
         "msg/block/tx globals",
@@ -21893,6 +21651,7 @@
     {
       "category": "import-rejected",
       "features": [
+        "declaration values",
         "functions not declared pure",
         "library calls and contract-name members",
         "state variables"
@@ -21905,6 +21664,7 @@
     {
       "category": "import-rejected",
       "features": [
+        "declaration values",
         "functions not declared pure",
         "library calls and contract-name members",
         "state variables"
@@ -21970,8 +21730,7 @@
       "features": [
         "bytes and string",
         "functions not declared pure",
-        "tuples of literals",
-        "values of type t_tuple$_t_string_memory_ptr_$_t_stringliteral_34607c9bbfeb9c23509680f04363f298fdb0b5f9abe327304ecd1daca08cda9c_$"
+        "tuples of literals"
       ],
       "first": null,
       "reason": "elaborate_unit returned NONE for various/string_tuples.sol",
@@ -22023,8 +21782,7 @@
       "features": [
         "functions not declared pure",
         "state variables",
-        "structs",
-        "values of type t_tuple$_t_struct$_S_$5_storage_$_t_struct$_S_$5_storage_$"
+        "structs"
       ],
       "first": "structs",
       "reason": "StructDefinition 5: no definition for field \"parameters\" in object",
@@ -22066,8 +21824,7 @@
         "state variables",
         "this",
         "tuples of literals",
-        "values of type t_tuple$_t_uint256_$__$_t_uint256_$__$__$",
-        "values of type t_tuple$_t_uint256_$_t_uint256_$_t_array$_t_uint256_$dyn_storage_ptr_$"
+        "tuples with empty components"
       ],
       "first": "state variables",
       "reason": "VariableDeclaration 3: no definition for field \"parameters\" in object",
@@ -22091,6 +21848,7 @@
       "category": "import-rejected",
       "features": [
         "contract creation (new C)",
+        "declaration values",
         "external calls and contract members",
         "functions not declared pure",
         "source units without exactly one contract",
@@ -22126,7 +21884,7 @@
       "category": "elaboration-rejected",
       "features": [
         "tuples of literals",
-        "values of type t_tuple$__$__$_t_uint256_$"
+        "tuples with empty components"
       ],
       "first": null,
       "reason": "elaborate_unit returned NONE for viaYul/assign_tuple_from_function_call.sol",
@@ -22311,6 +22069,7 @@
       "category": "import-rejected",
       "features": [
         "arrays",
+        "declaration values",
         "external calls and contract members",
         "function members (selector, address, \u2026)",
         "function types",
@@ -22675,10 +22434,11 @@
       "category": "import-rejected",
       "features": [
         "arrays",
+        "declaration values",
         "functions not declared pure",
         "state variables",
         "tuples of literals",
-        "values of type t_tuple$_t_uint256_$_t_uint256_$__$_t_uint256_$_t_uint256_$"
+        "tuples with empty components"
       ],
       "first": "state variables",
       "reason": "VariableDeclaration 3: no definition for field \"parameters\" in object",
@@ -23008,7 +22768,8 @@
     {
       "category": "elaboration-rejected",
       "features": [
-        "bytes and string"
+        "bytes and string",
+        "literals of non-integer types"
       ],
       "first": null,
       "reason": "elaborate_unit returned NONE for viaYul/string_format.sol",
@@ -23032,8 +22793,7 @@
         "constructors",
         "functions not declared pure",
         "state variables",
-        "structs",
-        "values of type t_tuple$_t_uint256_$_t_array$_t_uint256_$dyn_memory_ptr_$_t_uint256_$"
+        "structs"
       ],
       "first": "structs",
       "reason": "StructDefinition 9: no definition for field \"parameters\" in object",

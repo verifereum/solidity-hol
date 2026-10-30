@@ -68,6 +68,7 @@ class ReadTestTests(unittest.TestCase):
         self.assertEqual(test.name, "dir/t.sol")
         self.assertEqual(list(test.sources), ["a.sol", "b.sol"])
         self.assertEqual(test.sources["a.sol"], "contract A {}\n")
+        self.assertEqual(test.sources["b.sol"], 'import "a.sol";\n')
         self.assertEqual(test.settings, {"EVMVersion": ">=cancun", "compileViaYul": "true"})
         self.assertIsNone(coverage.skip_reason(test, PROFILE))
 
@@ -118,6 +119,42 @@ class ClassifyTests(unittest.TestCase):
             "a.sol", coverage.scan({"a.sol": unit([function(4, [])])}), {"status": "admitted"})
         self.assertEqual(admitted.blockers, [])
         self.assertTrue(admitted.scan_agrees)
+
+    def test_scan_records_every_property_of_a_variable(self) -> None:
+        constant = dict(variable(3, state=True), constant=True, mutability="constant",
+                        value={"nodeType": "Literal", "id": 4, "kind": "number",
+                               "typeDescriptions": {"typeIdentifier": "t_rational_1_by_1"}})
+        self.assertEqual({b.feature for b in coverage.scan({"t.sol": unit([constant])})[3]},
+                         {"state variables", "constants", "declaration values"})
+
+    def test_scan_finds_literals_of_non_integer_types(self) -> None:
+        def literal(node_id, type_identifier):
+            return {"nodeType": "Literal", "id": node_id, "kind": "number", "value": "1",
+                    "typeDescriptions": {"typeIdentifier": type_identifier}}
+
+        address = literal(5, "t_address")
+        declaration = {
+            "nodeType": "VariableDeclarationStatement", "id": 6,
+            "declarations": [variable(7, type_identifier="t_bytes4")],
+            "initialValue": literal(8, "t_rational_305419896_by_1"),
+        }
+        boolean = {"nodeType": "Literal", "id": 9, "kind": "bool", "value": "false",
+                   "typeDescriptions": {"typeIdentifier": "t_bool"}}
+        found = coverage.scan({"t.sol": unit([function(4, [address, declaration, boolean])])})
+        self.assertEqual(found[5], [coverage.Blocker(
+            "Literal", "literals of non-integer types", "elaboration")])
+        self.assertEqual(found[6], [coverage.Blocker(
+            "VariableDeclarationStatement", "literals of non-integer types", "elaboration")])
+        self.assertNotIn(8, found)
+        self.assertNotIn(9, found)
+
+    def test_tuples_are_classified_by_a_component(self) -> None:
+        self.assertTrue(coverage.decodes("t_tuple$_t_bool_$_t_bytes4_$"))
+        self.assertFalse(coverage.decodes("t_tuple$_t_bool_$_t_bytes_memory_ptr_$"))
+        self.assertEqual(coverage.type_feature("t_tuple$_t_bool_$_t_bytes_memory_ptr_$"),
+                         "bytes and string")
+        self.assertEqual(coverage.type_feature("t_bytes32"),
+                         "fixed-size bytes members and indexing")
 
     def test_ranking_counts_only_blockers(self) -> None:
         def rejected(name: str, members: list) -> coverage.Classification:

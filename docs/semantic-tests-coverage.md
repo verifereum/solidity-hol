@@ -12,7 +12,7 @@ git remote add origin https://github.com/argotorg/solidity.git
 git sparse-checkout set --no-cone test/libsolidity/semanticTests
 git fetch --depth 1 --filter=blob:none origin f401782df49be312ea4ef52a2d467cf5183b5906
 git checkout FETCH_HEAD && cd -
-tools/semantic_tests_coverage.py ../solidity-tests --solc /path/to/solc-0.8.37
+tools/semantic_tests_coverage.py ../solidity-tests --solc /path/to/solc
 ```
 
 | outcome | tests |
@@ -32,17 +32,18 @@ The scan disagrees with the HOL run on 0 tests.
 
 | feature | AST nodes | tests | only blocker | first |
 | --- | --- | ---: | ---: | ---: |
-| functions not declared pure | `FunctionDefinition` | 1270 | 74 | 0 |
-| state variables | `VariableDeclaration` | 683 | 1 | 460 |
+| functions not declared pure | `FunctionDefinition` | 1270 | 73 | 0 |
+| state variables | `VariableDeclaration` | 683 | 0 | 460 |
 | arrays | `ArrayTypeName`, `FunctionCall`, `IndexAccess`, `MemberAccess`, `TupleExpression`, `VariableDeclaration` | 424 | 4 | 119 |
-| bytes and string | `FunctionCall`, `IndexAccess`, `Literal`, `MemberAccess`, `NewExpression`, `TupleExpression`, `VariableDeclaration` | 418 | 15 | 28 |
+| bytes and string | `FunctionCall`, `IndexAccess`, `Literal`, `MemberAccess`, `NewExpression`, `TupleExpression`, `VariableDeclaration` | 413 | 15 | 28 |
 | source units without exactly one contract | `SourceUnit` | 341 | 0 | 0 |
-| inline assembly | `InlineAssembly` | 266 | 18 | 95 |
+| inline assembly | `InlineAssembly` | 266 | 17 | 95 |
 | external calls and contract members | `FunctionCall`, `MemberAccess`, `TupleExpression`, `UserDefinedTypeName`, `VariableDeclaration` | 227 | 0 | 25 |
 | require/assert/revert | `Identifier` | 216 | 2 | 23 |
 | structs | `FunctionCall`, `IndexAccess`, `MemberAccess`, `StructDefinition`, `TupleExpression`, `UserDefinedTypeName`, `VariableDeclaration` | 214 | 10 | 157 |
 | constructors | `FunctionDefinition` | 208 | 0 | 17 |
 | this | `Identifier` | 167 | 0 | 2 |
+| declaration values | `VariableDeclaration` | 160 | 0 | 0 |
 | inheritance | `ContractDefinition`, `Identifier`, `InheritanceSpecifier`, `MemberAccess`, `TupleExpression` | 151 | 0 | 122 |
 | function members (selector, address, …) | `MemberAccess`, `TupleExpression`, `VariableDeclaration` | 124 | 0 | 8 |
 | libraries | `ContractDefinition` | 116 | 0 | 9 |
@@ -68,87 +69,36 @@ The scan disagrees with the HOL run on 0 tests.
 | modifiers | `FunctionDefinition`, `ModifierDefinition`, `ModifierInvocation`, `PlaceholderStatement` | 53 | 0 | 11 |
 | user-defined value types | `MemberAccess`, `TupleExpression`, `UserDefinedTypeName`, `UserDefinedValueTypeDefinition`, `VariableDeclaration` | 52 | 2 | 28 |
 | type(…) | `Identifier`, `MemberAccess` | 52 | 0 | 11 |
+| constants | `VariableDeclaration` | 47 | 0 | 5 |
 | inline arrays | `TupleExpression` | 47 | 0 | 0 |
 | virtual functions | `FunctionDefinition` | 45 | 0 | 4 |
 | conditional expressions | `Conditional` | 40 | 6 | 19 |
-| custom errors | `ErrorDefinition`, `MemberAccess`, `RevertStatement` | 38 | 2 | 12 |
+| custom errors | `ErrorDefinition`, `MemberAccess`, `RevertStatement`, `TupleExpression` | 38 | 2 | 12 |
 | interfaces | `ContractDefinition` | 35 | 0 | 0 |
 | unimplemented functions | `FunctionDefinition` | 34 | 0 | 0 |
+| literals of non-integer types | `Assignment`, `BinaryOperation`, `FunctionCall`, `Literal`, `Return`, `VariableDeclarationStatement` | 32 | 0 | 0 |
 | named arguments | `FunctionCall` | 32 | 0 | 7 |
-| conversions to non-elementary types | `FunctionCall` | 30 | 0 | 0 |
+| conversions to non-elementary types | `Identifier`, `IndexAccess`, `MemberAccess` | 30 | 0 | 0 |
 | enums | `EnumDefinition`, `EnumValue`, `FunctionCall`, `MemberAccess`, `TupleExpression`, `UserDefinedTypeName`, `VariableDeclaration` | 29 | 0 | 18 |
 | tuples of literals | `TupleExpression` | 28 | 1 | 0 |
 | call options ({value: …, gas: …}) | `FunctionCallOptions` | 26 | 0 | 3 |
+| immutables | `VariableDeclaration` | 24 | 0 | 0 |
+| members of elementary type names | `IndexAccess`, `TupleExpression` | 24 | 0 | 0 |
 | abstract contracts | `ContractDefinition` | 23 | 0 | 0 |
 | try/catch | `FunctionCall`, `TryCatchClause`, `TryStatement` | 20 | 0 | 2 |
 | array slices | `IndexRangeAccess` | 19 | 0 | 5 |
 | fallback functions | `FunctionDefinition` | 18 | 0 | 4 |
-| members of elementary type names | `IndexAccess`, `TupleExpression` | 18 | 0 | 0 |
 | built-in erc7201 | `Identifier` | 14 | 0 | 3 |
+| fixed-size bytes members and indexing | `IndexAccess`, `MemberAccess` | 12 | 0 | 0 |
 | literal subdenominations (ether, days, …) | `Literal` | 12 | 0 | 1 |
-| constants | `VariableDeclaration` | 11 | 4 | 5 |
 | receive functions | `FunctionDefinition` | 7 | 0 | 1 |
-| values of type t_tuple$_t_bool_$_t_bytes_memory_ptr_$ | `TupleExpression` | 7 | 0 | 0 |
-| values of type t_tuple$_t_type$_t_uint256_$_$_t_type$_t_bytes_storage_ptr_$_$ | `TupleExpression` | 5 | 0 | 0 |
+| tuples with empty components | `TupleExpression` | 6 | 0 | 0 |
 | built-in blobhash | `Identifier` | 3 | 0 | 3 |
 | built-in blockhash | `Identifier` | 3 | 0 | 1 |
 | built-in selfdestruct | `Identifier` | 3 | 0 | 0 |
 | built-in addmod | `Identifier` | 2 | 0 | 2 |
 | built-in gasleft | `Identifier` | 2 | 0 | 1 |
-| values of type t_tuple$_t_array$_t_uint256_$dyn_memory_ptr_$_t_array$_t_uint256_$1_calldata_ptr_$ | `TupleExpression` | 2 | 0 | 0 |
-| values of type t_tuple$_t_bytes_memory_ptr_$_t_bytes_memory_ptr_$ | `TupleExpression` | 2 | 0 | 0 |
-| values of type t_tuple$_t_bytes_storage_$_t_bytes_storage_$ | `TupleExpression` | 2 | 0 | 0 |
-| values of type t_tuple$_t_string_memory_ptr_$_t_string_memory_ptr_$ | `TupleExpression` | 2 | 0 | 0 |
-| values of type t_tuple$_t_uint256_$_t_array$_t_uint256_$dyn_calldata_ptr_$ | `TupleExpression` | 2 | 0 | 0 |
 | built-in mulmod | `Identifier` | 1 | 0 | 0 |
-| values of type t_error | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$__$__$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$__$__$_t_uint256_$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$__$_t_int256_$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_array$_t_string_memory_ptr_$2_memory_ptr_$_t_array$_t_string_memory_ptr_$3_memory_ptr_$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_array$_t_uint256_$dyn_calldata_ptr_$_t_array$_t_uint256_$2_calldata_ptr_$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_array$_t_uint256_$dyn_memory_ptr_$_t_uint256_$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_bool_$_t_struct$_T_$8_calldata_ptr_$_t_array$_t_bytes32_$2_calldata_ptr_$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_bytes_memory_ptr_$_t_tuple$_t_bytes_memory_ptr_$_t_bytes_memory_ptr_$_$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_enum$_E_$258_$_t_enum$_E_$258_$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_int256_$__$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_mapping$_t_uint8_$_t_uint8_$_$_t_uint8_$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_string_calldata_ptr_$_t_string_calldata_ptr_$_t_uint256_$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_string_calldata_ptr_$_t_stringliteral_c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470_$_t_uint256_$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_string_calldata_ptr_$_t_uint256_$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_string_memory_ptr_$_t_stringliteral_34607c9bbfeb9c23509680f04363f298fdb0b5f9abe327304ecd1daca08cda9c_$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_string_storage_$_t_string_storage_$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_stringliteral_044852b2a670ade5407e78fb2863c51de9fcb96542a07186fe3aeda6bb8a116d_$_t_tuple$_t_stringliteral_c89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc6_$_t_stringliteral_ad7c5bef027816a800da1736444fb58a807ef4c9603b7848673f7e3a68eb14a5_$_$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_stringliteral_4e03657aea45a94fc7d47ba826c8d667c0d1e6e33a64a036ec44f58fa12d6c45_$_t_stringliteral_48bed44d1bcd124a28c27f343a817e5f5243190d3c52bf347daf876de1dbbf77_$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_stringliteral_c89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc6_$_t_stringliteral_ad7c5bef027816a800da1736444fb58a807ef4c9603b7848673f7e3a68eb14a5_$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_stringliteral_fb79856d4be6e4152983d8f934d820ec61c255bb7f1581914e7da0f335bdbf33_$_t_stringliteral_fb79856d4be6e4152983d8f934d820ec61c255bb7f1581914e7da0f335bdbf33_$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_struct$_S_$5_storage_$_t_struct$_S_$5_storage_$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_tuple$__$__$_$__$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_tuple$__$_t_int256_$_$__$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_tuple$_t_int256_$__$_$__$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_type$_t_array$_t_uint256_$dyn_memory_ptr_$_$_t_type$_t_array$_t_uint256_$dyn_memory_ptr_$_$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_type$_t_int256_$_$_t_type$_t_int256_$_$_t_type$_t_int256_$_$_t_type$_t_int256_$_$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_type$_t_uint256_$_$_t_type$_t_uint256_$_$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_type$_t_userDefinedValueType$_MyInt_$2_$_$_t_type$_t_userDefinedValueType$_MyInt_$2_$_$_t_type$_t_userDefinedValueType$_MyInt_$2_$_$_t_type$_t_userDefinedValueType$_MyInt_$2_$_$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_uint256_$__$_t_uint256_$__$__$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_uint256_$_t_array$_t_uint256_$3_calldata_ptr_$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_uint256_$_t_array$_t_uint256_$dyn_memory_ptr_$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_uint256_$_t_array$_t_uint256_$dyn_memory_ptr_$_t_uint256_$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_uint256_$_t_bytes_memory_ptr_$_t_uint256_$__$__$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_uint256_$_t_enum$_ActionChoices_$17_$_t_bytes32_$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_uint256_$_t_function_external_nonpayable$__$returns$__$_$_t_uint256_$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_uint256_$_t_stringliteral_c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470_$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_uint256_$_t_uint256_$__$_t_uint256_$_t_uint256_$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_uint256_$_t_uint256_$_t_array$_t_uint256_$dyn_storage_$_t_bytes_storage_$_t_uint256_$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_uint256_$_t_uint256_$_t_array$_t_uint256_$dyn_storage_ptr_$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_uint256_$_t_uint256_$_t_bytes_memory_ptr_$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_uint256_$_t_uint256_$_t_uint8_$_t_string_memory_ptr_$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_uint32_$_t_array$_t_uint32_$dyn_storage_$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_uint32_$_t_struct$_S_$11_calldata_ptr_$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_uint32_$_t_struct$_S_$11_memory_ptr_$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_uint8_$_t_userDefinedValueType$_MyUInt8_$3_$_t_uint8_$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_userDefinedValueType$_MyInt_$2_$_t_userDefinedValueType$_MyBytes_$4_$ | `TupleExpression` | 1 | 0 | 0 |
-| values of type t_tuple$_t_userDefinedValueType$_U8_$2_$_t_userDefinedValueType$_U8_$2_$ | `TupleExpression` | 1 | 0 | 0 |
 
 ## Features in order of tests admitted
 
@@ -156,26 +106,26 @@ Supporting the features in this order admits the most rejected tests at each ste
 
 | step | feature | admitted |
 | ---: | --- | ---: |
-| 1 | functions not declared pure | 74 |
-| 2 | inline assembly | 132 |
-| 3 | bytes and string | 164 |
-| 4 | state variables | 216 |
-| 5 | arrays | 292 |
-| 6 | structs | 349 |
-| 7 | require/assert/revert | 398 |
-| 8 | constructors | 431 |
-| 9 | operator delete | 467 |
-| 10 | mappings | 505 |
-| 11 | memory arrays (new T[](n)) | 548 |
-| 12 | msg/block/tx globals | 574 |
-| 13 | events | 607 |
-| 14 | constant expressions over literals | 630 |
-| 15 | inline arrays | 655 |
-| 16 | modifiers | 676 |
-| 17 | abi.* functions | 693 |
-| 18 | hash and signature built-ins | 717 |
-| 19 | contracts without functions | 732 |
-| 20 | user-defined value types | 748 |
+| 1 | functions not declared pure | 73 |
+| 2 | inline assembly | 130 |
+| 3 | bytes and string | 160 |
+| 4 | state variables | 200 |
+| 5 | arrays | 276 |
+| 6 | structs | 333 |
+| 7 | require/assert/revert | 375 |
+| 8 | memory arrays (new T[](n)) | 403 |
+| 9 | constructors | 430 |
+| 10 | mappings | 470 |
+| 11 | operator delete | 503 |
+| 12 | msg/block/tx globals | 529 |
+| 13 | events | 561 |
+| 14 | constant expressions over literals | 583 |
+| 15 | declaration values | 603 |
+| 16 | inline arrays | 627 |
+| 17 | modifiers | 648 |
+| 18 | abi.* functions | 668 |
+| 19 | hash and signature built-ins | 689 |
+| 20 | custom errors | 706 |
 
 ## Skipped and compile failures
 
