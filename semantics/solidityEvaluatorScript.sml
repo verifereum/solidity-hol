@@ -26,7 +26,7 @@
  *)
 Theory solidityEvaluator
 Ancestors
-  solidityState solidityScalar vfmCompute
+  solidityState solidityScalar vfmCompute keccak
 Libs
   cv_transLib wordsLib intLib
 
@@ -256,6 +256,38 @@ Definition state_target_def:
     | NONE => NONE
 End
 
+(* Solidity mapping keys occupy one 32-byte word: integers are extended to
+ * 256 bits, addresses and booleans are zero padded, bytesN are right padded.
+ *)
+Definition mapping_key_bytes_def:
+  mapping_key_bytes key s =
+    if ¬elementary_storage_type_ok key ∨ ¬elementary_scalar_has_type key s then NONE
+    else case s of
+      BytesValue bs => SOME (bs ++ REPLICATE (32 - LENGTH bs) 0w)
+    | _ => OPTION_MAP (num_to_bytes 32) (stored_number 32 s)
+End
+
+Definition mapping_slot_def:
+  mapping_slot key_bytes (slot : bytes32) : bytes32 =
+    word_of_bytes_be (Keccak_256_w64 (key_bytes ++ num_to_bytes 32 (w2n slot)))
+End
+
+(* Navigation consumes already evaluated atoms and returns a concrete location.
+ * A nested mapping starts at the preceding mapping's hashed slot.
+ *)
+Definition navigate_storage_def:
+  navigate_storage r s =
+    case r of
+      StorageReference PersistentStorage addr slot 0 (MappingT key value) layout =>
+        (case mapping_key_bytes key s of
+           SOME bs =>
+             ValueOk (ReferenceValue
+               (StorageReference PersistentStorage addr (mapping_slot bs slot)
+                  0 value layout))
+         | NONE => ValueAbrupt (InvalidCompletion "bad mapping key"))
+    | _ => ValueAbrupt (InvalidCompletion "unsupported storage navigation")
+End
+
 (* Every operation except an internal call, which needs the evaluator. *)
 Definition eval_operation_def:
   eval_operation env (st : source_state) op =
@@ -264,6 +296,24 @@ Definition eval_operation_def:
         (case read_state_variable env st x of
            SOME s => ValueOk (ScalarValue s)
          | NONE => ValueAbrupt (InvalidCompletion "bad state read"))
+    | StateReferenceOperation x =>
+        (case state_target env st x of
+           SOME (ValueTarget r) => ValueOk (ReferenceValue r)
+         | _ => ValueAbrupt (InvalidCompletion "bad state reference"))
+    | ReadOperation ty a =>
+        (case eval_atom st.scopes a of
+           SOME (ReferenceValue
+             (StorageReference PersistentStorage addr slot offset rty _)) =>
+               if rty ≠ ty then ValueAbrupt (InvalidCompletion "bad read type")
+               else (case read_storage st.world.accounts addr slot offset ty of
+                       SOME s => ValueOk (ScalarValue s)
+                     | NONE => ValueAbrupt (InvalidCompletion "bad storage read"))
+         | _ => ValueAbrupt (InvalidCompletion "bad storage reference"))
+    | NavigateOperation ty root_expr (IndexNavigation index) =>
+        (case (eval_atom st.scopes root_expr, eval_atom st.scopes index) of
+           (SOME (ReferenceValue r), SOME (ScalarValue s)) =>
+             navigate_storage r s
+         | _ => ValueAbrupt (InvalidCompletion "bad index operands"))
     | _ => eval_pure_operation env st.scopes op
 End
 
@@ -376,6 +426,12 @@ Definition simple_stmt_def:
     | CaptureBindingStmt t x =>
         normal_result
           (st with targets := set_target t (BindTarget x) st.targets) gas
+    | CaptureValueStmt t a =>
+        (case eval_atom st.scopes a of
+           SOME (ReferenceValue r) =>
+             normal_result
+               (st with targets := set_target t (ValueTarget r) st.targets) gas
+         | _ => abrupt_result (InvalidCompletion "bad captured reference") st gas)
     | CaptureStateStmt t x =>
         (case state_target env st x of
            SOME target =>

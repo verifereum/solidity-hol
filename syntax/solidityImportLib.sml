@@ -86,12 +86,15 @@ fun type_id v = mk_str (string_field (field v "typeDescriptions") "typeIdentifie
 (* Type names *)
 
 fun type_name v = within v (fn v =>
-  (expect v "ElementaryTypeName";
-   con "SrcElementaryTypeName"
+  case node_type v of
+    "Mapping" => con "SrcMappingTypeName"
+      [info v, type_name (field v "keyType"), type_name (field v "valueType")]
+  | "ElementaryTypeName" => con "SrcElementaryTypeName"
      [info v, mk_str (string_field v "name"),
       mk_opt stringSyntax.string_ty
         (Option.map (mk_str o JSONUtil.asString)
-           (optional_field v "stateMutability"))]))
+           (optional_field v "stateMutability"))]
+  | other => fail (describe v ^ ": unsupported type name " ^ other))
 
 (* Expressions *)
 
@@ -127,6 +130,10 @@ fun expr v = within v (fn v =>
         [info v, mk_str (string_field v "operator"),
          expr (field v "leftHandSide"), expr (field v "rightHandSide"),
          type_id v]
+  | "IndexAccess" =>
+      con "SrcIndexAccess"
+        [info v, expr (field v "baseExpression"),
+         expr (field v "indexExpression"), type_id v]
   | "TupleExpression" =>
       (require v (not (bool_field v "isInlineArray"))
          "inline arrays are not supported";

@@ -150,9 +150,28 @@ Definition storage_bytes_def:
     | _ => NONE
 End
 
+(* Stored elementary values and mappings to them, including nested mappings.
+ * ReferenceType represents a captured storage location, even at a scalar leaf.
+ *)
+Definition elementary_storage_type_ok_def:
+  (elementary_storage_type_ok BoolT ⇔ T) ∧
+  (elementary_storage_type_ok (UintT n) ⇔ valid_int_width n) ∧
+  (elementary_storage_type_ok (IntT n) ⇔ valid_int_width n) ∧
+  (elementary_storage_type_ok (AddressT _) ⇔ T) ∧
+  (elementary_storage_type_ok (FixedBytesT n) ⇔ valid_fixed_bytes_width n) ∧
+  (elementary_storage_type_ok _ ⇔ F)
+End
+
+Definition storage_type_ok_def:
+  (storage_type_ok (MappingT key value) ⇔
+    elementary_storage_type_ok key ∧ storage_type_ok value) ∧
+  (storage_type_ok ty ⇔ elementary_storage_type_ok ty)
+End
+
 (* ProductType is reserved for tuples and multiple returns: never singleton. *)
 Definition wf_core_value_type_def:
   (wf_core_value_type env (SingleType ty) ⇔ core_scalar_type env ty) ∧
+  (wf_core_value_type env (ReferenceType ty) ⇔ storage_type_ok ty) ∧
   (wf_core_value_type env (ProductType tys) ⇔
     LENGTH tys ≠ 1 ∧ EVERY (wf_core_value_type env) tys)
 Termination
@@ -212,6 +231,10 @@ End
 Definition value_has_type_def:
   (value_has_type env (SingleType ty) (ScalarValue s) ⇔
     scalar_has_type env ty s) ∧
+  (value_has_type env (ReferenceType ty)
+     (ReferenceValue (StorageReference PersistentStorage _ _ offset rty _)) ⇔
+    ty = rty ∧ storage_type_ok ty ∧
+    (case storage_bytes ty of SOME b => offset + b ≤ 32 | NONE => offset = 0)) ∧
   (value_has_type env (ProductType tys) (TupleValue vs) ⇔
     values_have_types env tys vs) ∧
   (value_has_type env _ _ ⇔ F) ∧
@@ -250,7 +273,7 @@ Definition wf_core_atom_def:
     ALOOKUP ctx.bindings x = SOME ty) ∧
   (wf_core_atom env ctx (SingleType ty) (ConstantAtom s) ⇔
     scalar_has_type env ty s) ∧
-  (wf_core_atom env ctx (ProductType _) (ConstantAtom _) ⇔ F)
+  (wf_core_atom env ctx _ (ConstantAtom _) ⇔ F)
 End
 
 (* Operations *)
@@ -405,7 +428,7 @@ Definition wf_core_operation_def:
   (wf_core_operation env ctx annotation (TupleOperation atoms) ⇔
     case annotation of
       ProductType tys => LIST_REL (wf_core_atom env ctx) tys atoms
-    | SingleType _ => F) ∧
+    | _ => F) ∧
   (wf_core_operation env ctx annotation (TupleComponentOperation n a) ⇔
     case a of
       BoundAtom x =>
@@ -415,8 +438,26 @@ Definition wf_core_operation_def:
     | ConstantAtom _ => F) ∧
   (wf_core_operation env ctx annotation (ReadStateOperation x) ⇔
     case lookup_state_variable env x of
-      SOME v => annotation = SingleType v.state_type
+      SOME v => annotation = SingleType v.state_type ∧
+                core_scalar_type env v.state_type
     | NONE => F) ∧
+  (wf_core_operation env ctx annotation (StateReferenceOperation x) ⇔
+    case lookup_state_variable env x of
+      SOME v => annotation = ReferenceType v.state_type
+    | NONE => F) ∧
+  (wf_core_operation env ctx annotation (ReadOperation ty a) ⇔
+    annotation = SingleType ty ∧ core_scalar_type env ty ∧
+    IS_SOME (storage_bytes ty) ∧ wf_core_atom env ctx (ReferenceType ty) a) ∧
+  (wf_core_operation env ctx annotation
+     (NavigateOperation ty base (IndexNavigation index)) ⇔
+    annotation = ReferenceType ty ∧
+    case base of
+      BoundAtom x =>
+        (case ALOOKUP ctx.bindings x of
+           SOME (ReferenceType (MappingT key value)) =>
+             value = ty ∧ wf_core_atom env ctx (SingleType key) index
+         | _ => F)
+    | _ => F) ∧
   (wf_core_operation env ctx annotation (InternalCallOperation f args) ⇔
     case lookup_procedure env f of
       SOME p =>
@@ -457,10 +498,21 @@ Definition check_core_stmts_def:
         then check_core_stmts env (capture_core_target t ty ctx) ss
         else NONE
     | _ => NONE) ∧
+  (check_core_stmts env ctx (CaptureValueStmt t a :: ss) =
+    case a of
+      BoundAtom x =>
+        (case ALOOKUP ctx.bindings x of
+           SOME (ReferenceType ty) =>
+             if fresh_core_id ctx t ∧ core_scalar_type env ty ∧
+                IS_SOME (storage_bytes ty)
+             then check_core_stmts env (capture_core_target t ty ctx) ss
+             else NONE
+         | _ => NONE)
+    | _ => NONE) ∧
   (check_core_stmts env ctx (CaptureStateStmt t x :: ss) =
     case lookup_state_variable env x of
       SOME v =>
-        if fresh_core_id ctx t
+        if fresh_core_id ctx t ∧ core_scalar_type env v.state_type
         then check_core_stmts env (capture_core_target t v.state_type ctx) ss
         else NONE
     | NONE => NONE) ∧
@@ -539,10 +591,10 @@ End
  *)
 Definition wf_core_state_variable_def:
   wf_core_state_variable env (v : core_state_variable) ⇔
-    core_scalar_type env v.state_type ∧
+    storage_type_ok v.state_type ∧
     case storage_bytes v.state_type of
       SOME b => v.state_offset + b ≤ 32
-    | NONE => F
+    | NONE => v.state_offset = 0
 End
 
 Definition wf_core_environment_def:
