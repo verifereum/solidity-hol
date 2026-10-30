@@ -135,8 +135,9 @@ Definition core_scalar_type_def:
     declared_type_ok env ty
 End
 
-(* The bytes a value type occupies in a storage slot; an enum has at most 256
- * members. User-defined value types are not stored yet.
+(* The bytes a value type occupies in a storage slot. Enums and user-defined
+ * value types are not stored yet: reading an enum needs a choice of where an
+ * out-of-range byte is rejected.
  *)
 Definition storage_bytes_def:
   storage_bytes ty =
@@ -146,7 +147,6 @@ Definition storage_bytes_def:
     | IntT n => SOME (n DIV 8)
     | AddressT _ => SOME 20
     | FixedBytesT n => SOME n
-    | EnumT _ => SOME 1
     | _ => NONE
 End
 

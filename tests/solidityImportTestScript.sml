@@ -309,26 +309,40 @@ val () = import_error_with storage_contracts "state variable initialiser"
      storage_ast)
 val () = import_error_with (JSON.OBJECT []) "missing storage layout" storage_ast
 
-(* The contracts output with an edit to the first layout entry, of total. *)
+(* The contracts output with an edit to the layout entries; the first is
+ * total's. *)
 fun edit_layout f =
   case storage_contracts of
     JSON.OBJECT [(name, contract)] =>
       let
         val layout = JSONUtil.lookupField contract "storageLayout"
         val entries =
-          case JSONUtil.lookupField layout "storage" of
-            JSON.ARRAY (e :: es) => JSON.ARRAY (f e :: es)
-          | _ => raise Fail "empty storage layout"
+          JSON.ARRAY (f (JSONUtil.arrayMap I (JSONUtil.lookupField layout "storage")))
       in
         JSON.OBJECT [(name, set_field "storageLayout"
                               (set_field "storage" entries layout) contract)]
       end
   | _ => raise Fail "expected one contract"
 
-val () = edited_unit_with (edit_layout (set_field "type" (JSON.STRING "t_uint8")))
+fun edit_first_entry f = edit_layout (fn e :: es => f e :: es | [] => [])
+
+val () = edited_unit_with
+  (edit_first_entry (set_field "type" (JSON.STRING "t_uint8")))
   "layout_type_mismatch" storage_ast
-val () = edited_unit_with (edit_layout (set_field "astId" (JSON.INT 999999)))
+val () = edited_unit_with
+  (edit_first_entry (set_field "astId" (JSON.INT 999999)))
   "layout_id_mismatch" storage_ast
+val () = edited_unit_with (edit_layout tl) "layout_missing_entry" storage_ast
+val () = edited_unit_with (edit_layout (fn e :: es => es @ [e] | [] => []))
+  "layout_reordered" storage_ast
+
+(* The first function is setTotal, which writes total. *)
+val () = edited_unit_with storage_contracts "pure_writes_state"
+  (edit_first "FunctionDefinition"
+     (set_field "stateMutability" (JSON.STRING "pure")) storage_ast)
+val () = edited_unit_with storage_contracts "payable_function"
+  (edit_first "FunctionDefinition"
+     (set_field "stateMutability" (JSON.STRING "payable")) storage_ast)
 
 Theorem layout_type_mismatch_rejected:
   ¬valid_src_unit layout_type_mismatch
@@ -338,6 +352,30 @@ QED
 
 Theorem layout_id_mismatch_rejected:
   ¬valid_src_unit layout_id_mismatch
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem layout_missing_entry_rejected:
+  ¬valid_src_unit layout_missing_entry
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem layout_reordered_rejected:
+  ¬valid_src_unit layout_reordered
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem pure_writes_state_rejected:
+  ¬valid_src_unit pure_writes_state
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem payable_function_rejected:
+  ¬valid_src_unit payable_function
 Proof
   CONV_TAC cv_eval
 QED

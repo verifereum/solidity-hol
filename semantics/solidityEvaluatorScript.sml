@@ -194,7 +194,6 @@ Definition stored_value_def:
     case ty of
       BoolT => SOME (BoolValue (n ≠ 0))
     | UintT _ => SOME (IntegerValue (&n))
-    | EnumT _ => SOME (IntegerValue (&n))
     | IntT w => SOME (IntegerValue (wrap_integer T w (&n)))
     | AddressT _ => SOME (AddressValue (n2w n))
     | FixedBytesT k => SOME (BytesValue (num_to_bytes k n))

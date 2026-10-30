@@ -24,6 +24,10 @@ contract Storage {
         return total;
     }
 
+    function getFlag() public view returns (bool) {
+        return flag;
+    }
+
     function packed(uint8 a, int16 b, bool c, address d) public returns (uint8, int16, bool, address) {
         small = a;
         signedValue = b;

@@ -174,15 +174,9 @@ Definition contract_accounts_def:
       empty_accounts
 End
 
-Definition distinct_slots_def:
-  (distinct_slots [] = []) ∧
-  (distinct_slots (k :: ks) =
-    if MEM k ks then distinct_slots ks else k :: distinct_slots ks)
-End
-
 Definition observed_slots_def:
   observed_slots (prog : core_program) storage final =
-    distinct_slots
+    nub
       (MAP (λv. w2n v.state_slot) prog.state_variables ++ MAP FST storage ++
        MAP FST final)
 End
@@ -210,7 +204,8 @@ Definition differential_state_def:
     world := <| accounts := accounts;
                 transient := empty_transient_storage;
                 logs := [] |>;
-    frame := <| self_address := 0x1000w; code_address := 0x1000w;
+    frame := <| self_address := contract_address;
+                code_address := contract_address;
                 sender_address := 0x2000w; call_value := 0; call_data := [];
                 static_context := F |>;
     scopes := [];
@@ -278,7 +273,7 @@ End
 
 Definition differential_tx_def:
   differential_tx data = <|
-    from := 0x2000w; to := SOME 0x1000w; data := data; nonce := 0;
+    from := 0x2000w; to := SOME contract_address; data := data; nonce := 0;
     value := 0; gasLimit := 10000000; gasPrice := 0; accessList := [];
     blobVersionedHashes := []; maxFeePerBlobGas := NONE; maxFeePerGas := NONE;
     authorizationList := []
@@ -431,7 +426,7 @@ val () = cv_auto_trans function_types_def;
 val () = cv_auto_trans completion_outcome_def;
 val () = cv_auto_trans seed_storage_def;
 val () = cv_auto_trans contract_accounts_def;
-val () = cv_auto_trans distinct_slots_def;
+val () = cv_auto_trans listTheory.nub_def;
 val () = cv_auto_trans observed_slots_def;
 val () = cv_auto_trans storage_at_def;
 val () = cv_auto_trans expected_storage_def;

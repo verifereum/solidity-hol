@@ -160,6 +160,7 @@
       "cases": [
         {"name": "set_total", "function": "setTotal", "args": [7], "expect": {"return": []}, "final_storage": {"0": 7}},
         {"name": "get_total_reads_storage", "function": "getTotal", "args": [], "storage": {"0": 42}, "expect": {"return": [42]}},
+        {"name": "dirty_bool_reads_true", "function": "getFlag", "args": [], "storage": {"1": "0x02000000"}, "expect": {"return": [true]}},
         {"name": "packed_slot_keeps_neighbours", "function": "packed", "args": [200, -2, true, "0x1234567890abcdef1234567890abcdef12345678"], "storage": {"1": "0xdeadbeef000000000000000000000000000000000000000000000000"}, "expect": {"return": [200, -2, true, 103929005307927756724354605802047639613112342136]}, "final_storage": {"1": "0xdeadbeef1234567890abcdef1234567890abcdef1234567801fffec8"}},
         {"name": "fixed_bytes", "function": "setTag", "args": ["0x12345678"], "expect": {"return": ["0x12345678"]}, "final_storage": {"1": "0x12345678000000000000000000000000000000000000000000000000"}},
         {"name": "halves_share_slot", "function": "halves", "args": [3, 5], "expect": {"return": [8]}, "final_storage": {"2": "0x0500000000000000000000000000000003"}},
