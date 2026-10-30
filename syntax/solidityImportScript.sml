@@ -11,15 +11,15 @@
  * annotations are kept as the compiler's encoded typeIdentifier and decoded
  * here, never from the display typeString.
  *
- * Types are normalized from elementary and mapping type-name nodes; value types are decoded from
- * typeIdentifiers; both yield only valid shapes (normalize_type_name_valid,
+ * Types are normalized from elementary and mapping type-name nodes; value
+ * types are decoded from typeIdentifiers. Both yield only valid shapes (normalize_type_name_valid,
  * decode_type_identifier_valid). Literals keep their exact rational type.
  *
  * valid_src_unit then establishes, for an imported unit:
  *  - all node ids are distinct;
  *  - every parameter, return, local and state variable has a normalized
- *    elementary or admitted mapping type, the default data location, an identifier agreeing
- *    with that type, and the enclosing function, block, for statement or
+ *    elementary or admitted mapping type, the default data location, and a
+ *    type identifier agreeing with that type, and the enclosing function, block, for statement or
  *    contract as its scope;
  *  - the contract's storage layout lists its state variables in declaration
  *    order, each with its own typeIdentifier and a slot below 2 ** 256;

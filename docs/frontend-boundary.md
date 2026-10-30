@@ -133,7 +133,7 @@ slot, byte offset and type identifier; `valid_src_unit` requires one entry per
 state variable, naming its declaration and type, and leaves the layout
 calculation itself, including that packed variables don't overlap, to the
 compiler. Elaboration copies slot and offset into the core program's
-`state_variables`. Public state variables, initialisers, constants, immutables
+`state_variables`. Public state variables, initialisers, constants and immutables
 are import errors. Mapping key/value types come from recursive type-name
 normalization. AST and layout type identifiers use different encodings; both
 are checked against the normalized type. The scalar leaf width determines

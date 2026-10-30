@@ -87,8 +87,20 @@ fun type_id v = mk_str (string_field (field v "typeDescriptions") "typeIdentifie
 
 fun type_name v = within v (fn v =>
   case node_type v of
-    "Mapping" => con "SrcMappingTypeName"
-      [info v, type_name (field v "keyType"), type_name (field v "valueType")]
+    "Mapping" =>
+      let
+        val key = field v "keyType"
+        (* solc omits stateMutability on an address mapping key. *)
+        val key_name =
+          if node_type key = "ElementaryTypeName" andalso
+             string_field key "name" = "address" andalso
+             not (Option.isSome (optional_field key "stateMutability"))
+          then con "SrcElementaryTypeName"
+                 [info key, mk_str "address", optionSyntax.mk_some (mk_str "nonpayable")]
+          else type_name key
+      in
+        con "SrcMappingTypeName" [info v, key_name, type_name (field v "valueType")]
+      end
   | "ElementaryTypeName" => con "SrcElementaryTypeName"
      [info v, mk_str (string_field v "name"),
       mk_opt stringSyntax.string_ty

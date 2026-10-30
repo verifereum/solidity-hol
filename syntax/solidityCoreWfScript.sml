@@ -7,8 +7,9 @@
  * user-defined value types, which are integers and addresses at runtime.
  * Function values are deferred together with indirect calls; contract types
  * are deferred until contract metadata (payability, bases) is in the
- * environment. Reference navigation, reads through references, copies and
- * external calls are rejected until their validation rules exist.
+ * environment. Typed storage references support mapping navigation and scalar
+ * leaf reads/captures. Other navigation, copies and external calls remain
+ * rejected until their validation rules exist.
  *)
 Theory solidityCoreWf
 Ancestors

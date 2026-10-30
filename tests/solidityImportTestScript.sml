@@ -276,8 +276,7 @@ QED
 
 (* State variables and the storage layout *)
 
-val storage_fixture = "../testdata/differential/expected/storage.json",
-  "../testdata/differential/expected/mappings.json"
+val storage_fixture = "../testdata/differential/expected/storage.json"
 val storage_source = "testdata/differential/storage.sol"
 
 Definition storage_unit_def:
