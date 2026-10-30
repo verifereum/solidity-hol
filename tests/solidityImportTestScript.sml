@@ -164,6 +164,20 @@ val () = import_error "inheritance"
   (edit_first "ContractDefinition"
      (set_field "linearizedBaseContracts" (JSON.ARRAY [])) ast)
 
+(* solc refers to built-ins such as require by negative declaration ids; the
+ * rejection names the identifier's node.
+ *)
+val () =
+  (import_source_unit
+     (edit_first "Identifier"
+        (set_field "referencedDeclaration" (JSON.INT ~18)) ast);
+   raise Fail "built-in: imported")
+  handle ImportError msg =>
+    if String.isPrefix "Identifier " msg andalso
+       String.isSubstring ": built-in " msg
+    then ()
+    else raise Fail ("built-in: " ^ msg)
+
 (* Duplicate and dangling ids and inconsistent types import but are invalid. *)
 
 val unit_id = JSONUtil.lookupField ast "id"

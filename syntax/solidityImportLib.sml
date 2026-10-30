@@ -97,9 +97,13 @@ fun type_name v = within v (fn v =>
 fun expr v = within v (fn v =>
   case node_type v of
     "Identifier" =>
-      con "SrcIdentifier"
-        [info v, mk_str (string_field v "name"),
-         mk_num (int_field v "referencedDeclaration"), type_id v]
+      let val declaration = int_field v "referencedDeclaration" in
+        require v (declaration >= 0)
+          ("built-in " ^ string_field v "name" ^ " is not supported");
+        con "SrcIdentifier"
+          [info v, mk_str (string_field v "name"), mk_num declaration,
+           type_id v]
+      end
   | "Literal" =>
       (require v (not (isSome (optional_field v "subdenomination")))
          "literal subdenominations are not supported";

@@ -134,6 +134,19 @@ def parse_args() -> argparse.Namespace:
 
 
 def build_artifact(solc: Path, source_paths: list[Path], profile_path: Path) -> dict[str, Any]:
+    sources: dict[str, str] = {}
+    for path in source_paths:
+        name = source_name(path)
+        if name in sources:
+            raise SystemExit(f"duplicate source name: {name}")
+        sources[name] = path.read_text(encoding="utf-8")
+    return build_artifact_from_sources(solc, sources, profile_path)
+
+
+def build_artifact_from_sources(
+    solc: Path, sources: dict[str, str], profile_path: Path
+) -> dict[str, Any]:
+    """The artifact of sources given by Standard JSON name and content."""
     pin = PIN_FILE.read_text(encoding="ascii").strip()
     if re.fullmatch(r"[0-9a-f]{40}", pin) is None:
         raise SystemExit(f"{PIN_FILE} must contain one lowercase 40-character SHA")
@@ -145,16 +158,9 @@ def build_artifact(solc: Path, source_paths: list[Path], profile_path: Path) -> 
         raise SystemExit("profile must contain compilerVersion and settings")
     identity = compiler_identity(solc, expected_version, pin)
 
-    sources: dict[str, dict[str, str]] = {}
-    for path in source_paths:
-        name = source_name(path)
-        if name in sources:
-            raise SystemExit(f"duplicate source name: {name}")
-        sources[name] = {"content": path.read_text(encoding="utf-8")}
-
     compiler_input = {
         "language": "Solidity",
-        "sources": dict(sorted(sources.items())),
+        "sources": {name: {"content": sources[name]} for name in sorted(sources)},
         "settings": {**settings, "outputSelection": OUTPUT_SELECTION},
     }
     compiler_output = compile_standard_json(solc, compiler_input)
