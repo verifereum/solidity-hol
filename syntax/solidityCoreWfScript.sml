@@ -163,7 +163,30 @@ Definition elementary_storage_type_ok_def:
   (elementary_storage_type_ok _ ⇔ F)
 End
 
+(* Fixed arrays start on a slot boundary, including each nested row. Scalar
+ * elements share slots without straddling a boundary. *)
+Definition fixed_storage_slots_def:
+  fixed_storage_slots ty =
+    case ty of
+      ArrayT element (SOME n) =>
+        if n = 0 then NONE else
+        (case storage_bytes element of
+           SOME b =>
+             if b = 0 ∨ 32 < b then NONE else
+             let per_slot = 32 DIV b in
+             SOME ((n + per_slot - 1) DIV per_slot)
+         | NONE => OPTION_MAP (λslots. n * slots)
+                     (fixed_storage_slots element))
+    | ArrayT _ NONE => NONE
+    | _ => OPTION_MAP (K 1) (storage_bytes ty)
+Termination
+  WF_REL_TAC ‘measure sol_type_size’
+End
+
 Definition storage_type_ok_def:
+  (storage_type_ok (ArrayT element (SOME n)) ⇔
+    0 < n ∧ n < 2 ** 256 ∧ storage_type_ok element ∧
+    IS_SOME (fixed_storage_slots (ArrayT element (SOME n)))) ∧
   (storage_type_ok (MappingT key value) ⇔
     elementary_storage_type_ok key ∧ storage_type_ok value) ∧
   (storage_type_ok ty ⇔ elementary_storage_type_ok ty)
@@ -457,6 +480,8 @@ Definition wf_core_operation_def:
         (case ALOOKUP ctx.bindings x of
            SOME (ReferenceType (MappingT key value)) =>
              value = ty ∧ wf_core_atom env ctx (SingleType key) index
+         | SOME (ReferenceType (ArrayT element (SOME _))) =>
+             element = ty ∧ wf_core_atom env ctx (SingleType (UintT 256)) index
          | _ => F)
     | _ => F) ∧
   (wf_core_operation env ctx annotation (InternalCallOperation f args) ⇔

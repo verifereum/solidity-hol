@@ -88,8 +88,16 @@ existing `WriteScalarStmt`. Assignment evaluates and saves its RHS before
 navigating the target; compound assignment and increment/decrement read and
 write the same captured location. Integer keys are extended to 256 bits,
 addresses and booleans are zero padded, and fixed bytes are right padded.
-Dynamic keys, composite values, and local storage-reference bindings remain
-coverage work.
+Fixed-size storage arrays use the same captured references. Scalar elements
+occupy `32 DIV storage_bytes` positions per slot, without straddling slots;
+`fixed_storage_slots` rounds each nested row up to whole slots.
+`fixed_array_element` checks bounds before computing its slot and byte offset,
+returning panic `0x32` on failure. `.length` evaluates the reference prefix and
+then returns the fixed dimension. Storage writes and panic rollback reuse the
+scalar operations and source-frame boundary.
+
+Dynamic keys, dynamic arrays, memory/calldata arrays, aggregate copying and
+local storage-reference bindings remain coverage work.
 
 Memory references use object identity and an abstract cell offset; this is not
 an EVM byte address. The sparse heap separates metadata from cells, avoiding a

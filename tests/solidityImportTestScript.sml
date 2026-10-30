@@ -13,7 +13,8 @@ fun holbuild_extra_deps (_ : string list) = ()
 val () = holbuild_extra_deps [
   "../testdata/frontend/expected/pure_core.json",
   "../testdata/differential/expected/storage.json",
-  "../testdata/differential/expected/mappings.json"
+  "../testdata/differential/expected/mappings.json",
+  "../testdata/differential/expected/storage_arrays.json"
 ]
 
 val fixture = "../testdata/frontend/expected/pure_core.json"
@@ -431,6 +432,54 @@ QED
 
 Theorem mapping_leaf_metadata_rejected:
   ¬valid_src_unit mapping_leaf_metadata_mismatch
+Proof
+  CONV_TAC cv_eval
+QED
+
+(* The compiler uses different array encodings in AST types and storageLayout;
+ * changing only the resolved dimension or the indexed leaf must be rejected. *)
+val array_fixture = "../testdata/differential/expected/storage_arrays.json"
+val array_source = "testdata/differential/storage_arrays.sol"
+val array_ast = artifact_part array_fixture ["sources", array_source, "ast"]
+val array_contracts = artifact_part array_fixture ["contracts", array_source]
+
+Definition array_unit_def:
+  array_unit = ^(import_artifact array_fixture array_source)
+End
+val () = cv_auto_trans array_unit_def;
+
+Theorem array_unit_valid:
+  valid_src_unit array_unit
+Proof
+  CONV_TAC cv_eval
+QED
+
+val () = import_error_with array_contracts "dynamic array"
+  (edit_first "ArrayTypeName" (set_field "length" JSON.NULL) array_ast)
+
+val () = import_error_with array_contracts "malformed resolved array dimension"
+  (edit_first "ArrayTypeName"
+     (fn v => set_field "length"
+       (type_identifier "t_rational_35x_by_1" (JSONUtil.lookupField v "length")) v)
+     array_ast)
+
+val () = edited_unit_with array_contracts "array_dimension_mismatch"
+  (edit_first "ArrayTypeName"
+     (fn v => set_field "length"
+       (type_identifier "t_rational_34_by_1" (JSONUtil.lookupField v "length")) v)
+     array_ast)
+
+Theorem array_dimension_metadata_rejected:
+  ¬valid_src_unit array_dimension_mismatch
+Proof
+  CONV_TAC cv_eval
+QED
+
+val () = edited_unit_with array_contracts "array_leaf_mismatch"
+  (edit_first "IndexAccess" (type_identifier "t_uint16") array_ast)
+
+Theorem array_leaf_metadata_rejected:
+  ¬valid_src_unit array_leaf_mismatch
 Proof
   CONV_TAC cv_eval
 QED
