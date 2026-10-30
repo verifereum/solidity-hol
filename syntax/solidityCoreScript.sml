@@ -89,6 +89,10 @@ Datatype:
   external_kind = ExternalCall | ExternalStaticCall | ExternalDelegateCall
 End
 
+(* ReadStateOperation reads a value-type state variable of the program; no
+ * reference is bound, since a storage location of a value type is not a
+ * valid binding type.
+ *)
 Datatype:
   core_operation
   = ScalarOperation sol_type arithmetic_mode core_operator (core_atom list)
@@ -96,12 +100,15 @@ Datatype:
   | TupleOperation (core_atom list)
   | TupleComponentOperation num core_atom
   | ReadOperation sol_type core_atom
+  | ReadStateOperation ast_id
   | NavigateOperation sol_type core_atom navigation
   | InternalCallOperation ast_id (core_atom list)
   | ExternalCallOperation external_kind (core_atom list)
 End
 
 (* Explicitly separate scalar writes, reference binding, and content copying.
+ * CaptureStateStmt captures a value-type state variable's storage location
+ * as a ValueTarget for WriteScalarStmt.
  * Copy traversal is independently terminating, not fuel-indexed.
  * While/internal recursion need depth fuel; finite syntax/list traversal does not.
  *)
@@ -111,6 +118,7 @@ Datatype:
   | CaptureBindingStmt ast_id ast_id
   | CaptureValueStmt ast_id core_atom
   | CaptureReferenceFieldStmt ast_id core_atom navigation
+  | CaptureStateStmt ast_id ast_id
   | WriteScalarStmt ast_id sol_type core_atom
   | BindReferenceStmt ast_id sol_type core_atom
   | CopyContentsStmt sol_type sol_type core_atom core_atom
@@ -131,9 +139,22 @@ Datatype:
   |>
 End
 
+(* A state variable of value type, at the slot and byte offset (from the
+ * slot's low-order end) the compiler's storage layout gives.
+ *)
+Datatype:
+  core_state_variable = <|
+    state_id : ast_id;
+    state_type : sol_type;
+    state_slot : bytes32;
+    state_offset : num
+  |>
+End
+
 Datatype:
   core_program = <|
     procedures : core_procedure list;
+    state_variables : core_state_variable list;
     entry_procedure : ast_id
   |>
 End

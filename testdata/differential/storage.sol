@@ -1,0 +1,92 @@
+// SPDX-License-Identifier: CC0-1.0
+pragma solidity 0.8.37;
+
+// Value-type state variables: packed slots, signed and fixed-bytes values,
+// writes seen across internal calls, and reverts discarding writes. The
+// admitted subset has no require or revert, so the reverts are panics, and
+// no negative literals.
+contract Storage {
+    uint256 total;
+    uint8 small;
+    int16 signedValue;
+    bool flag;
+    address owner;
+    bytes4 tag;
+    uint128 low;
+    uint128 high;
+    int256 wide;
+
+    function setTotal(uint256 x) public {
+        total = x;
+    }
+
+    function getTotal() public view returns (uint256) {
+        return total;
+    }
+
+    function packed(uint8 a, int16 b, bool c, address d) public returns (uint8, int16, bool, address) {
+        small = a;
+        signedValue = b;
+        flag = c;
+        owner = d;
+        return (small, signedValue, flag, owner);
+    }
+
+    function setTag(bytes4 t) public returns (bytes4) {
+        tag = t;
+        return tag;
+    }
+
+    function halves(uint128 a, uint128 b) public returns (uint256) {
+        low = a;
+        high = b;
+        return uint256(high) + uint256(low);
+    }
+
+    function bump() internal returns (uint256) {
+        total += 1;
+        return total;
+    }
+
+    function acrossCalls() public returns (uint256, uint256) {
+        total = 10;
+        uint256 seen = bump();
+        total *= 2;
+        return (seen, total);
+    }
+
+    function increments() public returns (uint8, uint8, int16) {
+        small = 253;
+        uint8 before = small++;
+        ++small;
+        signedValue--;
+        return (before, small, signedValue);
+    }
+
+    function overflow() public {
+        small = 255;
+        small++;
+    }
+
+    function writeThenRevert(uint256 x) public returns (uint256) {
+        total = x;
+        wide = int256(x) - 6;
+        return 10 / x;
+    }
+
+    function swap() public returns (uint128, uint128) {
+        (low, high) = (high, low);
+        return (low, high);
+    }
+
+    function readOrder() public returns (uint256) {
+        total = 1;
+        return total + bump();
+    }
+
+    function compound() public returns (int256) {
+        wide = int256(uint256(small)) - 5;
+        wide -= int256(uint256(small));
+        return wide;
+    }
+}

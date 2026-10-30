@@ -182,6 +182,7 @@ Definition test_program_def:
     procedures := [add_proc; sum_proc; fact_proc; pair_proc; first_proc;
                    spin_proc; fail_proc; call_fail_proc; callee_proc;
                    caller_proc];
+    state_variables := [];
     entry_procedure := AstId 1
   |>
 End

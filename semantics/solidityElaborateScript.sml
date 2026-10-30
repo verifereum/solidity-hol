@@ -1,20 +1,22 @@
 (* Elaboration of the normalised source AST (solidityImport) to the ordered
- * pure core, for the pinned profile solc-0.8.37-via-ir-osaka.
+ * core, for the pinned profile solc-0.8.37-via-ir-osaka.
  *
- * Admitted: one contract of pure functions over elementary value types, with
- * locals (including tuple declarations with holes), internal calls with
- * single or multiple returns, explicit elementary conversions, literals,
- * unary, binary, comparison and short-circuit operators, simple and compound
- * assignment to locals, tuple assignment, ++ and --, if, while, do-while,
- * for, break, continue, return and unchecked blocks. Anything else, and any
- * literal that is not an integer, is rejected (NONE) rather than partially
- * elaborated.
+ * Admitted: one contract of functions over elementary value types, with
+ * value-type state variables at their storage layout entries, locals
+ * (including tuple declarations with holes), internal calls with single or
+ * multiple returns, explicit elementary conversions, literals, unary, binary,
+ * comparison and short-circuit operators, simple and compound assignment to
+ * locals and state variables, tuple assignment, ++ and --, if, while,
+ * do-while, for, break, continue, return and unchecked blocks. Anything else,
+ * and any literal that is not an integer, is rejected (NONE) rather than
+ * partially elaborated.
  *
  * Schedules, read from the compiler's IR for this profile (the ir output in
  * testdata/frontend/expected/pure_core.json) and checked against the compiled
  * bytecode by the differential tests:
  *  - binary operands, call arguments and tuple components are evaluated left
- *    to right, each read of a local being a copy taken when it is evaluated;
+ *    to right, each read of a local or a state variable being a copy taken
+ *    when it is evaluated;
  *  - && and || evaluate their right operand only when needed;
  *  - x op= e evaluates e, then reads x, then writes x;
  *  - ++ and -- read, step (checked unless unchecked) and write back, yielding
@@ -39,12 +41,13 @@ Theory solidityElaborate
 Ancestors
   solidityImport solidityEvaluator
 Libs
-  cv_transLib
+  cv_transLib wordsLib
 
 Datatype:
   elab_ctx = <|
     functions : (num # src_function) list;
     variables : (num # sol_type) list;
+    state : (num # sol_type) list;
     returns : (num # sol_type) list;
     mode : arithmetic_mode
   |>
@@ -91,6 +94,40 @@ End
 Definition assign_local_def:
   assign_local (t : num) x ty a =
     [CaptureBindingStmt (AstId t) (AstId x); WriteScalarStmt (AstId t) ty a]
+End
+
+(* Variables: a local, or a state variable, which is read from storage into
+ * a fresh binding when it is evaluated.
+ *)
+Datatype:
+  elab_place = LocalPlace sol_type | StatePlace sol_type
+End
+
+Definition variable_place_def:
+  variable_place ctx x =
+    case ALOOKUP ctx.variables x of
+      SOME ty => SOME (LocalPlace ty)
+    | NONE =>
+        (case ALOOKUP ctx.state x of
+           SOME ty => SOME (StatePlace ty)
+         | NONE => NONE)
+End
+
+Definition place_type_def:
+  (place_type (LocalPlace ty) = ty) ∧
+  (place_type (StatePlace ty) = ty)
+End
+
+Definition read_place_def:
+  (read_place n x (LocalPlace ty) = (([], BoundAtom (AstId x)), n)) ∧
+  (read_place n x (StatePlace ty) =
+    (bind_value n ty (ReadStateOperation (AstId x)), n + 1))
+End
+
+Definition write_place_def:
+  (write_place t x (LocalPlace ty) a = assign_local t x ty a) ∧
+  (write_place (t : num) x (StatePlace ty) a =
+    [CaptureStateStmt (AstId t) (AstId x); WriteScalarStmt (AstId t) ty a])
 End
 
 (* Operators *)
@@ -210,11 +247,11 @@ Definition tuple_writes_def:
   (tuple_writes ctx n [] [] = SOME ([], n)) ∧
   (tuple_writes ctx n (NONE :: cs) (_ :: vs) = tuple_writes ctx n cs vs) ∧
   (tuple_writes ctx n (SOME (SrcIdentifier _ _ x _) :: cs) ((a, vt) :: vs) =
-    case (ALOOKUP ctx.variables x, tuple_writes ctx n cs vs) of
-      (SOME ty, SOME (ws, n')) =>
-        (case coerce n' ty a vt of
-           SOME ((ss, a'), n'') => SOME (ws ++ ss ++ assign_local n'' x ty a',
-                                        n'' + 1)
+    case (variable_place ctx x, tuple_writes ctx n cs vs) of
+      (SOME place, SOME (ws, n')) =>
+        (case coerce n' (place_type place) a vt of
+           SOME ((ss, a'), n'') =>
+             SOME (ws ++ ss ++ write_place n'' x place a', n'' + 1)
          | NONE => NONE)
     | _ => NONE) ∧
   (tuple_writes ctx n _ _ = NONE)
@@ -236,8 +273,11 @@ End
  *)
 Definition elab_expr_def:
   (elab_expr ctx n (SrcIdentifier _ _ x _) =
-    case ALOOKUP ctx.variables x of
-      SOME ty => SOME (([], BoundAtom (AstId x), ElabType ty), n)
+    case variable_place ctx x of
+      SOME place =>
+        let (read, n1) = read_place n x place in
+        let (ss, a) = read in
+        SOME ((ss, a, ElabType (place_type place)), n1)
     | NONE => NONE) ∧
   (elab_expr ctx n (SrcLiteral _ kind value tid) =
     if kind = "bool" then
@@ -250,19 +290,22 @@ Definition elab_expr_def:
     if op = "++" ∨ op = "--" then
       case e of
         SrcIdentifier _ _ x _ =>
-          (case ALOOKUP ctx.variables x of
-             SOME ty =>
+          (case variable_place ctx x of
+             SOME place =>
+               let ty = place_type place in
+               let (read, n1) = read_place n x place in
+               let (rs, cur) = read in
                let (old, old_atom) =
-                 bind_value n ty (ConvertOperation ty (BoundAtom (AstId x))) in
+                 bind_value n1 ty (ConvertOperation ty cur) in
                let (step, new_atom) =
-                 bind_value (n + 1) ty
+                 bind_value (n1 + 1) ty
                    (ScalarOperation ty ctx.mode
                       (if op = "++" then AddOp else SubtractOp)
-                      [BoundAtom (AstId x); ConstantAtom (IntegerValue 1)]) in
-               SOME (((if prefix then [] else old) ++ step ++
-                      assign_local (n + 2) x ty new_atom,
+                      [cur; ConstantAtom (IntegerValue 1)]) in
+               SOME ((rs ++ (if prefix then [] else old) ++ step ++
+                      write_place (n1 + 2) x place new_atom,
                       (if prefix then new_atom else old_atom), ElabType ty),
-                     n + 3)
+                     n1 + 3)
            | NONE => NONE)
       | _ => NONE
     else
@@ -331,24 +374,28 @@ Definition elab_expr_def:
            | NONE => NONE)
     | _ => NONE) ∧
   (elab_expr ctx n (SrcAssignment _ op (SrcIdentifier _ _ x _) rhs tid) =
-    case (ALOOKUP ctx.variables x, elab_expr ctx n rhs) of
-      (SOME ty, SOME ((sr, ar, vr), n1)) =>
+    case (variable_place ctx x, elab_expr ctx n rhs) of
+      (SOME place, SOME ((sr, ar, vr), n1)) =>
+        let ty = place_type place in
         if op = "=" then
           (case coerce n1 ty ar vr of
              SOME ((cr, ar'), n2) =>
-               SOME ((sr ++ cr ++ assign_local n2 x ty ar', ar', ElabType ty),
-                     n2 + 1)
+               SOME ((sr ++ cr ++ write_place n2 x place ar', ar',
+                      ElabType ty), n2 + 1)
            | NONE => NONE)
         else
           (case compound_operator op of
              SOME aop =>
                (case coerce n1 (right_operand_type aop ty) ar vr of
                   SOME ((cr, ar'), n2) =>
-                    let (ss, v) = bind_value n2 ty
+                    let (read, n3) = read_place n2 x place in
+                    let (rs, cur) = read in
+                    let (ss, v) = bind_value n3 ty
                                     (ScalarOperation ty ctx.mode aop
-                                       [BoundAtom (AstId x); ar']) in
-                    SOME ((sr ++ cr ++ ss ++ assign_local (n2 + 1) x ty v,
-                           v, ElabType ty), n2 + 2)
+                                       [cur; ar']) in
+                    SOME ((sr ++ cr ++ rs ++ ss ++
+                           write_place (n3 + 1) x place v,
+                           v, ElabType ty), n3 + 2)
                 | NONE => NONE)
            | NONE => NONE)
     | _ => NONE) ∧
@@ -653,12 +700,13 @@ End
  * their declaration ids.
  *)
 Definition elab_function_def:
-  elab_function functions n (f : src_function) =
+  elab_function functions state n (f : src_function) =
     case (all_some (MAP variable_binding f.fn_parameters),
           all_some (MAP variable_binding f.fn_returns), f.fn_body) of
       (SOME ps, SOME rs, SrcBlock _ ss) =>
         (case elab_stmts <| functions := functions; variables := ps ++ rs;
-                            returns := rs; mode := CheckedArithmetic |> n ss of
+                            state := state; returns := rs;
+                            mode := CheckedArithmetic |> n ss of
            SOME ((code, _), n1) =>
              SOME (<| procedure_id := AstId f.fn_info.node_id;
                       parameters := core_bindings ps;
@@ -669,14 +717,29 @@ Definition elab_function_def:
 End
 
 Definition elab_functions_def:
-  (elab_functions functions n [] = SOME ([], n)) ∧
-  (elab_functions functions n (f :: fs) =
-    case elab_function functions n f of
+  (elab_functions functions state n [] = SOME ([], n)) ∧
+  (elab_functions functions state n (f :: fs) =
+    case elab_function functions state n f of
       SOME (p, n1) =>
-        (case elab_functions functions n1 fs of
+        (case elab_functions functions state n1 fs of
            SOME (ps, n2) => SOME (p :: ps, n2)
          | NONE => NONE)
     | NONE => NONE)
+End
+
+(* The state variables at their layout entries, which a valid unit lists in
+ * the same order.
+ *)
+Definition core_state_variables_def:
+  (core_state_variables [] [] = SOME []) ∧
+  (core_state_variables ((x, ty) :: vs) (e :: es) =
+    case core_state_variables vs es of
+      SOME cvs =>
+        SOME (<| state_id := AstId x; state_type := ty;
+                 state_slot := n2w e.storage_slot;
+                 state_offset := e.storage_offset |> :: cvs)
+    | NONE => NONE) ∧
+  (core_state_variables _ _ = NONE)
 End
 
 (* A valid unit of one contract, elaborated with fresh ids above its node ids;
@@ -687,12 +750,17 @@ Definition elaborate_unit_def:
     if ¬valid_src_unit u then NONE else
     case u.unit_contracts of
       [c] =>
-        (case elab_functions
-                (MAP (λf. (f.fn_info.node_id, f)) c.contract_functions)
-                (MAX_LIST (unit_ids u) + 1) c.contract_functions of
-           SOME (p :: ps, _) =>
-             SOME <| procedures := p :: ps; entry_procedure := p.procedure_id |>
-         | _ => NONE)
+        (case all_some (MAP variable_binding c.contract_state_variables) of
+           NONE => NONE
+         | SOME state =>
+             case (core_state_variables state c.contract_storage,
+                   elab_functions
+                     (MAP (λf. (f.fn_info.node_id, f)) c.contract_functions)
+                     state (MAX_LIST (unit_ids u) + 1) c.contract_functions) of
+               (SOME cvs, SOME (p :: ps, _)) =>
+                 SOME <| procedures := p :: ps; state_variables := cvs;
+                         entry_procedure := p.procedure_id |>
+             | _ => NONE)
     | _ => NONE
 End
 
@@ -704,6 +772,10 @@ val () = cv_auto_trans bind_value_def;
 val () = cv_auto_trans coerce_def;
 val () = cv_auto_trans snapshot_def;
 val () = cv_auto_trans assign_local_def;
+val () = cv_auto_trans variable_place_def;
+val () = cv_auto_trans place_type_def;
+val () = cv_auto_trans read_place_def;
+val () = cv_auto_trans write_place_def;
 val () = cv_auto_trans arithmetic_operator_def;
 val () = cv_auto_trans right_operand_type_def;
 val () = cv_auto_trans compound_operator_def;
@@ -805,5 +877,6 @@ val () = cv_auto_trans variable_binding_def;
 val () = cv_auto_trans core_bindings_def;
 val () = cv_auto_trans elab_function_def;
 val () = cv_auto_trans elab_functions_def;
+val () = cv_auto_trans core_state_variables_def;
 val () = cv_auto_trans elaborate_unit_def;
 val () = cv_auto_trans solidityCoreWfTheory.core_program_environment_def;

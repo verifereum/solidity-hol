@@ -1,5 +1,5 @@
-(* Pure evaluator: locals, control flow and internal calls over the stage-2
- * core, fuel-indexed by recursive depth.
+(* Evaluator: locals, value-type state variables, control flow and internal
+ * calls over the core, fuel-indexed by recursive depth.
  *
  * Fuel: statement-list traversal is structural and siblings reuse the bound;
  * invoke_source decrements on entry and a while loop decrements on its back
@@ -11,6 +11,14 @@
  * procedure runs in a fresh scope and target map; the caller's are restored
  * afterwards, since the pure fragment has no references through which a callee
  * could reach them. Within a procedure, capturing a target overwrites it.
+ *
+ * Storage: a state variable lives in the storage of the executing account,
+ * frame.self_address, in the world's verifereum accounts, at the slot and
+ * byte offset of the program's layout. Reads and writes go straight to that
+ * world, so a write is seen by everything after it, callers and callees
+ * included; restoring the world on revert is the frame's job
+ * (finish_source_frame). Access sets and original values, which only matter
+ * to gas, are not tracked.
  *
  * Gas evidence is passed through unchanged; the EVM boundary is out of scope.
  * Unsupported statements and operations, and anything the checker would reject,
@@ -133,7 +141,7 @@ Definition scalar_outcome_value_def:
     ValueAbrupt (InvalidCompletion "ill-typed scalar operands")
 End
 
-(* Every operation except an internal call, which needs the evaluator. *)
+(* Every operation except a state read and an internal call. *)
 Definition eval_pure_operation_def:
   eval_pure_operation env scopes op =
     case op of
@@ -163,6 +171,101 @@ Definition eval_pure_operation_def:
               | NONE => ValueAbrupt (InvalidCompletion "tuple index"))
          | _ => ValueAbrupt (InvalidCompletion "not a tuple"))
     | _ => ValueAbrupt (InvalidCompletion "unsupported operation")
+End
+
+(* Storage *)
+
+(* A value as the number held in its b storage bytes: integers in two's
+ * complement, fixed bytes big-endian.
+ *)
+Definition stored_number_def:
+  stored_number b s =
+    case s of
+      BoolValue v => SOME (if v then 1 else 0)
+    | IntegerValue i => SOME (Num (wrap_integer F (8 * b) i))
+    | AddressValue a => SOME (w2n a)
+    | BytesValue bs => SOME (num_of_be_bytes bs)
+    | _ => NONE
+End
+
+(* The value of type ty held as the number n < 256 ** storage_bytes ty. *)
+Definition stored_value_def:
+  stored_value ty (n : num) =
+    case ty of
+      BoolT => SOME (BoolValue (n ≠ 0))
+    | UintT _ => SOME (IntegerValue (&n))
+    | EnumT _ => SOME (IntegerValue (&n))
+    | IntT w => SOME (IntegerValue (wrap_integer T w (&n)))
+    | AddressT _ => SOME (AddressValue (n2w n))
+    | FixedBytesT k => SOME (BytesValue (num_to_bytes k n))
+    | _ => NONE
+End
+
+(* The bytes of a value of type ty at a byte offset from the low-order end of
+ * a slot of an account. Reading keeps only those bytes, as the compiler's
+ * storage cleanup does; writing replaces only them.
+ *)
+Definition read_storage_def:
+  read_storage accounts addr slot offset ty =
+    case storage_bytes ty of
+      SOME b =>
+        stored_value ty
+          ((w2n (lookup_storage slot (lookup_account addr accounts).storage)
+            DIV 2 ** (8 * offset)) MOD 2 ** (8 * b))
+    | NONE => NONE
+End
+
+Definition write_storage_def:
+  write_storage accounts addr slot offset ty s =
+    case storage_bytes ty of
+      NONE => NONE
+    | SOME b =>
+        case stored_number b s of
+          NONE => NONE
+        | SOME v =>
+            let account = lookup_account addr accounts in
+            let w = w2n (lookup_storage slot account.storage) in
+            let lo = 2 ** (8 * offset) in
+            let hi = 2 ** (8 * (offset + b)) in
+            let w' = w DIV hi * hi + v MOD 2 ** (8 * b) * lo + w MOD lo in
+            SOME (update_account addr
+                    (account with storage :=
+                       update_storage slot (n2w w') account.storage)
+                    accounts)
+End
+
+Definition read_state_variable_def:
+  read_state_variable env (st : source_state) x =
+    case lookup_state_variable env x of
+      SOME v =>
+        read_storage st.world.accounts st.frame.self_address v.state_slot
+          v.state_offset v.state_type
+    | NONE => NONE
+End
+
+(* A state variable's location in the executing account. A value type needs
+ * no layout for navigation; its layout id names the declaration.
+ *)
+Definition state_target_def:
+  state_target env (st : source_state) x =
+    case lookup_state_variable env x of
+      SOME v =>
+        SOME (ValueTarget
+                (StorageReference PersistentStorage st.frame.self_address
+                   v.state_slot v.state_offset v.state_type
+                   (LayoutId (ast_key x))))
+    | NONE => NONE
+End
+
+(* Every operation except an internal call, which needs the evaluator. *)
+Definition eval_operation_def:
+  eval_operation env (st : source_state) op =
+    case op of
+      ReadStateOperation x =>
+        (case read_state_variable env st x of
+           SOME s => ValueOk (ScalarValue s)
+         | NONE => ValueAbrupt (InvalidCompletion "bad state read"))
+    | _ => eval_pure_operation env st.scopes op
 End
 
 (* Procedures *)
@@ -243,12 +346,22 @@ Definition define_binding_def:
       bind_local x <| binding_type := ty; binding_value := v |> st.scopes
 End
 
+(* A storage write in a static frame fails; the EVM would halt exceptionally,
+ * which no source completion models yet.
+ *)
 Definition write_target_def:
   write_target t a (st : source_state) =
     case (FLOOKUP st.targets (ast_key t), eval_atom st.scopes a) of
       (SOME (BindTarget x), SOME v) =>
         (case update_binding x v st.scopes of
            SOME scopes => SOME (st with scopes := scopes)
+         | NONE => NONE)
+    | (SOME (ValueTarget (StorageReference PersistentStorage addr slot offset
+                            ty _)), SOME (ScalarValue s)) =>
+        if st.frame.static_context then NONE else
+        (case write_storage st.world.accounts addr slot offset ty s of
+           SOME accounts =>
+             SOME (st with world := st.world with accounts := accounts)
          | NONE => NONE)
     | _ => NONE
 End
@@ -258,12 +371,19 @@ Definition simple_stmt_def:
   simple_stmt env s st gas =
     case s of
       DefineStmt x ty op =>
-        (case eval_pure_operation env st.scopes op of
+        (case eval_operation env st op of
            ValueOk v => normal_result (define_binding x ty v st) gas
          | ValueAbrupt c => abrupt_result c st gas)
     | CaptureBindingStmt t x =>
         normal_result
           (st with targets := set_target t (BindTarget x) st.targets) gas
+    | CaptureStateStmt t x =>
+        (case state_target env st x of
+           SOME target =>
+             normal_result
+               (st with targets := set_target t target st.targets) gas
+         | NONE =>
+             abrupt_result (InvalidCompletion "unknown state variable") st gas)
     | WriteScalarStmt t ty a =>
         (case write_target t a st of
            SOME st' => normal_result st' gas

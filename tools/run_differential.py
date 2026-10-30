@@ -88,6 +88,30 @@ def check_expectation(value: Any, what: str) -> None:
         raise CorpusError(f"{what} has unknown kind {kind!r}")
 
 
+def word(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, str) and HEX.fullmatch(value):
+        value = int(value[2:] or "0", 16)
+    elif isinstance(value, str) and DECIMAL.fullmatch(value):
+        value = int(value)
+    if isinstance(value, int) and 0 <= value < 2**256:
+        return value
+    return None
+
+
+def check_storage(value: Any, what: str) -> None:
+    """Storage is an object from slot to value, each a 256-bit word given as an
+    integer, a decimal string or 0x-prefixed hex; slots are strings."""
+    if not isinstance(value, dict):
+        raise CorpusError(f"{what} must be an object from slot to value")
+    for slot, contents in value.items():
+        if word(slot) is None:
+            raise CorpusError(f"{what}: slot {slot!r} is not a 256-bit word")
+        if word(contents) is None:
+            raise CorpusError(f"{what}[{slot}] is not a 256-bit word: {contents!r}")
+
+
 def check_fuel(value: Any, what: str) -> None:
     if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
         raise CorpusError(f"{what} must be a positive integer")
@@ -142,7 +166,11 @@ def load_corpus(path: Path) -> dict[str, Any]:
             check_expectation(case.get("expect"), f"{what}.expect")
             if "fuel" in case:
                 check_fuel(case["fuel"], f"{what}.fuel")
-            unknown = set(case) - {"name", "function", "args", "expect", "fuel"}
+            for key in ("storage", "final_storage"):
+                if key in case:
+                    check_storage(case[key], f"{what}.{key}")
+            unknown = set(case) - {"name", "function", "args", "storage", "expect",
+                                   "final_storage", "fuel"}
             if unknown:
                 raise CorpusError(f"{what}: unknown fields {sorted(unknown)}")
     return corpus
@@ -349,7 +377,9 @@ def write_reproduction(root: Path, directory: Path, suite: dict[str, Any],
     inputs.update({key: suite[key] for key in ("source", "contract", "artifact")})
     if case is not None:
         inputs.update({"case": case["name"], "function": case["function"],
-                       "args": case["args"], "expect": case["expect"],
+                       "args": case["args"], "storage": case.get("storage", {}),
+                       "expect": case["expect"],
+                       "final_storage": case.get("final_storage", {}),
                        "fuel": case.get("fuel", fuel)})
     exporter.write_json_atomic(directory / "inputs.json", inputs)
     exporter.write_json_atomic(directory / "outcomes.json", result)
