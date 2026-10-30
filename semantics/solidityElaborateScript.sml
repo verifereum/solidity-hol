@@ -215,6 +215,7 @@ Definition expr_assigns_def:
   (expr_assigns (SrcTupleExpression _ cs _) ⇔ components_assign cs) ∧
   (expr_assigns (SrcFunctionCall _ _ args _) ⇔ exprs_assign args) ∧
   (expr_assigns (SrcIndexAccess _ b i _) ⇔ expr_assigns b ∨ expr_assigns i) ∧
+  (expr_assigns (SrcArrayLength _ root_expr _) ⇔ expr_assigns root_expr) ∧
   (expr_assigns (SrcTypeConversion _ _ e _) ⇔ expr_assigns e) ∧
   (expr_assigns _ ⇔ F) ∧
   (components_assign [] ⇔ F) ∧

@@ -113,4 +113,18 @@ contract StorageArrays {
         packed[32] = 255;
         ++packed[32];
     }
+
+    function lengthOrder() public returns (uint256, uint256, uint256, uint256, uint256) {
+        uint256 i = 0;
+        uint256 sum = i + rows[i++].length;
+        i = 0;
+        (uint256 first, uint256 size) = (i, rows[i++].length);
+        i = 0;
+        uint256 combined = combine(i, rows[i++].length);
+        return (sum, first, size, combined, i);
+    }
+
+    function combine(uint256 a, uint256 b) internal pure returns (uint256) {
+        return a * 100 + b;
+    }
 }

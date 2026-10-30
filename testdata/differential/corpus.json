@@ -242,7 +242,8 @@
         {"name": "dirty_bool_reads_true", "function": "flagGet", "args": [32], "storage": {"12": 2}, "expect": {"return": [true]}, "final_storage": {"12": 2}},
         {"name": "bool_neighbour_preserved", "function": "flagPut", "args": [33, false], "storage": {"12": "0x0202"}, "expect": {"return": [false]}, "final_storage": {"12": 2}},
         {"name": "address_does_not_straddle_slot", "function": "ownerPut", "args": [1, 4660], "storage": {"13": 17, "14": "0xabcdef0000000000000000000000000000000000000000"}, "expect": {"return": [4660]}, "final_storage": {"13": 17, "14": "0xabcdef0000000000000000000000000000000000001234"}},
-        {"name": "full_width_element", "function": "widePut", "args": [1, 23], "storage": {"15": 17}, "expect": {"return": [23]}, "final_storage": {"15": 17, "16": 23}}
+        {"name": "full_width_element", "function": "widePut", "args": [1, 23], "storage": {"15": 17}, "expect": {"return": [23]}, "final_storage": {"15": 17, "16": 23}},
+        {"name": "length_prefix_preserves_earlier_locals", "function": "lengthOrder", "args": [], "expect": {"return": [11, 0, 11, 11, 1]}}
       ]
     }
   ]
