@@ -1,10 +1,11 @@
-(* Normalized source AST: the admitted pure subset of the pinned compiler's
+(* Normalized source AST: the admitted subset of the pinned compiler's
  * analyzed Standard JSON AST, between the raw compiler output and the core.
  *
  * solidityImportLib builds these terms from a compiler artifact and fails
  * closed: an unknown nodeType, a missing required field, or a feature outside
- * the subset (state variables, modifiers, inheritance, named or try calls,
- * literal subdenominations, inline arrays, non-elementary type names, ...)
+ * the subset (public, constant, immutable or initialised state variables,
+ * modifiers, inheritance, named or try calls, literal subdenominations,
+ * inline arrays, non-elementary type names, ...)
  * raises ImportError. Every node keeps its compiler id and source range;
  * declarations are referred to by id, and names are diagnostic only. Type
  * annotations are kept as the compiler's encoded typeIdentifier and decoded
@@ -16,9 +17,12 @@
  *
  * valid_src_unit then establishes, for an imported unit:
  *  - all node ids are distinct;
- *  - every parameter, return and local variable has a normalized elementary
- *    type, the default data location, a typeIdentifier agreeing with that
- *    type, and the enclosing function, block or for statement as its scope;
+ *  - every parameter, return, local and state variable has a normalized
+ *    elementary type, the default data location, a typeIdentifier agreeing
+ *    with that type, and the enclosing function, block, for statement or
+ *    contract as its scope;
+ *  - the contract's storage layout lists its state variables in declaration
+ *    order, each with its own typeIdentifier and a slot below 2 ** 256;
  *  - every identifier resolves, within its lexical scope, to a variable of the
  *    annotated type, or, as the callee of a call, to a function of the same
  *    contract; calls have matching arity and are annotated with the callee's
@@ -26,14 +30,16 @@
  *  - declaration statements list exactly their declarations' ids as
  *    assignments, returns name the enclosing function's return list, break and
  *    continue occur in loop bodies, conditions are boolean;
- *  - functions are pure, contracts are not derived and are scoped by the unit;
+ *  - functions are pure, view or nonpayable, and only non-pure ones refer to
+ *    state variables; contracts are not derived and are scoped by the unit;
  *  - operators belong to the admitted set and every other expression
  *    annotation decodes to an elementary, rational literal or tuple type.
  *
  * Left to elaboration: implicit conversions (operand and argument types
  * against commonType and parameter types, literal ranges), return value
  * arity and types, assignment target shapes and their types, and evaluation
- * order, which the AST does not record.
+ * order, which the AST does not record. Left to the compiler: storage layout
+ * calculation, and that view functions write no state variable.
  *)
 Theory solidityImport
 Ancestors
@@ -130,11 +136,25 @@ Datatype:
   |>
 End
 
+(* An entry of the compiler's storageLayout: the state variable's id, its
+ * slot, its byte offset from the slot's low-order end and its type label.
+ *)
+Datatype:
+  src_storage_entry = <|
+    storage_id : num;
+    storage_slot : num;
+    storage_offset : num;
+    storage_type_id : string
+  |>
+End
+
 Datatype:
   src_contract = <|
     contract_info : node_info;
     contract_name : string;
     contract_scope : num;
+    contract_state_variables : src_variable list;
+    contract_storage : src_storage_entry list;
     contract_functions : src_function list
   |>
 End
@@ -418,7 +438,9 @@ End
 
 Definition contract_ids_def:
   contract_ids (c : src_contract) =
-    c.contract_info.node_id :: FLAT (MAP function_ids c.contract_functions)
+    c.contract_info.node_id ::
+    FLAT (MAP variable_ids c.contract_state_variables) ++
+    FLAT (MAP function_ids c.contract_functions)
 End
 
 Definition unit_ids_def:
@@ -447,13 +469,15 @@ Definition assignment_operator_ok_def:
     op = "<<=" ∨ op = ">>=" ∨ op = "&=" ∨ op = "|=" ∨ op = "^="
 End
 
-(* Functions callable by id; variables in lexical scope; the innermost scope
- * node; the enclosing function's return list; whether in a loop body.
+(* Functions callable by id; variables in lexical scope; the contract's state
+ * variables, if the function may read them; the innermost scope node; the
+ * enclosing function's return list; whether in a loop body.
  *)
 Datatype:
   import_env = <|
     functions : (num # src_function) list;
     variables : (num # sol_type) list;
+    state : (num # sol_type) list;
     scope : num;
     returns_id : num;
     in_loop : bool
@@ -463,7 +487,7 @@ End
 (* The decoded type of a checked expression. *)
 Definition check_expr_def:
   (check_expr (env : import_env) (SrcIdentifier _ _ x tid) =
-    case ALOOKUP env.variables x of
+    case ALOOKUP (env.variables ++ env.state) x of
       SOME ty =>
         if decode_type_identifier tid = SOME (SrcType ty) then SOME (SrcType ty)
         else NONE
@@ -631,36 +655,58 @@ Termination
   rw[fetch "-" "src_stmt_size_def", listTheory.list_size_def]
 End
 
-(* A parameter or return variable of the function fn_id. *)
-Definition parameter_type_def:
-  parameter_type fn_id (v : src_variable) =
-    if v.var_scope = fn_id then
+(* A variable declared by the node scope: a parameter or return variable of a
+ * function, or a state variable of a contract.
+ *)
+Definition scoped_variable_def:
+  scoped_variable scope (v : src_variable) =
+    if v.var_scope = scope then
       case variable_type v of
         SOME ty => SOME (v.var_info.node_id, ty)
       | NONE => NONE
     else NONE
 End
 
+(* A pure function sees no state variables. Whether a view function writes
+ * one is the compiler's check.
+ *)
 Definition check_function_def:
-  check_function functions contract_id (f : src_function) ⇔
-    f.fn_scope = contract_id ∧ f.fn_mutability = "pure" ∧
-    case (all_some (MAP (parameter_type f.fn_info.node_id)
+  check_function functions state contract_id (f : src_function) ⇔
+    f.fn_scope = contract_id ∧
+    (f.fn_mutability = "pure" ∨ f.fn_mutability = "view" ∨
+     f.fn_mutability = "nonpayable") ∧
+    case (all_some (MAP (scoped_variable f.fn_info.node_id)
                      (f.fn_parameters ++ f.fn_returns)), f.fn_body) of
       (SOME variables, SrcBlock info ss) =>
         IS_SOME (check_stmts
           <| functions := functions; variables := variables;
+             state := if f.fn_mutability = "pure" then [] else state;
              scope := info.node_id; returns_id := f.fn_returns_id;
              in_loop := F |> ss)
     | _ => F
 End
 
+(* The layout has an entry for each state variable, in order. *)
+Definition storage_layout_ok_def:
+  (storage_layout_ok [] [] ⇔ T) ∧
+  (storage_layout_ok ((v : src_variable) :: vs) (e :: es) ⇔
+     e.storage_id = v.var_info.node_id ∧ e.storage_type_id = v.var_type_id ∧
+     e.storage_slot < 2 ** 256 ∧ storage_layout_ok vs es) ∧
+  (storage_layout_ok _ _ ⇔ F)
+End
+
 Definition check_contract_def:
   check_contract unit_id (c : src_contract) ⇔
     c.contract_scope = unit_id ∧
-    EVERY (check_function
-             (MAP (λf. (f.fn_info.node_id, f)) c.contract_functions)
-             c.contract_info.node_id)
-      c.contract_functions
+    storage_layout_ok c.contract_state_variables c.contract_storage ∧
+    case all_some (MAP (scoped_variable c.contract_info.node_id)
+                     c.contract_state_variables) of
+      SOME state =>
+        EVERY (check_function
+                 (MAP (λf. (f.fn_info.node_id, f)) c.contract_functions)
+                 state c.contract_info.node_id)
+          c.contract_functions
+    | NONE => F
 End
 
 Definition valid_src_unit_def:
@@ -748,7 +794,8 @@ Proof
   Cases_on ‘env'’ >> gvs[fetch "-" "import_env_fn_updates"]
 QED
 
-val () = cv_auto_trans parameter_type_def;
+val () = cv_auto_trans scoped_variable_def;
+val () = cv_auto_trans storage_layout_ok_def;
 val () = cv_auto_trans check_function_def;
 val () = cv_auto_trans check_contract_def;
 val () = cv_auto_trans valid_src_unit_def;

@@ -58,6 +58,7 @@ val stmt_ty = import_type "src_stmt"
 val variable_ty = import_type "src_variable"
 val function_ty = import_type "src_function"
 val contract_ty = import_type "src_contract"
+val storage_entry_ty = import_type "src_storage_entry"
 
 fun con name args =
   list_mk_comb (prim_mk_const {Thy = "solidityImport", Name = name}, args)
@@ -166,21 +167,27 @@ fun optional_expr v k =
 
 (* Declarations *)
 
-fun variable v = within v (fn v =>
+(* A local, parameter or return variable, or, given state, a state variable. *)
+fun declaration state v = within v (fn v =>
   (expect v "VariableDeclaration";
    require v (not (bool_field v "constant")) "constants are not supported";
-   require v (not (bool_field v "stateVariable"))
-     "state variables are not supported";
+   require v (bool_field v "stateVariable" = state)
+     (if state then "expected a state variable"
+      else "expected a local variable");
    require v (string_field v "mutability" = "mutable")
      "immutable variables are not supported";
    require v (not (isSome (optional_field v "value")))
      "declaration values are not supported";
+   require v (not state orelse string_field v "visibility" <> "public")
+     "public state variables are not supported";
    record "src_variable"
      [("var_info", info v), ("var_name", mk_str (string_field v "name")),
       ("var_scope", mk_num (int_field v "scope")),
       ("var_type_name", type_name (field v "typeName")),
       ("var_type_id", type_id v),
       ("var_location", mk_str (string_field v "storageLocation"))]))
+
+val variable = declaration false
 
 (* Statements *)
 
@@ -268,8 +275,39 @@ fun function v = within v (fn v =>
        ("fn_body", stmt (field v "body"))]
   end)
 
-fun contract v = within v (fn v =>
-  let val id = int_field v "id" in
+(* An entry of a contract's storageLayout. *)
+fun storage_entry v = within v (fn v =>
+  record "src_storage_entry"
+    [("storage_id", mk_num (int_field v "astId")),
+     ("storage_slot",
+      case IntInf.fromString (string_field v "slot") of
+        SOME i => mk_num i
+      | NONE => fail "malformed storage slot"),
+     ("storage_offset", mk_num (int_field v "offset")),
+     ("storage_type_id", mk_str (string_field v "type"))])
+
+(* Contract members are functions and state variables; the layout is that
+ * contract's entry of the compiler's contracts output for the source.
+ *)
+fun contract contracts v = within v (fn v =>
+  let
+    val id = int_field v "id"
+    val name = string_field v "name"
+    val members = JSONUtil.arrayMap I (field v "nodes")
+    fun members_of ty = List.filter (fn m => node_type m = ty) members
+    val () =
+      List.app (fn m => within m (fn m =>
+                  require m (node_type m = "FunctionDefinition" orelse
+                             node_type m = "VariableDeclaration")
+                    "unsupported contract member"))
+        members
+    val layout =
+      JSONUtil.get (contracts,
+        [JSONUtil.SEL name, JSONUtil.SEL "storageLayout",
+         JSONUtil.SEL "storage"])
+      handle e => fail (describe v ^ ": no storage layout: " ^
+                        JSONUtil.exnMessage e)
+  in
     expect v "ContractDefinition";
     require v (string_field v "contractKind" = "contract")
       ("unsupported contract kind " ^ string_field v "contractKind");
@@ -283,20 +321,27 @@ fun contract v = within v (fn v =>
       [("contract_info", info v),
        ("contract_name", mk_str (string_field v "name")),
        ("contract_scope", mk_num (int_field v "scope")),
+       ("contract_state_variables",
+        listSyntax.mk_list
+          (map (declaration true) (members_of "VariableDeclaration"),
+           variable_ty)),
+       ("contract_storage",
+        listSyntax.mk_list
+          (JSONUtil.arrayMap storage_entry layout, storage_entry_ty)),
        ("contract_functions",
         listSyntax.mk_list
-          (JSONUtil.arrayMap function (field v "nodes"), function_ty))]
+          (map function (members_of "FunctionDefinition"), function_ty))]
   end)
 
 (* Pragmas carry no semantics for the pinned profile; any other source-unit
  * member is rejected.
  *)
-fun import_source_unit v = within v (fn v =>
+fun import_source_unit v contracts = within v (fn v =>
   let
     fun member m acc =
       case node_type m of
         "PragmaDirective" => acc
-      | "ContractDefinition" => contract m :: acc
+      | "ContractDefinition" => contract contracts m :: acc
       | other => fail (describe m ^ ": unsupported source unit member " ^ other)
     val contracts =
       List.foldr (fn (m, acc) => within m (fn m => member m acc)) []
@@ -332,12 +377,15 @@ fun artifact_deployed_bytecode path source contract =
                     JSONUtil.exnMessage e)
 
 fun import_artifact path source =
-  import_source_unit
-    (JSONUtil.get (read_artifact path,
-       [JSONUtil.SEL "output", JSONUtil.SEL "sources", JSONUtil.SEL source,
-        JSONUtil.SEL "ast"])
-     handle ImportError msg => raise ImportError msg
-          | e => fail (path ^ ": no AST for " ^ source ^ ": " ^
-                       JSONUtil.exnMessage e))
+  let
+    val artifact = read_artifact path
+    fun get keys what =
+      JSONUtil.get (artifact, map JSONUtil.SEL keys)
+      handle e => fail (path ^ ": no " ^ what ^ " for " ^ source ^ ": " ^
+                        JSONUtil.exnMessage e)
+  in
+    import_source_unit (get ["output", "sources", source, "ast"] "AST")
+      (get ["output", "contracts", source] "contracts")
+  end
 
 end

@@ -70,6 +70,14 @@ fields), or copies typed contents between references. A storage reference
 captures backend, account, slot and byte offset, together with type/layout
 identity. No stored index path is reevaluated.
 
+Value-type state variables are the exception: no reference to one is bound.
+`ReadStateOperation` reads one into a binding and `CaptureStateStmt` captures a
+`ValueTarget` holding its storage reference for `WriteScalarStmt`. Both read
+the slot and offset from the program's `state_variables`, and the evaluator
+reads and writes the bytes of the executing account's word in place, keeping
+the rest of a packed slot. A write in a static frame is invalid, where the EVM
+would halt exceptionally.
+
 Memory references use object identity and an abstract cell offset; this is not
 an EVM byte address. The sparse heap separates metadata from cells, avoiding a
 mandatory dense array representation. Calldata references capture an offset

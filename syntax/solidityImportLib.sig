@@ -8,8 +8,10 @@ sig
    *)
   exception ImportError of string
 
-  (* A SourceUnit AST node as a src_unit term. *)
-  val import_source_unit : JSON.value -> term
+  (* A SourceUnit AST node as a src_unit term, given the compiler's contracts
+   * output for that source, which holds the storage layouts.
+   *)
+  val import_source_unit : JSON.value -> JSON.value -> term
 
   (* The named source unit of a solidity-hol-solc-artifact-v1 file written by
    * tools/export_solc_artifacts.py.

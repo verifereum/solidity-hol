@@ -1,13 +1,14 @@
-(* Static environment and well-formedness for the stage-2 pure core.
+(* Static environment and well-formedness for the stage-2 pure core, with
+ * value-type state variables.
  *
- * Only the pure fragment is admitted: scalar/convert/tuple/internal-call
- * definitions, local capture and scalar writes, and structured control flow.
- * Bindings hold elementary types, enums and user-defined value types, which
- * are integers and addresses at runtime. Function values are deferred together
- * with indirect calls; contract types are deferred until contract metadata
- * (payability, bases) is in the environment. Reference navigation, reads,
- * copies and external calls are rejected until their validation rules exist
- * (stage 3 onwards).
+ * Admitted: scalar/convert/tuple/internal-call definitions, reads of state
+ * variables, capture of locals and state variables and scalar writes to them,
+ * and structured control flow. Bindings hold elementary types, enums and
+ * user-defined value types, which are integers and addresses at runtime.
+ * Function values are deferred together with indirect calls; contract types
+ * are deferred until contract metadata (payability, bases) is in the
+ * environment. Reference navigation, reads through references, copies and
+ * external calls are rejected until their validation rules exist.
  *)
 Theory solidityCoreWf
 Ancestors
@@ -27,6 +28,7 @@ End
 Datatype:
   core_environment = <|
     procedures : (ast_id # core_procedure) list;
+    state_variables : (ast_id # core_state_variable) list;
     type_declarations : (ast_id # core_type_declaration) list
   |>
 End
@@ -34,12 +36,17 @@ End
 Definition core_program_environment_def:
   core_program_environment decls (prog : core_program) = <|
     procedures := MAP (λp. (p.procedure_id, p)) prog.procedures;
+    state_variables := MAP (λv. (v.state_id, v)) prog.state_variables;
     type_declarations := decls
   |>
 End
 
 Definition lookup_procedure_def:
   lookup_procedure env f = ALOOKUP env.procedures f
+End
+
+Definition lookup_state_variable_def:
+  lookup_state_variable env x = ALOOKUP env.state_variables x
 End
 
 Definition lookup_enum_def:
@@ -126,6 +133,21 @@ Definition core_scalar_type_def:
   core_scalar_type env ty ⇔
     is_value_type ty ∧ ¬is_function_type ty ∧ valid_type_shape ty ∧
     declared_type_ok env ty
+End
+
+(* The bytes a value type occupies in a storage slot. Enums and user-defined
+ * value types are not stored yet: reading an enum needs a choice of where an
+ * out-of-range byte is rejected.
+ *)
+Definition storage_bytes_def:
+  storage_bytes ty =
+    case ty of
+      BoolT => SOME 1
+    | UintT n => SOME (n DIV 8)
+    | IntT n => SOME (n DIV 8)
+    | AddressT _ => SOME 20
+    | FixedBytesT n => SOME n
+    | _ => NONE
 End
 
 (* ProductType is reserved for tuples and multiple returns: never singleton. *)
@@ -391,6 +413,10 @@ Definition wf_core_operation_def:
            SOME (ProductType tys) => n < LENGTH tys ∧ annotation = EL n tys
          | _ => F)
     | ConstantAtom _ => F) ∧
+  (wf_core_operation env ctx annotation (ReadStateOperation x) ⇔
+    case lookup_state_variable env x of
+      SOME v => annotation = SingleType v.state_type
+    | NONE => F) ∧
   (wf_core_operation env ctx annotation (InternalCallOperation f args) ⇔
     case lookup_procedure env f of
       SOME p =>
@@ -431,6 +457,13 @@ Definition check_core_stmts_def:
         then check_core_stmts env (capture_core_target t ty ctx) ss
         else NONE
     | _ => NONE) ∧
+  (check_core_stmts env ctx (CaptureStateStmt t x :: ss) =
+    case lookup_state_variable env x of
+      SOME v =>
+        if fresh_core_id ctx t
+        then check_core_stmts env (capture_core_target t v.state_type ctx) ss
+        else NONE
+    | NONE => NONE) ∧
   (check_core_stmts env ctx (WriteScalarStmt t ty a :: ss) =
     if ALOOKUP ctx.targets t = SOME ty ∧
        wf_core_atom env ctx (SingleType ty) a
@@ -500,11 +533,26 @@ Definition wf_core_procedure_def:
     wf_core_stmts env (procedure_check_context p) p.body
 End
 
+(* A state variable has a stored value type that fits its slot. Distinct
+ * variables are not checked to occupy disjoint bytes: layout calculation is
+ * the compiler's.
+ *)
+Definition wf_core_state_variable_def:
+  wf_core_state_variable env (v : core_state_variable) ⇔
+    core_scalar_type env v.state_type ∧
+    case storage_bytes v.state_type of
+      SOME b => v.state_offset + b ≤ 32
+    | NONE => F
+End
+
 Definition wf_core_environment_def:
   wf_core_environment env ⇔
     ALL_DISTINCT (MAP FST env.procedures) ∧
     EVERY (λ(f, p). p.procedure_id = f ∧ wf_core_procedure env p)
       env.procedures ∧
+    ALL_DISTINCT (MAP FST env.state_variables) ∧
+    EVERY (λ(x, v). v.state_id = x ∧ wf_core_state_variable env v)
+      env.state_variables ∧
     ALL_DISTINCT (MAP FST env.type_declarations) ∧
     EVERY (λ(_, decl). wf_type_declaration env decl) env.type_declarations
 End
@@ -512,6 +560,7 @@ End
 Definition wf_core_program_def:
   wf_core_program env (prog : core_program) ⇔
     env.procedures = MAP (λp. (p.procedure_id, p)) prog.procedures ∧
+    env.state_variables = MAP (λv. (v.state_id, v)) prog.state_variables ∧
     wf_core_environment env ∧
     IS_SOME (lookup_procedure env prog.entry_procedure)
 End

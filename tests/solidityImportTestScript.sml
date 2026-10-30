@@ -1,5 +1,6 @@
-(* Import of the pinned compiler's AST for testdata/frontend/pure_core.sol,
- * and negative fixtures derived from it by single edits to the JSON.
+(* Import of the pinned compiler's AST for testdata/frontend/pure_core.sol and
+ * testdata/differential/storage.sol, and negative fixtures derived from them
+ * by single edits to the JSON.
  *)
 Theory solidityImportTest
 Ancestors
@@ -9,7 +10,10 @@ Libs
 
 (* Read by holbuild's dependency scanner, which stages the fixture. *)
 fun holbuild_extra_deps (_ : string list) = ()
-val () = holbuild_extra_deps ["../testdata/frontend/expected/pure_core.json"]
+val () = holbuild_extra_deps [
+  "../testdata/frontend/expected/pure_core.json",
+  "../testdata/differential/expected/storage.json"
+]
 
 val fixture = "../testdata/frontend/expected/pure_core.json"
 val source = "testdata/frontend/pure_core.sol"
@@ -89,10 +93,12 @@ QED
  * document order, of a given nodeType.
  *)
 
-val ast =
-  JSONUtil.get (JSONParser.parseFile fixture,
-    [JSONUtil.SEL "output", JSONUtil.SEL "sources", JSONUtil.SEL source,
-     JSONUtil.SEL "ast"])
+fun artifact_part path keys =
+  JSONUtil.get (JSONParser.parseFile path,
+    [JSONUtil.SEL "output"] @ map JSONUtil.SEL keys)
+
+val ast = artifact_part fixture ["sources", source, "ast"]
+val contracts = artifact_part fixture ["contracts", source]
 
 fun is_node ty =
   JSONUtil.testField "nodeType" (fn JSON.STRING s => s = ty | _ => false)
@@ -126,18 +132,22 @@ fun type_identifier tid =
     (JSON.OBJECT [("typeIdentifier", JSON.STRING tid),
                   ("typeString", JSON.STRING "")])
 
-fun import_error name v =
-  (import_source_unit v; raise Fail (name ^ ": imported"))
+fun import_error_with contracts name v =
+  (import_source_unit v contracts; raise Fail (name ^ ": imported"))
   handle ImportError _ => ()
 
+val import_error = import_error_with contracts
+
 (* An edited unit that imports, as a cv-translated constant. *)
-fun edited_unit name v =
+fun edited_unit_with contracts name v =
   let
-    val tm = import_source_unit v
+    val tm = import_source_unit v contracts
     val def = new_definition (name ^ "_def", mk_eq (mk_var (name, type_of tm), tm))
   in
     cv_auto_trans def
   end
+
+val edited_unit = edited_unit_with contracts
 
 (* Unknown forms, missing annotations and unsupported features fail import. *)
 
@@ -151,7 +161,7 @@ val () = import_error "missing declaration reference"
   (edit_first "Identifier" (drop_field "referencedDeclaration") ast)
 val () = import_error "missing common type"
   (edit_first "BinaryOperation" (drop_field "commonType") ast)
-val () = import_error "state variable"
+val () = import_error "function as state variable"
   (edit_first "FunctionDefinition"
      (set_field "nodeType" (JSON.STRING "VariableDeclaration")) ast)
 val () = import_error "modifier"
@@ -259,6 +269,127 @@ QED
 
 Theorem call_arity_rejected:
   ¬valid_src_unit call_arity
+Proof
+  CONV_TAC cv_eval
+QED
+
+(* State variables and the storage layout *)
+
+val storage_fixture = "../testdata/differential/expected/storage.json"
+val storage_source = "testdata/differential/storage.sol"
+
+Definition storage_unit_def:
+  storage_unit = ^(import_artifact storage_fixture storage_source)
+End
+
+val () = cv_auto_trans storage_unit_def;
+
+Theorem storage_unit_valid:
+  valid_src_unit storage_unit
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem storage_unit_layout:
+  MAP (λe. (e.storage_slot, e.storage_offset, e.storage_type_id))
+    (HD storage_unit.unit_contracts).contract_storage =
+  [(0, 0, "t_uint256"); (1, 0, "t_uint8"); (1, 1, "t_int16");
+   (1, 3, "t_bool"); (1, 4, "t_address"); (1, 24, "t_bytes4");
+   (2, 0, "t_uint128"); (2, 16, "t_uint128"); (3, 0, "t_int256")]
+Proof
+  EVAL_TAC
+QED
+
+val storage_ast =
+  artifact_part storage_fixture ["sources", storage_source, "ast"]
+val storage_contracts =
+  artifact_part storage_fixture ["contracts", storage_source]
+
+(* The first variable declaration is the state variable total. *)
+val () = import_error_with storage_contracts "public state variable"
+  (edit_first "VariableDeclaration"
+     (set_field "visibility" (JSON.STRING "public")) storage_ast)
+val () = import_error_with storage_contracts "constant state variable"
+  (edit_first "VariableDeclaration" (set_field "constant" (JSON.BOOL true))
+     storage_ast)
+val () = import_error_with storage_contracts "immutable state variable"
+  (edit_first "VariableDeclaration"
+     (set_field "mutability" (JSON.STRING "immutable")) storage_ast)
+val () = import_error_with storage_contracts "state variable initialiser"
+  (edit_first "VariableDeclaration"
+     (fn JSON.OBJECT kvs =>
+           JSON.OBJECT (kvs @ [("value", edit_first "Literal" I storage_ast)])
+       | v => v)
+     storage_ast)
+val () = import_error_with (JSON.OBJECT []) "missing storage layout" storage_ast
+
+(* The contracts output with an edit to the layout entries; the first is
+ * total's. *)
+fun edit_layout f =
+  case storage_contracts of
+    JSON.OBJECT [(name, contract)] =>
+      let
+        val layout = JSONUtil.lookupField contract "storageLayout"
+        val entries =
+          JSON.ARRAY (f (JSONUtil.arrayMap I (JSONUtil.lookupField layout "storage")))
+      in
+        JSON.OBJECT [(name, set_field "storageLayout"
+                              (set_field "storage" entries layout) contract)]
+      end
+  | _ => raise Fail "expected one contract"
+
+fun edit_first_entry f = edit_layout (fn e :: es => f e :: es | [] => [])
+
+val () = edited_unit_with
+  (edit_first_entry (set_field "type" (JSON.STRING "t_uint8")))
+  "layout_type_mismatch" storage_ast
+val () = edited_unit_with
+  (edit_first_entry (set_field "astId" (JSON.INT 999999)))
+  "layout_id_mismatch" storage_ast
+val () = edited_unit_with (edit_layout tl) "layout_missing_entry" storage_ast
+val () = edited_unit_with (edit_layout (fn e :: es => es @ [e] | [] => []))
+  "layout_reordered" storage_ast
+
+(* The first function is setTotal, which writes total. *)
+val () = edited_unit_with storage_contracts "pure_writes_state"
+  (edit_first "FunctionDefinition"
+     (set_field "stateMutability" (JSON.STRING "pure")) storage_ast)
+val () = edited_unit_with storage_contracts "payable_function"
+  (edit_first "FunctionDefinition"
+     (set_field "stateMutability" (JSON.STRING "payable")) storage_ast)
+
+Theorem layout_type_mismatch_rejected:
+  ¬valid_src_unit layout_type_mismatch
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem layout_id_mismatch_rejected:
+  ¬valid_src_unit layout_id_mismatch
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem layout_missing_entry_rejected:
+  ¬valid_src_unit layout_missing_entry
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem layout_reordered_rejected:
+  ¬valid_src_unit layout_reordered
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem pure_writes_state_rejected:
+  ¬valid_src_unit pure_writes_state
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem payable_function_rejected:
+  ¬valid_src_unit payable_function
 Proof
   CONV_TAC cv_eval
 QED

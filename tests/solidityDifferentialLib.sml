@@ -122,6 +122,20 @@ fun expectation v =
   | _ => fail "expect is one of {\"return\": [...]}, {\"panic\": code}, \
               \{\"revert\": \"0x...\"}"
 
+(* An object from slot to value, both 256-bit words. *)
+fun storage v =
+  let
+    fun word i =
+      if 0 <= i andalso i < IntInf.pow (2, 256) then num_term i
+      else fail ("not a 256-bit word: " ^ IntInf.toString i)
+    fun entry (k, x) = pairSyntax.mk_pair (word (integer (JSON.STRING k)), word (integer x))
+  in
+    case v of
+      NONE => listSyntax.mk_list ([], “:num # num”)
+    | SOME (JSON.OBJECT kvs) => listSyntax.mk_list (map entry kvs, “:num # num”)
+    | SOME _ => fail "storage is an object from slot to value"
+  end
+
 (* Outcomes as JSON *)
 
 fun hex_of_bytes tm =
@@ -141,6 +155,16 @@ fun outcome_json tm =
         json_object [("diagnostic", json_string (fst (dest_const d)))]
     | _ => json_string (term_to_string tm)
   end
+
+fun storage_json tm =
+  json_object
+    (map (fn p =>
+            let val (k, v) = pairSyntax.dest_pair p in
+              (Arbnum.toString (numSyntax.dest_numeral k),
+               json_string ("0x" ^ String.map Char.toLower
+                                     (Arbnum.toHexString (numSyntax.dest_numeral v))))
+            end)
+         (fst (listSyntax.dest_list tm)))
 
 (* Definitions made by the corpus *)
 
@@ -213,12 +237,15 @@ fun run_case {suite, code, unit, program, fuel} c =
                  SOME v => integer v
                | NONE => fuel
     val args = arguments (array_field c "args")
+    val initial = storage (JSONUtil.findField c "storage")
     val expect = expectation (field c "expect")
+    val final = storage (JSONUtil.findField c "final_storage")
     val verdict_tm =
       list_mk_comb (prim_mk_const {Thy = "solidityDifferential",
                                    Name = "differential_verdict"},
                     [code, unit, program, num_term fuel,
-                     stringSyntax.fromMLstring function, args, expect])
+                     stringSyntax.fromMLstring function, args, initial, expect,
+                     final])
     val verdict = cv_eval verdict_tm
     val result = rhs (concl verdict)
     val base = [("kind", json_string "case"), ("suite", json_string suite),
@@ -237,6 +264,24 @@ fun run_case {suite, code, unit, program, fuel} c =
                       ("theorem", json_string theorem),
                       ("outcome", outcome_json (rand result))]);
         true
+      end
+    else if is_con "StorageMismatch" result orelse is_con "StorageUnexpected" result
+    then
+      let
+        (* a mismatch carries the source's storage, an unexpected result the
+         * expected one; in the latter both runs ended with the first *)
+        val mismatch = is_con "StorageMismatch" result
+        val (bytecode, other) =
+          case snd (strip_comb result) of
+            [b, x] => (b, x)
+          | _ => raise ERR "run_case" "unexpected verdict"
+      in
+        emit (base @ [("status", json_string (if mismatch then "storage-mismatch"
+                                              else "storage-unexpected")),
+                      ("bytecode_storage", storage_json bytecode),
+                      (if mismatch then "source_storage" else "expected_storage",
+                       storage_json other)]);
+        false
       end
     else
       let
