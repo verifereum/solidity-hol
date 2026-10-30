@@ -4,10 +4,10 @@
  * shallow values. Temporaries, capture targets and copies only rename terms;
  * checked operations and calls become binds unless the path condition decides
  * their check; pure branches merge, other branches take the rest of the block
- * with them. A loop becomes a helper over the variables it reads or writes;
- * a variable it only ever sets to one constant at the top of its prelude (the
- * elaborator's first-iteration flag) is not a parameter, and the iteration in
- * which it still has another value is peeled.
+ * with them. A loop becomes a helper over the variables whose values on
+ * entry it uses, called after the loop's first iteration; a boolean it only ever sets to one
+ * constant at the top of its prelude (the elaborator's first-iteration flag)
+ * is not a parameter. One loop per procedure, not nested.
  *
  * Proof: induction on the shallow definition, a case split along it, the
  * theorems of callees, helpers and the induction hypotheses at the calls it
@@ -76,6 +76,9 @@ fun range_facts (Uint n) v = [numSyntax.mk_less (v, power_of_two n)]
          (ts, pairSyntax.strip_pair v))
   | range_facts _ _ = []
 
+fun range_hyps decls vs =
+  List.concat (ListPair.map (fn ((_, ty), v) => range_facts ty v) (decls, vs))
+
 (* The core value of a shallow value *)
 fun encode (Uint _) v = mk_comb (“uint_value”, v)
   | encode Bool v = mk_comb (“bool_value”, v)
@@ -92,10 +95,12 @@ fun tuple_term [] = oneSyntax.one_tm
 fun tuple_type [] = oneSyntax.one_ty
   | tuple_type ts = pairSyntax.list_mk_prod ts
 
-(* Fresh variables, distinct from every one made so far. *)
-val used = ref ([] : term list)
+(* Fresh variables, distinct from every one made so far and from the
+   variables the theorems bind themselves *)
+val reserved = map (fn n => mk_var (n, bool)) ["m", "N", "st", "gas", "sc", "tg"]
+val used = ref reserved
 fun fresh name ty =
-  let val v = variant (!used) (mk_var (name, ty)) in used := v :: !used; v end
+  let val v = prim_variant (!used) (mk_var (name, ty)) in used := v :: !used; v end
 
 fun mk_call f [] = mk_comb (f, oneSyntax.one_tm)
   | mk_call f args = list_mk_comb (f, args)
@@ -153,7 +158,7 @@ fun decides pc goal =
 
 (* Translation context *)
 
-type callee = {shallow : term, params : ty list, returns : ty list}
+type callee = {shallow : term, returns : ty list}
 
 type loop_info = {pre : term, cond : term, body : term,
                   params : (int * ty) list, consts : (int * term) list,
@@ -163,8 +168,7 @@ type context = {
   name : string,                          (* the procedure's shallow name *)
   names : (int * string) list,            (* source names of declarations *)
   callees : (int * callee) list,
-  loops : int ref,
-  helpers : (term * term * loop_info) list ref  (* helper var, equation, loop *)
+  helper : (term * term * loop_info) option ref  (* variable, equation, loop *)
 }
 
 fun var_name (ctx : context) x =
@@ -336,14 +340,13 @@ fun exec_stmt (ctx : context) (env : env) pc s =
   | ("CaptureBindingStmt", [t, x]) =>
       Leaf (Normal, {vals = #vals env,
                      targets = (ast_id t, ast_id x) :: #targets env}, pc)
-  | ("WriteScalarStmt", [t, _, a]) =>
+  | ("WriteScalarStmt", [t, ty, a]) =>
       let
         val x = case List.find (fn (u, _) => u = ast_id t) (#targets env) of
                   SOME (_, x) => x
                 | NONE => unsupported "write without capture"
-        val (_, xty) = lookup_val env x
       in
-        Leaf (Normal, set_val env x (fst (atom_value env a), xty), pc)
+        Leaf (Normal, set_val env x (fst (atom_value env a), dest_sol_type ty), pc)
       end
   | ("IfStmt", [c, ts, es]) =>
       let
@@ -386,6 +389,8 @@ and exec_loop (ctx : context) (env : env) pc (pre, c, body) =
     val pre_s = dest_list pre
     val body_s = dest_list body
     val stmts = all_stmts (pre_s @ body_s)
+    val () = if List.exists (fn s => head_name s = "WhileStmt") stmts
+             then unsupported "nested loop" else ()
     val captures =
       List.mapPartial
         (fn s => if head_name s = "CaptureBindingStmt"
@@ -402,14 +407,18 @@ and exec_loop (ctx : context) (env : env) pc (pre, c, body) =
     val written = Lib.mk_set (List.filter (bound env) (map fst writes))
     val read = Lib.mk_set (List.filter (bound env)
                  (map (ast_id o rand) (List.concat (map atoms_of [pre, c, body]))))
-    (* variables set to one constant at the top of the prelude, and nowhere
-       else to anything else *)
+    (* boolean variables set to one constant at the top of the prelude, and
+       nowhere else to anything else *)
     val top_consts =
       List.mapPartial
         (fn s => if head_name s = "WriteScalarStmt" then
-                   let val [t, _, a] = args_of s in
-                     if head_name a = "ConstantAtom"
-                     then SOME (target (ast_id t), fst (atom_value env a))
+                   let
+                     val [t, _, a] = args_of s
+                     val x = target (ast_id t)
+                   in
+                     if head_name a = "ConstantAtom" andalso bound env x andalso
+                        snd (lookup_val env x) = Bool
+                     then SOME (x, fst (atom_value env a))
                      else NONE
                    end
                  else NONE) pre_s
@@ -421,17 +430,9 @@ and exec_loop (ctx : context) (env : env) pc (pre, c, body) =
         top_consts
     val is_const = fn x => List.exists (fn (y, _) => y = x) consts
     val sorted = Listsort.sort Int.compare
-    val params = sorted (List.filter (not o is_const)
-                           (Lib.union read written))
     val outs = sorted (List.filter (not o is_const) written)
-    val ptys = map (fn x => (x, snd (lookup_val env x))) params
     val otys = map (fn x => (x, snd (lookup_val env x))) outs
-    val () = #loops ctx := !(#loops ctx) + 1
-    val hname = #name ctx ^ "_loop" ^ Int.toString (!(#loops ctx))
     val out_ty = tuple_type (map (hol_type o snd) otys)
-    val hvar = mk_var (hname, foldr (op -->) (sol_result_ty out_ty)
-                                (if null ptys then [oneSyntax.one_ty]
-                                 else map (hol_type o snd) ptys))
     fun with_consts e = foldl (fn ((x, k), e) => set_val e x (k, Bool)) e consts
     fun iteration env pc =
       graft (fn (e1, p1) =>
@@ -451,40 +452,62 @@ and exec_loop (ctx : context) (env : env) pc (pre, c, body) =
         (map_exits (fn Normal => Normal
                      | _ => unsupported "control flow out of a loop prelude")
            (exec_block ctx env pc pre_s))
-    fun leaf (Next, e) =
+    fun leaf hvar ptys (Next, e) =
           (List.app (fn (x, k) => if aconv (fst (lookup_val e x)) k then ()
                                   else unsupported "loop flag not constant")
                     consts;
-           mk_call hvar (map (fn x => fst (lookup_val e x)) params))
-      | leaf (Exit, e) = mk_returns (tuple_term (map (fn x => fst (lookup_val e x)) outs))
-      | leaf _ = raise ERR "exec_loop" "unexpected exit"
-    (* the helper, with its own variable names *)
-    val outer_used = !used
-    val () = used := []
-    val pvars = map (fn (x, ty) => fresh (var_name ctx x) (hol_type ty)) ptys
-    val henv = with_consts
-                 {vals = ListPair.map (fn ((x, ty), v) => (x, (v, ty))) (ptys, pvars),
-                  targets = #targets env}
-    val hpc = List.concat (ListPair.map (fn ((_, ty), v) => range_facts ty v)
-                                        (ptys, pvars))
-    val equation = mk_eq (mk_call hvar pvars, to_term leaf (iteration henv hpc))
-    val info = {pre = pre, cond = c, body = body, params = ptys,
-                consts = consts, outs = otys}
-    val () = used := outer_used
-    val () = #helpers ctx := (hvar, equation, info) :: !(#helpers ctx)
-    (* the loop here *)
-    val peel = List.exists (fn (x, k) => not (aconv (fst (lookup_val env x)) k))
-                           consts
-    val m = if peel then to_term leaf (iteration env pc)
-            else mk_call hvar (map (fn x => fst (lookup_val env x)) params)
+           mk_call hvar (map (fn (x, _) => fst (lookup_val e x)) ptys))
+      | leaf _ _ (Exit, e) =
+          mk_returns (tuple_term (map (fn x => fst (lookup_val e x)) outs))
+      | leaf _ _ _ = raise ERR "exec_loop" "unexpected exit"
+    (* the helper over the given parameters, with its own variable names *)
+    fun helper ptys =
+      let
+        val hvar = mk_var (#name ctx ^ "_loop",
+                           foldr (op -->) (sol_result_ty out_ty)
+                             (if null ptys then [oneSyntax.one_ty]
+                              else map (hol_type o snd) ptys))
+        val outer_used = !used
+        val () = used := reserved
+        val pvars = map (fn (x, ty) => fresh (var_name ctx x) (hol_type ty)) ptys
+        val henv = with_consts
+                     {vals = ListPair.map (fn ((x, ty), v) => (x, (v, ty))) (ptys, pvars),
+                      targets = #targets env}
+        val rhs = to_term (leaf hvar ptys) (iteration henv (range_hyps ptys pvars))
+      in
+        used := outer_used;
+        (hvar, pvars, mk_eq (mk_call hvar pvars, rhs))
+      end
+    (* a loop reached along several paths has one helper *)
+    val (hvar, ptys) =
+      case !(#helper ctx) of
+        SOME (hvar, _, i : loop_info) =>
+          if aconv (#pre i) pre andalso aconv (#cond i) c andalso aconv (#body i) body
+          then (hvar, #params i) else unsupported "more than one loop"
+      | NONE =>
+          let
+            (* the variables it reads or writes, less those whose value on
+               entry it never uses (written before read) *)
+            val all = map (fn x => (x, snd (lookup_val env x)))
+                          (sorted (List.filter (not o is_const) (Lib.union read written)))
+            val (_, pvars, eqn) = helper all
+            val ptys = map fst (List.filter (fn (_, v) => free_in v (rhs eqn))
+                                            (ListPair.zip (all, pvars)))
+            val (hvar, _, eqn) = helper ptys
+          in
+            #helper ctx := SOME (hvar, eqn, {pre = pre, cond = c, body = body,
+                                             params = ptys, consts = consts,
+                                             outs = otys});
+            (hvar, ptys)
+          end
+    (* the loop here: its first iteration, then the helper *)
+    val m = to_term (leaf hvar ptys) (iteration env pc)
     val pat = tuple_term (map (fn (x, ty) => fresh (var_name ctx x) (hol_type ty)) otys)
+    val outvs = pairSyntax.strip_pair pat
     val env' = with_consts
                  (foldl (fn (((x, ty), v), e) => set_val e x (v, ty)) env
-                        (ListPair.zip (otys, pairSyntax.strip_pair pat
-                                             handle _ => [pat])))
-    val pc' = List.concat (map (fn ((_, ty), v) => range_facts ty v)
-                               (ListPair.zip (otys, if null otys then []
-                                                    else pairSyntax.strip_pair pat)))
+                        (ListPair.zip (otys, outvs)))
+    val pc' = range_hyps otys outvs
   in
     Bind (m, pat, Leaf (Normal, env', pc' @ pc))
   end
@@ -504,9 +527,6 @@ fun dest_procedure tm =
     [_, ps, rs, body] => (map dest_decl (dest_list ps), map dest_decl (dest_list rs),
                           dest_list body)
   | _ => unsupported ("procedure " ^ term_to_string tm)
-
-fun range_hyps decls vs =
-  List.concat (ListPair.map (fn ((_, ty), v) => range_facts ty v) (decls, vs))
 
 (* sol_bind m (λx. Returns x) is m *)
 fun drop_returns tm =
@@ -558,7 +578,7 @@ fun value_list tys vs =
 fun result_vars ctx t decls =
   let
     fun next ((x, ty), vs) =
-      variant (vs @ free_vars t) (mk_var (var_name ctx x, hol_type ty)) :: vs
+      prim_variant (vs @ reserved @ free_vars t) (mk_var (var_name ctx x, hol_type ty)) :: vs
   in rev (foldl next [] decls) end
 
 (* ∀rs. call = Returns rs ⇒ ranges, if there are any *)
@@ -595,15 +615,19 @@ fun loop_goal ctx env hconst pvars ({pre, cond, body, params, consts, outs} : lo
   let
     val call = mk_call hconst pvars
     val ovs = result_vars ctx call outs
+    (* results the loop writes before it reads them are bound to something *)
+    val fresh_outs = List.filter (fn (x, _) => not (exists (fn (y, _) => y = x) params)) outs
     val lookups =
       ListPair.map (fn ((x, ty), v) => has_binding (x, ty, v)) (params, pvars) @
+      ListPair.map (fn ((x, ty), v) => mk_exists (v, has_binding (x, ty, v)))
+                   (fresh_outs, result_vars ctx call fresh_outs) @
       map (fn (x, k) => has_binding (x, Bool, k)) consts
     val writes =
       ListPair.map (fn ((x, ty), v) => pairSyntax.mk_pair
                       (“AstId ^(numSyntax.term_of_int x)”, encode ty v)) (outs, ovs) @
       map (fn (x, k) => pairSyntax.mk_pair
              (“AstId ^(numSyntax.term_of_int x)”, encode Bool k)) consts
-    val writes = listSyntax.mk_list (writes, type_of (hd writes))
+    val writes = listSyntax.mk_list (writes, pairSyntax.mk_prod (“:ast_id”, type_of (encode Bool T)))
     val post = list_mk_forall (ovs,
                  mk_imp (mk_eq (call, mk_returns (tuple_term ovs)),
                          “sc = set_bindings ^writes ^st_var.scopes”))
@@ -639,7 +663,8 @@ val eval_simps =
    procedure_completion_def, read_returns_def, restore_caller_def,
    result_completion_def, result_outcome_def, loop_completion_def,
    uint_value_def, bool_value_def, valid_int_width_def, simple_stmt_def,
-   source_state_component_equality, eval_block_cons, result_literal_eqs] @
+   source_state_component_equality, eval_block_cons, result_literal_eqs,
+   uint_div_range, uint_mod_range, uint_mod_divisor_range] @
   List.filter (fn th => let val (h, args) = strip_comb (lhs (concl (SPEC_ALL th))) in
                           same_const h eval_stmt_tm orelse
                           same_const h eval_block_tm andalso listSyntax.is_nil (el 3 args)
@@ -796,9 +821,9 @@ fun define name eqn termination =
 type translated = {callee : callee, thm : thm}
 val translated = ref ([] : (int * translated) list)
 
-fun translate {env, lookup, name, id, names, termination, loops} =
+fun translate {env, lookup, name, id, names, termination, loop} =
   let
-    val () = used := []
+    val () = used := reserved
     val lookup_th = lookup “lookup_procedure ^env (AstId ^(numSyntax.term_of_int id))”
     val proc = rand (rhs (concl lookup_th))
     val (ps, rs, body) = dest_procedure proc
@@ -807,28 +832,26 @@ fun translate {env, lookup, name, id, names, termination, loops} =
                                    (if null ps then [oneSyntax.one_ty]
                                     else map (hol_type o snd) ps))
     val ctx = {name = name, names = names,
-               callees = (id, {shallow = fvar, params = map snd ps, returns = map snd rs}) ::
+               callees = (id, {shallow = fvar, returns = map snd rs}) ::
                          map (fn (i, t) => (i, #callee t)) (!translated),
-               loops = ref 0, helpers = ref []} : context
+               helper = ref NONE} : context
     val (pvars, eqn) = procedure_equation ctx fvar (ps, rs, body)
     val simps = lookup_th :: eval_simps
     val callee_heads = map (#shallow o #callee o snd) (!translated)
     val callee_thms = map (#thm o snd) (!translated)
-    (* helpers, inner ones first *)
-    fun do_helpers [] _ done = rev done
-      | do_helpers ((hvar, heqn, info) :: hs) (tac :: tacs) done =
+    val helpers =
+      case (!(#helper ctx), loop) of
+        (NONE, _) => []
+      | (SOME (hvar, heqn, info), SOME tac) =>
           let
-            val s = map (fn (v, c, _) => v |-> c) done
-            val (def, c, ind) = define (fst (dest_var hvar)) (Term.subst s heqn) (SOME tac)
+            val (def, c, ind) = define (fst (dest_var hvar)) heqn (SOME tac)
             val hpvars = snd (strip_comb (lhs heqn))
             val goal = loop_goal ctx env c hpvars info
-            val heads = c :: map #2 done @ callee_heads
-            val facts = map #3 done @ callee_thms
-            val th = prove (goal, along_tac def ind heads facts >> loop_case_tac simps)
+            val th = prove (goal, along_tac def ind (c :: callee_heads) callee_thms >>
+                                  loop_case_tac simps)
             val _ = save_thm (fst (dest_var hvar) ^ "_correct", th)
-          in do_helpers hs tacs ((hvar, c, th) :: done) end
-      | do_helpers _ [] _ = raise ERR "translate" "a termination tactic per loop"
-    val helpers = do_helpers (rev (!(#helpers ctx))) loops []
+          in [(hvar, c, th)] end
+      | (SOME _, NONE) => raise ERR "translate" "the loop needs a termination tactic"
     val s = map (fn (v, c, _) => v |-> c) helpers
     val (def, c, ind) = define name (Term.subst s eqn) termination
     val goal = procedure_goal ctx env id c pvars ps rs
@@ -837,7 +860,7 @@ fun translate {env, lookup, name, id, names, termination, loops} =
     val th = prove (goal, along_tac def ind heads facts >> procedure_case_tac simps)
     val th = save_thm (name ^ "_correct", th)
   in
-    translated := (id, {callee = {shallow = c, params = map snd ps, returns = map snd rs},
+    translated := (id, {callee = {shallow = c, returns = map snd rs},
                         thm = th}) :: !translated;
     th
   end

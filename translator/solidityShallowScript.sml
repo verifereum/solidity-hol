@@ -45,23 +45,27 @@ val () = enable_monad "sol";
 (* Checked unsigned arithmetic *)
 
 Definition uint_add_def:
-  uint_add n (x : num) y = if x + y < 2 ** n then Returns (x + y) else Panics 0x11
+  uint_add n (x : num) y =
+    if x + y < 2 ** n then Returns (x + y) else Panics panic_arithmetic
 End
 
 Definition uint_sub_def:
-  uint_sub (x : num) y = if y ≤ x then Returns (x - y) else Panics 0x11
+  uint_sub (x : num) y = if y ≤ x then Returns (x - y) else Panics panic_arithmetic
 End
 
 Definition uint_mul_def:
-  uint_mul n (x : num) y = if x * y < 2 ** n then Returns (x * y) else Panics 0x11
+  uint_mul n (x : num) y =
+    if x * y < 2 ** n then Returns (x * y) else Panics panic_arithmetic
 End
 
 Definition uint_div_def:
-  uint_div (x : num) y = if y = 0 then Panics 0x12 else Returns (x DIV y)
+  uint_div (x : num) y =
+    if y = 0 then Panics panic_division_by_zero else Returns (x DIV y)
 End
 
 Definition uint_mod_def:
-  uint_mod (x : num) y = if y = 0 then Panics 0x12 else Returns (x MOD y)
+  uint_mod (x : num) y =
+    if y = 0 then Panics panic_division_by_zero else Returns (x MOD y)
 End
 
 (* Encodings *)
@@ -264,6 +268,12 @@ Proof
   strip_tac >> irule LESS_EQ_LESS_TRANS >> qexists_tac ‘x’ >> simp[MOD_LESS_EQ]
 QED
 
+Theorem uint_mod_divisor_range:
+  y ≠ 0 ∧ y < N ⇒ x MOD y < N
+Proof
+  strip_tac >> irule LESS_TRANS >> qexists_tac ‘y’ >> simp[]
+QED
+
 (* Scopes. A loop's effect on its enclosing scopes is a list of writes,
  * set_bindings. Two results of writes to the same scopes are equal when
  * every lookup agrees (same_frames_ext). *)
@@ -301,14 +311,6 @@ Proof
   rw[] >> rpt (CASE_TAC >> gvs[lookup_binding_def, FLOOKUP_UPDATE])
 QED
 
-Theorem lookup_bind_local:
-  lookup_binding y (bind_local x b scopes) =
-  if ast_key y = ast_key x then SOME b else lookup_binding y scopes
-Proof
-  Cases_on ‘scopes’ >> rw[bind_local_def, lookup_binding_def] >>
-  gvs[FLOOKUP_UPDATE]
-QED
-
 (* a is scopes with the values of some bindings changed: same frames, same
  * keys, and a key shadowed by an inner frame is untouched further out. *)
 Definition same_frames_def:
@@ -342,13 +344,6 @@ Proof
       ‘ast_key x ≠ k’ by (strip_tac >> gvs[]) >>
       simp[flookups_set_binding])
   >- (gvs[flookup_thm] >> simp[pred_setTheory.ABSORPTION_RWT])
-QED
-
-Theorem same_frames_set_bindings:
-  ∀ws. same_frames scopes a ⇒ same_frames scopes (set_bindings ws a)
-Proof
-  Induct >> simp[set_bindings_def] >> Cases >>
-  simp[set_bindings_def, same_frames_set_binding]
 QED
 
 Theorem lookup_flookups[local]:
@@ -508,9 +503,3 @@ Proof
      bind_call_result_def, pop_result_def]
 QED
 
-(* A procedure leaves the caller's state as it found it. *)
-Theorem restore_caller_same:
-  restore_caller st (st with <| scopes := sc; targets := tg |>) = st
-Proof
-  simp[restore_caller_def, source_state_component_equality]
-QED
