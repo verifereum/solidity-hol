@@ -39,7 +39,7 @@ reads and writes the captured location once.
 
 Scalar state variables use `StateReferenceOperation`, `ReadOperation` and
 `CaptureValueStmt`, like navigated storage. There is no second scalar-state
-read/capture operation. `WriteScalarStmt`, `RebindReferenceStmt` and
+read/capture operation. `WriteScalarStmt`, `BindReferenceStmt` and
 `CopyContentsStmt` remain distinct: changing an alias is not copying an aggregate.
 The latter operations are extension points, not aggregate execution coverage.
 
