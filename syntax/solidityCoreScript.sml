@@ -130,6 +130,7 @@ Datatype:
   | BreakStmt
   | ContinueStmt
   | RevertStmt core_atom
+  | PanicStmt num
 End
 
 Datatype:
