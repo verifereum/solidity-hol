@@ -188,7 +188,11 @@ fun prepared_constants prefix (prepared : solidityPrepareLib.prepared) =
 
 fun code_constant prefix artifact source contract =
   let
-    val hex = solidityImportLib.artifact_deployed_bytecode artifact source contract
+    val hex = JSONUtil.asString (JSONUtil.get (artifact,
+      map JSONUtil.SEL ["output", "contracts", source, contract, "evm",
+                        "deployedBytecode", "object"]))
+      handle e as JSONUtil.JSONError _ => fail (JSONUtil.exnMessage e)
+           | e as JSONUtil.FieldNotFound _ => fail (JSONUtil.exnMessage e)
     val def = define (prefix ^ "_code")
                 “REVERSE $ hex_to_rev_bytes [] ^(stringSyntax.fromMLstring hex)”
     val () = cv_trans_deep_embedding EVAL def
@@ -306,10 +310,10 @@ fun run_suite root fuel s =
     val cases = array_field s "cases"
   in
     let
-      val prepared = solidityPrepareLib.prepare_artifact
+      val checked = solidityPrepareLib.prepare_artifact
         {root = root, path = artifact, source = source}
-      val (unit, program) = prepared_constants prefix prepared
-      val code = code_constant prefix artifact source contract
+      val (unit, program) = prepared_constants prefix (#prepared checked)
+      val code = code_constant prefix (#artifact checked) source contract
       val () = emit [("kind", json_string "suite"),
                      ("suite", json_string suite),
                      ("status", json_string "ok"),

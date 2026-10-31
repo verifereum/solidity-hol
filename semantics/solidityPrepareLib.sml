@@ -84,7 +84,7 @@ fun read_artifact {root, path} = json_input (fn () =>
         val suffix = String.extract (token, size prefix, NONE)
         val commit = hd (String.fields (fn c => c = #".") suffix)
       in
-        size commit >= 8 andalso String.isPrefix (String.map Char.toLower commit) pin
+        size commit >= 8 andalso String.isPrefix (String.map Char.toLower commit) (String.map Char.toLower pin)
       end
     fun reported_identity ("Version:" :: version :: rest) =
           identity version orelse reported_identity rest
@@ -103,7 +103,8 @@ fun read_artifact {root, path} = json_input (fn () =>
       "input settings differ from pinned profile/output selection"
     val _ = object (field input "sources")
     val output = field artifact "output"
-    val _ = object (field output "sources")
+    val () = require (not (null (object (field output "sources"))))
+      "artifact has no source units"
     val () = case JSONUtil.findField output "errors" of
       NONE => ()
     | SOME errors => List.app (fn error =>
@@ -130,7 +131,8 @@ fun prepare_unit unit =
     val source_valid = checked_predicate SourceRejected
       "valid_src_unit failed (source validation/subset restriction)"
       (mk_comb (prim_mk_const {Thy = "solidityImport", Name = "valid_src_unit"}, unit))
-    val elaborates = cv_eval (mk_comb (elaborate_unit_tm, unit))
+    val elaborates = (REWRITE_CONV [elaborate_unit_def, source_valid] THENC cv_eval)
+      (mk_comb (elaborate_unit_tm, unit))
     val result = rhs (concl elaborates)
     val program = if optionSyntax.is_none result then
       reject UnsupportedLowering "elaborate_unit returned NONE (unsupported lowering)"
@@ -144,24 +146,31 @@ fun prepare_unit unit =
   end
 
 
+(* Import from an artifact already checked by read_artifact. *)
+fun import_unit artifact source =
+  (json_input (fn () =>
+    let
+      val output = field artifact "output"
+      val contracts = case JSONUtil.findField output "contracts" of
+        NONE => JSON.OBJECT []
+      | SOME all => (case JSONUtil.findField all source of
+                      NONE => JSON.OBJECT [] | SOME contracts => contracts)
+    in
+      solidityImportLib.import_source_unit
+        (JSONUtil.get (output, map JSONUtil.SEL ["sources", source, "ast"])) contracts
+    end)
+    handle solidityImportLib.ImportError message => reject UnsupportedImport message
+         | solidityImportLib.MalformedInput message => reject MalformedInput message)
+  handle PreparationError (kind, message) => reject kind (source ^ ": " ^ message)
+
 fun prepare_artifact {root, path, source} =
   let
     val artifact = read_artifact {root = root, path = path}
-    val unit = json_input (fn () =>
-      let
-        val output = field artifact "output"
-        val contracts = case JSONUtil.findField output "contracts" of
-          NONE => JSON.OBJECT []
-        | SOME all => (case JSONUtil.findField all source of
-                        NONE => JSON.OBJECT [] | SOME contracts => contracts)
-      in
-        solidityImportLib.import_source_unit
-          (JSONUtil.get (output, map JSONUtil.SEL ["sources", source, "ast"])) contracts
-      end)
-      handle solidityImportLib.ImportError message => reject UnsupportedImport message
-           | solidityImportLib.MalformedInput message => reject MalformedInput message
+    val unit = import_unit artifact source
+    val prepared = prepare_unit unit
+      handle PreparationError (kind, message) => reject kind (source ^ ": " ^ message)
   in
-    prepare_unit unit
+    {artifact = artifact, prepared = prepared}
   end
 
 end

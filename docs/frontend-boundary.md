@@ -29,8 +29,11 @@ The implementation should distinguish three representations:
 2. a validated, normalized AST retaining source and declaration identity; and
 3. a smaller executable core with explicit effect schedules and operations.
 
-The raw AST is trusted input initially, but it is not directly executable.
-Import must reject unknown forms and missing required annotations.
+Artifact consumers enter through `solidityPrepareLib`: check the pinned
+compiler/profile/settings contract, import, validate the source, elaborate,
+and check the full core with cv evaluation. Raw import and elaboration remain
+available with these checks as caller preconditions. Unknown forms and missing
+required annotations have distinct unsupported and malformed diagnostics.
 
 ## Identity and source positions
 
@@ -166,10 +169,12 @@ struct's stride, scalar fields crossing a slot boundary, unaligned aggregates,
 and cyclic inline containment. Layout calculation and byte disjointness remain
 trusted compiler work. Unused declarations need no runtime layout.
 
-The core program carries these struct layouts into its environment. Member
-navigation extends an already captured base, and array strides use each struct's
-whole-slot size. Elaboration rejects missing or inconsistent runtime layouts; the core checker
-independently checks the elaborated program.
+The core program owns semantic struct declarations independently of keyed
+storage layouts, including unused structs with no runtime layout. Its environment
+is derived from both. Member navigation extends an already captured base, and
+array strides use each struct's whole-slot size. Raw elaboration preserves
+these declarations; the complete core checker rejects missing or inconsistent
+runtime layouts as invalid generated core at the checked preparation boundary.
 
 The selected compiler also emits `transientStorageLayout`. It is empty for the
 initial corpus, so transient layout remains unvalidated.

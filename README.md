@@ -18,9 +18,11 @@ consumers. It checks the artifact format, compiler version/commit, profile and
 Standard JSON settings against `SOLIDITY_PIN` and
 `profiles/solc-0.8.37-via-ir-osaka.json`. It then imports and validates the source,
 elaborates it, and checks the complete `wf_core_program` with `cv_eval`.
-Success returns the source/core terms and HOL theorems for source validation,
+Success retains the checked artifact alongside the source/core terms and HOL theorems for source validation,
 elaboration and core well-formedness. Artifact metadata checks run in SML;
-they do not certify that the compiler produced the recorded output.
+they do not certify that the compiler produced the recorded output. The Python
+runner's solc-free artifact checks provide earlier diagnostics; acceptance is
+always decided by this SML preparation boundary.
 
 Malformed artifacts, unsupported import/lowering, source-validation rejection
 and invalid generated core have distinct diagnostics. Source validation also
