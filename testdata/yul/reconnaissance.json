@@ -1,0 +1,2604 @@
+{
+  "compiler": {
+    "pin": "f401782df49be312ea4ef52a2d467cf5183b5906",
+    "reportedVersion": "solc, the solidity compiler commandline interface\nVersion: 0.8.37+commit.f401782d.Linux.g++"
+  },
+  "fixtures": [
+    {
+      "contracts": [
+        {
+          "contract": "Builtins",
+          "objects": [
+            {
+              "builtins": {
+                "callvalue": 1,
+                "codecopy": 1,
+                "dataoffset": 1,
+                "datasize": 2,
+                "memoryguard": 1,
+                "mload": 1,
+                "mstore": 1,
+                "return": 1,
+                "revert": 1
+              },
+              "dataSections": 0,
+              "depth": 0,
+              "name": "Builtins_301",
+              "nodeKinds": {
+                "assignment": 1,
+                "block": 5,
+                "expressionStatement": 6,
+                "functionCall": 13,
+                "functionDefinition": 3,
+                "identifier": 2,
+                "if": 1,
+                "literal:number": 5,
+                "literal:string": 3,
+                "variableDeclaration": 1
+              },
+              "role": "creation",
+              "subobjects": 1
+            },
+            {
+              "builtins": {
+                "add": 70,
+                "and": 2,
+                "calldataload": 3,
+                "calldatasize": 20,
+                "callvalue": 19,
+                "div": 1,
+                "eq": 6,
+                "iszero": 15,
+                "lt": 1,
+                "memoryguard": 1,
+                "mload": 1,
+                "mstore": 47,
+                "not": 1,
+                "or": 1,
+                "return": 19,
+                "revert": 26,
+                "shl": 1,
+                "shr": 2,
+                "sload": 2,
+                "slt": 3,
+                "sstore": 1,
+                "sub": 48
+              },
+              "dataSections": 1,
+              "depth": 1,
+              "name": "Builtins_301_deployed",
+              "nodeKinds": {
+                "assignment": 110,
+                "block": 208,
+                "case": 19,
+                "default": 1,
+                "expressionStatement": 204,
+                "functionCall": 592,
+                "functionDefinition": 141,
+                "identifier": 465,
+                "if": 36,
+                "leave": 6,
+                "literal:number": 219,
+                "literal:string": 9,
+                "switch": 1,
+                "variableDeclaration": 179
+              },
+              "role": "runtime",
+              "subobjects": 0
+            }
+          ]
+        }
+      ],
+      "sha256": "d95666c7e2135bfebc299d31e9a919c2c882ef6a0de332db1a225417ea169378",
+      "source": "testdata/differential/builtins.sol"
+    },
+    {
+      "contracts": [
+        {
+          "contract": "Calls",
+          "objects": [
+            {
+              "builtins": {
+                "callvalue": 1,
+                "codecopy": 1,
+                "dataoffset": 1,
+                "datasize": 2,
+                "memoryguard": 1,
+                "mload": 1,
+                "mstore": 1,
+                "return": 1,
+                "revert": 1
+              },
+              "dataSections": 0,
+              "depth": 0,
+              "name": "Calls_391",
+              "nodeKinds": {
+                "assignment": 1,
+                "block": 5,
+                "expressionStatement": 6,
+                "functionCall": 13,
+                "functionDefinition": 3,
+                "identifier": 2,
+                "if": 1,
+                "literal:number": 5,
+                "literal:string": 3,
+                "variableDeclaration": 1
+              },
+              "role": "creation",
+              "subobjects": 1
+            },
+            {
+              "builtins": {
+                "add": 25,
+                "and": 1,
+                "calldataload": 3,
+                "calldatasize": 18,
+                "callvalue": 17,
+                "div": 2,
+                "eq": 9,
+                "gt": 4,
+                "iszero": 8,
+                "lt": 3,
+                "memoryguard": 1,
+                "mload": 1,
+                "mstore": 8,
+                "mul": 1,
+                "or": 1,
+                "return": 17,
+                "revert": 8,
+                "shr": 1,
+                "slt": 5,
+                "sub": 26
+              },
+              "dataSections": 1,
+              "depth": 1,
+              "name": "Calls_391_deployed",
+              "nodeKinds": {
+                "assignment": 129,
+                "block": 154,
+                "case": 18,
+                "default": 2,
+                "expressionStatement": 91,
+                "functionCall": 424,
+                "functionDefinition": 86,
+                "identifier": 545,
+                "if": 38,
+                "leave": 20,
+                "literal:number": 124,
+                "switch": 2,
+                "variableDeclaration": 311
+              },
+              "role": "runtime",
+              "subobjects": 0
+            }
+          ]
+        }
+      ],
+      "sha256": "3e375714aad4b4c8f5a22c5536e1d3edcbd92c88b5a8c65df126a580373a1d18",
+      "source": "testdata/differential/calls.sol"
+    },
+    {
+      "contracts": [
+        {
+          "contract": "Control",
+          "objects": [
+            {
+              "builtins": {
+                "callvalue": 1,
+                "codecopy": 1,
+                "dataoffset": 1,
+                "datasize": 2,
+                "memoryguard": 1,
+                "mload": 1,
+                "mstore": 1,
+                "return": 1,
+                "revert": 1
+              },
+              "dataSections": 0,
+              "depth": 0,
+              "name": "Control_295",
+              "nodeKinds": {
+                "assignment": 1,
+                "block": 5,
+                "expressionStatement": 6,
+                "functionCall": 13,
+                "functionDefinition": 3,
+                "identifier": 2,
+                "if": 1,
+                "literal:number": 5,
+                "literal:string": 3,
+                "variableDeclaration": 1
+              },
+              "role": "creation",
+              "subobjects": 1
+            },
+            {
+              "builtins": {
+                "add": 15,
+                "and": 1,
+                "calldataload": 4,
+                "calldatasize": 9,
+                "callvalue": 8,
+                "div": 1,
+                "eq": 11,
+                "gt": 5,
+                "iszero": 24,
+                "lt": 10,
+                "memoryguard": 1,
+                "mload": 1,
+                "mod": 1,
+                "mstore": 7,
+                "mul": 2,
+                "or": 1,
+                "return": 8,
+                "revert": 9,
+                "shr": 1,
+                "slt": 6,
+                "sub": 12
+              },
+              "dataSections": 1,
+              "depth": 1,
+              "name": "Control_295_deployed",
+              "nodeKinds": {
+                "assignment": 91,
+                "block": 162,
+                "break": 14,
+                "case": 10,
+                "continue": 3,
+                "default": 3,
+                "expressionStatement": 57,
+                "for": 11,
+                "functionCall": 347,
+                "functionDefinition": 68,
+                "identifier": 412,
+                "if": 42,
+                "leave": 6,
+                "literal:number": 112,
+                "switch": 3,
+                "variableDeclaration": 245
+              },
+              "role": "runtime",
+              "subobjects": 0
+            }
+          ]
+        }
+      ],
+      "sha256": "912a8c5e8865fc91c0d06c936bd5dc67cdea70538a9e1314c8df1f79759d1a05",
+      "source": "testdata/differential/control.sol"
+    },
+    {
+      "contracts": [
+        {
+          "contract": "DynamicStorageArrays",
+          "objects": [
+            {
+              "builtins": {
+                "callvalue": 1,
+                "codecopy": 1,
+                "dataoffset": 1,
+                "datasize": 2,
+                "memoryguard": 1,
+                "mload": 1,
+                "mstore": 1,
+                "return": 1,
+                "revert": 1
+              },
+              "dataSections": 0,
+              "depth": 0,
+              "name": "DynamicStorageArrays_739",
+              "nodeKinds": {
+                "assignment": 1,
+                "block": 5,
+                "expressionStatement": 6,
+                "functionCall": 13,
+                "functionDefinition": 3,
+                "identifier": 2,
+                "if": 1,
+                "literal:number": 5,
+                "literal:string": 3,
+                "variableDeclaration": 1
+              },
+              "role": "creation",
+              "subobjects": 1
+            },
+            {
+              "builtins": {
+                "add": 73,
+                "and": 18,
+                "calldataload": 7,
+                "calldatasize": 28,
+                "callvalue": 27,
+                "div": 9,
+                "eq": 8,
+                "gt": 3,
+                "iszero": 31,
+                "keccak256": 16,
+                "lt": 20,
+                "memoryguard": 1,
+                "mload": 1,
+                "mod": 9,
+                "mstore": 34,
+                "mul": 23,
+                "not": 6,
+                "or": 6,
+                "return": 27,
+                "revert": 14,
+                "shl": 3,
+                "shr": 4,
+                "signextend": 2,
+                "sload": 32,
+                "slt": 8,
+                "sstore": 17,
+                "sub": 40
+              },
+              "dataSections": 1,
+              "depth": 1,
+              "name": "DynamicStorageArrays_739_deployed",
+              "nodeKinds": {
+                "assignment": 329,
+                "block": 378,
+                "case": 27,
+                "default": 1,
+                "expressionStatement": 282,
+                "functionCall": 1204,
+                "functionDefinition": 272,
+                "identifier": 1432,
+                "if": 69,
+                "leave": 27,
+                "literal:number": 440,
+                "switch": 1,
+                "variableDeclaration": 783
+              },
+              "role": "runtime",
+              "subobjects": 0
+            }
+          ]
+        }
+      ],
+      "sha256": "7fe03327f30147b089b5b4a7ae86f4b732ee8f8f26f079b297b1049ddb05d436",
+      "source": "testdata/differential/dynamic_storage_arrays.sol"
+    },
+    {
+      "contracts": [
+        {
+          "contract": "Mappings",
+          "objects": [
+            {
+              "builtins": {
+                "callvalue": 1,
+                "codecopy": 1,
+                "dataoffset": 1,
+                "datasize": 2,
+                "memoryguard": 1,
+                "mload": 1,
+                "mstore": 1,
+                "return": 1,
+                "revert": 1
+              },
+              "dataSections": 0,
+              "depth": 0,
+              "name": "Mappings_488",
+              "nodeKinds": {
+                "assignment": 1,
+                "block": 5,
+                "expressionStatement": 6,
+                "functionCall": 13,
+                "functionDefinition": 3,
+                "identifier": 2,
+                "if": 1,
+                "literal:number": 5,
+                "literal:string": 3,
+                "variableDeclaration": 1
+              },
+              "role": "creation",
+              "subobjects": 1
+            },
+            {
+              "builtins": {
+                "add": 50,
+                "and": 18,
+                "calldataload": 9,
+                "calldatasize": 17,
+                "callvalue": 16,
+                "eq": 11,
+                "gt": 3,
+                "iszero": 11,
+                "keccak256": 10,
+                "lt": 1,
+                "memoryguard": 1,
+                "mload": 1,
+                "mstore": 30,
+                "not": 5,
+                "or": 5,
+                "return": 16,
+                "revert": 13,
+                "shl": 2,
+                "shr": 2,
+                "signextend": 3,
+                "sload": 14,
+                "slt": 9,
+                "sstore": 7,
+                "sub": 26
+              },
+              "dataSections": 1,
+              "depth": 1,
+              "name": "Mappings_488_deployed",
+              "nodeKinds": {
+                "assignment": 218,
+                "block": 276,
+                "case": 16,
+                "default": 1,
+                "expressionStatement": 170,
+                "functionCall": 771,
+                "functionDefinition": 202,
+                "identifier": 918,
+                "if": 40,
+                "leave": 18,
+                "literal:number": 263,
+                "switch": 1,
+                "variableDeclaration": 494
+              },
+              "role": "runtime",
+              "subobjects": 0
+            }
+          ]
+        }
+      ],
+      "sha256": "bd8ab8ade431dc1b12c85a8278e7ed821e251c72b310afa6483bcf04c80b79ba",
+      "source": "testdata/differential/mappings.sol"
+    },
+    {
+      "contracts": [
+        {
+          "contract": "Mutant",
+          "objects": [
+            {
+              "builtins": {
+                "callvalue": 1,
+                "codecopy": 1,
+                "dataoffset": 1,
+                "datasize": 2,
+                "memoryguard": 1,
+                "mload": 1,
+                "mstore": 1,
+                "return": 1,
+                "revert": 1
+              },
+              "dataSections": 0,
+              "depth": 0,
+              "name": "Mutant_17",
+              "nodeKinds": {
+                "assignment": 1,
+                "block": 5,
+                "expressionStatement": 6,
+                "functionCall": 13,
+                "functionDefinition": 3,
+                "identifier": 2,
+                "if": 1,
+                "literal:number": 5,
+                "literal:string": 3,
+                "variableDeclaration": 1
+              },
+              "role": "creation",
+              "subobjects": 1
+            },
+            {
+              "builtins": {
+                "add": 5,
+                "and": 1,
+                "calldataload": 2,
+                "calldatasize": 2,
+                "callvalue": 1,
+                "eq": 1,
+                "iszero": 2,
+                "lt": 1,
+                "memoryguard": 1,
+                "mload": 1,
+                "mstore": 2,
+                "return": 1,
+                "revert": 5,
+                "shr": 1,
+                "slt": 1,
+                "sub": 2
+              },
+              "dataSections": 1,
+              "depth": 1,
+              "name": "Mutant_17_deployed",
+              "nodeKinds": {
+                "assignment": 11,
+                "block": 25,
+                "case": 1,
+                "default": 1,
+                "expressionStatement": 14,
+                "functionCall": 47,
+                "functionDefinition": 16,
+                "identifier": 37,
+                "if": 4,
+                "leave": 1,
+                "literal:number": 25,
+                "switch": 1,
+                "variableDeclaration": 13
+              },
+              "role": "runtime",
+              "subobjects": 0
+            }
+          ]
+        }
+      ],
+      "sha256": "013b724827263e6de7345faadf25726608baa55149dbdf3d12321988be7662c3",
+      "source": "testdata/differential/mutant.sol"
+    },
+    {
+      "contracts": [
+        {
+          "contract": "Scalars",
+          "objects": [
+            {
+              "builtins": {
+                "callvalue": 1,
+                "codecopy": 1,
+                "dataoffset": 1,
+                "datasize": 2,
+                "memoryguard": 1,
+                "mload": 1,
+                "mstore": 1,
+                "return": 1,
+                "revert": 1
+              },
+              "dataSections": 0,
+              "depth": 0,
+              "name": "Scalars_383",
+              "nodeKinds": {
+                "assignment": 1,
+                "block": 5,
+                "expressionStatement": 6,
+                "functionCall": 13,
+                "functionDefinition": 3,
+                "identifier": 2,
+                "if": 1,
+                "literal:number": 5,
+                "literal:string": 3,
+                "variableDeclaration": 1
+              },
+              "role": "creation",
+              "subobjects": 1
+            },
+            {
+              "builtins": {
+                "add": 47,
+                "and": 10,
+                "calldataload": 6,
+                "calldatasize": 23,
+                "callvalue": 22,
+                "div": 4,
+                "eq": 10,
+                "exp": 3,
+                "gt": 10,
+                "iszero": 20,
+                "lt": 5,
+                "memoryguard": 1,
+                "mload": 1,
+                "mstore": 12,
+                "mul": 8,
+                "not": 2,
+                "or": 2,
+                "return": 22,
+                "revert": 11,
+                "sar": 1,
+                "sdiv": 4,
+                "sgt": 3,
+                "shl": 1,
+                "shr": 3,
+                "signextend": 2,
+                "slt": 16,
+                "smod": 1,
+                "sub": 36,
+                "xor": 1
+              },
+              "dataSections": 1,
+              "depth": 1,
+              "name": "Scalars_383_deployed",
+              "nodeKinds": {
+                "assignment": 195,
+                "block": 254,
+                "case": 28,
+                "default": 1,
+                "expressionStatement": 142,
+                "for": 1,
+                "functionCall": 650,
+                "functionDefinition": 139,
+                "identifier": 742,
+                "if": 64,
+                "leave": 30,
+                "literal:number": 183,
+                "switch": 4,
+                "variableDeclaration": 313
+              },
+              "role": "runtime",
+              "subobjects": 0
+            }
+          ]
+        }
+      ],
+      "sha256": "34be21de2b336813a57a50b1712531d029725d2553cfe3ca8d7dae59cf242657",
+      "source": "testdata/differential/scalars.sol"
+    },
+    {
+      "contracts": [
+        {
+          "contract": "ShadowedBuiltins",
+          "objects": [
+            {
+              "builtins": {
+                "callvalue": 1,
+                "codecopy": 1,
+                "dataoffset": 1,
+                "datasize": 2,
+                "memoryguard": 1,
+                "mload": 1,
+                "mstore": 1,
+                "return": 1,
+                "revert": 1
+              },
+              "dataSections": 0,
+              "depth": 0,
+              "name": "ShadowedBuiltins_60",
+              "nodeKinds": {
+                "assignment": 1,
+                "block": 5,
+                "expressionStatement": 6,
+                "functionCall": 13,
+                "functionDefinition": 3,
+                "identifier": 2,
+                "if": 1,
+                "literal:number": 5,
+                "literal:string": 3,
+                "variableDeclaration": 1
+              },
+              "role": "creation",
+              "subobjects": 1
+            },
+            {
+              "builtins": {
+                "add": 5,
+                "calldataload": 2,
+                "calldatasize": 2,
+                "callvalue": 1,
+                "eq": 1,
+                "iszero": 4,
+                "lt": 1,
+                "memoryguard": 1,
+                "mload": 1,
+                "mstore": 2,
+                "return": 1,
+                "revert": 5,
+                "shr": 1,
+                "slt": 1,
+                "sub": 2
+              },
+              "dataSections": 1,
+              "depth": 1,
+              "name": "ShadowedBuiltins_60_deployed",
+              "nodeKinds": {
+                "assignment": 33,
+                "block": 40,
+                "case": 1,
+                "default": 1,
+                "expressionStatement": 16,
+                "functionCall": 75,
+                "functionDefinition": 30,
+                "identifier": 70,
+                "if": 6,
+                "leave": 6,
+                "literal:number": 30,
+                "switch": 1,
+                "variableDeclaration": 31
+              },
+              "role": "runtime",
+              "subobjects": 0
+            }
+          ]
+        }
+      ],
+      "sha256": "fe7e3bcdea9a5cdc43331ba49f3e8ad2a05cf99261af63ac4129f026863ddcb1",
+      "source": "testdata/differential/shadowed_builtins.sol"
+    },
+    {
+      "contracts": [
+        {
+          "contract": "Storage",
+          "objects": [
+            {
+              "builtins": {
+                "callvalue": 1,
+                "codecopy": 1,
+                "dataoffset": 1,
+                "datasize": 2,
+                "memoryguard": 1,
+                "mload": 1,
+                "mstore": 1,
+                "return": 1,
+                "revert": 1
+              },
+              "dataSections": 0,
+              "depth": 0,
+              "name": "Storage_298",
+              "nodeKinds": {
+                "assignment": 1,
+                "block": 5,
+                "expressionStatement": 6,
+                "functionCall": 13,
+                "functionDefinition": 3,
+                "identifier": 2,
+                "if": 1,
+                "literal:number": 5,
+                "literal:string": 3,
+                "variableDeclaration": 1
+              },
+              "role": "creation",
+              "subobjects": 1
+            },
+            {
+              "builtins": {
+                "add": 34,
+                "and": 26,
+                "calldataload": 8,
+                "calldatasize": 14,
+                "callvalue": 13,
+                "div": 2,
+                "eq": 10,
+                "gt": 1,
+                "iszero": 14,
+                "lt": 1,
+                "memoryguard": 1,
+                "mload": 1,
+                "mstore": 13,
+                "mul": 1,
+                "not": 8,
+                "or": 10,
+                "return": 13,
+                "revert": 13,
+                "sgt": 1,
+                "shl": 7,
+                "shr": 7,
+                "signextend": 2,
+                "sload": 18,
+                "slt": 8,
+                "sstore": 9,
+                "sub": 20
+              },
+              "dataSections": 1,
+              "depth": 1,
+              "name": "Storage_298_deployed",
+              "nodeKinds": {
+                "assignment": 196,
+                "block": 241,
+                "case": 13,
+                "default": 1,
+                "expressionStatement": 142,
+                "functionCall": 620,
+                "functionDefinition": 186,
+                "identifier": 578,
+                "if": 32,
+                "leave": 12,
+                "literal:number": 209,
+                "switch": 1,
+                "variableDeclaration": 233
+              },
+              "role": "runtime",
+              "subobjects": 0
+            }
+          ]
+        }
+      ],
+      "sha256": "af7ac523d2374e4fc00019e87a1971788e0dd65da28177d47ccae5240f7d8b33",
+      "source": "testdata/differential/storage.sol"
+    },
+    {
+      "contracts": [
+        {
+          "contract": "StorageArrays",
+          "objects": [
+            {
+              "builtins": {
+                "callvalue": 1,
+                "codecopy": 1,
+                "dataoffset": 1,
+                "datasize": 2,
+                "memoryguard": 1,
+                "mload": 1,
+                "mstore": 1,
+                "return": 1,
+                "revert": 1
+              },
+              "dataSections": 0,
+              "depth": 0,
+              "name": "StorageArrays_555",
+              "nodeKinds": {
+                "assignment": 1,
+                "block": 5,
+                "expressionStatement": 6,
+                "functionCall": 13,
+                "functionDefinition": 3,
+                "identifier": 2,
+                "if": 1,
+                "literal:number": 5,
+                "literal:string": 3,
+                "variableDeclaration": 1
+              },
+              "role": "creation",
+              "subobjects": 1
+            },
+            {
+              "builtins": {
+                "add": 65,
+                "and": 20,
+                "calldataload": 8,
+                "calldatasize": 20,
+                "callvalue": 19,
+                "div": 7,
+                "eq": 12,
+                "gt": 2,
+                "iszero": 21,
+                "keccak256": 1,
+                "lt": 9,
+                "memoryguard": 1,
+                "mload": 1,
+                "mod": 6,
+                "mstore": 13,
+                "mul": 22,
+                "not": 6,
+                "or": 7,
+                "return": 19,
+                "revert": 13,
+                "shl": 3,
+                "shr": 4,
+                "signextend": 2,
+                "sload": 16,
+                "slt": 9,
+                "sstore": 8,
+                "sub": 30
+              },
+              "dataSections": 1,
+              "depth": 1,
+              "name": "StorageArrays_555_deployed",
+              "nodeKinds": {
+                "assignment": 261,
+                "block": 309,
+                "case": 19,
+                "default": 1,
+                "expressionStatement": 179,
+                "functionCall": 874,
+                "functionDefinition": 221,
+                "identifier": 1127,
+                "if": 51,
+                "leave": 21,
+                "literal:number": 296,
+                "switch": 1,
+                "variableDeclaration": 574
+              },
+              "role": "runtime",
+              "subobjects": 0
+            }
+          ]
+        }
+      ],
+      "sha256": "bd0620c2870d6637e580fca10e4dc19220535aaafc1580f48fbbfc2498d62403",
+      "source": "testdata/differential/storage_arrays.sol"
+    },
+    {
+      "contracts": [
+        {
+          "contract": "StorageStructs",
+          "objects": [
+            {
+              "builtins": {
+                "callvalue": 1,
+                "codecopy": 1,
+                "dataoffset": 1,
+                "datasize": 2,
+                "memoryguard": 1,
+                "mload": 1,
+                "mstore": 1,
+                "return": 1,
+                "revert": 1
+              },
+              "dataSections": 0,
+              "depth": 0,
+              "name": "StorageStructs_708",
+              "nodeKinds": {
+                "assignment": 1,
+                "block": 5,
+                "expressionStatement": 6,
+                "functionCall": 13,
+                "functionDefinition": 3,
+                "identifier": 2,
+                "if": 1,
+                "literal:number": 5,
+                "literal:string": 3,
+                "variableDeclaration": 1
+              },
+              "role": "creation",
+              "subobjects": 1
+            },
+            {
+              "builtins": {
+                "add": 145,
+                "and": 18,
+                "calldataload": 6,
+                "calldatasize": 20,
+                "callvalue": 19,
+                "div": 4,
+                "eq": 8,
+                "gt": 3,
+                "iszero": 18,
+                "keccak256": 7,
+                "lt": 9,
+                "memoryguard": 1,
+                "mload": 1,
+                "mod": 4,
+                "mstore": 24,
+                "mul": 10,
+                "not": 7,
+                "or": 7,
+                "return": 19,
+                "revert": 13,
+                "shl": 7,
+                "shr": 8,
+                "signextend": 2,
+                "sload": 18,
+                "slt": 8,
+                "sstore": 9,
+                "sub": 30
+              },
+              "dataSections": 1,
+              "depth": 1,
+              "name": "StorageStructs_708_deployed",
+              "nodeKinds": {
+                "assignment": 257,
+                "block": 294,
+                "case": 19,
+                "default": 1,
+                "expressionStatement": 203,
+                "functionCall": 929,
+                "functionDefinition": 210,
+                "identifier": 1290,
+                "if": 48,
+                "leave": 20,
+                "literal:number": 403,
+                "switch": 1,
+                "variableDeclaration": 789
+              },
+              "role": "runtime",
+              "subobjects": 0
+            }
+          ]
+        }
+      ],
+      "sha256": "bfddd2a0b03235bcd1b1d3c85a3535f4ea1a0853f23f9876c6d16e1256202e77",
+      "source": "testdata/differential/storage_structs.sol"
+    },
+    {
+      "contracts": [
+        {
+          "contract": "TopLevelStructs",
+          "objects": [
+            {
+              "builtins": {
+                "callvalue": 1,
+                "codecopy": 1,
+                "dataoffset": 1,
+                "datasize": 2,
+                "memoryguard": 1,
+                "mload": 1,
+                "mstore": 1,
+                "return": 1,
+                "revert": 1
+              },
+              "dataSections": 0,
+              "depth": 0,
+              "name": "TopLevelStructs_51",
+              "nodeKinds": {
+                "assignment": 1,
+                "block": 5,
+                "expressionStatement": 6,
+                "functionCall": 13,
+                "functionDefinition": 3,
+                "identifier": 2,
+                "if": 1,
+                "literal:number": 5,
+                "literal:string": 3,
+                "variableDeclaration": 1
+              },
+              "role": "creation",
+              "subobjects": 1
+            },
+            {
+              "builtins": {
+                "add": 12,
+                "and": 4,
+                "calldataload": 3,
+                "calldatasize": 2,
+                "callvalue": 1,
+                "div": 1,
+                "eq": 2,
+                "gt": 1,
+                "iszero": 4,
+                "keccak256": 1,
+                "lt": 2,
+                "memoryguard": 1,
+                "mload": 1,
+                "mod": 1,
+                "mstore": 7,
+                "mul": 1,
+                "not": 1,
+                "or": 1,
+                "return": 1,
+                "revert": 8,
+                "shl": 1,
+                "shr": 2,
+                "sload": 2,
+                "slt": 1,
+                "sstore": 1,
+                "sub": 3
+              },
+              "dataSections": 1,
+              "depth": 1,
+              "name": "TopLevelStructs_51_deployed",
+              "nodeKinds": {
+                "assignment": 38,
+                "block": 50,
+                "case": 1,
+                "default": 1,
+                "expressionStatement": 29,
+                "functionCall": 113,
+                "functionDefinition": 38,
+                "identifier": 115,
+                "if": 7,
+                "leave": 1,
+                "literal:number": 63,
+                "switch": 1,
+                "variableDeclaration": 50
+              },
+              "role": "runtime",
+              "subobjects": 0
+            }
+          ]
+        }
+      ],
+      "sha256": "07c1f66a01bb3e7b6dd68e7d4183b62074488bd023d3927ae793f9ed06075991",
+      "source": "testdata/differential/storage_structs_top_level.sol"
+    },
+    {
+      "contracts": [
+        {
+          "contract": "EvaluationOrder",
+          "objects": [
+            {
+              "builtins": {
+                "callvalue": 1,
+                "codecopy": 1,
+                "dataoffset": 1,
+                "datasize": 2,
+                "memoryguard": 1,
+                "mload": 1,
+                "mstore": 1,
+                "return": 1,
+                "revert": 1
+              },
+              "dataSections": 0,
+              "depth": 0,
+              "name": "EvaluationOrder_76",
+              "nodeKinds": {
+                "assignment": 1,
+                "block": 5,
+                "expressionStatement": 6,
+                "functionCall": 13,
+                "functionDefinition": 3,
+                "identifier": 2,
+                "if": 1,
+                "literal:number": 5,
+                "literal:string": 3,
+                "variableDeclaration": 1
+              },
+              "role": "creation",
+              "subobjects": 1
+            },
+            {
+              "builtins": {
+                "add": 7,
+                "and": 2,
+                "calldataload": 1,
+                "calldatasize": 5,
+                "callvalue": 4,
+                "div": 1,
+                "eq": 1,
+                "gt": 1,
+                "iszero": 3,
+                "log1": 1,
+                "lt": 1,
+                "memoryguard": 1,
+                "mload": 1,
+                "mstore": 4,
+                "mul": 2,
+                "not": 1,
+                "or": 2,
+                "return": 4,
+                "revert": 4,
+                "shl": 1,
+                "shr": 3,
+                "sload": 3,
+                "slt": 1,
+                "sstore": 1,
+                "sub": 6
+              },
+              "dataSections": 1,
+              "depth": 1,
+              "name": "EvaluationOrder_76_deployed",
+              "nodeKinds": {
+                "assignment": 40,
+                "block": 57,
+                "case": 4,
+                "default": 1,
+                "expressionStatement": 35,
+                "functionCall": 143,
+                "functionDefinition": 42,
+                "identifier": 114,
+                "if": 8,
+                "leave": 4,
+                "literal:number": 47,
+                "switch": 1,
+                "variableDeclaration": 47
+              },
+              "role": "runtime",
+              "subobjects": 0
+            }
+          ]
+        }
+      ],
+      "sha256": "bfdb7ae32851355d656e6d4f813912c4d18588c8c4ba34b6c2ca8310efcc37ca",
+      "source": "testdata/frontend/evaluation_order.sol"
+    },
+    {
+      "contracts": [
+        {
+          "contract": "PureCore",
+          "objects": [
+            {
+              "builtins": {
+                "callvalue": 1,
+                "codecopy": 1,
+                "dataoffset": 1,
+                "datasize": 2,
+                "memoryguard": 1,
+                "mload": 1,
+                "mstore": 1,
+                "return": 1,
+                "revert": 1
+              },
+              "dataSections": 0,
+              "depth": 0,
+              "name": "PureCore_399",
+              "nodeKinds": {
+                "assignment": 1,
+                "block": 5,
+                "expressionStatement": 6,
+                "functionCall": 13,
+                "functionDefinition": 3,
+                "identifier": 2,
+                "if": 1,
+                "literal:number": 5,
+                "literal:string": 3,
+                "variableDeclaration": 1
+              },
+              "role": "creation",
+              "subobjects": 1
+            },
+            {
+              "builtins": {
+                "add": 33,
+                "and": 3,
+                "calldataload": 6,
+                "calldatasize": 19,
+                "callvalue": 18,
+                "div": 2,
+                "eq": 15,
+                "gt": 8,
+                "iszero": 20,
+                "lt": 6,
+                "memoryguard": 1,
+                "mload": 1,
+                "mod": 1,
+                "mstore": 11,
+                "mul": 1,
+                "not": 1,
+                "or": 1,
+                "return": 18,
+                "revert": 11,
+                "shr": 1,
+                "signextend": 1,
+                "slt": 6,
+                "sub": 26
+              },
+              "dataSections": 1,
+              "depth": 1,
+              "name": "PureCore_399_deployed",
+              "nodeKinds": {
+                "assignment": 145,
+                "block": 209,
+                "break": 4,
+                "case": 19,
+                "continue": 2,
+                "default": 2,
+                "expressionStatement": 109,
+                "for": 3,
+                "functionCall": 532,
+                "functionDefinition": 119,
+                "identifier": 597,
+                "if": 51,
+                "leave": 13,
+                "literal:number": 161,
+                "switch": 2,
+                "variableDeclaration": 325
+              },
+              "role": "runtime",
+              "subobjects": 0
+            }
+          ]
+        }
+      ],
+      "sha256": "1473294265425cf80f7b5a972df5db1f32348c3dce454dc6fd0a5dda902d763b",
+      "source": "testdata/frontend/pure_core.sol"
+    },
+    {
+      "contracts": [
+        {
+          "contract": "StorageReferences",
+          "objects": [
+            {
+              "builtins": {
+                "callvalue": 1,
+                "codecopy": 1,
+                "dataoffset": 1,
+                "datasize": 2,
+                "memoryguard": 1,
+                "mload": 1,
+                "mstore": 1,
+                "return": 1,
+                "revert": 1
+              },
+              "dataSections": 0,
+              "depth": 0,
+              "name": "StorageReferences_85",
+              "nodeKinds": {
+                "assignment": 1,
+                "block": 5,
+                "expressionStatement": 6,
+                "functionCall": 13,
+                "functionDefinition": 3,
+                "identifier": 2,
+                "if": 1,
+                "literal:number": 5,
+                "literal:string": 3,
+                "variableDeclaration": 1
+              },
+              "role": "creation",
+              "subobjects": 1
+            },
+            {
+              "builtins": {
+                "add": 33,
+                "and": 8,
+                "calldataload": 4,
+                "calldatasize": 6,
+                "callvalue": 5,
+                "div": 1,
+                "eq": 4,
+                "gt": 1,
+                "iszero": 10,
+                "keccak256": 4,
+                "lt": 6,
+                "memoryguard": 1,
+                "mload": 2,
+                "mod": 1,
+                "mstore": 17,
+                "mul": 2,
+                "not": 3,
+                "or": 3,
+                "return": 5,
+                "revert": 12,
+                "shl": 3,
+                "shr": 3,
+                "sload": 7,
+                "slt": 4,
+                "sstore": 5,
+                "sub": 11
+              },
+              "dataSections": 1,
+              "depth": 1,
+              "name": "StorageReferences_85_deployed",
+              "nodeKinds": {
+                "assignment": 71,
+                "block": 119,
+                "case": 5,
+                "default": 1,
+                "expressionStatement": 82,
+                "functionCall": 289,
+                "functionDefinition": 82,
+                "identifier": 267,
+                "if": 21,
+                "leave": 1,
+                "literal:number": 135,
+                "switch": 1,
+                "variableDeclaration": 97
+              },
+              "role": "runtime",
+              "subobjects": 0
+            }
+          ]
+        }
+      ],
+      "sha256": "558dd232c6a7f5f372b04f555f1de005cbab8ae215fbf2515b6e2ecfb1a2db65",
+      "source": "testdata/frontend/storage_references.sol"
+    },
+    {
+      "contracts": [
+        {
+          "contract": "Types",
+          "objects": [
+            {
+              "builtins": {
+                "callvalue": 1,
+                "codecopy": 1,
+                "dataoffset": 1,
+                "datasize": 2,
+                "memoryguard": 1,
+                "mload": 1,
+                "mstore": 1,
+                "return": 1,
+                "revert": 1
+              },
+              "dataSections": 0,
+              "depth": 0,
+              "name": "Types_56",
+              "nodeKinds": {
+                "assignment": 1,
+                "block": 5,
+                "expressionStatement": 6,
+                "functionCall": 13,
+                "functionDefinition": 3,
+                "identifier": 2,
+                "if": 1,
+                "literal:number": 5,
+                "literal:string": 3,
+                "variableDeclaration": 1
+              },
+              "role": "creation",
+              "subobjects": 1
+            },
+            {
+              "builtins": {
+                "add": 26,
+                "and": 3,
+                "calldataload": 7,
+                "calldatasize": 4,
+                "callvalue": 2,
+                "eq": 4,
+                "gt": 6,
+                "iszero": 6,
+                "lt": 4,
+                "memoryguard": 1,
+                "mload": 3,
+                "mstore": 12,
+                "mul": 3,
+                "not": 1,
+                "or": 1,
+                "return": 2,
+                "revert": 12,
+                "shr": 1,
+                "signextend": 1,
+                "slt": 3,
+                "sub": 5
+              },
+              "dataSections": 1,
+              "depth": 1,
+              "name": "Types_56_deployed",
+              "nodeKinds": {
+                "assignment": 57,
+                "block": 87,
+                "case": 2,
+                "default": 1,
+                "expressionStatement": 49,
+                "for": 2,
+                "functionCall": 178,
+                "functionDefinition": 57,
+                "identifier": 174,
+                "if": 16,
+                "leave": 1,
+                "literal:number": 79,
+                "switch": 1,
+                "variableDeclaration": 45
+              },
+              "role": "runtime",
+              "subobjects": 0
+            }
+          ]
+        }
+      ],
+      "sha256": "31301a30f87e7b2d7352a21691f9afe9a640d3c2c3beeeddf5c2dda34a6ed5ed",
+      "source": "testdata/frontend/types.sol"
+    }
+  ],
+  "format": "solidity-hol-yul-reconnaissance-v1",
+  "outputSelection": {
+    "*": {
+      "*": [
+        "ir"
+      ]
+    }
+  },
+  "profile": {
+    "compilerVersion": "0.8.37",
+    "settings": {
+      "debug": {
+        "revertStrings": "default"
+      },
+      "evmVersion": "osaka",
+      "metadata": {
+        "appendCBOR": false,
+        "bytecodeHash": "none"
+      },
+      "optimizer": {
+        "enabled": false,
+        "runs": 200
+      },
+      "viaIR": true
+    }
+  },
+  "summary": {
+    "builtins": {
+      "add": {
+        "creation": 0,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/mutant.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/shadowed_builtins.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 645,
+        "subobject": 0
+      },
+      "and": {
+        "creation": 0,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/mutant.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 135,
+        "subobject": 0
+      },
+      "calldataload": {
+        "creation": 0,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/mutant.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/shadowed_builtins.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 79,
+        "subobject": 0
+      },
+      "calldatasize": {
+        "creation": 0,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/mutant.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/shadowed_builtins.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 209,
+        "subobject": 0
+      },
+      "callvalue": {
+        "creation": 16,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/mutant.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/shadowed_builtins.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 192,
+        "subobject": 0
+      },
+      "codecopy": {
+        "creation": 16,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/mutant.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/shadowed_builtins.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 0,
+        "subobject": 0
+      },
+      "dataoffset": {
+        "creation": 16,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/mutant.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/shadowed_builtins.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 0,
+        "subobject": 0
+      },
+      "datasize": {
+        "creation": 32,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/mutant.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/shadowed_builtins.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 0,
+        "subobject": 0
+      },
+      "div": {
+        "creation": 0,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol"
+        ],
+        "runtime": 35,
+        "subobject": 0
+      },
+      "eq": {
+        "creation": 0,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/mutant.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/shadowed_builtins.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 113,
+        "subobject": 0
+      },
+      "exp": {
+        "creation": 0,
+        "fixtures": [
+          "testdata/differential/scalars.sol"
+        ],
+        "runtime": 3,
+        "subobject": 0
+      },
+      "gt": {
+        "creation": 0,
+        "fixtures": [
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 48,
+        "subobject": 0
+      },
+      "iszero": {
+        "creation": 0,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/mutant.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/shadowed_builtins.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 211,
+        "subobject": 0
+      },
+      "keccak256": {
+        "creation": 0,
+        "fixtures": [
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/storage_references.sol"
+        ],
+        "runtime": 39,
+        "subobject": 0
+      },
+      "log1": {
+        "creation": 0,
+        "fixtures": [
+          "testdata/frontend/evaluation_order.sol"
+        ],
+        "runtime": 1,
+        "subobject": 0
+      },
+      "lt": {
+        "creation": 0,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/mutant.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/shadowed_builtins.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 80,
+        "subobject": 0
+      },
+      "memoryguard": {
+        "creation": 16,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/mutant.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/shadowed_builtins.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 16,
+        "subobject": 0
+      },
+      "mload": {
+        "creation": 16,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/mutant.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/shadowed_builtins.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 19,
+        "subobject": 0
+      },
+      "mod": {
+        "creation": 0,
+        "fixtures": [
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol"
+        ],
+        "runtime": 23,
+        "subobject": 0
+      },
+      "mstore": {
+        "creation": 16,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/mutant.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/shadowed_builtins.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 243,
+        "subobject": 0
+      },
+      "mul": {
+        "creation": 0,
+        "fixtures": [
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 76,
+        "subobject": 0
+      },
+      "not": {
+        "creation": 0,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 42,
+        "subobject": 0
+      },
+      "or": {
+        "creation": 0,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 48,
+        "subobject": 0
+      },
+      "return": {
+        "creation": 16,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/mutant.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/shadowed_builtins.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 192,
+        "subobject": 0
+      },
+      "revert": {
+        "creation": 16,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/mutant.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/shadowed_builtins.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 177,
+        "subobject": 0
+      },
+      "sar": {
+        "creation": 0,
+        "fixtures": [
+          "testdata/differential/scalars.sol"
+        ],
+        "runtime": 1,
+        "subobject": 0
+      },
+      "sdiv": {
+        "creation": 0,
+        "fixtures": [
+          "testdata/differential/scalars.sol"
+        ],
+        "runtime": 4,
+        "subobject": 0
+      },
+      "sgt": {
+        "creation": 0,
+        "fixtures": [
+          "testdata/differential/scalars.sol",
+          "testdata/differential/storage.sol"
+        ],
+        "runtime": 4,
+        "subobject": 0
+      },
+      "shl": {
+        "creation": 0,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/storage_references.sol"
+        ],
+        "runtime": 29,
+        "subobject": 0
+      },
+      "shr": {
+        "creation": 0,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/mutant.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/shadowed_builtins.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 44,
+        "subobject": 0
+      },
+      "signextend": {
+        "creation": 0,
+        "fixtures": [
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 15,
+        "subobject": 0
+      },
+      "sload": {
+        "creation": 0,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/storage_references.sol"
+        ],
+        "runtime": 112,
+        "subobject": 0
+      },
+      "slt": {
+        "creation": 0,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/mutant.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/shadowed_builtins.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 89,
+        "subobject": 0
+      },
+      "smod": {
+        "creation": 0,
+        "fixtures": [
+          "testdata/differential/scalars.sol"
+        ],
+        "runtime": 1,
+        "subobject": 0
+      },
+      "sstore": {
+        "creation": 0,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/storage_references.sol"
+        ],
+        "runtime": 58,
+        "subobject": 0
+      },
+      "sub": {
+        "creation": 0,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/mutant.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/shadowed_builtins.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 323,
+        "subobject": 0
+      },
+      "xor": {
+        "creation": 0,
+        "fixtures": [
+          "testdata/differential/scalars.sol"
+        ],
+        "runtime": 1,
+        "subobject": 0
+      }
+    },
+    "nodeKinds": {
+      "assignment": {
+        "creation": 16,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/mutant.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/shadowed_builtins.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 2181,
+        "subobject": 0
+      },
+      "block": {
+        "creation": 80,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/mutant.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/shadowed_builtins.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 2863,
+        "subobject": 0
+      },
+      "break": {
+        "creation": 0,
+        "fixtures": [
+          "testdata/differential/control.sol",
+          "testdata/frontend/pure_core.sol"
+        ],
+        "runtime": 18,
+        "subobject": 0
+      },
+      "case": {
+        "creation": 0,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/mutant.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/shadowed_builtins.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 202,
+        "subobject": 0
+      },
+      "continue": {
+        "creation": 0,
+        "fixtures": [
+          "testdata/differential/control.sol",
+          "testdata/frontend/pure_core.sol"
+        ],
+        "runtime": 5,
+        "subobject": 0
+      },
+      "default": {
+        "creation": 0,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/mutant.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/shadowed_builtins.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 20,
+        "subobject": 0
+      },
+      "expressionStatement": {
+        "creation": 96,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/mutant.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/shadowed_builtins.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 1804,
+        "subobject": 0
+      },
+      "for": {
+        "creation": 0,
+        "fixtures": [
+          "testdata/differential/control.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 17,
+        "subobject": 0
+      },
+      "functionCall": {
+        "creation": 208,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/mutant.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/shadowed_builtins.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 7788,
+        "subobject": 0
+      },
+      "functionDefinition": {
+        "creation": 48,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/mutant.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/shadowed_builtins.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 1909,
+        "subobject": 0
+      },
+      "identifier": {
+        "creation": 32,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/mutant.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/shadowed_builtins.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 8883,
+        "subobject": 0
+      },
+      "if": {
+        "creation": 16,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/mutant.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/shadowed_builtins.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 533,
+        "subobject": 0
+      },
+      "leave": {
+        "creation": 0,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/mutant.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/shadowed_builtins.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 187,
+        "subobject": 0
+      },
+      "literal:number": {
+        "creation": 80,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/mutant.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/shadowed_builtins.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 2789,
+        "subobject": 0
+      },
+      "literal:string": {
+        "creation": 48,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/mutant.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/shadowed_builtins.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 9,
+        "subobject": 0
+      },
+      "switch": {
+        "creation": 0,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/mutant.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/shadowed_builtins.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 23,
+        "subobject": 0
+      },
+      "variableDeclaration": {
+        "creation": 16,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/mutant.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/shadowed_builtins.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 4529,
+        "subobject": 0
+      }
+    },
+    "objectLevelForms": {
+      "data": {
+        "creation": 0,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/mutant.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/shadowed_builtins.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 16,
+        "subobject": 0
+      },
+      "datacopy": {
+        "creation": 0,
+        "fixtures": [],
+        "runtime": 0,
+        "subobject": 0
+      },
+      "dataoffset": {
+        "creation": 16,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/mutant.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/shadowed_builtins.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 0,
+        "subobject": 0
+      },
+      "datasize": {
+        "creation": 32,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/mutant.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/shadowed_builtins.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 0,
+        "subobject": 0
+      },
+      "subobject": {
+        "creation": 16,
+        "fixtures": [
+          "testdata/differential/builtins.sol",
+          "testdata/differential/calls.sol",
+          "testdata/differential/control.sol",
+          "testdata/differential/dynamic_storage_arrays.sol",
+          "testdata/differential/mappings.sol",
+          "testdata/differential/mutant.sol",
+          "testdata/differential/scalars.sol",
+          "testdata/differential/shadowed_builtins.sol",
+          "testdata/differential/storage.sol",
+          "testdata/differential/storage_arrays.sol",
+          "testdata/differential/storage_structs.sol",
+          "testdata/differential/storage_structs_top_level.sol",
+          "testdata/frontend/evaluation_order.sol",
+          "testdata/frontend/pure_core.sol",
+          "testdata/frontend/storage_references.sol",
+          "testdata/frontend/types.sol"
+        ],
+        "runtime": 0,
+        "subobject": 0
+      },
+      "verbatim": {
+        "creation": 0,
+        "fixtures": [],
+        "runtime": 0,
+        "subobject": 0
+      }
+    },
+    "unknownBuiltins": {}
+  }
+}
