@@ -247,3 +247,9 @@ try/catch, errors, fallback/receive, dynamic and memory/calldata arrays, bytes/s
 pointers, transient storage, and custom storage layout bases. The first HOL type
 theory can begin from the normalized types already observed, provided unsupported
 forms continue to fail closed.
+
+The general `wf_core_program env prog` predicate retains its environment-relative
+contract: it checks the declarations supplied by `env`. Checked preparation and
+execution instantiate it with `core_program_environment prog`, whose declarations
+come directly from the program. This keeps existing lookup/entry consequences
+available without strengthening their premises.
