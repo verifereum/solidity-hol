@@ -955,6 +955,14 @@ Definition core_state_variables_def:
   (core_state_variables _ _ = NONE)
 End
 
+Definition elab_type_declarations_def:
+  elab_type_declarations structs =
+    all_some (MAP (λs.
+      OPTION_MAP (λfields. (AstId s.struct_info.node_id, StructDeclaration fields))
+        (all_some (MAP (λv. OPTION_MAP (λty. (AstId v.var_info.node_id, ty))
+                           (field_variable_type v)) s.struct_members))) structs)
+End
+
 Definition elab_struct_layouts_def:
   (elab_struct_layouts [] = SOME []) ∧
   (elab_struct_layouts (s :: ss) =
@@ -976,8 +984,10 @@ Definition elab_struct_layouts_def:
                           :: layouts))
 End
 
-(* A valid unit of one contract, elaborated with fresh ids above its node ids;
- * the first function is the entry procedure.
+(* Raw lowering of a valid unit of one contract, with fresh ids above its
+ * node ids; the first function is the entry procedure. A SOME result is not
+ * yet a checked program: consumers must establish wf_core_program through
+ * solidityPrepareLib before execution.
  *)
 Definition elaborate_unit_def:
   elaborate_unit (u : src_unit) =
@@ -987,19 +997,16 @@ Definition elaborate_unit_def:
         (case all_some (MAP variable_binding c.contract_state_variables) of
            NONE => NONE
          | SOME state =>
-             case (elab_struct_layouts c.contract_structs,
+             case (elab_type_declarations c.contract_structs,
+                   elab_struct_layouts c.contract_structs,
                    core_state_variables state c.contract_storage,
                    elab_functions c.contract_structs
                      (MAP (λf. (f.fn_info.node_id, f)) c.contract_functions)
                      state (MAX_LIST (unit_ids u) + 1) c.contract_functions) of
-               (SOME layouts, SOME cvs, SOME (p :: ps, _)) =>
-                 let prog = <| procedures := p :: ps; state_variables := cvs;
-                               struct_layouts := layouts;
-                               entry_procedure := p.procedure_id |> in
-                 let env = core_program_environment [] prog in
-                 if EVERY (wf_core_struct_layout env) layouts ∧
-                    EVERY (wf_core_state_variable env) cvs
-                 then SOME prog else NONE
+               (SOME decls, SOME layouts, SOME cvs, SOME (p :: ps, _)) =>
+                 SOME <| procedures := p :: ps; state_variables := cvs;
+                         struct_layouts := layouts; type_declarations := decls;
+                         entry_procedure := p.procedure_id |>
              | _ => NONE)
     | _ => NONE
 End
@@ -1067,8 +1074,13 @@ Theorem elab_expr_pre[cv_pre,local]:
   (∀ctx n cs. elab_components_pre ctx n cs) ∧
   (∀ctx n e. elab_location_pre ctx n e)
 Proof
-  ho_match_mp_tac elab_expr_ind >> rpt strip_tac >>
-  simp[Once elab_expr_pre_def] >> rw[] >> fs[]
+  ho_match_mp_tac elab_expr_ind >> rpt strip_tac
+  >~ [‘elab_expr_pre ctx n expression’] >-
+    (Cases_on ‘expression’ >>
+     rule_assum_tac (SIMP_RULE (srw_ss()) []) >>
+     simp_tac std_ss [Once elab_expr_pre_def] >>
+     rw[] >> fs[]) >>
+  simp_tac std_ss [Once elab_expr_pre_def] >> rw[] >> fs[]
 QED
 
 val () = cv_auto_trans elab_condition_def;
@@ -1114,7 +1126,7 @@ Theorem elab_stmts_pre[cv_pre,local]:
   (∀ctx n st. elab_for_init_pre ctx n st)
 Proof
   ho_match_mp_tac elab_stmts_ind >> rpt strip_tac >>
-  simp[Once elab_stmts_pre_def] >> rw[] >> fs[] >>
+  simp[Once elab_stmts_pre_def, elab_expr_pre] >> rw[] >> fs[] >>
   (* the record update appears as a case on the context *)
   Cases_on ‘ctx’ >> gvs[fetch "-" "elab_ctx_fn_updates"]
 QED
@@ -1124,11 +1136,6 @@ val () = cv_auto_trans core_bindings_def;
 val () = cv_auto_trans elab_function_def;
 val () = cv_auto_trans elab_functions_def;
 val () = cv_auto_trans core_state_variables_def;
+val () = cv_auto_trans elab_type_declarations_def;
 val () = cv_auto_trans elab_struct_layouts_def;
-val () = cv_auto_trans_rec solidityCoreWfTheory.inline_storage_shape_def (
-  WF_REL_TAC ‘inv_image ($< LEX $<) (λx. case x of
-    INL (env, n, ty) => (cv$c2n n, cv_size ty)
-  | INR (env, n, tys) => (cv$c2n n, cv_size tys))’ >> cv_termination_tac
-);
 val () = cv_auto_trans elaborate_unit_def;
-val () = cv_auto_trans solidityCoreWfTheory.core_program_environment_def;

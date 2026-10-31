@@ -46,15 +46,19 @@ EVM_VERSIONS = [
     "petersburg", "istanbul", "berlin", "london", "paris", "shanghai", "cancun",
     "prague", "osaka", "amsterdam", "@future",
 ]
-IMPORT_ERROR_NODE = re.compile(r"^([A-Za-z]+) ([0-9]+): (.*)$", re.S)
+IMPORT_ERROR_NODE = re.compile(r"^(?:.*?: )?([A-Za-z]+) ([0-9]+): (.*)$", re.S)
 
 SKIPPED = "skipped"
 COMPILE_FAILURE = "compile-failure"
 IMPORT_REJECTED = "import-rejected"
 ELABORATION_REJECTED = "elaboration-rejected"
 ADMITTED = "admitted"
+MALFORMED_INPUT = "malformed-input"
+INVALID_CORE = "invalid-core"
+SOURCE_REJECTED = "source-rejected"
 GREEDY_STEPS = 20
-CATEGORIES = [ADMITTED, ELABORATION_REJECTED, IMPORT_REJECTED, COMPILE_FAILURE, SKIPPED]
+CATEGORIES = [ADMITTED, ELABORATION_REJECTED, IMPORT_REJECTED, COMPILE_FAILURE,
+              MALFORMED_INPUT, SOURCE_REJECTED, INVALID_CORE, SKIPPED]
 
 
 class TestFormatError(Exception):
@@ -154,18 +158,8 @@ def skip_reason(test: SemanticTest, profile: dict[str, Any]) -> str | None:
 
 
 def compile_test(solc: Path, test: SemanticTest, profile_path: Path) -> dict[str, Any]:
-    """ASTs and storage layouts by source; compiler diagnostics raise SystemExit."""
-    output = exporter.build_artifact_from_sources(solc, test.sources, profile_path)["output"]
-    return {
-        name: {
-            "ast": source["ast"],
-            "contracts": {
-                contract: {"storageLayout": metadata["storageLayout"]}
-                for contract, metadata in output.get("contracts", {}).get(name, {}).items()
-            },
-        }
-        for name, source in output["sources"].items()
-    }
+    """Full compiler artifact; shared HOL preparation checks its provenance."""
+    return exporter.build_artifact_from_sources(solc, test.sources, profile_path)
 
 
 # The scan
@@ -640,7 +634,7 @@ def run_hol(holbuild: str, work: Path, units: list[tuple[str, Path]]) -> dict[st
     manifest.write_text("".join(f"{name}\t{path}\n" for name, path in units), encoding="utf-8")
     log = work / "hol.log"
     # `holbuild run` loads built theories but does not build them.
-    build = [holbuild, "-j8", "build", "--skip-checkpoints", "--skip-proof-steps", "solidityImportLib",
+    build = [holbuild, "-j8", "build", "--skip-checkpoints", "--skip-proof-steps", "solidityPrepareLib",
              "solidityElaborateTheory"]
     print("+", " ".join(build), file=sys.stderr, flush=True)
     subprocess.run(build, cwd=ROOT, check=True)
@@ -655,7 +649,10 @@ def run_hol(holbuild: str, work: Path, units: list[tuple[str, Path]]) -> dict[st
     results = {}
     for line in log.read_text(encoding="utf-8", errors="replace").splitlines():
         if line.startswith(RESULT_PREFIX):
-            result = json.loads(line[len(RESULT_PREFIX):])
+            try:
+                result = json.loads(line[len(RESULT_PREFIX):])
+            except json.JSONDecodeError as error:
+                raise SystemExit(f"malformed HOL result: {line!r}: {error}") from error
             results[result["test"]] = result
     missing = [name for name, _ in units if name not in results]
     if status != 0 or missing:
@@ -693,9 +690,11 @@ def classify(test: str, scanned: dict[int, list[Blocker]], hol: dict[str, Any]) 
     message = hol.get("message")
     if status == ADMITTED:
         return Classification(test, ADMITTED, blockers=blockers, scan_agrees=not blockers)
-    if status == ELABORATION_REJECTED:
-        return Classification(test, ELABORATION_REJECTED, message, blockers=blockers,
+    if status in (ELABORATION_REJECTED, SOURCE_REJECTED):
+        return Classification(test, status, message, blockers=blockers,
                               scan_agrees=stages == {"elaboration"})
+    if status in (MALFORMED_INPUT, INVALID_CORE):
+        return Classification(test, status, message, blockers=blockers, scan_agrees=False)
     if status != IMPORT_REJECTED:
         raise ValueError(f"{test}: unknown HOL status {status!r}")
     match = IMPORT_ERROR_NODE.match(message or "")
@@ -718,7 +717,7 @@ class Report:
         return Counter(r.category for r in self.results)
 
     def rejected(self) -> list[Classification]:
-        return [r for r in self.results if r.category in (IMPORT_REJECTED, ELABORATION_REJECTED)]
+        return [r for r in self.results if r.category in (IMPORT_REJECTED, ELABORATION_REJECTED, SOURCE_REJECTED)]
 
     def feature_ranking(self) -> list[dict[str, Any]]:
         """Features by how many rejected tests they occur in, with how many
@@ -788,9 +787,14 @@ class Report:
             "",
             f"Every test under `{TESTS_DIR.as_posix()}` of argotorg/solidity at "
             f"`{self.pin}` was compiled with profile `{self.profile}`, imported by "
-            "`solidityImportLib` and elaborated by `elaborate_unit`. Call expectations "
+            "`solidityPrepareLib`, including source validation, elaboration and full core checking. Call expectations "
             "(the `// ----` sections) are not run, so an admitted test is one the "
             "semantics accepts, not one it is known to agree on.",
+            "",
+            "`source-rejected` records a failed `valid_src_unit` check. That check",
+            "mixes subset restrictions and consistency checks; this category does",
+            "not establish that a feature is unsupported. The scan only identifies",
+            "known blockers present in the same test.",
             "",
             "To regenerate it from the repository root, with the pinned solc and the "
             "tests checked out outside the repository:",
@@ -844,7 +848,9 @@ class Report:
         reasons = Counter(r.reason if r.category == SKIPPED else "compile failure"
                           for r in self.results if r.category in (SKIPPED, COMPILE_FAILURE))
         lines += [f"| {reason} | {n} |" for reason, n in sorted(reasons.items(), key=lambda kv: -kv[1])]
-        for title, category in (("Admitted", ADMITTED), ("Elaborator rejections", ELABORATION_REJECTED)):
+        for title, category in (("Admitted", ADMITTED),
+                                ("Source validation rejections", SOURCE_REJECTED),
+                                ("Elaborator rejections", ELABORATION_REJECTED)):
             lines += ["", f"## {title}", ""]
             tests = [r for r in self.results if r.category == category]
             lines += [f"- `{r.test}`" + (f": {r.reason}" if r.reason else "") for r in tests] or ["None."]
@@ -860,7 +866,6 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("solidity", type=Path,
                         help="a checkout of argotorg/solidity at SOLIDITY_PIN")
     parser.add_argument("--solc", required=True, type=Path)
-    parser.add_argument("--profile", type=Path, default=exporter.DEFAULT_PROFILE)
     parser.add_argument("--holbuild", default="holbuild")
     parser.add_argument("-j", "--jobs", type=int, default=os.cpu_count())
     parser.add_argument("--output", type=Path, default=ROOT / "docs" / "semantic-tests-coverage",
@@ -871,7 +876,7 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     pin = exporter.PIN_FILE.read_text(encoding="ascii").strip()
-    profile = exporter.read_json(args.profile)
+    profile = exporter.read_json(exporter.DEFAULT_PROFILE)
     # Checked once here, so that every failure below is the test's own.
     exporter.compiler_identity(args.solc, profile["compilerVersion"], pin)
     tests_root = args.solidity / TESTS_DIR
@@ -888,7 +893,7 @@ def main(argv: list[str] | None = None) -> int:
 
     def compile_one(test: SemanticTest) -> tuple[SemanticTest, dict[str, Any] | str]:
         try:
-            return test, compile_test(args.solc, test, args.profile)
+            return test, compile_test(args.solc, test, exporter.DEFAULT_PROFILE)
         except SystemExit as error:
             return test, str(error)
 
@@ -908,15 +913,15 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{len(tests)} tests, {len(units)} compiled", file=sys.stderr, flush=True)
         hol = run_hol(args.holbuild, work, units)
     for name, sources in compiled.items():
-        results[name] = classify(name, scan({source: data["ast"] for source, data in sources.items()}),
+        results[name] = classify(name, scan({source: data["ast"] for source, data in sources["output"]["sources"].items()}),
                                  hol[name])
 
-    report = Report(pin, args.profile.stem, [results[t.name] for t in tests])
+    report = Report(pin, exporter.DEFAULT_PROFILE.stem, [results[t.name] for t in tests])
     exporter.write_json_atomic(args.output.with_suffix(".json"), report.json())
     args.output.with_suffix(".md").write_text(report.markdown(), encoding="utf-8")
     counts = report.counts()
     print(", ".join(f"{counts[c]} {c}" for c in CATEGORIES), file=sys.stderr)
-    return 0
+    return 1 if counts[MALFORMED_INPUT] or counts[INVALID_CORE] else 0
 
 
 if __name__ == "__main__":

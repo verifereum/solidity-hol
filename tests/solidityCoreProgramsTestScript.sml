@@ -271,14 +271,14 @@ Definition programs_def:
       binop_proc 5 u256 UncheckedArithmetic DivideOp;
       count_proc; nested_proc; fact_proc; fib_proc; divmod_proc; swap_proc;
       spin_proc; deep_proc; inner_proc; middle_proc; outer_proc];
-    struct_layouts := [];
+    struct_layouts := []; type_declarations := [];
     state_variables := [];
     entry_procedure := AstId 16
   |>
 End
 
 Definition programs_env_def:
-  programs_env = core_program_environment [] programs
+  programs_env = core_program_environment programs
 End
 
 Theorem programs_wf:

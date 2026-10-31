@@ -13,6 +13,6 @@ Ancestors
   solidityEVMReentryTest solidityEVMBookkeepingTest
   solidityEvaluator solidityEvaluatorProps solidityEvaluatorTest
   solidityCoreProgramsTest solidityImport solidityImportTest
-  solidityElaborate solidityElaborateTest solidityDifferential
+  solidityElaborate solidityElaborateTest solidityPrepareTest solidityDifferential
   solidityDifferentialCorpus solidityDifferentialTest
   verifereum
