@@ -44,7 +44,8 @@ only, with function and contract values deferred; a `ConvertOperation` on a
 constant is the literal/default-initialisation form and checks membership only;
 return bindings are in scope from procedure entry, so the evaluator
 default-initialises them and fall-through returns their current values;
-`RevertStmt` carries a constant `BytesValue` of any length as raw revert data; a
+`RevertStmt` carries a constant `BytesValue` of any length as raw revert data;
+`PanicStmt` carries a panic code, including assertion failure `0x01`; a
 loop prelude is not a loop body, so `break`/`continue` there are rejected;
 targets are lexically scoped like bindings, so a runtime target map is saved and
 restored per scope or capture overwrites; and a `ScalarOperation`'s type is its

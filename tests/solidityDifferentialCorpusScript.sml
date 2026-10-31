@@ -25,7 +25,9 @@ val () = holbuild_extra_deps [
   "../testdata/differential/expected/storage_arrays.json",
   "../testdata/differential/expected/dynamic_storage_arrays.json",
   "../testdata/differential/expected/storage_structs.json",
-  "../testdata/differential/expected/storage_structs_top_level.json"
+  "../testdata/differential/expected/storage_structs_top_level.json",
+  "../testdata/differential/expected/builtins.json",
+  "../testdata/differential/expected/shadowed_builtins.json"
 ]
 
 val () = run_corpus {root = "..", corpus = "testdata/differential/corpus.json"}

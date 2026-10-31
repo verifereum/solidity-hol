@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from pathlib import Path
+import json
 import sys
 import json
 import tempfile
@@ -46,6 +47,25 @@ def unit(members):
 
 ASSEMBLY = {"nodeType": "InlineAssembly", "id": 20,
             "AST": {"nodeType": "YulBlock", "statements": []}}
+
+
+class BuiltinCoverageTests(unittest.TestCase):
+    def test_literal_messages_are_admitted_only_in_builtin_calls(self) -> None:
+        artifact = json.loads((ROOT / "testdata/differential/expected/builtins.json").read_text())
+        ast = artifact["output"]["sources"]["testdata/differential/builtins.sol"]["ast"]
+        self.assertEqual(coverage.scan({"builtins.sol": ast}), {})
+        literal = next(n for n in coverage.nodes(ast)
+                       if n["nodeType"] == "Literal" and n["kind"] == "string")
+        self.assertEqual(coverage.elaboration_blockers(literal), [
+            coverage.Blocker("Literal", "bytes and string", "elaboration")])
+
+    def test_shadowed_names_are_ordinary_calls(self) -> None:
+        artifact = json.loads((ROOT / "testdata/differential/expected/shadowed_builtins.json").read_text())
+        ast = artifact["output"]["sources"]["testdata/differential/shadowed_builtins.sol"]["ast"]
+        self.assertEqual(coverage.scan({"shadowed_builtins.sol": ast}), {})
+        for node in coverage.nodes(ast):
+            if node["nodeType"] == "FunctionCall":
+                self.assertGreaterEqual(node["expression"]["referencedDeclaration"], 0)
 
 
 class ReadTestTests(unittest.TestCase):

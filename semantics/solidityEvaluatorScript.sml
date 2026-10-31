@@ -580,6 +580,7 @@ Definition simple_stmt_def:
          | NONE => abrupt_result (InvalidCompletion "unbound atom") st gas)
     | BreakStmt => abrupt_result BreakCompletion st gas
     | ContinueStmt => abrupt_result ContinueCompletion st gas
+    | PanicStmt code => abrupt_result (PanicCompletion code) st gas
     | RevertStmt a =>
         (case eval_atom st.scopes a of
            SOME (ScalarValue (BytesValue data)) =>

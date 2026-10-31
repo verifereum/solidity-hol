@@ -9,9 +9,9 @@
  * multiple returns, explicit elementary conversions, literals, unary, binary,
  * comparison and short-circuit operators, simple and compound assignment to
  * locals and state variables, tuple assignment, ++ and --, if, while,
- * do-while, for, break, continue, return and unchecked blocks. Anything else,
- * and any literal that is not an integer, is rejected (NONE) rather than
- * partially elaborated.
+ * do-while, for, break, continue, return and unchecked blocks. Built-in
+ * require/assert/revert admit boolean conditions and literal string messages.
+ * Other string runtime operations and unsupported forms are rejected (NONE).
  *
  * Schedules, read from the compiler's IR for this profile (the ir output in
  * testdata/frontend/expected/pure_core.json) and checked against the compiled
@@ -218,6 +218,9 @@ Definition expr_assigns_def:
   (expr_assigns (SrcFunctionCall _ callee args _) ⇔
     expr_assigns callee ∨ exprs_assign args) ∧
   (expr_assigns (SrcArrayMember _ _ root_expr _) ⇔ expr_assigns root_expr) ∧
+  (expr_assigns (SrcBuiltinCall _ _ _ condition message _) ⇔
+    (case condition of NONE => F | SOME c => expr_assigns c) ∨
+    (case message of NONE => F | SOME m => expr_assigns m)) ∧
   (expr_assigns (SrcIndexAccess _ b i _) ⇔ expr_assigns b ∨ expr_assigns i) ∧
   (expr_assigns (SrcMemberAccess _ root_expr _ _) ⇔ expr_assigns root_expr) ∧
   (expr_assigns (SrcArrayLength _ root_expr _) ⇔ expr_assigns root_expr) ∧
@@ -279,6 +282,25 @@ Definition snapshot_values_def:
       ((ss, a'), n') =>
         case snapshot_values n' vs of
           (ss', vs', n'') => (ss ++ ss', (a', vt) :: vs', n''))
+End
+
+(* Error(string): one dynamic ABI argument, encoded from literal bytes only. *)
+Definition error_string_data_def:
+  error_string_data value =
+    let bytes = MAP (λc. n2w (ORD c) : byte) value in
+    [0x08w; 0xc3w; 0x79w; 0xa0w] ++ num_to_bytes 32 32 ++
+    num_to_bytes 32 (LENGTH bytes) ++ bytes ++
+    REPLICATE ((32 - LENGTH bytes MOD 32) MOD 32) 0w
+End
+
+Definition builtin_failure_def:
+  builtin_failure builtin message =
+    if builtin = AssertBuiltin then PanicStmt 1 else
+    RevertStmt (ConstantAtom (BytesValue
+      (case message of NONE => []
+       | SOME m => case literal_message m of
+           SOME value => error_string_data value
+         | NONE => [])))
 End
 
 (* Expressions: statements computing a value, the value as an atom, and its
@@ -544,6 +566,23 @@ Definition elab_expr_def:
                    | NONE => NONE)
               | NONE => NONE)
          | _ => NONE)
+    | SrcBuiltinCall _ _ builtin condition message _ =>
+        (if ¬builtin_shape builtin condition message then NONE else
+         let failure = builtin_failure builtin message in
+         case condition of
+           NONE => SOME (([failure;
+             DefineStmt (AstId n) (ProductType []) (TupleOperation [])],
+             BoundAtom (AstId n), ElabTuple []), n + 1)
+         | SOME c =>
+             (case elab_expr ctx n c of
+                SOME ((ss, a, vt), n1) =>
+                  (case coerce n1 BoolT a vt of
+                     SOME ((cs, v), n2) =>
+                       SOME ((ss ++ cs ++ [IfStmt v [] [failure];
+                         DefineStmt (AstId n2) (ProductType []) (TupleOperation [])],
+                         BoundAtom (AstId n2), ElabTuple []), n2 + 1)
+                   | NONE => NONE)
+              | NONE => NONE))
     | SrcTypeConversion _ tn e _ =>
         (case (normalize_type_name tn, elab_expr ctx n e) of
            (SOME ty, SOME ((ss, a, vt), n1)) =>
@@ -1005,6 +1044,9 @@ val () = cv_auto_trans_rec expr_assigns_def (
                | INR (INR es) => cv_size es)’ >>
   cv_termination_tac
 );
+
+val () = cv_auto_trans error_string_data_def;
+val () = cv_auto_trans builtin_failure_def;
 
 val elab_expr_pre_def = cv_auto_trans_pre_rec
   "elab_expr_pre elab_args_pre elab_values_pre elab_components_pre elab_location_pre"

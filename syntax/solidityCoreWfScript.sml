@@ -621,6 +621,8 @@ Definition check_core_stmts_def:
     if ctx.in_loop then check_core_stmts env ctx ss else NONE) ∧
   (check_core_stmts env ctx (ContinueStmt :: ss) =
     if ctx.in_loop then check_core_stmts env ctx ss else NONE) ∧
+  (check_core_stmts env ctx (PanicStmt code :: ss) =
+    check_core_stmts env ctx ss) ∧
   (check_core_stmts env ctx (RevertStmt a :: ss) =
     if provisional_revert_payload a then check_core_stmts env ctx ss
     else NONE) ∧
