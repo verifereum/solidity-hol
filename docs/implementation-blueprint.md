@@ -106,8 +106,17 @@ The pinned profile rejects push at length >= `2^64` with panic `0x41`; indexing
 and length reads keep the full 256-bit range. Zero-argument push preserves dirty
 bytes, while pop clears only the removed scalar's packed bytes.
 
-Dynamic keys, dynamic arrays of aggregates, memory/calldata arrays, aggregate
-copying and local storage-reference bindings remain coverage work.
+Storage structs carry declaration-ID field tables and relative slot/offset
+metadata in `core_program.struct_layouts` and `core_environment.struct_layouts`.
+`FieldNavigation` resolves a field within its struct and adds its relative slot
+to the captured base. Fixed and dynamic arrays of structs use the imported
+whole-slot stride. Struct fields may themselves be structs, mappings or arrays;
+only scalar leaves are read or assigned. The core checker validates field
+ownership, supported types, alignment, field extents and finite inline nesting.
+Elaboration checks the resulting runtime layout metadata before returning it.
+
+Dynamic keys, mutation of aggregate array elements, memory/calldata references,
+aggregate copying and local storage-reference bindings remain coverage work.
 
 Memory references use object identity and an abstract cell offset; this is not
 an EVM byte address. The sparse heap separates metadata from cells, avoiding a

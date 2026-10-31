@@ -16,7 +16,8 @@ val () = holbuild_extra_deps [
   "../testdata/differential/expected/mappings.json",
   "../testdata/differential/expected/storage_arrays.json",
   "../testdata/differential/expected/dynamic_storage_arrays.json",
-  "../testdata/differential/expected/builtins.json"
+  "../testdata/differential/expected/builtins.json",
+  "../testdata/differential/expected/storage_structs.json"
 ]
 
 val fixture = "../testdata/frontend/expected/pure_core.json"
@@ -552,3 +553,44 @@ Theorem nonliteral_builtin_message_rejected:
 Proof
   CONV_TAC cv_eval
 QED
+
+val struct_fixture = "../testdata/differential/expected/storage_structs.json"
+val struct_source = "testdata/differential/storage_structs.sol"
+val struct_ast = artifact_part struct_fixture ["sources", struct_source, "ast"]
+val struct_contracts = artifact_part struct_fixture ["contracts", struct_source]
+
+Definition struct_unit_def:
+  struct_unit = ^(import_artifact struct_fixture struct_source)
+End
+val () = cv_auto_trans struct_unit_def;
+
+Theorem struct_unit_valid:
+  valid_src_unit struct_unit
+Proof
+  CONV_TAC cv_eval
+QED
+
+val () = edited_unit_with struct_contracts "struct_type_identity_mismatch"
+  (edit_first "UserDefinedTypeName"
+    (set_field "referencedDeclaration" (JSON.INT 999999)) struct_ast)
+
+val () = edited_unit_with struct_contracts "struct_field_identity_mismatch"
+  (edit_first "MemberAccess"
+    (set_field "referencedDeclaration" (JSON.INT 999999)) struct_ast)
+
+val () = edited_unit_with struct_contracts "struct_field_type_mismatch"
+  (edit_first "MemberAccess" (type_identifier "t_uint16") struct_ast)
+
+Theorem struct_identities_checked:
+  ¬valid_src_unit struct_type_identity_mismatch ∧
+  ¬valid_src_unit struct_field_identity_mismatch ∧
+  ¬valid_src_unit struct_field_type_mismatch
+Proof
+  CONV_TAC cv_eval
+QED
+
+val () = import_error_with struct_contracts "missing field identity"
+  (edit_first "MemberAccess" (drop_field "referencedDeclaration") struct_ast)
+
+val () = import_error_with struct_contracts "missing struct type identity"
+  (edit_first "UserDefinedTypeName" (drop_field "referencedDeclaration") struct_ast)

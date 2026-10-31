@@ -3,6 +3,7 @@
 from pathlib import Path
 import json
 import sys
+import json
 import tempfile
 import textwrap
 import unittest
@@ -217,20 +218,33 @@ class ClassifyTests(unittest.TestCase):
         self.assertEqual(coverage.scan({"t.sol": unit([function(4, [index])])}), {})
         base["typeDescriptions"]["typeIdentifier"] = "t_array$_t_uint8_$dyn_storage"
         self.assertEqual(coverage.scan({"t.sol": unit([function(4, [index])])}), {})
-        self.assertFalse(coverage.storage_type_supported("t_array$_t_array$_t_uint8_$dyn_storage_$dyn_storage"))
-        self.assertFalse(coverage.storage_type_supported("t_array$_t_array$_t_uint8_$dyn_storage_$2_storage"))
+        self.assertTrue(coverage.storage_type_supported("t_array$_t_array$_t_uint8_$dyn_storage_$dyn_storage"))
+        self.assertTrue(coverage.storage_type_supported("t_array$_t_array$_t_uint8_$dyn_storage_$2_storage"))
 
     def test_nested_array_types_and_fixed_length_prefix(self) -> None:
         tid = "t_array$_t_array$_t_uint24_$11_storage_$2_storage"
         self.assertTrue(coverage.storage_type_supported(tid))
         self.assertFalse(coverage.storage_type_supported(tid + "_ptr"))
         self.assertFalse(coverage.storage_type_supported("t_array$_t_uint8_$2_memory_ptr"))
-        self.assertFalse(coverage.storage_type_supported("t_array$_t_mapping$_t_uint8_$_t_uint8_$_$2_storage"))
+        self.assertTrue(coverage.storage_type_supported("t_array$_t_mapping$_t_uint8_$_t_uint8_$_$2_storage"))
         root = {"nodeType": "Identifier", "id": 5, "name": "rows", "referencedDeclaration": 3,
                 "typeDescriptions": {"typeIdentifier": tid}}
         length = {"nodeType": "MemberAccess", "id": 6, "memberName": "length", "expression": root,
                   "typeDescriptions": {"typeIdentifier": "t_uint256"}}
         self.assertEqual(coverage.scan({"t.sol": unit([function(4, [length])])}), {})
+
+    def test_array_type_expression_without_index_is_import_rejection(self) -> None:
+        node = {"nodeType": "IndexAccess", "id": 13}
+        self.assertEqual(coverage.node_blockers(node),
+                         [coverage.Blocker("IndexAccess", "array type expressions", "import")])
+
+    def test_struct_fixtures_have_no_coverage_blockers(self) -> None:
+        for name in ("storage_structs", "storage_structs_top_level"):
+            with self.subTest(name=name):
+                artifact = json.loads((ROOT / "testdata" / "differential" / "expected"
+                                       / f"{name}.json").read_text())
+                source = f"testdata/differential/{name}.sol"
+                self.assertEqual(coverage.scan({source: artifact["output"]["sources"][source]["ast"]}), {})
 
     def test_compilation_retains_storage_layout_for_import(self) -> None:
         metadata = {"storageLayout": {"storage": [{"astId": 3, "slot": "0"}]},

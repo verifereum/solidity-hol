@@ -17,9 +17,9 @@ tools/semantic_tests_coverage.py ../solidity-tests --solc /path/to/solc
 
 | outcome | tests |
 | --- | ---: |
-| admitted | 139 |
-| elaboration-rejected | 155 |
-| import-rejected | 1276 |
+| admitted | 142 |
+| elaboration-rejected | 215 |
+| import-rejected | 1213 |
 | compile-failure | 0 |
 | skipped | 100 |
 | total | 1670 |
@@ -32,69 +32,72 @@ The scan disagrees with the HOL run on 0 tests.
 
 | feature | AST nodes | tests | only blocker | first |
 | --- | --- | ---: | ---: | ---: |
-| bytes and string | `FunctionCall`, `IndexAccess`, `Literal`, `MemberAccess`, `NewExpression`, `TupleExpression`, `VariableDeclaration` | 404 | 32 | 18 |
-| arrays | `ArrayTypeName`, `FunctionCall`, `IndexAccess`, `MemberAccess`, `TupleExpression`, `VariableDeclaration` | 363 | 4 | 2 |
+| bytes and string | `FunctionCall`, `IndexAccess`, `Literal`, `MemberAccess`, `NewExpression`, `TupleExpression`, `VariableDeclaration` | 404 | 32 | 22 |
 | source units without exactly one contract | `SourceUnit` | 341 | 0 | 0 |
+| arrays | `ArrayTypeName`, `FunctionCall`, `IndexAccess`, `MemberAccess`, `TupleExpression`, `VariableDeclaration` | 323 | 4 | 2 |
 | local reference bindings | `VariableDeclaration` | 278 | 0 | 0 |
-| inline assembly | `InlineAssembly` | 266 | 65 | 134 |
-| array values | `Identifier`, `IndexAccess` | 252 | 9 | 0 |
-| external calls and contract members | `FunctionCall`, `MemberAccess`, `TupleExpression`, `UserDefinedTypeName`, `VariableDeclaration` | 227 | 0 | 52 |
-| structs | `FunctionCall`, `IndexAccess`, `MemberAccess`, `StructDefinition`, `TupleExpression`, `UserDefinedTypeName`, `VariableDeclaration` | 214 | 9 | 176 |
-| constructors | `FunctionDefinition` | 208 | 1 | 32 |
-| public state variables | `VariableDeclaration` | 206 | 3 | 104 |
-| this | `Identifier` | 167 | 0 | 2 |
-| declaration values | `VariableDeclaration` | 160 | 0 | 38 |
+| inline assembly | `InlineAssembly` | 266 | 66 | 150 |
+| array values | `Identifier`, `IndexAccess`, `MemberAccess` | 261 | 9 | 0 |
+| external calls and contract members | `FunctionCall`, `MemberAccess`, `TupleExpression`, `UserDefinedTypeName`, `VariableDeclaration` | 227 | 0 | 32 |
+| constructors | `FunctionDefinition` | 208 | 1 | 54 |
+| public state variables | `VariableDeclaration` | 206 | 3 | 119 |
+| this | `Identifier` | 167 | 0 | 17 |
+| structs | `FunctionCall`, `IndexAccess`, `MemberAccess`, `TupleExpression`, `VariableDeclaration` | 165 | 3 | 6 |
+| declaration values | `VariableDeclaration` | 160 | 0 | 46 |
 | inheritance | `ContractDefinition`, `Identifier`, `InheritanceSpecifier`, `MemberAccess`, `TupleExpression` | 151 | 1 | 112 |
 | function members (selector, address, …) | `MemberAccess`, `TupleExpression`, `VariableDeclaration` | 124 | 0 | 9 |
-| libraries | `ContractDefinition` | 116 | 0 | 7 |
-| memory arrays (new T[](n)) | `NewExpression` | 111 | 0 | 38 |
-| library calls and contract-name members | `IndexAccess`, `MemberAccess` | 110 | 0 | 22 |
+| libraries | `ContractDefinition` | 116 | 0 | 29 |
+| memory arrays (new T[](n)) | `NewExpression` | 111 | 0 | 46 |
+| library calls and contract-name members | `IndexAccess`, `MemberAccess` | 110 | 0 | 0 |
+| struct values and copying | `Identifier`, `IndexAccess`, `MemberAccess` | 108 | 2 | 0 |
 | contracts without functions | `ContractDefinition` | 101 | 6 | 0 |
-| abi.* functions | `Identifier`, `MemberAccess` | 100 | 1 | 37 |
-| function types | `FunctionTypeName` | 99 | 0 | 50 |
+| abi.* functions | `Identifier`, `MemberAccess` | 100 | 1 | 48 |
+| function types | `FunctionTypeName` | 99 | 0 | 56 |
 | type names as values | `ElementaryTypeNameExpression` | 91 | 0 | 8 |
 | using for | `MemberAccess`, `UsingForDirective` | 81 | 0 | 47 |
-| contract creation (new C) | `NewExpression` | 80 | 0 | 8 |
+| contract creation (new C) | `NewExpression` | 80 | 0 | 13 |
 | operator delete | `UnaryOperation` | 75 | 2 | 0 |
 | free functions | `FunctionDefinition` | 73 | 3 | 31 |
-| msg/block/tx globals | `Identifier`, `MemberAccess` | 71 | 12 | 32 |
-| mappings | `IndexAccess`, `MemberAccess`, `TupleExpression`, `VariableDeclaration` | 67 | 0 | 0 |
+| msg/block/tx globals | `Identifier`, `MemberAccess` | 71 | 12 | 34 |
 | hash and signature built-ins | `Identifier` | 62 | 2 | 11 |
-| events | `EmitStatement`, `EventDefinition`, `MemberAccess` | 60 | 6 | 43 |
-| address members (balance, call, transfer, …) | `MemberAccess` | 58 | 0 | 3 |
+| events | `EmitStatement`, `EventDefinition`, `MemberAccess` | 60 | 6 | 46 |
+| address members (balance, call, transfer, …) | `MemberAccess` | 58 | 0 | 4 |
 | constant expressions over literals | `BinaryOperation`, `UnaryOperation` | 57 | 11 | 0 |
 | overrides | `FunctionDefinition`, `OverrideSpecifier` | 57 | 0 | 0 |
-| imports | `ImportDirective`, `MemberAccess`, `TupleExpression` | 56 | 0 | 11 |
+| imports | `ImportDirective`, `MemberAccess`, `TupleExpression` | 56 | 0 | 9 |
 | functions as values | `Identifier` | 55 | 1 | 0 |
-| modifiers | `FunctionDefinition`, `ModifierDefinition`, `ModifierInvocation`, `PlaceholderStatement` | 53 | 5 | 32 |
+| modifiers | `FunctionDefinition`, `ModifierDefinition`, `ModifierInvocation`, `PlaceholderStatement` | 53 | 5 | 33 |
 | user-defined value types | `MemberAccess`, `TupleExpression`, `UserDefinedTypeName`, `UserDefinedValueTypeDefinition`, `VariableDeclaration` | 52 | 5 | 32 |
 | type(…) | `Identifier`, `MemberAccess` | 52 | 0 | 14 |
 | payable functions | `FunctionDefinition` | 50 | 0 | 0 |
 | constants | `VariableDeclaration` | 47 | 0 | 26 |
-| inline arrays | `TupleExpression` | 47 | 0 | 10 |
+| inline arrays | `TupleExpression` | 47 | 0 | 13 |
 | virtual functions | `FunctionDefinition` | 45 | 0 | 4 |
 | transient storage | `VariableDeclaration` | 41 | 4 | 0 |
-| conditional expressions | `Conditional` | 40 | 11 | 21 |
-| custom errors | `ErrorDefinition`, `MemberAccess`, `RevertStatement`, `TupleExpression` | 38 | 5 | 24 |
+| mappings | `IndexAccess`, `MemberAccess`, `TupleExpression`, `VariableDeclaration` | 41 | 0 | 0 |
+| conditional expressions | `Conditional` | 40 | 11 | 22 |
+| custom errors | `ErrorDefinition`, `MemberAccess`, `RevertStatement`, `TupleExpression` | 38 | 6 | 25 |
+| aggregate array mutation | `MemberAccess` | 35 | 1 | 0 |
 | interfaces | `ContractDefinition` | 35 | 0 | 0 |
 | unimplemented functions | `FunctionDefinition` | 34 | 0 | 0 |
-| named arguments | `FunctionCall` | 32 | 3 | 7 |
+| named arguments | `FunctionCall` | 32 | 3 | 9 |
 | literals of non-integer types | `Assignment`, `BinaryOperation`, `FunctionCall`, `Literal`, `Return`, `VariableDeclarationStatement` | 32 | 1 | 0 |
-| conversions to non-elementary types | `Identifier`, `IndexAccess`, `MemberAccess` | 30 | 0 | 0 |
-| enums | `EnumDefinition`, `EnumValue`, `FunctionCall`, `MemberAccess`, `TupleExpression`, `UserDefinedTypeName`, `VariableDeclaration` | 29 | 0 | 22 |
+| conversions to non-elementary types | `Identifier`, `IndexAccess`, `MemberAccess` | 30 | 0 | 1 |
+| enums | `EnumDefinition`, `EnumValue`, `FunctionCall`, `MemberAccess`, `TupleExpression`, `UserDefinedTypeName`, `VariableDeclaration` | 29 | 1 | 23 |
 | tuples of literals | `TupleExpression` | 28 | 1 | 0 |
-| call options ({value: …, gas: …}) | `FunctionCallOptions` | 26 | 0 | 3 |
+| call options ({value: …, gas: …}) | `FunctionCallOptions` | 26 | 0 | 4 |
 | immutables | `VariableDeclaration` | 24 | 1 | 15 |
 | members of elementary type names | `IndexAccess`, `TupleExpression` | 24 | 0 | 0 |
 | abstract contracts | `ContractDefinition` | 23 | 0 | 0 |
 | try/catch | `FunctionCall`, `TryCatchClause`, `TryStatement` | 20 | 0 | 11 |
-| array slices | `IndexRangeAccess` | 19 | 0 | 10 |
+| array slices | `IndexRangeAccess` | 19 | 0 | 11 |
 | fallback functions | `FunctionDefinition` | 18 | 0 | 5 |
-| mapping values | `Identifier`, `IndexAccess` | 17 | 0 | 0 |
+| mapping values | `Identifier`, `IndexAccess`, `MemberAccess` | 17 | 0 | 0 |
 | fixed-size bytes members and indexing | `IndexAccess`, `MemberAccess` | 12 | 1 | 0 |
 | built-in erc7201 | `Identifier` | 12 | 0 | 3 |
 | literal subdenominations (ether, days, …) | `Literal` | 11 | 0 | 1 |
 | receive functions | `FunctionDefinition` | 7 | 0 | 1 |
+| array type expressions | `IndexAccess` | 6 | 0 | 1 |
 | tuples with empty components | `TupleExpression` | 6 | 0 | 0 |
 | built-in blobhash | `Identifier` | 3 | 2 | 3 |
 | array members as values | `MemberAccess` | 3 | 1 | 0 |
@@ -110,26 +113,26 @@ Supporting the features in this order admits the most rejected tests at each ste
 
 | step | feature | admitted |
 | ---: | --- | ---: |
-| 1 | inline assembly | 65 |
-| 2 | bytes and string | 105 |
-| 3 | msg/block/tx globals | 123 |
-| 4 | constant expressions over literals | 138 |
-| 5 | local reference bindings | 152 |
-| 6 | structs | 177 |
-| 7 | arrays | 221 |
-| 8 | array values | 279 |
-| 9 | memory arrays (new T[](n)) | 308 |
-| 10 | operator delete | 332 |
-| 11 | events | 353 |
-| 12 | public state variables | 374 |
-| 13 | constructors | 408 |
-| 14 | mappings | 436 |
-| 15 | abi.* functions | 455 |
-| 16 | hash and signature built-ins | 476 |
-| 17 | modifiers | 494 |
-| 18 | declaration values | 512 |
-| 19 | inline arrays | 533 |
-| 20 | transient storage | 557 |
+| 1 | inline assembly | 66 |
+| 2 | bytes and string | 106 |
+| 3 | msg/block/tx globals | 124 |
+| 4 | constant expressions over literals | 139 |
+| 5 | local reference bindings | 153 |
+| 6 | arrays | 173 |
+| 7 | array values | 218 |
+| 8 | structs | 243 |
+| 9 | memory arrays (new T[](n)) | 271 |
+| 10 | struct values and copying | 295 |
+| 11 | events | 315 |
+| 12 | public state variables | 335 |
+| 13 | constructors | 373 |
+| 14 | operator delete | 395 |
+| 15 | aggregate array mutation | 421 |
+| 16 | abi.* functions | 440 |
+| 17 | hash and signature built-ins | 461 |
+| 18 | modifiers | 479 |
+| 19 | declaration values | 497 |
+| 20 | inline arrays | 518 |
 
 ## Skipped and compile failures
 
@@ -170,6 +173,7 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `array/array_storage_push_pop.sol`
 - `array/copying/array_storage_multi_items_per_slot.sol`
 - `array/dynamic_out_of_bounds_array_access.sol`
+- `array/fixed_arrays_in_storage.sol`
 - `array/fixed_out_of_bounds_array_access.sol`
 - `array/pop/array_pop.sol`
 - `array/pop/array_pop_empty_exception.sol`
@@ -233,10 +237,12 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `statements/do_while_loop_continue.sol`
 - `statements/empty_for_loop.sol`
 - `storage/mapping_state.sol`
+- `storage/packed_storage_structs_uint.sol`
 - `storage/state_smoke_test.sol`
 - `storageLayoutSpecifier/base_slot_max_value.sol`
 - `storageLayoutSpecifier/dynamic_array_storage_end.sol`
 - `storageLayoutSpecifier/mapping_storage_end.sol`
+- `structs/structs.sol`
 - `types/assign_calldata_value_type.sol`
 - `types/convert_fixed_bytes_to_fixed_bytes_greater_size.sol`
 - `types/convert_fixed_bytes_to_fixed_bytes_same_size.sol`
@@ -294,6 +300,7 @@ Supporting the features in this order admits the most rejected tests at each ste
 
 ## Elaborator rejections
 
+- `abicoder/bug_abi_encoder_v2_head_overflow_with_static_array_cleanup.sol`: elaborate_unit returned NONE for abicoder/bug_abi_encoder_v2_head_overflow_with_static_array_cleanup.sol
 - `abicoder/calldataDecoding/array/byte_arrays.sol`: elaborate_unit returned NONE for abicoder/calldataDecoding/array/byte_arrays.sol
 - `abicoder/calldataDecoding/array/calldata_array_bytes_v2.sol`: elaborate_unit returned NONE for abicoder/calldataDecoding/array/calldata_array_bytes_v2.sol
 - `abicoder/calldataDecoding/array/calldata_array_dynamic_static_short_decode_v2.sol`: elaborate_unit returned NONE for abicoder/calldataDecoding/array/calldata_array_dynamic_static_short_decode_v2.sol
@@ -301,10 +308,24 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `abicoder/calldataDecoding/array/calldata_array_indexing_3d_v2.sol`: elaborate_unit returned NONE for abicoder/calldataDecoding/array/calldata_array_indexing_3d_v2.sol
 - `abicoder/calldataDecoding/array/calldata_array_length_v2.sol`: elaborate_unit returned NONE for abicoder/calldataDecoding/array/calldata_array_length_v2.sol
 - `abicoder/calldataDecoding/array/calldata_array_static_of_uint_v2.sol`: elaborate_unit returned NONE for abicoder/calldataDecoding/array/calldata_array_static_of_uint_v2.sol
+- `abicoder/calldataDecoding/array/calldata_array_struct_static_v2.sol`: elaborate_unit returned NONE for abicoder/calldataDecoding/array/calldata_array_struct_static_v2.sol
 - `abicoder/calldataDecoding/array/calldata_dynamic_array_to_memory_v2.sol`: elaborate_unit returned NONE for abicoder/calldataDecoding/array/calldata_dynamic_array_to_memory_v2.sol
 - `abicoder/calldataDecoding/array/calldata_string_array_v2.sol`: elaborate_unit returned NONE for abicoder/calldataDecoding/array/calldata_string_array_v2.sol
 - `abicoder/calldataDecoding/array/memory_arrays_static.sol`: elaborate_unit returned NONE for abicoder/calldataDecoding/array/memory_arrays_static.sol
 - `abicoder/calldataDecoding/array/memory_dynamic_arrays.sol`: elaborate_unit returned NONE for abicoder/calldataDecoding/array/memory_dynamic_arrays.sol
+- `abicoder/calldataDecoding/struct/member_array_dynamic2_v2.sol`: elaborate_unit returned NONE for abicoder/calldataDecoding/struct/member_array_dynamic2_v2.sol
+- `abicoder/calldataDecoding/struct/member_array_dynamic_multiple_fields_v2.sol`: elaborate_unit returned NONE for abicoder/calldataDecoding/struct/member_array_dynamic_multiple_fields_v2.sol
+- `abicoder/calldataDecoding/struct/member_array_static_mulitple_fields_v2.sol`: elaborate_unit returned NONE for abicoder/calldataDecoding/struct/member_array_static_mulitple_fields_v2.sol
+- `abicoder/calldataDecoding/struct/multiple_structs_v2.sol`: elaborate_unit returned NONE for abicoder/calldataDecoding/struct/multiple_structs_v2.sol
+- `abicoder/calldataDecoding/struct/nested_static_3_fields_v2.sol`: elaborate_unit returned NONE for abicoder/calldataDecoding/struct/nested_static_3_fields_v2.sol
+- `abicoder/calldataDecoding/struct/nested_static_4_fields_v2.sol`: elaborate_unit returned NONE for abicoder/calldataDecoding/struct/nested_static_4_fields_v2.sol
+- `abicoder/calldataDecoding/struct/nested_with_bytes_v2.sol`: elaborate_unit returned NONE for abicoder/calldataDecoding/struct/nested_with_bytes_v2.sol
+- `abicoder/calldataDecoding/struct/nested_with_dynamic_array_v2.sol`: elaborate_unit returned NONE for abicoder/calldataDecoding/struct/nested_with_dynamic_array_v2.sol
+- `abicoder/calldataDecoding/struct/nested_with_dynamic_struct_array_v2.sol`: elaborate_unit returned NONE for abicoder/calldataDecoding/struct/nested_with_dynamic_struct_array_v2.sol
+- `abicoder/calldataDecoding/struct/short_v2.sol`: elaborate_unit returned NONE for abicoder/calldataDecoding/struct/short_v2.sol
+- `abicoder/calldataDecoding/struct/simple_multiple_fields_short_types_v2.sol`: elaborate_unit returned NONE for abicoder/calldataDecoding/struct/simple_multiple_fields_short_types_v2.sol
+- `abicoder/calldataDecoding/struct/simple_multiple_fields_v2.sol`: elaborate_unit returned NONE for abicoder/calldataDecoding/struct/simple_multiple_fields_v2.sol
+- `abicoder/calldataDecoding/struct/struct_and_ints_v2.sol`: elaborate_unit returned NONE for abicoder/calldataDecoding/struct/struct_and_ints_v2.sol
 - `abicoder/validation/array_exceeds_calldatasize_no_revert_string.sol`: elaborate_unit returned NONE for abicoder/validation/array_exceeds_calldatasize_no_revert_string.sol
 - `array/arrayMemoryAllocation/array_static_return_param_zeroed_memory_index_access.sol`: elaborate_unit returned NONE for array/arrayMemoryAllocation/array_static_return_param_zeroed_memory_index_access.sol
 - `array/arrayMemoryAllocation/array_static_zeroed_memory_index_access.sol`: elaborate_unit returned NONE for array/arrayMemoryAllocation/array_static_zeroed_memory_index_access.sol
@@ -320,17 +341,23 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `array/copying/array_copy_storage_storage_static_dynamic.sol`: elaborate_unit returned NONE for array/copying/array_copy_storage_storage_static_dynamic.sol
 - `array/copying/array_copy_storage_storage_static_simple.sol`: elaborate_unit returned NONE for array/copying/array_copy_storage_storage_static_simple.sol
 - `array/copying/array_copy_storage_storage_static_static.sol`: elaborate_unit returned NONE for array/copying/array_copy_storage_storage_static_static.sol
+- `array/copying/array_copy_storage_storage_struct.sol`: elaborate_unit returned NONE for array/copying/array_copy_storage_storage_struct.sol
 - `array/copying/array_copy_storage_to_memory.sol`: elaborate_unit returned NONE for array/copying/array_copy_storage_to_memory.sol
 - `array/copying/array_copy_storage_to_memory_nested.sol`: elaborate_unit returned NONE for array/copying/array_copy_storage_to_memory_nested.sol
 - `array/copying/array_copy_target_leftover.sol`: elaborate_unit returned NONE for array/copying/array_copy_target_leftover.sol
 - `array/copying/array_copy_target_leftover2.sol`: elaborate_unit returned NONE for array/copying/array_copy_target_leftover2.sol
 - `array/copying/array_copy_target_simple.sol`: elaborate_unit returned NONE for array/copying/array_copy_target_simple.sol
 - `array/copying/array_copy_target_simple_2.sol`: elaborate_unit returned NONE for array/copying/array_copy_target_simple_2.sol
+- `array/copying/array_of_struct_calldata_to_memory.sol`: elaborate_unit returned NONE for array/copying/array_of_struct_calldata_to_memory.sol
+- `array/copying/array_of_struct_calldata_to_storage.sol`: elaborate_unit returned NONE for array/copying/array_of_struct_calldata_to_storage.sol
+- `array/copying/array_of_structs_containing_arrays_calldata_to_memory.sol`: elaborate_unit returned NONE for array/copying/array_of_structs_containing_arrays_calldata_to_memory.sol
+- `array/copying/array_of_structs_containing_arrays_calldata_to_storage.sol`: elaborate_unit returned NONE for array/copying/array_of_structs_containing_arrays_calldata_to_storage.sol
 - `array/copying/bytes_calldata_to_string_calldata.sol`: elaborate_unit returned NONE for array/copying/bytes_calldata_to_string_calldata.sol
 - `array/copying/bytes_memory_to_storage.sol`: elaborate_unit returned NONE for array/copying/bytes_memory_to_storage.sol
 - `array/copying/calldata_2d_bytes_to_memory.sol`: elaborate_unit returned NONE for array/copying/calldata_2d_bytes_to_memory.sol
 - `array/copying/calldata_2d_bytes_to_memory_2.sol`: elaborate_unit returned NONE for array/copying/calldata_2d_bytes_to_memory_2.sol
 - `array/copying/calldata_array_dynamic_to_storage.sol`: elaborate_unit returned NONE for array/copying/calldata_array_dynamic_to_storage.sol
+- `array/copying/calldata_array_of_struct_to_memory.sol`: elaborate_unit returned NONE for array/copying/calldata_array_of_struct_to_memory.sol
 - `array/copying/calldata_array_static_to_memory.sol`: elaborate_unit returned NONE for array/copying/calldata_array_static_to_memory.sol
 - `array/copying/calldata_array_to_mapping.sol`: elaborate_unit returned NONE for array/copying/calldata_array_to_mapping.sol
 - `array/copying/calldata_bytes_array_to_memory.sol`: elaborate_unit returned NONE for array/copying/calldata_bytes_array_to_memory.sol
@@ -338,19 +365,30 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `array/copying/calldata_dyn_2d_bytes_to_memory.sol`: elaborate_unit returned NONE for array/copying/calldata_dyn_2d_bytes_to_memory.sol
 - `array/copying/calldata_dynamic_array_to_memory.sol`: elaborate_unit returned NONE for array/copying/calldata_dynamic_array_to_memory.sol
 - `array/copying/calldata_to_storage_different_base.sol`: elaborate_unit returned NONE for array/copying/calldata_to_storage_different_base.sol
+- `array/copying/copy_byte_array_in_struct_to_storage.sol`: elaborate_unit returned NONE for array/copying/copy_byte_array_in_struct_to_storage.sol
+- `array/copying/elements_of_nested_array_of_structs_calldata_to_storage.sol`: elaborate_unit returned NONE for array/copying/elements_of_nested_array_of_structs_calldata_to_storage.sol
+- `array/copying/elements_of_nested_array_of_structs_memory_to_storage.sol`: elaborate_unit returned NONE for array/copying/elements_of_nested_array_of_structs_memory_to_storage.sol
 - `array/copying/nested_array_calldata_to_memory.sol`: elaborate_unit returned NONE for array/copying/nested_array_calldata_to_memory.sol
 - `array/copying/nested_array_calldata_to_storage.sol`: elaborate_unit returned NONE for array/copying/nested_array_calldata_to_storage.sol
 - `array/copying/nested_array_element_calldata_to_storage.sol`: elaborate_unit returned NONE for array/copying/nested_array_element_calldata_to_storage.sol
 - `array/copying/nested_array_element_memory_to_storage.sol`: elaborate_unit returned NONE for array/copying/nested_array_element_memory_to_storage.sol
+- `array/copying/nested_array_of_structs_calldata_to_memory.sol`: elaborate_unit returned NONE for array/copying/nested_array_of_structs_calldata_to_memory.sol
+- `array/copying/nested_array_of_structs_calldata_to_storage.sol`: elaborate_unit returned NONE for array/copying/nested_array_of_structs_calldata_to_storage.sol
+- `array/copying/nested_array_of_structs_memory_to_memory.sol`: elaborate_unit returned NONE for array/copying/nested_array_of_structs_memory_to_memory.sol
+- `array/copying/nested_array_of_structs_memory_to_storage.sol`: elaborate_unit returned NONE for array/copying/nested_array_of_structs_memory_to_storage.sol
 - `array/copying/storage_memory_nested.sol`: elaborate_unit returned NONE for array/copying/storage_memory_nested.sol
 - `array/copying/storage_memory_nested_bytes.sol`: elaborate_unit returned NONE for array/copying/storage_memory_nested_bytes.sol
 - `array/copying/storage_memory_nested_from_pointer.sol`: elaborate_unit returned NONE for array/copying/storage_memory_nested_from_pointer.sol
+- `array/copying/storage_memory_nested_struct.sol`: elaborate_unit returned NONE for array/copying/storage_memory_nested_struct.sol
 - `array/copying/storage_memory_packed.sol`: elaborate_unit returned NONE for array/copying/storage_memory_packed.sol
 - `array/copying/storage_memory_packed_dyn.sol`: elaborate_unit returned NONE for array/copying/storage_memory_packed_dyn.sol
 - `array/copying/string_calldata_to_bytes_calldata.sol`: elaborate_unit returned NONE for array/copying/string_calldata_to_bytes_calldata.sol
+- `array/delete/delete_on_array_of_structs.sol`: elaborate_unit returned NONE for array/delete/delete_on_array_of_structs.sol
 - `array/delete/memory_arrays_delete.sol`: elaborate_unit returned NONE for array/delete/memory_arrays_delete.sol
 - `array/delete/memory_bytes_delete_element.sol`: elaborate_unit returned NONE for array/delete/memory_bytes_delete_element.sol
 - `array/dynamic_array_cleanup.sol`: elaborate_unit returned NONE for array/dynamic_array_cleanup.sol
+- `array/dynamic_arrays_in_storage.sol`: elaborate_unit returned NONE for array/dynamic_arrays_in_storage.sol
+- `array/dynamic_multi_array_cleanup.sol`: elaborate_unit returned NONE for array/dynamic_multi_array_cleanup.sol
 - `array/external_array_args.sol`: elaborate_unit returned NONE for array/external_array_args.sol
 - `array/fixed_array_cleanup.sol`: elaborate_unit returned NONE for array/fixed_array_cleanup.sol
 - `array/fixed_bytes_length_access.sol`: elaborate_unit returned NONE for array/fixed_bytes_length_access.sol
@@ -368,11 +406,13 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `array/pop/byte_array_pop_masking_long.sol`: elaborate_unit returned NONE for array/pop/byte_array_pop_masking_long.sol
 - `array/pop/byte_array_pop_storage_empty.sol`: elaborate_unit returned NONE for array/pop/byte_array_pop_storage_empty.sol
 - `array/pop/parenthesized.sol`: elaborate_unit returned NONE for array/pop/parenthesized.sol
+- `array/push/array_push_struct_from_calldata.sol`: elaborate_unit returned NONE for array/push/array_push_struct_from_calldata.sol
 - `array/push/byte_array_push.sol`: elaborate_unit returned NONE for array/push/byte_array_push.sol
 - `array/push/byte_array_push_transition.sol`: elaborate_unit returned NONE for array/push/byte_array_push_transition.sol
 - `array/push/nested_bytes_push.sol`: elaborate_unit returned NONE for array/push/nested_bytes_push.sol
 - `array/push/push_no_args_2d.sol`: elaborate_unit returned NONE for array/push/push_no_args_2d.sol
 - `array/push/push_no_args_bytes.sol`: elaborate_unit returned NONE for array/push/push_no_args_bytes.sol
+- `array/push/push_no_args_struct.sol`: elaborate_unit returned NONE for array/push/push_no_args_struct.sol
 - `array/short_fixed_array_cleanup.sol`: elaborate_unit returned NONE for array/short_fixed_array_cleanup.sol
 - `array/slices/array_calldata_assignment.sol`: elaborate_unit returned NONE for array/slices/array_calldata_assignment.sol
 - `array/string_bytes_conversion.sol`: elaborate_unit returned NONE for array/string_bytes_conversion.sol
@@ -388,6 +428,8 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `expressions/unary_too_long_literal.sol`: elaborate_unit returned NONE for expressions/unary_too_long_literal.sol
 - `functionCall/array_multiple_local_vars.sol`: elaborate_unit returned NONE for functionCall/array_multiple_local_vars.sol
 - `functionCall/calldata_argument_internal_bytes.sol`: elaborate_unit returned NONE for functionCall/calldata_argument_internal_bytes.sol
+- `functionCall/calldata_argument_internal_struct_as_memory_v2.sol`: elaborate_unit returned NONE for functionCall/calldata_argument_internal_struct_as_memory_v2.sol
+- `functionCall/calldata_argument_internal_struct_v2.sol`: elaborate_unit returned NONE for functionCall/calldata_argument_internal_struct_v2.sol
 - `functionCall/mapping_array_internal_argument.sol`: elaborate_unit returned NONE for functionCall/mapping_array_internal_argument.sol
 - `functionCall/mapping_internal_argument.sol`: elaborate_unit returned NONE for functionCall/mapping_internal_argument.sol
 - `functionCall/mapping_internal_return.sol`: elaborate_unit returned NONE for functionCall/mapping_internal_return.sol
@@ -411,6 +453,7 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `storage/mappings_array2d_pop_delete.sol`: elaborate_unit returned NONE for storage/mappings_array2d_pop_delete.sol
 - `storage/mappings_array_pop_delete.sol`: elaborate_unit returned NONE for storage/mappings_array_pop_delete.sol
 - `storage/packed_storage_signed.sol`: elaborate_unit returned NONE for storage/packed_storage_signed.sol
+- `storage/packed_storage_structs_bytes.sol`: elaborate_unit returned NONE for storage/packed_storage_structs_bytes.sol
 - `storageLayoutSpecifier/delete_transient_storage.sol`: elaborate_unit returned NONE for storageLayoutSpecifier/delete_transient_storage.sol
 - `storageLayoutSpecifier/state_variables_transient.sol`: elaborate_unit returned NONE for storageLayoutSpecifier/state_variables_transient.sol
 - `storageLayoutSpecifier/variable_cleanup.sol`: elaborate_unit returned NONE for storageLayoutSpecifier/variable_cleanup.sol
@@ -419,6 +462,28 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `strings/string_escapes.sol`: elaborate_unit returned NONE for strings/string_escapes.sol
 - `strings/unicode_escapes.sol`: elaborate_unit returned NONE for strings/unicode_escapes.sol
 - `strings/unicode_string.sol`: elaborate_unit returned NONE for strings/unicode_string.sol
+- `structs/copy_struct_with_nested_array_from_calldata_to_memory.sol`: elaborate_unit returned NONE for structs/copy_struct_with_nested_array_from_calldata_to_memory.sol
+- `structs/copy_struct_with_nested_array_from_calldata_to_storage.sol`: elaborate_unit returned NONE for structs/copy_struct_with_nested_array_from_calldata_to_storage.sol
+- `structs/copy_struct_with_nested_array_from_memory_to_memory.sol`: elaborate_unit returned NONE for structs/copy_struct_with_nested_array_from_memory_to_memory.sol
+- `structs/copy_struct_with_nested_struct_from_calldata_to_memory.sol`: elaborate_unit returned NONE for structs/copy_struct_with_nested_struct_from_calldata_to_memory.sol
+- `structs/global.sol`: elaborate_unit returned NONE for structs/global.sol
+- `structs/memory_structs_as_function_args.sol`: elaborate_unit returned NONE for structs/memory_structs_as_function_args.sol
+- `structs/memory_structs_nested.sol`: elaborate_unit returned NONE for structs/memory_structs_nested.sol
+- `structs/memory_structs_nested_load.sol`: elaborate_unit returned NONE for structs/memory_structs_nested_load.sol
+- `structs/memory_structs_read_write.sol`: elaborate_unit returned NONE for structs/memory_structs_read_write.sol
+- `structs/packed_storage_structs_delete.sol`: elaborate_unit returned NONE for structs/packed_storage_structs_delete.sol
+- `structs/struct_containing_bytes_copy_and_delete.sol`: elaborate_unit returned NONE for structs/struct_containing_bytes_copy_and_delete.sol
+- `structs/struct_copy.sol`: elaborate_unit returned NONE for structs/struct_copy.sol
+- `structs/struct_copy_calldata_to_memory_nested_bytes_v2.sol`: elaborate_unit returned NONE for structs/struct_copy_calldata_to_memory_nested_bytes_v2.sol
+- `structs/struct_copy_calldata_to_memory_nested_dynamic_array_v2.sol`: elaborate_unit returned NONE for structs/struct_copy_calldata_to_memory_nested_dynamic_array_v2.sol
+- `structs/struct_copy_calldata_to_memory_nested_static_array_v2.sol`: elaborate_unit returned NONE for structs/struct_copy_calldata_to_memory_nested_static_array_v2.sol
+- `structs/struct_copy_calldata_to_memory_tuple.sol`: elaborate_unit returned NONE for structs/struct_copy_calldata_to_memory_tuple.sol
+- `structs/struct_copy_calldata_to_memory_v2.sol`: elaborate_unit returned NONE for structs/struct_copy_calldata_to_memory_v2.sol
+- `structs/struct_copy_calldata_to_storage_nested_dynamic_array_v2.sol`: elaborate_unit returned NONE for structs/struct_copy_calldata_to_storage_nested_dynamic_array_v2.sol
+- `structs/struct_copy_calldata_to_storage_v2.sol`: elaborate_unit returned NONE for structs/struct_copy_calldata_to_storage_v2.sol
+- `structs/struct_copy_via_local.sol`: elaborate_unit returned NONE for structs/struct_copy_via_local.sol
+- `structs/struct_reference.sol`: elaborate_unit returned NONE for structs/struct_reference.sol
+- `structs/struct_storage_to_mapping.sol`: elaborate_unit returned NONE for structs/struct_storage_to_mapping.sol
 - `types/nested_tuples.sol`: elaborate_unit returned NONE for types/nested_tuples.sol
 - `types/strings.sol`: elaborate_unit returned NONE for types/strings.sol
 - `types/tuple_assign_multi_slot_grow.sol`: elaborate_unit returned NONE for types/tuple_assign_multi_slot_grow.sol
@@ -436,6 +501,7 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `various/memory_overwrite.sol`: elaborate_unit returned NONE for various/memory_overwrite.sol
 - `various/storage_string_as_mapping_key_without_variable.sol`: elaborate_unit returned NONE for various/storage_string_as_mapping_key_without_variable.sol
 - `various/string_tuples.sol`: elaborate_unit returned NONE for various/string_tuples.sol
+- `various/typed_multi_variable_declaration.sol`: elaborate_unit returned NONE for various/typed_multi_variable_declaration.sol
 - `viaYul/assign_tuple_from_function_call.sol`: elaborate_unit returned NONE for viaYul/assign_tuple_from_function_call.sol
 - `viaYul/comparison.sol`: elaborate_unit returned NONE for viaYul/comparison.sol
 - `viaYul/define_tuple_from_function_call.sol`: elaborate_unit returned NONE for viaYul/define_tuple_from_function_call.sol

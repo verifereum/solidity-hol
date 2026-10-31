@@ -3,7 +3,7 @@ Theory solidityCoreWfTest
 Ancestors
   solidityCoreWf
 Libs
-  intLib
+  intLib wordsLib
 
 Overload u256 = “UintT 256”
 
@@ -197,6 +197,7 @@ Definition test_program_def:
   test_program = <|
     procedures := [add_proc; count_proc; pair_proc; first_proc; fact_proc;
                    wrapper_proc; void_proc; convert_proc; scope_proc];
+    struct_layouts := [];
     state_variables := [];
     entry_procedure := AstId 6
   |>
@@ -729,6 +730,81 @@ Theorem array_navigation_leaf_type_must_match:
     (ReferenceType (UintT 16))
     (NavigateOperation (UintT 16) (BoundAtom (AstId 1))
        (IndexNavigation (ConstantAtom (IntegerValue 1))))
+Proof
+  EVAL_TAC
+QED
+
+Definition packed_struct_layout_def:
+  packed_struct_layout = <|
+    struct_id := AstId 950;
+    struct_slots := 1;
+    struct_fields :=
+      [<| state_id := AstId 951; state_type := UintT 8;
+          state_slot := 0w; state_offset := 0 |>;
+       <| state_id := AstId 952; state_type := IntT 16;
+          state_slot := 0w; state_offset := 1 |>]
+  |>
+End
+
+Definition struct_layout_environment_def:
+  struct_layout_environment layouts = core_program_environment []
+    <| procedures := []; state_variables := []; struct_layouts := layouts;
+       entry_procedure := AstId 0 |>
+End
+
+Theorem packed_struct_layout_checked:
+  wf_core_environment (struct_layout_environment [packed_struct_layout])
+Proof
+  EVAL_TAC
+QED
+
+Theorem malformed_struct_fields_rejected:
+  ¬wf_core_environment
+    (struct_layout_environment [packed_struct_layout with struct_fields :=
+      [<| state_id := AstId 951; state_type := UintT 16;
+          state_slot := 0w; state_offset := 31 |>]]) ∧
+  ¬wf_core_environment
+    (struct_layout_environment [packed_struct_layout with struct_fields :=
+      [<| state_id := AstId 951; state_type := UintT 8;
+          state_slot := 1w; state_offset := 0 |>]]) ∧
+  ¬wf_core_environment
+    (struct_layout_environment [packed_struct_layout with struct_fields :=
+      [<| state_id := AstId 951; state_type := StructT (AstId 950);
+          state_slot := 0w; state_offset := 0 |>]])
+Proof
+  EVAL_TAC
+QED
+
+Theorem struct_field_ownership_checked:
+  wf_core_operation (struct_layout_environment [packed_struct_layout])
+    <| bindings := [(AstId 1, ReferenceType (StructT (AstId 950)))];
+       targets := []; returns := []; in_loop := F |>
+    (ReferenceType (UintT 8))
+    (NavigateOperation (UintT 8) (BoundAtom (AstId 1)) (FieldNavigation (AstId 951))) ∧
+  ¬wf_core_operation (struct_layout_environment [packed_struct_layout])
+    <| bindings := [(AstId 1, ReferenceType (StructT (AstId 950)))];
+       targets := []; returns := []; in_loop := F |>
+    (ReferenceType (UintT 8))
+    (NavigateOperation (UintT 8) (BoundAtom (AstId 1)) (FieldNavigation (AstId 999))) ∧
+  ¬wf_core_operation (struct_layout_environment [packed_struct_layout])
+    <| bindings := [(AstId 1, ReferenceType (StructT (AstId 950)))];
+       targets := []; returns := []; in_loop := F |>
+    (ReferenceType (UintT 8))
+    (NavigateOperation (UintT 8) (BoundAtom (AstId 1)) (FieldNavigation (AstId 952)))
+Proof
+  EVAL_TAC
+QED
+
+Theorem recursive_struct_behind_mapping_checked:
+  wf_core_environment
+    (struct_layout_environment [packed_struct_layout with <|
+      struct_slots := 2;
+      struct_fields :=
+        [<| state_id := AstId 951; state_type := UintT 8;
+            state_slot := 0w; state_offset := 0 |>;
+         <| state_id := AstId 952;
+            state_type := MappingT (UintT 256) (StructT (AstId 950));
+            state_slot := 1w; state_offset := 0 |>] |>])
 Proof
   EVAL_TAC
 QED
