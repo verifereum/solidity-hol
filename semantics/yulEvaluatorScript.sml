@@ -97,6 +97,19 @@ Definition yul_bind_scope_def:
      yul_bind_scope (scope |+ (x, v)) ps)
 End
 
+(* A call's own scope, holding its parameters.  A named function rather than
+ * an update written out at the call, because a mutual recursion translated
+ * through a pre-relation is compared on its arguments as terms: a constant
+ * application is the same term on both sides, an inlined record update is
+ * not.
+ *)
+Definition yul_push_params_def:
+  yul_push_params params args m =
+    m with scopes :=
+      yul_bind_scope (FEMPTY : string |-> bytes32) (ZIP (params, args)) ::
+      m.scopes
+End
+
 (* Binds names in the innermost scope.  Written as a case on the scope stack
  * rather than with HD and TL, whose cv equations carry a non-emptiness
  * condition a translated definition cannot discharge.
@@ -487,11 +500,9 @@ Definition eval_yul_block_def:
            if LENGTH fd.function_params ≠ LENGTH args then
              EvalAbrupt (YulInvalid "bad call arity") m
            else
-             let m1 = m with scopes :=
-                        yul_bind_scope (FEMPTY : string |-> bytes32)
-                          (ZIP (fd.function_params, args)) :: m.scopes in
+             let m1 = yul_push_params fd.function_params args m in
              let r = eval_yul_block (n - 1) fns fd.function_body m1 in
-             let m2 = r.machine with scopes := TL r.machine.scopes in
+             let m2 = yul_pop_scope r.machine in
                if r.completion = YulNormal ∨ r.completion = YulLeave then
                  (case yul_lookup_names fd.function_results r.machine.scopes of
                     NONE => EvalAbrupt (YulInvalid "missing return binding") m2
@@ -530,6 +541,17 @@ End
  * relation are supplied here rather than left to the translator to guess.
  *)
 
+(* A cv pair is at least as large as its two halves together.  A recursion's
+ * cv obligations compare sums of projections of the encoded argument tuples,
+ * so each such sum needs a bound of this shape.  The toolchain proves the
+ * same fact locally, in cv_string_fmap, where it does not cross theories.
+ *)
+Theorem cv_size_cv_fst_cv_snd[local]:
+  ∀x. cv_size (cv_fst x) + cv_size (cv_snd x) ≤ cv_size x
+Proof
+  Cases \\ gvs [cvTheory.cv_size_def, cvTheory.cv_fst_def, cvTheory.cv_snd_def]
+QED
+
 val () = cv_auto_trans yul_lookup_def;
 val () = cv_auto_trans yul_lookup_names_def;
 val () = cv_auto_trans yul_bind_scope_def;
@@ -547,19 +569,26 @@ val () = cv_auto_trans yul_env_def;
 val yul_pre_def = cv_auto_trans_pre_rec "" eval_yul_block_def
   (WF_REL_TAC `inv_image ($< LEX $<)
      (\x. case x of
-            INL (n0, e0, s0, m0) => (cv$c2n n0, 2 * cv_size s0 + 1)
+            INL (n0, e0, s0, m0) => (cv$c2n n0, 2 * cv_size s0)
           | INR (INL (n0, e0, q0, m0)) => (cv$c2n n0, 2 * cv_size q0 + 1)
-          | INR (INR (INL (n0, e0, x0, m0))) =>
-              (cv$c2n n0, 2 * cv_size x0 + 1)
-          | INR (INR (INR (INL (n0, e0, x1, m0)))) =>
-              (cv$c2n n0, 2 * cv_size x1 + 1)
+          | INR (INR (INL (n0, e0, x0, m0))) => (cv$c2n n0, 2 * cv_size x0)
+          | INR (INR (INR (INL (n0, e0, x1, m0)))) => (cv$c2n n0, 2 * cv_size x1)
           | INR (INR (INR (INR (INL (n0, e0, c0, p0, b0, m0))))) =>
               (cv$c2n n0, 2 * (cv_size c0 + cv_size b0 + cv_size p0) + 1)
           | INR (INR (INR (INR (INR (INL (n0, e0, v0, cs0, d0, m0)))))) =>
               (cv$c2n n0, 2 * (cv_size cs0 + cv_size d0) + 1)
           | INR (INR (INR (INR (INR (INR (n0, e0, nm0, a0, m0)))))) =>
               (cv$c2n n0, 0))` >>
-   cv_termination_tac);
+   cv_termination_tac >>
+   (* The obligations compare sums of projections of the encoded argument
+    * tuples.  Each such sum is bounded by the size of the pair it projects
+    * from, so supply that bound at every pair this recursion reaches into,
+    * and the rest is arithmetic. *)
+   qspec_then ‘x2’ assume_tac cv_size_cv_fst_cv_snd >>
+   qspec_then ‘cv_snd x2’ assume_tac cv_size_cv_fst_cv_snd >>
+   qspec_then ‘cv_snd (cv_snd x2)’ assume_tac cv_size_cv_fst_cv_snd >>
+   gvs []
+   );
 
 (* The pre-relation is total: every input of every function has a translated
  * step, so the equations cv derives from it fire unconditionally.
@@ -575,6 +604,12 @@ Theorem yul_pre[cv_pre]:
 Proof
   ho_match_mp_tac eval_yul_block_ind \\ rw []
   \\ simp [Once yul_pre_def]
+  (* a call's precondition is the precondition of each of its sub-calls, at
+   * the machine the sub-call is actually made on; the case split puts that
+   * machine in the form the induction hypothesis wants *)
+  \\ rw []
+  \\ Cases_on ‘m’ \\ gvs []
+  \\ metis_tac []
 QED
 
 val () = cv_auto_trans run_yul_def;
