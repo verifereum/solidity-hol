@@ -1083,13 +1083,7 @@ Proof
   simp_tac std_ss [Once elab_expr_pre_def] >> rw[] >> fs[]
 QED
 
-val elab_condition_pre_def = cv_auto_trans_pre "elab_condition_pre" elab_condition_def;
-
-Theorem elab_condition_pre[cv_pre,local]:
-  ∀ctx n c. elab_condition_pre ctx n c
-Proof
-  simp[elab_condition_pre_def, elab_expr_pre]
-QED
+val () = cv_auto_trans elab_condition_def;
 
 val coerce_values_pre_def =
   cv_auto_trans_pre "coerce_values_pre" coerce_values_def;
