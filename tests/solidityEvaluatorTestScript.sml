@@ -182,14 +182,14 @@ Definition test_program_def:
     procedures := [add_proc; sum_proc; fact_proc; pair_proc; first_proc;
                    spin_proc; fail_proc; call_fail_proc; callee_proc;
                    caller_proc];
-    struct_layouts := [];
+    struct_layouts := []; type_declarations := [];
     state_variables := [];
     entry_procedure := AstId 1
   |>
 End
 
 Definition test_env_def:
-  test_env = core_program_environment [] test_program
+  test_env = core_program_environment test_program
 End
 
 Theorem test_program_wf:
@@ -293,7 +293,7 @@ End
 Definition storage_program_def:
   storage_program vs = <|
     procedures := [store_proc];
-    struct_layouts := [];
+    struct_layouts := []; type_declarations := [];
     state_variables := vs;
     entry_procedure := AstId 20
   |>
@@ -301,7 +301,7 @@ End
 
 Definition storage_wf_def:
   storage_wf vs ⇔
-    wf_core_program (core_program_environment [] (storage_program vs))
+    wf_core_program (core_program_environment (storage_program vs))
       (storage_program vs)
 End
 
@@ -328,7 +328,7 @@ End
 
 Definition run_store_def:
   run_store st x =
-    (invoke_source 10 (core_program_environment [] (storage_program [counter]))
+    (invoke_source 10 (core_program_environment (storage_program [counter]))
        (AstId 20) [ScalarValue (IntegerValue x)] st []).completion
 End
 

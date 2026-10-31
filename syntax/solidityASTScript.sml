@@ -155,13 +155,24 @@ Definition valid_type_shape_def:
   (valid_type_shape (ContractT _) ⇔ T) ∧
   (valid_type_shape (UserValueT _) ⇔ T) ∧
   (valid_type_shape (FunctionT _ _ parameters returns) ⇔
-    EVERY valid_type_shape parameters ∧ EVERY valid_type_shape returns) ∧
+    valid_type_shapes parameters ∧ valid_type_shapes returns) ∧
   (valid_type_shape (LocatedT location ty) ⇔
     valid_type_shape ty ∧ outer_location_free ty ∧
-    location_shape_ok location ty)
+    location_shape_ok location ty) ∧
+  (valid_type_shapes [] ⇔ T) ∧
+  (valid_type_shapes (ty :: tys) ⇔ valid_type_shape ty ∧ valid_type_shapes tys)
 Termination
-  WF_REL_TAC ‘measure sol_type_size’
+  WF_REL_TAC ‘measure (λx. case x of
+    INL ty => sol_type_size ty
+  | INR tys => list_size sol_type_size tys)’ >>
+  rw[fetch "-" "sol_type_size_def", list_size_def]
 End
+
+Theorem valid_type_shapes_every[simp]:
+  valid_type_shapes tys ⇔ EVERY valid_type_shape tys
+Proof
+  Induct_on ‘tys’ >> simp[valid_type_shape_def]
+QED
 
 Theorem valid_uint256:
   valid_type_shape (UintT 256)

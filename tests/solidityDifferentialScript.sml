@@ -261,7 +261,7 @@ Definition source_execution_def:
               NONE => (Diagnostic UnencodableArguments, NONE)
             | SOME vs =>
                 let st = differential_state (contract_accounts code storage) in
-                let r = invoke_source fuel (core_program_environment [] prog)
+                let r = invoke_source fuel (core_program_environment prog)
                           (AstId f.fn_info.node_id) vs st [] in
                 (completion_outcome rets r.completion,
                  case committed_world st.world r.state.world r.completion of

@@ -139,7 +139,7 @@ fun type_identifier tid =
 
 fun import_error_with contracts name v =
   (import_source_unit v contracts; raise Fail (name ^ ": imported"))
-  handle ImportError _ => ()
+  handle ImportError _ => () | MalformedInput _ => ()
 
 val import_error = import_error_with contracts
 
@@ -445,6 +445,14 @@ val array_fixture = "../testdata/differential/expected/storage_arrays.json"
 val array_source = "testdata/differential/storage_arrays.sol"
 val array_ast = artifact_part array_fixture ["sources", array_source, "ast"]
 val array_contracts = artifact_part array_fixture ["contracts", array_source]
+
+(* A null index is a valid array type expression, not malformed compiler JSON. *)
+val () =
+  (import_source_unit
+     (edit_first "IndexAccess" (set_field "indexExpression" JSON.NULL) array_ast)
+     array_contracts;
+   raise Fail "array type expression imported")
+  handle ImportError _ => ();
 
 Definition array_unit_def:
   array_unit = ^(import_artifact array_fixture array_source)
