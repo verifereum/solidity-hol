@@ -248,7 +248,7 @@ Definition committed_world_def:
     | _ => NONE
 End
 
-(* The outcome, and the final storage at the slots, of the evaluator run. *)
+(* The outcome and complete committed contract storage of the evaluator run. *)
 Definition source_execution_def:
   source_execution code u prog fuel name args storage =
     case unit_function u name of

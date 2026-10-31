@@ -146,6 +146,12 @@ End
 
 val () = cv_auto_trans unlisted_write_program_def;
 
+Theorem unlisted_write_program_wf:
+  wf_core_program (core_program_environment unlisted_write_program) unlisted_write_program
+Proof
+  CONV_TAC cv_eval
+QED
+
 Theorem unlisted_mapping_write_escaped_slot_projection:
   evm_observation corpus_mappings_code corpus_mappings_unit "read" [IntArg 0]
       [] (observed_slots unlisted_write_program [] []) =
