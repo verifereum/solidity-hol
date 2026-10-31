@@ -22,6 +22,12 @@ sig
    *)
   val prepare_unit : term -> prepared
 
-  (* The normal consumer entry point. *)
-  val prepare_artifact : {root : string, path : string, source : string} -> prepared
+  (* Import one source from an artifact already checked by read_artifact.
+   * Consumers of several sources import them all before semantic preparation.
+   *)
+  val import_unit : JSON.value -> string -> term
+
+  (* The normal consumer entry point; retain the checked artifact for bytecode. *)
+  val prepare_artifact : {root : string, path : string, source : string} ->
+    {artifact : JSON.value, prepared : prepared}
 end

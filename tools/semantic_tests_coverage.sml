@@ -35,12 +35,12 @@ local
         (JSONUtil.lookupField artifact "output") "sources" of
           JSON.OBJECT sources => map fst sources
         | _ => raise Fail (path ^ ": expected output sources object")
-      val () = if null sources then
-        raise solidityPrepareLib.PreparationError
-          (solidityPrepareLib.UnsupportedLowering, "artifact has no source units")
-        else ()
-      val _ = map (fn source => solidityPrepareLib.prepare_artifact
-        {root = ".", path = path, source = source}) sources
+      (* Report import blockers before lowering any source of a multi-source test. *)
+      val units = map (fn source =>
+        (source, solidityPrepareLib.import_unit artifact source)) sources
+      val _ = map (fn (source, unit) => solidityPrepareLib.prepare_unit unit
+        handle solidityPrepareLib.PreparationError (kind, message) =>
+          raise solidityPrepareLib.PreparationError (kind, source ^ ": " ^ message)) units
     in
       emit test "admitted" NONE
     end
@@ -48,7 +48,6 @@ local
       let val status = case kind of
         solidityPrepareLib.UnsupportedImport => "import-rejected"
       | solidityPrepareLib.UnsupportedLowering => "elaboration-rejected"
-      | solidityPrepareLib.SourceRejected => "elaboration-rejected"
       | _ => solidityPrepareLib.failure_name kind
       in emit test status (SOME message) end
 

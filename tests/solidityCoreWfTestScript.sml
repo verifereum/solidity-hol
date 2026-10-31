@@ -763,6 +763,16 @@ Proof
   EVAL_TAC
 QED
 
+Theorem struct_declarations_must_match_layout:
+  ¬wf_core_environment
+    (struct_layout_environment [packed_struct_layout] with type_declarations := []) ∧
+  ¬wf_core_environment
+    (struct_layout_environment [packed_struct_layout] with type_declarations :=
+      [(AstId 950, StructDeclaration [(AstId 951, UintT 16); (AstId 952, IntT 16)])])
+Proof
+  EVAL_TAC
+QED
+
 Theorem malformed_struct_fields_rejected:
   ¬wf_core_environment
     (struct_layout_environment [packed_struct_layout with struct_fields :=
