@@ -164,6 +164,20 @@ Proof
   CONV_TAC (cv_eval_call "source_observation") >> REFL_TAC
 QED
 
+Theorem unlisted_mapping_write_old_comparison_agrees:
+  compare_observations
+    (expected_outcome corpus_mappings_unit "read" (ExpectReturn [IntArg 0]), [(0,0); (1,0); (2,0); (3,0); (4,0); (5,0); (6,0)])
+    (evm_observation corpus_mappings_code corpus_mappings_unit "read" [IntArg 0]
+      [] (observed_slots unlisted_write_program [] []))
+    (source_observation corpus_mappings_code corpus_mappings_unit
+      unlisted_write_program 1000 "read" [IntArg 0] []
+      (observed_slots unlisted_write_program [] [])) = Agree (expected_outcome corpus_mappings_unit "read" (ExpectReturn [IntArg 0]))
+Proof
+  CONV_TAC (cv_eval_call "observed_slots") >>
+  CONV_TAC (cv_eval_call "evm_observation") >>
+  CONV_TAC (cv_eval_call "source_observation") >> CONV_TAC cv_eval
+QED
+
 Theorem unlisted_mapping_write_detected:
   differential_verdict corpus_mappings_code corpus_mappings_unit
     unlisted_write_program 1000 "read" [IntArg 0] []

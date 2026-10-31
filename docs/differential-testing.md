@@ -15,10 +15,11 @@ the compiler or its artifact producer.
 
 Both runs return an outcome and the complete committed storage of the tested
 contract. Source frame completion rolls back writes on panic or revert before
-comparison. Verifereum storage is a total word-to-word function; its canonical
-sparse cv encoding omits zero entries. The proved injectivity of that encoding
-makes cv equality a complete storage comparison, including unlisted mapping
-keys and cleared slots.
+comparison. The verdict compares total word-to-word storage functions by HOL
+equality, so agreement includes every slot, including unlisted mapping keys and
+cleared slots. The existing Verifereum from/to theorem and HOL's generic cv
+equality rule evaluate this equality using the canonical sparse encoding,
+which omits zero entries.
 
 The expected store is the initial store with the case's final entries applied;
 all unspecified slots are zero. Selected slots (variable roots and explicitly

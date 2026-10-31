@@ -25,7 +25,7 @@
  *)
 Theory solidityDifferential
 Ancestors
-  solidityStorage
+ 
   solidityElaborate contractABI keccak vfmCompute
 Libs
   cv_transLib wordsLib intLib
@@ -187,10 +187,7 @@ Definition storage_values_def:
   storage_values st slots = MAP (λk. (k, w2n (lookup_storage (n2w k) st))) slots
 End
 
-Definition storage_at_def:
-  storage_at accounts slots =
-    storage_values (lookup_account contract_address accounts).storage slots
-End
+
 
 (* A projection for diagnostics and the retained listed-slot interface. *)
 Definition project_observation_def:
@@ -303,7 +300,7 @@ Definition call_data_def:
 End
 
 (* A call of the code deployed at 0x1000 from 0x2000: its outcome, and the
- * final storage at the slots.
+ * complete committed storage.
  *)
 Definition evm_execution_def:
   evm_execution code u name args storage =
@@ -454,6 +451,18 @@ Proof
   drule compare_observations_agree >> simp[]
 QED
 
+(* Full committed storage, including slots absent from diagnostics. *)
+Theorem differential_agrees_storage:
+  differential_agrees code u prog fuel name args storage e final ⇒
+  SND (evm_execution code u name args storage) =
+    SOME (seed_storage (final ++ storage)) ∧
+  SND (source_execution code u prog fuel name args storage) =
+    SOME (seed_storage (final ++ storage))
+Proof
+  rw[differential_agrees_def, differential_verdict_def] >>
+  every_case_tac >> gvs[is_agreement_def]
+QED
+
 val () = cv_auto_trans argument_scalar_def;
 val () = cv_auto_trans solidityCoreWfTheory.elementary_scalar_has_type_def;
 val () = cv_auto_trans argument_value_def;
@@ -473,7 +482,6 @@ val () = cv_auto_trans contract_accounts_def;
 val () = cv_auto_trans listTheory.nub_def;
 val () = cv_auto_trans observed_slots_def;
 val () = cv_auto_trans storage_values_def;
-val () = cv_auto_trans storage_at_def;
 val () = cv_auto_trans project_observation_def;
 val () = cv_auto_trans expected_storage_def;
 val () = cv_auto_trans committed_world_def;
