@@ -126,8 +126,9 @@ compiler initially supplies layout calculation; Solidity-HOL interprets the
 layout when reading, writing, and capturing references. The declaration IDs in
 layout entries must resolve to compatible state-variable declarations.
 
-For value-type state variables and scalar-key mappings to scalar values
-(including nested mappings), this is implemented. The importer takes each
+For value-type state variables, scalar-key nested mappings and fixed-size
+storage arrays with scalar leaves (including nested arrays), this is implemented.
+The importer takes each
 contract's `storageLayout.storage` entries in declaration order, with their
 slot, byte offset and type identifier; `valid_src_unit` requires one entry per
 state variable, naming its declaration and type, and leaves the layout
@@ -137,8 +138,12 @@ compiler. Elaboration copies slot and offset into the core program's
 are import errors. Mapping key/value types come from recursive type-name
 normalization. AST and layout type identifiers use different encodings; both
 are checked against the normalized type. The scalar leaf width determines
-its storage read/write, and mapping root slots come from the layout. Other
-reference-type declarations remain coverage work.
+its storage read/write, and aggregate root slots come from the layout. Fixed
+array dimensions come from the compiler's resolved integer type of the length
+expression. Scalar elements pack without straddling slots; each nested row
+starts on a fresh slot. Array indexing checks bounds with panic `0x32`, and
+`.length` still evaluates its indexed prefix. Dynamic arrays, memory/calldata
+arrays and aggregate copies remain coverage work.
 
 The selected compiler also emits `transientStorageLayout`. It is empty for the
 initial corpus, so transient layout remains unvalidated.
@@ -186,7 +191,7 @@ import error, not a partial semantic result.
 
 Before fixing a complete core AST, extend the corpus to cover control flow,
 tuple holes, modifiers, inheritance and `super`, external calls, creation,
-try/catch, errors, fallback/receive, fixed arrays, bytes/string, function
+try/catch, errors, fallback/receive, dynamic and memory/calldata arrays, bytes/string, function
 pointers, transient storage, and custom storage layout bases. The first HOL type
 theory can begin from the normalized types already observed, provided unsupported
 forms continue to fail closed.

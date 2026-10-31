@@ -101,6 +101,24 @@ fun type_name v = within v (fn v =>
         con "SrcElementaryTypeName"
           [info v, mk_str name, mk_opt stringSyntax.string_ty (Option.map mk_str mutability)]
       end
+  | "ArrayTypeName" =>
+      let
+        val length = case optional_field v "length" of
+                       SOME e => e
+                     | NONE => fail (describe v ^ ": dynamic arrays are not supported")
+        val dimension =
+          case String.fields (fn c => c = #"_")
+                 (string_field (field length "typeDescriptions") "typeIdentifier") of
+            ["t", "rational", n, "by", "1"] =>
+              if size n > 0 andalso CharVector.all Char.isDigit n
+              then IntInf.fromString n else NONE
+          | _ => NONE
+        val n = case dimension of
+                  SOME n => if n > 0 then n else fail "nonpositive array length"
+                | NONE => fail (describe v ^ ": array length is not a positive integer constant")
+      in
+        con "SrcArrayTypeName" [info v, type_name (field v "baseType"), mk_num n]
+      end
   | other => fail (describe v ^ ": unsupported type name " ^ other))
 
 (* Expressions *)
@@ -115,6 +133,10 @@ fun expr v = within v (fn v =>
           [info v, mk_str (string_field v "name"), mk_num declaration,
            type_id v]
       end
+  | "MemberAccess" =>
+      (require v (string_field v "memberName" = "length")
+         "only fixed-array length members are supported";
+       con "SrcArrayLength" [info v, expr (field v "expression"), type_id v])
   | "Literal" =>
       (require v (not (isSome (optional_field v "subdenomination")))
          "literal subdenominations are not supported";

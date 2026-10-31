@@ -5,8 +5,8 @@
  * closed: an unknown nodeType, a missing required field, or a feature outside
  * the subset (public, constant, immutable or initialised state variables,
  * modifiers, inheritance, named or try calls, literal subdenominations,
- * inline arrays, type names other than elementary types and mappings, ...)
- * raises ImportError. Every node keeps its compiler id and source range;
+ * inline arrays, type names other than elementary types, fixed arrays and mappings, ...)
+ * raises ImportError. Semantic nodes keep their compiler id and source range;
  * declarations are referred to by id, and names are diagnostic only. Type
  * annotations are kept as the compiler's encoded typeIdentifier and decoded
  * here, never from the display typeString.
@@ -63,7 +63,8 @@ End
 (* ElementaryTypeName: name and, for addresses, stateMutability. *)
 Datatype:
   src_type_name = SrcElementaryTypeName node_info string (string option)
-                | SrcMappingTypeName node_info src_type_name src_type_name
+                | SrcArrayTypeName node_info src_type_name num
+  | SrcMappingTypeName node_info src_type_name src_type_name
 End
 
 Datatype:
@@ -90,6 +91,7 @@ End
 Datatype:
   src_expr
   = SrcIdentifier node_info string num string
+  | SrcArrayLength node_info src_expr string
   | SrcLiteral node_info string string string
   | SrcUnaryOperation node_info string bool src_expr string
   | SrcBinaryOperation node_info string src_expr src_expr string string
@@ -202,6 +204,11 @@ Definition normalize_type_name_def:
         else if mutability = SOME "payable" then SOME (AddressT PayableAddress)
         else NONE
     | SOME ty => if mutability = NONE then SOME ty else NONE
+    | NONE => NONE) ∧
+  (normalize_type_name (SrcArrayTypeName _ element n) =
+    case normalize_type_name element of
+      SOME ty => if 0 < n ∧ n < 2 ** 256 then SOME (ArrayT ty (SOME n))
+                 else NONE
     | NONE => NONE) ∧
   (normalize_type_name (SrcMappingTypeName _ key value) =
     case (normalize_type_name key, normalize_type_name value) of
@@ -324,7 +331,7 @@ Proof
   Induct_on ‘tn’ >> rw[normalize_type_name_def, AllCaseEqs()] >>
   imp_res_tac elementary_type_valid >>
   imp_res_tac elementary_type_outer_free >>
-  gvs[valid_type_shape_def, outer_location_free_def] >>
+  gvs[valid_type_shape_def, outer_location_free_def, valid_array_length_def] >>
   metis_tac[elementary_mapping_key]
 QED
 
@@ -383,6 +390,9 @@ Definition storage_type_identifier_def:
   (storage_type_identifier (AddressT NonpayableAddress) = "t_address") ∧
   (storage_type_identifier (AddressT PayableAddress) = "t_address_payable") ∧
   (storage_type_identifier (FixedBytesT n) = "t_bytes" ++ toString n) ∧
+  (storage_type_identifier (ArrayT element (SOME n)) =
+    "t_array$_" ++ storage_type_identifier element ++ "_$" ++ toString n ++
+    "_storage") ∧
   (storage_type_identifier (MappingT key value) =
     "t_mapping$_" ++ storage_type_identifier key ++ "_$_" ++
     storage_type_identifier value ++ "_$") ∧
@@ -391,6 +401,9 @@ End
 
 (* storageLayout uses parentheses and commas where AST identifiers use $_. *)
 Definition storage_layout_identifier_def:
+  (storage_layout_identifier (ArrayT element (SOME n)) =
+    "t_array(" ++ storage_layout_identifier element ++ ")" ++ toString n ++
+    "_storage") ∧
   (storage_layout_identifier (MappingT key value) =
     "t_mapping(" ++ storage_layout_identifier key ++ "," ++
     storage_layout_identifier value ++ ")") ∧
@@ -424,6 +437,8 @@ End
 
 Definition type_name_ids_def:
   (type_name_ids (SrcElementaryTypeName info _ _) = [info.node_id]) ∧
+  (type_name_ids (SrcArrayTypeName info element _) =
+    info.node_id :: type_name_ids element) ∧
   (type_name_ids (SrcMappingTypeName info key value) =
     info.node_id :: type_name_ids key ++ type_name_ids value)
 End
@@ -435,6 +450,8 @@ End
 
 Definition expr_ids_def:
   (expr_ids (SrcIdentifier info _ _ _) = [info.node_id]) ∧
+  (expr_ids (SrcArrayLength info root_expr _) =
+    info.node_id :: expr_ids root_expr) ∧
   (expr_ids (SrcLiteral info _ _ _) = [info.node_id]) ∧
   (expr_ids (SrcUnaryOperation info _ _ e _) = info.node_id :: expr_ids e) ∧
   (expr_ids (SrcBinaryOperation info _ l r _ _) =
@@ -558,6 +575,18 @@ Definition check_expr_def:
     case (check_expr env root_expr, check_expr env index) of
       (SOME (SrcType (MappingT key value)), SOME _) =>
         if source_type_matches value tid then SOME (SrcType value) else NONE
+    | (SOME (SrcType (ArrayT element (SOME _))), SOME index_type) =>
+        if source_type_matches element tid ∧
+           (case index_type of
+              SrcType (UintT _) => T
+            | SrcRational i d => 0 ≤ i ∧ d = 1
+            | _ => F)
+        then SOME (SrcType element) else NONE
+    | _ => NONE) ∧
+  (check_expr env (SrcArrayLength _ root_expr tid) =
+    case check_expr env root_expr of
+      SOME (SrcType (ArrayT _ (SOME _))) =>
+        if tid = "t_uint256" then SOME (SrcType (UintT 256)) else NONE
     | _ => NONE) ∧
   (check_expr env (SrcLiteral _ kind value tid) =
     if kind = "number" then

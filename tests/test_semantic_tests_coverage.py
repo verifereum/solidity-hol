@@ -184,7 +184,7 @@ class ClassifyTests(unittest.TestCase):
         v["storageLocation"] = "storage"
         self.assertIn("local reference bindings", {b.feature for b in coverage.elaboration_blockers(v)})
 
-    def test_mapping_indexing_is_admitted_but_other_indexing_is_elaboration(self) -> None:
+    def test_mapping_and_fixed_storage_array_indexing_are_admitted(self) -> None:
         base = {"nodeType": "Identifier", "id": 5, "name": "m", "referencedDeclaration": 3,
                 "typeDescriptions": {"typeIdentifier": "t_mapping$_t_uint256_$_t_uint8_$"}}
         index = {"nodeType": "IndexAccess", "id": 6, "baseExpression": base,
@@ -194,8 +194,22 @@ class ClassifyTests(unittest.TestCase):
         self.assertEqual(coverage.scan({"t.sol": unit([function(4, [index])])}), {})
         base["typeDescriptions"]["typeIdentifier"] = "t_array$_t_uint8_$2_storage"
         self.assertEqual(coverage.node_blockers(index), [])
+        self.assertEqual(coverage.scan({"t.sol": unit([function(4, [index])])}), {})
+        base["typeDescriptions"]["typeIdentifier"] = "t_array$_t_uint8_$dyn_storage"
         self.assertEqual(coverage.elaboration_blockers(index), [
             coverage.Blocker("IndexAccess", "arrays", "elaboration")])
+
+    def test_nested_array_types_and_fixed_length_prefix(self) -> None:
+        tid = "t_array$_t_array$_t_uint24_$11_storage_$2_storage"
+        self.assertTrue(coverage.storage_type_supported(tid))
+        self.assertFalse(coverage.storage_type_supported(tid + "_ptr"))
+        self.assertFalse(coverage.storage_type_supported("t_array$_t_uint8_$2_memory_ptr"))
+        self.assertFalse(coverage.storage_type_supported("t_array$_t_mapping$_t_uint8_$_t_uint8_$_$2_storage"))
+        root = {"nodeType": "Identifier", "id": 5, "name": "rows", "referencedDeclaration": 3,
+                "typeDescriptions": {"typeIdentifier": tid}}
+        length = {"nodeType": "MemberAccess", "id": 6, "memberName": "length", "expression": root,
+                  "typeDescriptions": {"typeIdentifier": "t_uint256"}}
+        self.assertEqual(coverage.scan({"t.sol": unit([function(4, [length])])}), {})
 
     def test_compilation_retains_storage_layout_for_import(self) -> None:
         metadata = {"storageLayout": {"storage": [{"astId": 3, "slot": "0"}]},

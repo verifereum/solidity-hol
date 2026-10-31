@@ -2,8 +2,8 @@
  * core, for the pinned profile solc-0.8.37-via-ir-osaka.
  *
  * Admitted: one contract of functions over elementary value types, with
- * value-type state variables and scalar-key nested mappings at their layout
- * entries, indexed scalar reads/updates, locals
+ * value-type state variables, scalar-key nested mappings and fixed storage
+ * arrays at their layout entries, indexed scalar reads/updates, fixed lengths, locals
  * (including tuple declarations with holes), internal calls with single or
  * multiple returns, explicit elementary conversions, literals, unary, binary,
  * comparison and short-circuit operators, simple and compound assignment to
@@ -215,6 +215,7 @@ Definition expr_assigns_def:
   (expr_assigns (SrcTupleExpression _ cs _) ⇔ components_assign cs) ∧
   (expr_assigns (SrcFunctionCall _ _ args _) ⇔ exprs_assign args) ∧
   (expr_assigns (SrcIndexAccess _ b i _) ⇔ expr_assigns b ∨ expr_assigns i) ∧
+  (expr_assigns (SrcArrayLength _ root_expr _) ⇔ expr_assigns root_expr) ∧
   (expr_assigns (SrcTypeConversion _ _ e _) ⇔ expr_assigns e) ∧
   (expr_assigns _ ⇔ F) ∧
   (components_assign [] ⇔ F) ∧
@@ -290,6 +291,12 @@ Definition elab_expr_def:
              let (ss, a) = read in
              SOME ((ss, a, ElabType (place_type place)), n1)
          | NONE => NONE)
+    | SrcArrayLength _ root_expr _ =>
+        (case elab_location ctx n root_expr of
+           SOME ((ss, _, ArrayT _ (SOME length)), n1) =>
+             SOME ((ss, ConstantAtom (IntegerValue (&length)),
+                    ElabType (UintT 256)), n1)
+         | _ => NONE)
     | SrcLiteral _ kind value tid =>
         (if kind = "bool" then
            SOME (([], ConstantAtom (BoolValue (value = "true")), ElabType BoolT), n)
@@ -566,6 +573,17 @@ Definition elab_expr_def:
                               [DefineStmt (AstId n3) (ReferenceType value)
                                 (NavigateOperation value ref (IndexNavigation a'))],
                               BoundAtom (AstId n3), value), n3 + 1)
+                   | NONE => NONE)
+              | NONE => NONE)
+         | SOME ((ss, ref, ArrayT element (SOME _)), n1) =>
+             (case elab_expr ctx n1 index of
+                SOME ((si, a, vt), n2) =>
+                  (case coerce n2 (UintT 256) a vt of
+                     SOME ((cs, a'), n3) =>
+                       SOME ((ss ++ si ++ cs ++
+                              [DefineStmt (AstId n3) (ReferenceType element)
+                                (NavigateOperation element ref (IndexNavigation a'))],
+                              BoundAtom (AstId n3), element), n3 + 1)
                    | NONE => NONE)
               | NONE => NONE)
          | _ => NONE)

@@ -272,6 +272,30 @@ Definition mapping_slot_def:
     word_of_bytes_be (Keccak_256_w64 (key_bytes ++ num_to_bytes 32 (w2n slot)))
 End
 
+(* One new index from a captured fixed-array reference. The caller has already
+ * evaluated the index; slot arithmetic wraps at the EVM word width. *)
+Definition fixed_array_element_def:
+  fixed_array_element addr slot element length layout (i : int) =
+    if i < 0 ∨ &length ≤ i then ValueAbrupt (PanicCompletion 50) else
+    case storage_bytes element of
+      SOME b =>
+        if b = 0 ∨ 32 < b then
+          ValueAbrupt (InvalidCompletion "bad array element width")
+        else
+          let per_slot = 32 DIV b in
+          ValueOk (ReferenceValue
+            (StorageReference PersistentStorage addr
+              (n2w (w2n slot + Num i DIV per_slot))
+              (b * (Num i MOD per_slot)) element layout))
+    | NONE =>
+        case fixed_storage_slots element of
+          SOME slots =>
+            ValueOk (ReferenceValue
+              (StorageReference PersistentStorage addr
+                (n2w (w2n slot + Num i * slots)) 0 element layout))
+        | NONE => ValueAbrupt (InvalidCompletion "bad array element type")
+End
+
 (* Navigation consumes already evaluated atoms and returns a concrete location.
  * A nested mapping starts at the preceding mapping's hashed slot.
  *)
@@ -285,6 +309,11 @@ Definition navigate_storage_def:
                (StorageReference PersistentStorage addr (mapping_slot bs slot)
                   0 value layout))
          | NONE => ValueAbrupt (InvalidCompletion "bad mapping key"))
+    | StorageReference PersistentStorage addr slot 0
+        (ArrayT element (SOME length)) layout =>
+        (case s of
+           IntegerValue i => fixed_array_element addr slot element length layout i
+         | _ => ValueAbrupt (InvalidCompletion "bad array index"))
     | _ => ValueAbrupt (InvalidCompletion "unsupported storage navigation")
 End
 

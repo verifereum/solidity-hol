@@ -17,9 +17,9 @@ tools/semantic_tests_coverage.py ../solidity-tests --solc /path/to/solc
 
 | outcome | tests |
 | --- | ---: |
-| admitted | 110 |
-| elaboration-rejected | 61 |
-| import-rejected | 1399 |
+| admitted | 113 |
+| elaboration-rejected | 83 |
+| import-rejected | 1374 |
 | compile-failure | 0 |
 | skipped | 100 |
 | total | 1670 |
@@ -32,49 +32,50 @@ The scan disagrees with the HOL run on 0 tests.
 
 | feature | AST nodes | tests | only blocker | first |
 | --- | --- | ---: | ---: | ---: |
-| arrays | `ArrayTypeName`, `FunctionCall`, `IndexAccess`, `MemberAccess`, `TupleExpression`, `VariableDeclaration` | 424 | 36 | 230 |
-| bytes and string | `FunctionCall`, `IndexAccess`, `Literal`, `MemberAccess`, `NewExpression`, `TupleExpression`, `VariableDeclaration` | 413 | 27 | 40 |
+| bytes and string | `FunctionCall`, `IndexAccess`, `Literal`, `MemberAccess`, `NewExpression`, `TupleExpression`, `VariableDeclaration` | 413 | 27 | 36 |
+| arrays | `ArrayTypeName`, `FunctionCall`, `IndexAccess`, `MemberAccess`, `TupleExpression`, `VariableDeclaration` | 402 | 4 | 170 |
 | source units without exactly one contract | `SourceUnit` | 341 | 0 | 0 |
+| array values | `Identifier`, `IndexAccess` | 292 | 5 | 0 |
 | local reference bindings | `VariableDeclaration` | 278 | 0 | 0 |
-| inline assembly | `InlineAssembly` | 266 | 59 | 111 |
-| external calls and contract members | `FunctionCall`, `MemberAccess`, `TupleExpression`, `UserDefinedTypeName`, `VariableDeclaration` | 227 | 0 | 40 |
-| require/assert/revert | `Identifier` | 216 | 7 | 30 |
-| structs | `FunctionCall`, `IndexAccess`, `MemberAccess`, `StructDefinition`, `TupleExpression`, `UserDefinedTypeName`, `VariableDeclaration` | 214 | 7 | 172 |
-| constructors | `FunctionDefinition` | 208 | 1 | 23 |
-| public state variables | `VariableDeclaration` | 206 | 3 | 103 |
+| inline assembly | `InlineAssembly` | 266 | 60 | 122 |
+| external calls and contract members | `FunctionCall`, `MemberAccess`, `TupleExpression`, `UserDefinedTypeName`, `VariableDeclaration` | 227 | 0 | 43 |
+| require/assert/revert | `Identifier` | 216 | 7 | 34 |
+| structs | `FunctionCall`, `IndexAccess`, `MemberAccess`, `StructDefinition`, `TupleExpression`, `UserDefinedTypeName`, `VariableDeclaration` | 214 | 9 | 174 |
+| constructors | `FunctionDefinition` | 208 | 1 | 24 |
+| public state variables | `VariableDeclaration` | 206 | 3 | 104 |
 | this | `Identifier` | 167 | 0 | 2 |
 | declaration values | `VariableDeclaration` | 160 | 0 | 38 |
 | inheritance | `ContractDefinition`, `Identifier`, `InheritanceSpecifier`, `MemberAccess`, `TupleExpression` | 151 | 1 | 112 |
 | function members (selector, address, …) | `MemberAccess`, `TupleExpression`, `VariableDeclaration` | 124 | 0 | 9 |
 | libraries | `ContractDefinition` | 116 | 0 | 7 |
 | memory arrays (new T[](n)) | `NewExpression` | 111 | 0 | 0 |
-| library calls and contract-name members | `IndexAccess`, `MemberAccess` | 110 | 0 | 18 |
+| library calls and contract-name members | `IndexAccess`, `MemberAccess` | 110 | 0 | 19 |
 | contracts without functions | `ContractDefinition` | 101 | 6 | 0 |
-| abi.* functions | `Identifier`, `MemberAccess` | 100 | 1 | 22 |
-| function types | `FunctionTypeName` | 99 | 0 | 39 |
-| type names as values | `ElementaryTypeNameExpression` | 91 | 0 | 5 |
+| abi.* functions | `Identifier`, `MemberAccess` | 100 | 1 | 26 |
+| function types | `FunctionTypeName` | 99 | 0 | 42 |
+| type names as values | `ElementaryTypeNameExpression` | 91 | 0 | 6 |
 | using for | `MemberAccess`, `UsingForDirective` | 81 | 0 | 47 |
 | contract creation (new C) | `NewExpression` | 80 | 0 | 8 |
 | operator delete | `UnaryOperation` | 75 | 2 | 0 |
 | free functions | `FunctionDefinition` | 73 | 3 | 31 |
-| msg/block/tx globals | `Identifier`, `MemberAccess` | 71 | 12 | 27 |
+| msg/block/tx globals | `Identifier`, `MemberAccess` | 71 | 12 | 28 |
 | mappings | `IndexAccess`, `MemberAccess`, `TupleExpression`, `VariableDeclaration` | 68 | 0 | 0 |
 | hash and signature built-ins | `Identifier` | 62 | 2 | 9 |
-| constant expressions over literals | `BinaryOperation`, `UnaryOperation` | 60 | 10 | 0 |
 | events | `EmitStatement`, `EventDefinition`, `MemberAccess` | 60 | 6 | 43 |
 | address members (balance, call, transfer, …) | `MemberAccess` | 58 | 0 | 3 |
+| constant expressions over literals | `BinaryOperation`, `UnaryOperation` | 57 | 10 | 0 |
 | overrides | `FunctionDefinition`, `OverrideSpecifier` | 57 | 0 | 0 |
 | imports | `ImportDirective`, `MemberAccess`, `TupleExpression` | 56 | 0 | 11 |
 | functions as values | `Identifier` | 55 | 1 | 0 |
 | modifiers | `FunctionDefinition`, `ModifierDefinition`, `ModifierInvocation`, `PlaceholderStatement` | 53 | 5 | 32 |
 | user-defined value types | `MemberAccess`, `TupleExpression`, `UserDefinedTypeName`, `UserDefinedValueTypeDefinition`, `VariableDeclaration` | 52 | 5 | 32 |
-| type(…) | `Identifier`, `MemberAccess` | 52 | 0 | 12 |
+| type(…) | `Identifier`, `MemberAccess` | 52 | 0 | 13 |
 | payable functions | `FunctionDefinition` | 50 | 0 | 0 |
 | constants | `VariableDeclaration` | 47 | 0 | 26 |
-| inline arrays | `TupleExpression` | 47 | 0 | 3 |
+| inline arrays | `TupleExpression` | 47 | 0 | 8 |
 | virtual functions | `FunctionDefinition` | 45 | 0 | 4 |
 | transient storage | `VariableDeclaration` | 41 | 4 | 0 |
-| conditional expressions | `Conditional` | 40 | 11 | 19 |
+| conditional expressions | `Conditional` | 40 | 11 | 21 |
 | custom errors | `ErrorDefinition`, `MemberAccess`, `RevertStatement`, `TupleExpression` | 38 | 2 | 18 |
 | interfaces | `ContractDefinition` | 35 | 0 | 0 |
 | unimplemented functions | `FunctionDefinition` | 34 | 0 | 0 |
@@ -91,9 +92,9 @@ The scan disagrees with the HOL run on 0 tests.
 | array slices | `IndexRangeAccess` | 19 | 0 | 5 |
 | fallback functions | `FunctionDefinition` | 18 | 0 | 5 |
 | mapping values | `Identifier`, `IndexAccess` | 17 | 0 | 0 |
-| built-in erc7201 | `Identifier` | 14 | 0 | 3 |
-| fixed-size bytes members and indexing | `IndexAccess`, `MemberAccess` | 12 | 1 | 1 |
-| literal subdenominations (ether, days, …) | `Literal` | 12 | 0 | 1 |
+| fixed-size bytes members and indexing | `IndexAccess`, `MemberAccess` | 12 | 1 | 0 |
+| built-in erc7201 | `Identifier` | 12 | 0 | 3 |
+| literal subdenominations (ether, days, …) | `Literal` | 11 | 0 | 1 |
 | receive functions | `FunctionDefinition` | 7 | 0 | 1 |
 | tuples with empty components | `TupleExpression` | 6 | 0 | 0 |
 | built-in blobhash | `Identifier` | 3 | 2 | 3 |
@@ -109,26 +110,26 @@ Supporting the features in this order admits the most rejected tests at each ste
 
 | step | feature | admitted |
 | ---: | --- | ---: |
-| 1 | inline assembly | 59 |
-| 2 | arrays | 101 |
-| 3 | bytes and string | 136 |
-| 4 | local reference bindings | 178 |
-| 5 | structs | 234 |
-| 6 | require/assert/revert | 271 |
-| 7 | memory arrays (new T[](n)) | 299 |
-| 8 | operator delete | 322 |
-| 9 | constant expressions over literals | 343 |
-| 10 | events | 363 |
-| 11 | public state variables | 383 |
-| 12 | constructors | 411 |
-| 13 | mappings | 439 |
-| 14 | msg/block/tx globals | 466 |
-| 15 | abi.* functions | 485 |
-| 16 | hash and signature built-ins | 506 |
-| 17 | modifiers | 524 |
-| 18 | declaration values | 542 |
-| 19 | inline arrays | 563 |
-| 20 | transient storage | 587 |
+| 1 | inline assembly | 60 |
+| 2 | bytes and string | 94 |
+| 3 | msg/block/tx globals | 112 |
+| 4 | require/assert/revert | 128 |
+| 5 | constant expressions over literals | 143 |
+| 6 | local reference bindings | 157 |
+| 7 | structs | 182 |
+| 8 | arrays | 222 |
+| 9 | array values | 307 |
+| 10 | memory arrays (new T[](n)) | 336 |
+| 11 | operator delete | 360 |
+| 12 | events | 381 |
+| 13 | public state variables | 402 |
+| 14 | constructors | 435 |
+| 15 | mappings | 464 |
+| 16 | abi.* functions | 483 |
+| 17 | hash and signature built-ins | 504 |
+| 18 | modifiers | 522 |
+| 19 | declaration values | 540 |
+| 20 | inline arrays | 561 |
 
 ## Skipped and compile failures
 
@@ -158,6 +159,8 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `arithmetics/exp_associativity.sol`
 - `arithmetics/unchecked_called_by_checked.sol`
 - `arithmetics/unchecked_div_by_zero.sol`
+- `array/copying/array_storage_multi_items_per_slot.sol`
+- `array/fixed_out_of_bounds_array_access.sol`
 - `builtinFunctions/blobhash_shadow_resolution.sol`
 - `builtinFunctions/blockhash_shadow_resolution.sol`
 - `cleanup/bool_conversion_v2.sol`
@@ -177,6 +180,7 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `integer/many_local_variables.sol`
 - `integer/small_signed_types.sol`
 - `isoltestTesting/storage/storage_nonempty.sol`
+- `literals/denominations_in_array_sizes.sol`
 - `operators/compound_assign.sol`
 - `operators/shifts/shift_cleanup.sol`
 - `operators/shifts/shift_constant_left_assignment.sol`
@@ -264,12 +268,33 @@ Supporting the features in this order admits the most rejected tests at each ste
 
 ## Elaborator rejections
 
+- `abicoder/calldataDecoding/array/byte_arrays.sol`: elaborate_unit returned NONE for abicoder/calldataDecoding/array/byte_arrays.sol
+- `abicoder/calldataDecoding/array/calldata_array_bytes_v2.sol`: elaborate_unit returned NONE for abicoder/calldataDecoding/array/calldata_array_bytes_v2.sol
+- `abicoder/calldataDecoding/array/calldata_array_static_of_uint_v2.sol`: elaborate_unit returned NONE for abicoder/calldataDecoding/array/calldata_array_static_of_uint_v2.sol
+- `abicoder/calldataDecoding/array/memory_arrays_static.sol`: elaborate_unit returned NONE for abicoder/calldataDecoding/array/memory_arrays_static.sol
+- `array/arrayMemoryAllocation/array_static_zeroed_memory_index_access.sol`: elaborate_unit returned NONE for array/arrayMemoryAllocation/array_static_zeroed_memory_index_access.sol
+- `array/copying/array_copy_storage_storage_static_simple.sol`: elaborate_unit returned NONE for array/copying/array_copy_storage_storage_static_simple.sol
+- `array/copying/array_copy_storage_storage_static_static.sol`: elaborate_unit returned NONE for array/copying/array_copy_storage_storage_static_static.sol
+- `array/copying/array_copy_target_leftover.sol`: elaborate_unit returned NONE for array/copying/array_copy_target_leftover.sol
+- `array/copying/array_copy_target_leftover2.sol`: elaborate_unit returned NONE for array/copying/array_copy_target_leftover2.sol
+- `array/copying/array_copy_target_simple.sol`: elaborate_unit returned NONE for array/copying/array_copy_target_simple.sol
+- `array/copying/array_copy_target_simple_2.sol`: elaborate_unit returned NONE for array/copying/array_copy_target_simple_2.sol
 - `array/copying/bytes_calldata_to_string_calldata.sol`: elaborate_unit returned NONE for array/copying/bytes_calldata_to_string_calldata.sol
 - `array/copying/bytes_memory_to_storage.sol`: elaborate_unit returned NONE for array/copying/bytes_memory_to_storage.sol
+- `array/copying/calldata_2d_bytes_to_memory.sol`: elaborate_unit returned NONE for array/copying/calldata_2d_bytes_to_memory.sol
+- `array/copying/calldata_array_static_to_memory.sol`: elaborate_unit returned NONE for array/copying/calldata_array_static_to_memory.sol
 - `array/copying/calldata_bytes_to_storage.sol`: elaborate_unit returned NONE for array/copying/calldata_bytes_to_storage.sol
+- `array/copying/storage_memory_packed.sol`: elaborate_unit returned NONE for array/copying/storage_memory_packed.sol
 - `array/copying/string_calldata_to_bytes_calldata.sol`: elaborate_unit returned NONE for array/copying/string_calldata_to_bytes_calldata.sol
+- `array/delete/memory_arrays_delete.sol`: elaborate_unit returned NONE for array/delete/memory_arrays_delete.sol
 - `array/delete/memory_bytes_delete_element.sol`: elaborate_unit returned NONE for array/delete/memory_bytes_delete_element.sol
+- `array/fixed_array_cleanup.sol`: elaborate_unit returned NONE for array/fixed_array_cleanup.sol
+- `array/fixed_bytes_length_access.sol`: elaborate_unit returned NONE for array/fixed_bytes_length_access.sol
 - `array/indexAccess/bytes_index_access_memory.sol`: elaborate_unit returned NONE for array/indexAccess/bytes_index_access_memory.sol
+- `array/indexAccess/bytes_memory_index_access.sol`: elaborate_unit returned NONE for array/indexAccess/bytes_memory_index_access.sol
+- `array/indexAccess/memory_arrays_index_access_write.sol`: elaborate_unit returned NONE for array/indexAccess/memory_arrays_index_access_write.sol
+- `array/short_fixed_array_cleanup.sol`: elaborate_unit returned NONE for array/short_fixed_array_cleanup.sol
+- `array/string_bytes_conversion.sol`: elaborate_unit returned NONE for array/string_bytes_conversion.sol
 - `cleanup/cleanup_address_types_v2.sol`: elaborate_unit returned NONE for cleanup/cleanup_address_types_v2.sol
 - `cleanup/cleanup_bytes_types_v2.sol`: elaborate_unit returned NONE for cleanup/cleanup_bytes_types_v2.sol
 - `constantEvaluator/negative_fractional_mod.sol`: elaborate_unit returned NONE for constantEvaluator/negative_fractional_mod.sol
@@ -281,6 +306,7 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `expressions/exp_zero_literal.sol`: elaborate_unit returned NONE for expressions/exp_zero_literal.sol
 - `expressions/unary_too_long_literal.sol`: elaborate_unit returned NONE for expressions/unary_too_long_literal.sol
 - `functionCall/calldata_argument_internal_bytes.sol`: elaborate_unit returned NONE for functionCall/calldata_argument_internal_bytes.sol
+- `functionCall/mapping_array_internal_argument.sol`: elaborate_unit returned NONE for functionCall/mapping_array_internal_argument.sol
 - `functionCall/mapping_internal_argument.sol`: elaborate_unit returned NONE for functionCall/mapping_internal_argument.sol
 - `functionCall/mapping_internal_return.sol`: elaborate_unit returned NONE for functionCall/mapping_internal_return.sol
 - `isoltestTesting/balance_without_balance.sol`: elaborate_unit returned NONE for isoltestTesting/balance_without_balance.sol

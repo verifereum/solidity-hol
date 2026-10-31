@@ -721,3 +721,14 @@ Theorem mapping_leaf_annotation_checked:
 Proof
   EVAL_TAC
 QED
+
+Theorem array_navigation_leaf_type_must_match:
+  ¬wf_core_operation test_env
+    <| bindings := [(AstId 1, ReferenceType (ArrayT (UintT 8) (SOME 35)))];
+       targets := []; returns := []; in_loop := F |>
+    (ReferenceType (UintT 16))
+    (NavigateOperation (UintT 16) (BoundAtom (AstId 1))
+       (IndexNavigation (ConstantAtom (IntegerValue 1))))
+Proof
+  EVAL_TAC
+QED
