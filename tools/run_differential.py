@@ -203,7 +203,11 @@ def read_artifact(root: Path, path: str) -> dict[str, Any]:
 
 
 def check_artifacts(root: Path, corpus: dict[str, Any]) -> list[dict[str, str]]:
-    """Profile, compiler and source freshness of every artifact, without solc."""
+    """Solc-free diagnostics and source freshness before the authoritative SML check.
+
+    These checks do not admit an artifact: solidityPrepareLib enforces the full
+    compiler/profile contract again when building the kernel-checked corpus.
+    """
     pin = (root / exporter.PIN_FILE.relative_to(exporter.ROOT)).read_text(encoding="ascii").strip()
     profile = exporter.read_json(root / exporter.DEFAULT_PROFILE.relative_to(exporter.ROOT))
     checks: list[dict[str, str]] = []

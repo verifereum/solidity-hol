@@ -136,6 +136,20 @@ class ClassifyTests(unittest.TestCase):
         self.assertEqual(result.first.feature, "unclassified")
         self.assertFalse(result.scan_agrees)
 
+    def test_source_rejection_is_distinct(self) -> None:
+        rejected = coverage.classify("t.sol", {}, {
+            "status": "source-rejected", "message": "valid_src_unit failed"})
+        self.assertEqual(rejected.category, coverage.SOURCE_REJECTED)
+        self.assertFalse(rejected.scan_agrees)
+
+    def test_import_rejection_names_its_source(self) -> None:
+        ast = unit([variable(3, state=True, visibility="public")])
+        named = coverage.classify("t.sol", coverage.scan({"t.sol": ast}), {
+            "status": "import-rejected",
+            "message": "a.sol: VariableDeclaration 3: public state variables are not supported"})
+        self.assertEqual(named.first.feature, "public state variables")
+        self.assertTrue(named.scan_agrees)
+
     def test_elaboration_rejection_and_admission(self) -> None:
         strings = unit([function(4, [{
             "nodeType": "VariableDeclarationStatement", "id": 5,

@@ -1,6 +1,8 @@
 Theory solidityAST
 Ancestors
   arithmetic list
+Libs
+  cv_transLib
 
 Datatype:
   ast_id = AstId num
@@ -167,6 +169,12 @@ Termination
   | INR tys => list_size sol_type_size tys)’ >>
   rw[fetch "-" "sol_type_size_def", list_size_def]
 End
+
+val () = cv_auto_trans_rec valid_type_shape_def (
+  WF_REL_TAC ‘measure (λx. case x of
+    INL ty => cv_size ty
+  | INR tys => cv_size tys)’ >> cv_termination_tac
+);
 
 Theorem valid_type_shapes_every[simp]:
   valid_type_shapes tys ⇔ EVERY valid_type_shape tys

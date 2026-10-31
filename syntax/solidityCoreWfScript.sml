@@ -103,6 +103,12 @@ Termination
   rw[list_size_def]
 End
 
+Theorem mapping_reachable_types_exists:
+  mapping_reachable_types env n tys ⇔ EXISTS (mapping_reachable env n) tys
+Proof
+  Induct_on ‘tys’ >> simp[mapping_reachable_def]
+QED
+
 (* Environment-aware type validation: declared ids resolve, and memory and
  * calldata types reach no mapping, including through struct fields.
  * valid_type_shape checks only the type's own structure.
@@ -132,6 +138,12 @@ Termination
   | INR (env, tys) => list_size sol_type_size tys)’ >>
   rw[solidityASTTheory.sol_type_size_def, list_size_def]
 End
+
+Theorem declared_types_ok_every:
+  declared_types_ok env tys ⇔ EVERY (declared_type_ok env) tys
+Proof
+  Induct_on ‘tys’ >> simp[declared_type_ok_def]
+QED
 
 Definition is_function_type_def[simp]:
   (is_function_type (FunctionT _ _ _ _) ⇔ T) ∧
@@ -220,6 +232,13 @@ Termination
   | INR (env, tys) => list_size core_value_type_size tys)’ >>
   rw[solidityCoreTheory.core_value_type_size_def, list_size_def]
 End
+
+Theorem wf_core_value_types_every:
+  wf_core_value_types env tys ⇔ EVERY (wf_core_value_type env) tys
+Proof
+  Induct_on ‘tys’ >> simp[wf_core_value_type_def]
+QED
+
 
 Definition wf_type_declaration_def:
   (wf_type_declaration env (EnumDeclaration members) ⇔
@@ -743,6 +762,13 @@ Definition wf_core_program_def:
     IS_SOME (lookup_procedure env prog.entry_procedure)
 End
 
+Theorem wf_core_program_environment:
+  wf_core_program env prog ⇒ env = core_program_environment prog
+Proof
+  rw[wf_core_program_def, core_program_environment_def,
+     DB.fetch "solidityCoreWf" "core_environment_component_equality"]
+QED
+
 (* Facts the evaluator can use under wf_core_program. *)
 
 Theorem wf_core_environment_lookup:
@@ -788,11 +814,6 @@ Proof
 QED
 
 (* The checked preparation boundary executes the complete checker through cv. *)
-val () = cv_auto_trans_rec solidityASTTheory.valid_type_shape_def (
-  WF_REL_TAC ‘measure (λx. case x of
-    INL ty => cv_size ty
-  | INR tys => cv_size tys)’ >> cv_termination_tac
-);
 val () = cv_auto_trans core_program_environment_def;
 val () = cv_auto_trans_rec mapping_reachable_def (
   WF_REL_TAC ‘inv_image ($< LEX $<) (λx. case x of

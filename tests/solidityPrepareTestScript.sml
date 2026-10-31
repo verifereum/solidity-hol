@@ -13,9 +13,10 @@ val () = holbuild_extra_deps [
   "../testdata/frontend/expected/pure_core.json"
 ]
 
-val prepared = solidityPrepareLib.prepare_artifact
+val checked_artifact = solidityPrepareLib.prepare_artifact
   {root = "..", path = "../testdata/frontend/expected/pure_core.json",
    source = "testdata/frontend/pure_core.sol"};
+val prepared = #prepared checked_artifact;
 
 Definition prepared_program_def:
   prepared_program = ^(#program prepared)
@@ -67,7 +68,8 @@ val bad_artifact_stream = TextIO.openOut bad_artifact_path;
 val () = TextIO.output (bad_artifact_stream,
   "{\"format\":\"solidity-hol-solc-artifact-v1\",\"compiler\":{\"pin\":\"wrong\"}}");
 val () = TextIO.closeOut bad_artifact_stream;
-val () = rejects solidityPrepareLib.MalformedInput
+val () = (rejects solidityPrepareLib.MalformedInput
   (fn () => ignore (solidityPrepareLib.read_artifact
-    {root = "..", path = bad_artifact_path}));
+    {root = "..", path = bad_artifact_path})))
+  handle e => (OS.FileSys.remove bad_artifact_path; raise e);
 val () = OS.FileSys.remove bad_artifact_path;
