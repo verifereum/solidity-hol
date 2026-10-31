@@ -126,9 +126,9 @@ compiler initially supplies layout calculation; Solidity-HOL interprets the
 layout when reading, writing, and capturing references. The declaration IDs in
 layout entries must resolve to compatible state-variable declarations.
 
-For value-type state variables, scalar-key nested mappings and fixed-size
-storage arrays with scalar leaves (including nested arrays), and dynamic scalar
-storage arrays, this is implemented.
+Storage declarations now include elementary scalars, structs, scalar-key
+mappings, and fixed/dynamic arrays, including their storage combinations.
+Scalar leaves can be read and updated through member/index paths.
 The importer takes each
 contract's `storageLayout.storage` entries in declaration order, with their
 slot, byte offset and type identifier; `valid_src_unit` requires one entry per
@@ -150,8 +150,26 @@ pop panics with `0x31`; both push forms follow the pinned compiler's resource
 panic `0x41` at length >= `2^64`. Length reads and indexing retain the full
 256-bit range. `pop()` clears only the removed scalar bytes; `push()` preserves
 existing bytes at the appended position, as the pinned compiler does. Dynamic
-arrays of aggregates, memory/calldata arrays, local reference bindings and
-aggregate copies remain coverage work.
+array mutation of aggregates, memory/calldata references, local reference
+bindings and aggregate copies remain coverage work.
+
+Struct declarations may be file-level or contract members. User-defined type
+names and field accesses retain declaration IDs; field ownership and expression
+types are checked against the declared struct. Struct fields use solc's storage
+pointer identifiers where state variables use storage reference identifiers.
+The importer preserves that distinction and ignores only the display name
+inside a struct type identifier, retaining its declaration ID and location.
+`storageLayout.types` supplies each used struct's ordered members, relative
+slots/offsets and size. Member IDs/types must match the declaration; sizes must
+be positive multiples of a slot. Core layout checks reject fields outside the
+struct's stride, scalar fields crossing a slot boundary, unaligned aggregates,
+and cyclic inline containment. Layout calculation and byte disjointness remain
+trusted compiler work. Unused declarations need no runtime layout.
+
+The core program carries these struct layouts into its environment. Member
+navigation extends an already captured base, and array strides use each struct's
+whole-slot size. Elaboration rejects missing or inconsistent runtime layouts; the core checker
+independently checks the elaborated program.
 
 The selected compiler also emits `transientStorageLayout`. It is empty for the
 initial corpus, so transient layout remains unvalidated.

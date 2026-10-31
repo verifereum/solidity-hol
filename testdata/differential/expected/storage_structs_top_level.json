@@ -1,0 +1,823 @@
+{
+  "compiler": {
+    "pin": "f401782df49be312ea4ef52a2d467cf5183b5906",
+    "reportedVersion": "solc, the solidity compiler commandline interface\nVersion: 0.8.37+commit.f401782d.Linux.g++"
+  },
+  "format": "solidity-hol-solc-artifact-v1",
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "debug": {
+        "revertStrings": "default"
+      },
+      "evmVersion": "osaka",
+      "metadata": {
+        "appendCBOR": false,
+        "bytecodeHash": "none"
+      },
+      "optimizer": {
+        "enabled": false,
+        "runs": 200
+      },
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "storageLayout",
+            "transientStorageLayout",
+            "evm.bytecode.object",
+            "evm.deployedBytecode.object",
+            "evm.methodIdentifiers",
+            "ir",
+            "irOptimized"
+          ]
+        }
+      },
+      "viaIR": true
+    },
+    "sources": {
+      "testdata/differential/storage_structs_top_level.sol": {
+        "content": "// SPDX-License-Identifier: CC0-1.0\npragma solidity 0.8.37;\n\nstruct Leaf_$12_storage {\n    uint8 value;\n}\n\ncontract TopLevelStructs {\n    struct Unused {\n        uint8 spare;\n    }\n\n    Leaf_$12_storage item;\n    Leaf_$12_storage[2] items;\n\n    function put(uint256 i, uint8 x) public returns (uint8, uint8) {\n        item.value = x;\n        items[i].value = x + 1;\n        return (item.value, items[i].value);\n    }\n}\n"
+      }
+    }
+  },
+  "output": {
+    "contracts": {
+      "testdata/differential/storage_structs_top_level.sol": {
+        "TopLevelStructs": {
+          "abi": [
+            {
+              "inputs": [
+                {
+                  "internalType": "uint256",
+                  "name": "i",
+                  "type": "uint256"
+                },
+                {
+                  "internalType": "uint8",
+                  "name": "x",
+                  "type": "uint8"
+                }
+              ],
+              "name": "put",
+              "outputs": [
+                {
+                  "internalType": "uint8",
+                  "name": "",
+                  "type": "uint8"
+                },
+                {
+                  "internalType": "uint8",
+                  "name": "",
+                  "type": "uint8"
+                }
+              ],
+              "stateMutability": "nonpayable",
+              "type": "function"
+            }
+          ],
+          "evm": {
+            "bytecode": {
+              "object": "608060405234601c57600e6020565b6102be61002b82396102be90f35b6026565b60405190565b5f80fdfe60806040526004361015610013575b610123565b61001d5f3561002c565b6315a334e00361000e576100ec565b60e01c90565b60405190565b5f80fd5b5f80fd5b90565b61004c81610040565b0361005357565b5f80fd5b9050359061006482610043565b565b60ff1690565b61007581610066565b0361007c57565b5f80fd5b9050359061008d8261006c565b565b91906040838203126100b757806100ab6100b4925f8601610057565b93602001610080565b90565b61003c565b6100c590610066565b9052565b9160206100ea9294936100e360408201965f8301906100bc565b01906100bc565b565b3461011e576101056100ff36600461008f565b9061024f565b9061011a610111610032565b928392836100c9565b0390f35b610038565b5f80fd5b5f90565b5f1b90565b9061013c60ff9161012b565b9181191691161790565b90565b61015d61015861016292610066565b610146565b610066565b90565b90565b9061017d61017861018492610149565b610165565b8254610130565b9055565b90565b61019f61019a6101a492610188565b610146565b610066565b90565b634e487b7160e01b5f52601160045260245ffd5b6101c76101cd91610066565b91610066565b019060ff82116101d957565b6101a7565b634e487b7160e01b5f52603260045260245ffd5b50600290565b90565b610204816101f2565b82101561021e576102166001916101f8565b910201905f90565b6101de565b5f1c90565b60ff1690565b61023a61023f91610223565b610228565b90565b61024c905461022e565b90565b919061028661029a91610260610127565b50610269610127565b50610276815f8001610168565b610280600161018b565b906101bb565b5f610293600186906101fb565b5001610168565b6102bb5f6102b46102ac828001610242565b9460016101fb565b5001610242565b9056"
+            },
+            "deployedBytecode": {
+              "object": "60806040526004361015610013575b610123565b61001d5f3561002c565b6315a334e00361000e576100ec565b60e01c90565b60405190565b5f80fd5b5f80fd5b90565b61004c81610040565b0361005357565b5f80fd5b9050359061006482610043565b565b60ff1690565b61007581610066565b0361007c57565b5f80fd5b9050359061008d8261006c565b565b91906040838203126100b757806100ab6100b4925f8601610057565b93602001610080565b90565b61003c565b6100c590610066565b9052565b9160206100ea9294936100e360408201965f8301906100bc565b01906100bc565b565b3461011e576101056100ff36600461008f565b9061024f565b9061011a610111610032565b928392836100c9565b0390f35b610038565b5f80fd5b5f90565b5f1b90565b9061013c60ff9161012b565b9181191691161790565b90565b61015d61015861016292610066565b610146565b610066565b90565b90565b9061017d61017861018492610149565b610165565b8254610130565b9055565b90565b61019f61019a6101a492610188565b610146565b610066565b90565b634e487b7160e01b5f52601160045260245ffd5b6101c76101cd91610066565b91610066565b019060ff82116101d957565b6101a7565b634e487b7160e01b5f52603260045260245ffd5b50600290565b90565b610204816101f2565b82101561021e576102166001916101f8565b910201905f90565b6101de565b5f1c90565b60ff1690565b61023a61023f91610223565b610228565b90565b61024c905461022e565b90565b919061028661029a91610260610127565b50610269610127565b50610276815f8001610168565b610280600161018b565b906101bb565b5f610293600186906101fb565b5001610168565b6102bb5f6102b46102ac828001610242565b9460016101fb565b5001610242565b9056"
+            },
+            "methodIdentifiers": {
+              "put(uint256,uint8)": "15a334e0"
+            }
+          },
+          "ir": "\n/// @use-src 0:\"testdata/differential/storage_structs_top_level.sol\"\nobject \"TopLevelStructs_51\" {\n    code {\n        /// @src 0:107:418  \"contract TopLevelStructs {...\"\n        mstore(64, memoryguard(128))\n        if callvalue() { revert_error_ca66f745a3ce8ff40e2ccaf1ad45db7774001b90d25810abd9040049be7bf4bb() }\n\n        constructor_TopLevelStructs_51()\n\n        let _1 := allocate_unbounded()\n        codecopy(_1, dataoffset(\"TopLevelStructs_51_deployed\"), datasize(\"TopLevelStructs_51_deployed\"))\n\n        return(_1, datasize(\"TopLevelStructs_51_deployed\"))\n\n        function allocate_unbounded() -> memPtr {\n            memPtr := mload(64)\n        }\n\n        function revert_error_ca66f745a3ce8ff40e2ccaf1ad45db7774001b90d25810abd9040049be7bf4bb() {\n            revert(0, 0)\n        }\n\n        /// @src 0:107:418  \"contract TopLevelStructs {...\"\n        function constructor_TopLevelStructs_51() {\n\n            /// @src 0:107:418  \"contract TopLevelStructs {...\"\n\n        }\n        /// @src 0:107:418  \"contract TopLevelStructs {...\"\n\n    }\n    /// @use-src 0:\"testdata/differential/storage_structs_top_level.sol\"\n    object \"TopLevelStructs_51_deployed\" {\n        code {\n            /// @src 0:107:418  \"contract TopLevelStructs {...\"\n            mstore(64, memoryguard(128))\n\n            if iszero(lt(calldatasize(), 4))\n            {\n                let selector := shift_right_224_unsigned(calldataload(0))\n                switch selector\n\n                case 0x15a334e0\n                {\n                    // put(uint256,uint8)\n\n                    external_fun_put_50()\n                }\n\n                default {}\n            }\n\n            revert_error_42b3090547df1d2001c96683413b8cf91c1b902ef5e3cb8d9f6f304cf7446f74()\n\n            function shift_right_224_unsigned(value) -> newValue {\n                newValue :=\n\n                shr(224, value)\n\n            }\n\n            function allocate_unbounded() -> memPtr {\n                memPtr := mload(64)\n            }\n\n            function revert_error_ca66f745a3ce8ff40e2ccaf1ad45db7774001b90d25810abd9040049be7bf4bb() {\n                revert(0, 0)\n            }\n\n            function revert_error_dbdddcbe895c83990c08b3492a0e83918d802a52331272ac6fdb6a7c4aea3b1b() {\n                revert(0, 0)\n            }\n\n            function revert_error_c1322bf8034eace5e0b5c7295db60986aa89aae5e0ea0873e4689e076861a5db() {\n                revert(0, 0)\n            }\n\n            function cleanup_t_uint256(value) -> cleaned {\n                cleaned := value\n            }\n\n            function validator_revert_t_uint256(value) {\n                if iszero(eq(value, cleanup_t_uint256(value))) { revert(0, 0) }\n            }\n\n            function abi_decode_t_uint256(offset, end) -> value {\n                value := calldataload(offset)\n                validator_revert_t_uint256(value)\n            }\n\n            function cleanup_t_uint8(value) -> cleaned {\n                cleaned := and(value, 0xff)\n            }\n\n            function validator_revert_t_uint8(value) {\n                if iszero(eq(value, cleanup_t_uint8(value))) { revert(0, 0) }\n            }\n\n            function abi_decode_t_uint8(offset, end) -> value {\n                value := calldataload(offset)\n                validator_revert_t_uint8(value)\n            }\n\n            function abi_decode_tuple_t_uint256t_uint8(headStart, dataEnd) -> value0, value1 {\n                if slt(sub(dataEnd, headStart), 64) { revert_error_dbdddcbe895c83990c08b3492a0e83918d802a52331272ac6fdb6a7c4aea3b1b() }\n\n                {\n\n                    let offset := 0\n\n                    value0 := abi_decode_t_uint256(add(headStart, offset), dataEnd)\n                }\n\n                {\n\n                    let offset := 32\n\n                    value1 := abi_decode_t_uint8(add(headStart, offset), dataEnd)\n                }\n\n            }\n\n            function abi_encode_t_uint8_to_t_uint8_fromStack(value, pos) {\n                mstore(pos, cleanup_t_uint8(value))\n            }\n\n            function abi_encode_tuple_t_uint8_t_uint8__to_t_uint8_t_uint8__fromStack(headStart , value0, value1) -> tail {\n                tail := add(headStart, 64)\n\n                abi_encode_t_uint8_to_t_uint8_fromStack(value0,  add(headStart, 0))\n\n                abi_encode_t_uint8_to_t_uint8_fromStack(value1,  add(headStart, 32))\n\n            }\n\n            function external_fun_put_50() {\n\n                if callvalue() { revert_error_ca66f745a3ce8ff40e2ccaf1ad45db7774001b90d25810abd9040049be7bf4bb() }\n                let param_0, param_1 :=  abi_decode_tuple_t_uint256t_uint8(4, calldatasize())\n                let ret_0, ret_1 :=  fun_put_50(param_0, param_1)\n                let memPos := allocate_unbounded()\n                let memEnd := abi_encode_tuple_t_uint8_t_uint8__to_t_uint8_t_uint8__fromStack(memPos , ret_0, ret_1)\n                return(memPos, sub(memEnd, memPos))\n\n            }\n\n            function revert_error_42b3090547df1d2001c96683413b8cf91c1b902ef5e3cb8d9f6f304cf7446f74() {\n                revert(0, 0)\n            }\n\n            function zero_value_for_split_t_uint8() -> ret {\n                ret := 0\n            }\n\n            function shift_left_0(value) -> newValue {\n                newValue :=\n\n                shl(0, value)\n\n            }\n\n            function update_byte_slice_1_shift_0(value, toInsert) -> result {\n                let mask := 255\n                toInsert := shift_left_0(toInsert)\n                value := and(value, not(mask))\n                result := or(value, and(toInsert, mask))\n            }\n\n            function identity(value) -> ret {\n                ret := value\n            }\n\n            function convert_t_uint8_to_t_uint8(value) -> converted {\n                converted := cleanup_t_uint8(identity(cleanup_t_uint8(value)))\n            }\n\n            function prepare_store_t_uint8(value) -> ret {\n                ret := value\n            }\n\n            function update_storage_value_offset_0_t_uint8_to_t_uint8(slot, value_0) {\n                let convertedValue_0 := convert_t_uint8_to_t_uint8(value_0)\n                sstore(slot, update_byte_slice_1_shift_0(sload(slot), prepare_store_t_uint8(convertedValue_0)))\n            }\n\n            function cleanup_t_rational_1_by_1(value) -> cleaned {\n                cleaned := value\n            }\n\n            function convert_t_rational_1_by_1_to_t_uint8(value) -> converted {\n                converted := cleanup_t_uint8(identity(cleanup_t_rational_1_by_1(value)))\n            }\n\n            function panic_error_0x11() {\n                mstore(0, 35408467139433450592217433187231851964531694900788300625387963629091585785856)\n                mstore(4, 0x11)\n                revert(0, 0x24)\n            }\n\n            function checked_add_t_uint8(x, y) -> sum {\n                x := cleanup_t_uint8(x)\n                y := cleanup_t_uint8(y)\n                sum := add(x, y)\n\n                if gt(sum, 0xff) { panic_error_0x11() }\n\n            }\n\n            function panic_error_0x32() {\n                mstore(0, 35408467139433450592217433187231851964531694900788300625387963629091585785856)\n                mstore(4, 0x32)\n                revert(0, 0x24)\n            }\n\n            function array_length_t_array$_t_struct$_Leaf_$$$12_storage_$4_storage_$2_storage(value) -> length {\n\n                length := 0x02\n\n            }\n\n            function array_dataslot_t_array$_t_struct$_Leaf_$$$12_storage_$4_storage_$2_storage(ptr) -> data {\n                data := ptr\n\n            }\n\n            function array_dataslot_t_bytes_storage_ptr(ptr) -> data {\n                data := ptr\n\n                mstore(0, ptr)\n                data := keccak256(0, 0x20)\n\n            }\n\n            function long_byte_array_index_access_no_checks(array, index) -> slot, offset {\n\n                offset := sub(31, mod(index, 0x20))\n                let dataArea := array_dataslot_t_bytes_storage_ptr(array)\n                slot := add(dataArea, div(index, 0x20))\n\n            }\n\n            function storage_array_index_access_t_array$_t_struct$_Leaf_$$$12_storage_$4_storage_$2_storage(array, index) -> slot, offset {\n                let arrayLength := array_length_t_array$_t_struct$_Leaf_$$$12_storage_$4_storage_$2_storage(array)\n                if iszero(lt(index, arrayLength)) { panic_error_0x32() }\n\n                let dataArea := array_dataslot_t_array$_t_struct$_Leaf_$$$12_storage_$4_storage_$2_storage(array)\n                slot := add(dataArea, mul(index, 1))\n                offset := 0\n\n            }\n\n            function shift_right_0_unsigned(value) -> newValue {\n                newValue :=\n\n                shr(0, value)\n\n            }\n\n            function cleanup_from_storage_t_uint8(value) -> cleaned {\n                cleaned := and(value, 0xff)\n            }\n\n            function extract_from_storage_value_offset_0_t_uint8(slot_value) -> value {\n                value := cleanup_from_storage_t_uint8(shift_right_0_unsigned(slot_value))\n            }\n\n            function read_from_storage_split_offset_0_t_uint8(slot) -> value {\n                value := extract_from_storage_value_offset_0_t_uint8(sload(slot))\n\n            }\n\n            /// @ast-id 50\n            /// @src 0:245:416  \"function put(uint256 i, uint8 x) public returns (uint8, uint8) {...\"\n            function fun_put_50(var_i_17, var_x_19) -> var__22, var__24 {\n                /// @src 0:294:299  \"uint8\"\n                let zero_t_uint8_1 := zero_value_for_split_t_uint8()\n                var__22 := zero_t_uint8_1\n                /// @src 0:301:306  \"uint8\"\n                let zero_t_uint8_2 := zero_value_for_split_t_uint8()\n                var__24 := zero_t_uint8_2\n\n                /// @src 0:331:332  \"x\"\n                let _3 := var_x_19\n                let expr_29 := _3\n                /// @src 0:318:322  \"item\"\n                let _4_slot := 0x00\n                let expr_26_slot := _4_slot\n                /// @src 0:318:328  \"item.value\"\n                let _5 := add(expr_26_slot, 0)\n                /// @src 0:318:332  \"item.value = x\"\n                update_storage_value_offset_0_t_uint8_to_t_uint8(_5, expr_29)\n                let expr_30 := expr_29\n                /// @src 0:359:360  \"x\"\n                let _6 := var_x_19\n                let expr_36 := _6\n                /// @src 0:363:364  \"1\"\n                let expr_37 := 0x01\n                /// @src 0:359:364  \"x + 1\"\n                let expr_38 := checked_add_t_uint8(expr_36, convert_t_rational_1_by_1_to_t_uint8(expr_37))\n\n                /// @src 0:342:347  \"items\"\n                let _7_slot := 0x01\n                let expr_32_slot := _7_slot\n                /// @src 0:348:349  \"i\"\n                let _8 := var_i_17\n                let expr_33 := _8\n                /// @src 0:342:350  \"items[i]\"\n\n                let _9, _10 := storage_array_index_access_t_array$_t_struct$_Leaf_$$$12_storage_$4_storage_$2_storage(expr_32_slot, expr_33)\n                let _11_slot := _9\n                let expr_34_slot := _11_slot\n                /// @src 0:342:356  \"items[i].value\"\n                let _12 := add(expr_34_slot, 0)\n                /// @src 0:342:364  \"items[i].value = x + 1\"\n                update_storage_value_offset_0_t_uint8_to_t_uint8(_12, expr_38)\n                let expr_39 := expr_38\n                /// @src 0:382:386  \"item\"\n                let _13_slot := 0x00\n                let expr_41_slot := _13_slot\n                /// @src 0:382:392  \"item.value\"\n                let _14 := add(expr_41_slot, 0)\n                let _15 := read_from_storage_split_offset_0_t_uint8(_14)\n                let expr_42 := _15\n                /// @src 0:381:409  \"(item.value, items[i].value)\"\n                let expr_47_component_1 := expr_42\n                /// @src 0:394:399  \"items\"\n                let _16_slot := 0x01\n                let expr_43_slot := _16_slot\n                /// @src 0:400:401  \"i\"\n                let _17 := var_i_17\n                let expr_44 := _17\n                /// @src 0:394:402  \"items[i]\"\n\n                let _18, _19 := storage_array_index_access_t_array$_t_struct$_Leaf_$$$12_storage_$4_storage_$2_storage(expr_43_slot, expr_44)\n                let _20_slot := _18\n                let expr_45_slot := _20_slot\n                /// @src 0:394:408  \"items[i].value\"\n                let _21 := add(expr_45_slot, 0)\n                let _22 := read_from_storage_split_offset_0_t_uint8(_21)\n                let expr_46 := _22\n                /// @src 0:381:409  \"(item.value, items[i].value)\"\n                let expr_47_component_2 := expr_46\n                /// @src 0:374:409  \"return (item.value, items[i].value)\"\n                var__22 := expr_47_component_1\n                var__24 := expr_47_component_2\n                leave\n\n            }\n            /// @src 0:107:418  \"contract TopLevelStructs {...\"\n\n        }\n\n        data \".metadata\" hex\"\"\n    }\n\n}\n\n",
+          "irOptimized": "/// @use-src 0:\"testdata/differential/storage_structs_top_level.sol\"\nobject \"TopLevelStructs_51\" {\n    code {\n        {\n            /// @src 0:107:418  \"contract TopLevelStructs {...\"\n            mstore(64, memoryguard(0x80))\n            if callvalue()\n            {\n                revert_error_ca66f745a3ce8ff40e2ccaf1ad45db7774001b90d25810abd9040049be7bf4bb()\n            }\n            let _1 := allocate_unbounded()\n            codecopy(_1, dataoffset(\"TopLevelStructs_51_deployed\"), datasize(\"TopLevelStructs_51_deployed\"))\n            return(_1, datasize(\"TopLevelStructs_51_deployed\"))\n        }\n        function allocate_unbounded() -> memPtr\n        { memPtr := mload(64) }\n        function revert_error_ca66f745a3ce8ff40e2ccaf1ad45db7774001b90d25810abd9040049be7bf4bb()\n        { revert(0, 0) }\n    }\n    /// @use-src 0:\"testdata/differential/storage_structs_top_level.sol\"\n    object \"TopLevelStructs_51_deployed\" {\n        code {\n            {\n                /// @src 0:107:418  \"contract TopLevelStructs {...\"\n                mstore(64, memoryguard(0x80))\n                if iszero(lt(calldatasize(), 4))\n                {\n                    let selector := shift_right_unsigned(calldataload(0))\n                    switch selector\n                    case 0x15a334e0 { external_fun_put() }\n                    default { }\n                }\n                revert_error_42b3090547df1d2001c96683413b8cf91c1b902ef5e3cb8d9f6f304cf7446f74()\n            }\n            function shift_right_unsigned(value) -> newValue\n            { newValue := shr(224, value) }\n            function allocate_unbounded() -> memPtr\n            { memPtr := mload(64) }\n            function revert_error_ca66f745a3ce8ff40e2ccaf1ad45db7774001b90d25810abd9040049be7bf4bb()\n            { revert(0, 0) }\n            function revert_error_dbdddcbe895c83990c08b3492a0e83918d802a52331272ac6fdb6a7c4aea3b1b()\n            { revert(0, 0) }\n            function cleanup_uint256(value) -> cleaned\n            { cleaned := value }\n            function validator_revert_uint256(value)\n            {\n                if iszero(eq(value, cleanup_uint256(value))) { revert(0, 0) }\n            }\n            function abi_decode_uint256(offset, end) -> value\n            {\n                value := calldataload(offset)\n                validator_revert_uint256(value)\n            }\n            function cleanup_uint8(value) -> cleaned\n            { cleaned := and(value, 0xff) }\n            function validator_revert_uint8(value)\n            {\n                if iszero(eq(value, cleanup_uint8(value))) { revert(0, 0) }\n            }\n            function abi_decode_uint8(offset, end) -> value\n            {\n                value := calldataload(offset)\n                validator_revert_uint8(value)\n            }\n            function abi_decode_uint256t_uint8(headStart, dataEnd) -> value0, value1\n            {\n                if slt(sub(dataEnd, headStart), 64)\n                {\n                    revert_error_dbdddcbe895c83990c08b3492a0e83918d802a52331272ac6fdb6a7c4aea3b1b()\n                }\n                let offset := 0\n                value0 := abi_decode_uint256(add(headStart, offset), dataEnd)\n                let offset_1 := 32\n                value1 := abi_decode_uint8(add(headStart, offset_1), dataEnd)\n            }\n            function abi_encode_uint8(value, pos)\n            {\n                mstore(pos, cleanup_uint8(value))\n            }\n            function abi_encode_uint8_uint8(headStart, value0, value1) -> tail\n            {\n                tail := add(headStart, 64)\n                abi_encode_uint8(value0, add(headStart, 0))\n                abi_encode_uint8(value1, add(headStart, 32))\n            }\n            function external_fun_put()\n            {\n                if callvalue()\n                {\n                    revert_error_ca66f745a3ce8ff40e2ccaf1ad45db7774001b90d25810abd9040049be7bf4bb()\n                }\n                let param, param_1 := abi_decode_uint256t_uint8(4, calldatasize())\n                let ret, ret_1 := fun_put(param, param_1)\n                let memPos := allocate_unbounded()\n                let memEnd := abi_encode_uint8_uint8(memPos, ret, ret_1)\n                return(memPos, sub(memEnd, memPos))\n            }\n            function revert_error_42b3090547df1d2001c96683413b8cf91c1b902ef5e3cb8d9f6f304cf7446f74()\n            { revert(0, 0) }\n            function zero_value_for_split_uint8() -> ret\n            { ret := 0 }\n            function shift_left(value) -> newValue\n            { newValue := shl(0, value) }\n            function update_byte_slice_shift(value, toInsert) -> result\n            {\n                let mask := 255\n                toInsert := shift_left(toInsert)\n                value := and(value, not(mask))\n                result := or(value, and(toInsert, mask))\n            }\n            function identity(value) -> ret\n            { ret := value }\n            function convert_uint8_to_uint8(value) -> converted\n            {\n                converted := cleanup_uint8(identity(cleanup_uint8(value)))\n            }\n            function prepare_store_uint8(value) -> ret\n            { ret := value }\n            function update_storage_value_offset_uint8_to_uint8(slot, value)\n            {\n                let convertedValue := convert_uint8_to_uint8(value)\n                sstore(slot, update_byte_slice_shift(sload(slot), prepare_store_uint8(convertedValue)))\n            }\n            function cleanup_rational_by(value) -> cleaned\n            { cleaned := value }\n            function convert_rational_by_to_uint8(value) -> converted\n            {\n                converted := cleanup_uint8(identity(cleanup_rational_by(value)))\n            }\n            function panic_error_0x11()\n            {\n                mstore(0, shl(224, 0x4e487b71))\n                mstore(4, 0x11)\n                revert(0, 0x24)\n            }\n            function checked_add_uint8(x, y) -> sum\n            {\n                x := cleanup_uint8(x)\n                y := cleanup_uint8(y)\n                sum := add(x, y)\n                if gt(sum, 0xff) { panic_error_0x11() }\n            }\n            function panic_error_0x32()\n            {\n                mstore(0, shl(224, 0x4e487b71))\n                mstore(4, 0x32)\n                revert(0, 0x24)\n            }\n            function array_length_array_struct_Leaf_$$12_storage(value) -> length\n            { length := 0x02 }\n            function array_dataslot_array_struct_Leaf_$$12_storage(ptr) -> data\n            { data := ptr }\n            function storage_array_index_access_struct_Leaf_$$12_storage(array, index) -> slot, offset\n            {\n                let arrayLength := array_length_array_struct_Leaf_$$12_storage(array)\n                if iszero(lt(index, arrayLength)) { panic_error_0x32() }\n                let dataArea := array_dataslot_array_struct_Leaf_$$12_storage(array)\n                slot := add(dataArea, mul(index, 1))\n                offset := 0\n            }\n            function shift_right_0_unsigned(value) -> newValue\n            { newValue := shr(0, value) }\n            function cleanup_from_storage_uint8(value) -> cleaned\n            { cleaned := and(value, 0xff) }\n            function extract_from_storage_value_offset_uint8(slot_value) -> value\n            {\n                value := cleanup_from_storage_uint8(shift_right_0_unsigned(slot_value))\n            }\n            function read_from_storage_split_offset_uint8(slot) -> value\n            {\n                value := extract_from_storage_value_offset_uint8(sload(slot))\n            }\n            /// @ast-id 50 @src 0:245:416  \"function put(uint256 i, uint8 x) public returns (uint8, uint8) {...\"\n            function fun_put(var_i, var_x) -> var, var_\n            {\n                /// @src 0:294:299  \"uint8\"\n                let zero_t_uint8 := zero_value_for_split_uint8()\n                var := zero_t_uint8\n                /// @src 0:301:306  \"uint8\"\n                let zero_uint8 := zero_value_for_split_uint8()\n                var_ := zero_uint8\n                /// @src 0:331:332  \"x\"\n                let _1 := var_x\n                let expr := _1\n                /// @src 0:318:322  \"item\"\n                let _4_slot := 0x00\n                let expr_26_slot := _4_slot\n                /// @src 0:318:328  \"item.value\"\n                let _2 := add(expr_26_slot, 0)\n                /// @src 0:318:332  \"item.value = x\"\n                update_storage_value_offset_uint8_to_uint8(_2, expr)\n                /// @src 0:359:360  \"x\"\n                let _3 := var_x\n                let expr_1 := _3\n                /// @src 0:363:364  \"1\"\n                let expr_2 := 0x01\n                /// @src 0:359:364  \"x + 1\"\n                let expr_3 := checked_add_uint8(expr_1, convert_rational_by_to_uint8(expr_2))\n                /// @src 0:342:347  \"items\"\n                let _7_slot := 0x01\n                let expr_32_slot := _7_slot\n                /// @src 0:348:349  \"i\"\n                let _4 := var_i\n                let expr_4 := _4\n                /// @src 0:342:350  \"items[i]\"\n                let _5, _6 := storage_array_index_access_struct_Leaf_$$12_storage(expr_32_slot, expr_4)\n                let _slot := _5\n                let expr_slot := _slot\n                /// @src 0:342:356  \"items[i].value\"\n                let _7 := add(expr_slot, 0)\n                /// @src 0:342:364  \"items[i].value = x + 1\"\n                update_storage_value_offset_uint8_to_uint8(_7, expr_3)\n                /// @src 0:382:386  \"item\"\n                let _13_slot := 0x00\n                let expr_41_slot := _13_slot\n                /// @src 0:382:392  \"item.value\"\n                let _8 := add(expr_41_slot, 0)\n                let _9 := read_from_storage_split_offset_uint8(_8)\n                let expr_5 := _9\n                /// @src 0:381:409  \"(item.value, items[i].value)\"\n                let expr_component := expr_5\n                /// @src 0:394:399  \"items\"\n                let _16_slot := 0x01\n                let expr_43_slot := _16_slot\n                /// @src 0:400:401  \"i\"\n                let _10 := var_i\n                let expr_6 := _10\n                /// @src 0:394:402  \"items[i]\"\n                let _11, _12 := storage_array_index_access_struct_Leaf_$$12_storage(expr_43_slot, expr_6)\n                let _20_slot := _11\n                let expr_45_slot := _20_slot\n                /// @src 0:394:408  \"items[i].value\"\n                let _13 := add(expr_45_slot, 0)\n                let _14 := read_from_storage_split_offset_uint8(_13)\n                let expr_7 := _14\n                /// @src 0:381:409  \"(item.value, items[i].value)\"\n                let expr_component_1 := expr_7\n                /// @src 0:374:409  \"return (item.value, items[i].value)\"\n                var := expr_component\n                var_ := expr_component_1\n                leave\n            }\n        }\n        data \".metadata\" hex\"\"\n    }\n}\n",
+          "storageLayout": {
+            "storage": [
+              {
+                "astId": 10,
+                "contract": "testdata/differential/storage_structs_top_level.sol:TopLevelStructs",
+                "label": "item",
+                "offset": 0,
+                "slot": "0",
+                "type": "t_struct(Leaf_$12_storage)4_storage"
+              },
+              {
+                "astId": 15,
+                "contract": "testdata/differential/storage_structs_top_level.sol:TopLevelStructs",
+                "label": "items",
+                "offset": 0,
+                "slot": "1",
+                "type": "t_array(t_struct(Leaf_$12_storage)4_storage)2_storage"
+              }
+            ],
+            "types": {
+              "t_array(t_struct(Leaf_$12_storage)4_storage)2_storage": {
+                "base": "t_struct(Leaf_$12_storage)4_storage",
+                "encoding": "inplace",
+                "label": "struct Leaf_$12_storage[2]",
+                "numberOfBytes": "64"
+              },
+              "t_struct(Leaf_$12_storage)4_storage": {
+                "encoding": "inplace",
+                "label": "struct Leaf_$12_storage",
+                "members": [
+                  {
+                    "astId": 3,
+                    "contract": "testdata/differential/storage_structs_top_level.sol:TopLevelStructs",
+                    "label": "value",
+                    "offset": 0,
+                    "slot": "0",
+                    "type": "t_uint8"
+                  }
+                ],
+                "numberOfBytes": "32"
+              },
+              "t_uint8": {
+                "encoding": "inplace",
+                "label": "uint8",
+                "numberOfBytes": "1"
+              }
+            }
+          },
+          "transientStorageLayout": {
+            "storage": [],
+            "types": null
+          }
+        }
+      }
+    },
+    "sources": {
+      "testdata/differential/storage_structs_top_level.sol": {
+        "ast": {
+          "absolutePath": "testdata/differential/storage_structs_top_level.sol",
+          "exportedSymbols": {
+            "Leaf_$12_storage": [
+              4
+            ],
+            "TopLevelStructs": [
+              51
+            ]
+          },
+          "id": 52,
+          "license": "CC0-1.0",
+          "nodeType": "SourceUnit",
+          "nodes": [
+            {
+              "id": 1,
+              "literals": [
+                "solidity",
+                "0.8",
+                ".37"
+              ],
+              "nodeType": "PragmaDirective",
+              "src": "36:23:0"
+            },
+            {
+              "canonicalName": "Leaf_$12_storage",
+              "id": 4,
+              "members": [
+                {
+                  "constant": false,
+                  "id": 3,
+                  "mutability": "mutable",
+                  "name": "value",
+                  "nameLocation": "97:5:0",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 4,
+                  "src": "91:11:0",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_uint8",
+                    "typeString": "uint8"
+                  },
+                  "typeName": {
+                    "id": 2,
+                    "name": "uint8",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "91:5:0",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_uint8",
+                      "typeString": "uint8"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "name": "Leaf_$12_storage",
+              "nameLocation": "68:16:0",
+              "nodeType": "StructDefinition",
+              "scope": 52,
+              "src": "61:44:0",
+              "visibility": "public"
+            },
+            {
+              "abstract": false,
+              "baseContracts": [],
+              "canonicalName": "TopLevelStructs",
+              "contractDependencies": [],
+              "contractKind": "contract",
+              "fullyImplemented": true,
+              "id": 51,
+              "linearizedBaseContracts": [
+                51
+              ],
+              "name": "TopLevelStructs",
+              "nameLocation": "116:15:0",
+              "nodeType": "ContractDefinition",
+              "nodes": [
+                {
+                  "canonicalName": "TopLevelStructs.Unused",
+                  "id": 7,
+                  "members": [
+                    {
+                      "constant": false,
+                      "id": 6,
+                      "mutability": "mutable",
+                      "name": "spare",
+                      "nameLocation": "168:5:0",
+                      "nodeType": "VariableDeclaration",
+                      "scope": 7,
+                      "src": "162:11:0",
+                      "stateVariable": false,
+                      "storageLocation": "default",
+                      "typeDescriptions": {
+                        "typeIdentifier": "t_uint8",
+                        "typeString": "uint8"
+                      },
+                      "typeName": {
+                        "id": 5,
+                        "name": "uint8",
+                        "nodeType": "ElementaryTypeName",
+                        "src": "162:5:0",
+                        "typeDescriptions": {
+                          "typeIdentifier": "t_uint8",
+                          "typeString": "uint8"
+                        }
+                      },
+                      "visibility": "internal"
+                    }
+                  ],
+                  "name": "Unused",
+                  "nameLocation": "145:6:0",
+                  "nodeType": "StructDefinition",
+                  "scope": 51,
+                  "src": "138:42:0",
+                  "visibility": "public"
+                },
+                {
+                  "constant": false,
+                  "id": 10,
+                  "mutability": "mutable",
+                  "name": "item",
+                  "nameLocation": "203:4:0",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 51,
+                  "src": "186:21:0",
+                  "stateVariable": true,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_struct$_Leaf_$$$12_storage_$4_storage",
+                    "typeString": "struct Leaf_$12_storage"
+                  },
+                  "typeName": {
+                    "id": 9,
+                    "nodeType": "UserDefinedTypeName",
+                    "pathNode": {
+                      "id": 8,
+                      "name": "Leaf_$12_storage",
+                      "nameLocations": [
+                        "186:16:0"
+                      ],
+                      "nodeType": "IdentifierPath",
+                      "referencedDeclaration": 4,
+                      "src": "186:16:0"
+                    },
+                    "referencedDeclaration": 4,
+                    "src": "186:16:0",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_struct$_Leaf_$$$12_storage_$4_storage_ptr",
+                      "typeString": "struct Leaf_$12_storage"
+                    }
+                  },
+                  "visibility": "internal"
+                },
+                {
+                  "constant": false,
+                  "id": 15,
+                  "mutability": "mutable",
+                  "name": "items",
+                  "nameLocation": "233:5:0",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 51,
+                  "src": "213:25:0",
+                  "stateVariable": true,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_array$_t_struct$_Leaf_$$$12_storage_$4_storage_$2_storage",
+                    "typeString": "struct Leaf_$12_storage[2]"
+                  },
+                  "typeName": {
+                    "baseType": {
+                      "id": 12,
+                      "nodeType": "UserDefinedTypeName",
+                      "pathNode": {
+                        "id": 11,
+                        "name": "Leaf_$12_storage",
+                        "nameLocations": [
+                          "213:16:0"
+                        ],
+                        "nodeType": "IdentifierPath",
+                        "referencedDeclaration": 4,
+                        "src": "213:16:0"
+                      },
+                      "referencedDeclaration": 4,
+                      "src": "213:16:0",
+                      "typeDescriptions": {
+                        "typeIdentifier": "t_struct$_Leaf_$$$12_storage_$4_storage_ptr",
+                        "typeString": "struct Leaf_$12_storage"
+                      }
+                    },
+                    "id": 14,
+                    "length": {
+                      "hexValue": "32",
+                      "id": 13,
+                      "isConstant": false,
+                      "isLValue": false,
+                      "isPure": true,
+                      "kind": "number",
+                      "lValueRequested": false,
+                      "nodeType": "Literal",
+                      "src": "230:1:0",
+                      "typeDescriptions": {
+                        "typeIdentifier": "t_rational_2_by_1",
+                        "typeString": "int_const 2"
+                      },
+                      "value": "2"
+                    },
+                    "nodeType": "ArrayTypeName",
+                    "src": "213:19:0",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_array$_t_struct$_Leaf_$$$12_storage_$4_storage_$2_storage_ptr",
+                      "typeString": "struct Leaf_$12_storage[2]"
+                    }
+                  },
+                  "visibility": "internal"
+                },
+                {
+                  "body": {
+                    "id": 49,
+                    "nodeType": "Block",
+                    "src": "308:108:0",
+                    "statements": [
+                      {
+                        "expression": {
+                          "id": 30,
+                          "isConstant": false,
+                          "isLValue": false,
+                          "isPure": false,
+                          "lValueRequested": false,
+                          "leftHandSide": {
+                            "expression": {
+                              "id": 26,
+                              "name": "item",
+                              "nodeType": "Identifier",
+                              "overloadedDeclarations": [],
+                              "referencedDeclaration": 10,
+                              "src": "318:4:0",
+                              "typeDescriptions": {
+                                "typeIdentifier": "t_struct$_Leaf_$$$12_storage_$4_storage",
+                                "typeString": "struct Leaf_$12_storage storage ref"
+                              }
+                            },
+                            "id": 28,
+                            "isConstant": false,
+                            "isLValue": true,
+                            "isPure": false,
+                            "lValueRequested": true,
+                            "memberLocation": "323:5:0",
+                            "memberName": "value",
+                            "nodeType": "MemberAccess",
+                            "referencedDeclaration": 3,
+                            "src": "318:10:0",
+                            "typeDescriptions": {
+                              "typeIdentifier": "t_uint8",
+                              "typeString": "uint8"
+                            }
+                          },
+                          "nodeType": "Assignment",
+                          "operator": "=",
+                          "rightHandSide": {
+                            "id": 29,
+                            "name": "x",
+                            "nodeType": "Identifier",
+                            "overloadedDeclarations": [],
+                            "referencedDeclaration": 19,
+                            "src": "331:1:0",
+                            "typeDescriptions": {
+                              "typeIdentifier": "t_uint8",
+                              "typeString": "uint8"
+                            }
+                          },
+                          "src": "318:14:0",
+                          "typeDescriptions": {
+                            "typeIdentifier": "t_uint8",
+                            "typeString": "uint8"
+                          }
+                        },
+                        "id": 31,
+                        "nodeType": "ExpressionStatement",
+                        "src": "318:14:0"
+                      },
+                      {
+                        "expression": {
+                          "id": 39,
+                          "isConstant": false,
+                          "isLValue": false,
+                          "isPure": false,
+                          "lValueRequested": false,
+                          "leftHandSide": {
+                            "expression": {
+                              "baseExpression": {
+                                "id": 32,
+                                "name": "items",
+                                "nodeType": "Identifier",
+                                "overloadedDeclarations": [],
+                                "referencedDeclaration": 15,
+                                "src": "342:5:0",
+                                "typeDescriptions": {
+                                  "typeIdentifier": "t_array$_t_struct$_Leaf_$$$12_storage_$4_storage_$2_storage",
+                                  "typeString": "struct Leaf_$12_storage storage ref[2] storage ref"
+                                }
+                              },
+                              "id": 34,
+                              "indexExpression": {
+                                "id": 33,
+                                "name": "i",
+                                "nodeType": "Identifier",
+                                "overloadedDeclarations": [],
+                                "referencedDeclaration": 17,
+                                "src": "348:1:0",
+                                "typeDescriptions": {
+                                  "typeIdentifier": "t_uint256",
+                                  "typeString": "uint256"
+                                }
+                              },
+                              "isConstant": false,
+                              "isLValue": true,
+                              "isPure": false,
+                              "lValueRequested": false,
+                              "nodeType": "IndexAccess",
+                              "src": "342:8:0",
+                              "typeDescriptions": {
+                                "typeIdentifier": "t_struct$_Leaf_$$$12_storage_$4_storage",
+                                "typeString": "struct Leaf_$12_storage storage ref"
+                              }
+                            },
+                            "id": 35,
+                            "isConstant": false,
+                            "isLValue": true,
+                            "isPure": false,
+                            "lValueRequested": true,
+                            "memberLocation": "351:5:0",
+                            "memberName": "value",
+                            "nodeType": "MemberAccess",
+                            "referencedDeclaration": 3,
+                            "src": "342:14:0",
+                            "typeDescriptions": {
+                              "typeIdentifier": "t_uint8",
+                              "typeString": "uint8"
+                            }
+                          },
+                          "nodeType": "Assignment",
+                          "operator": "=",
+                          "rightHandSide": {
+                            "commonType": {
+                              "typeIdentifier": "t_uint8",
+                              "typeString": "uint8"
+                            },
+                            "id": 38,
+                            "isConstant": false,
+                            "isLValue": false,
+                            "isPure": false,
+                            "lValueRequested": false,
+                            "leftExpression": {
+                              "id": 36,
+                              "name": "x",
+                              "nodeType": "Identifier",
+                              "overloadedDeclarations": [],
+                              "referencedDeclaration": 19,
+                              "src": "359:1:0",
+                              "typeDescriptions": {
+                                "typeIdentifier": "t_uint8",
+                                "typeString": "uint8"
+                              }
+                            },
+                            "nodeType": "BinaryOperation",
+                            "operator": "+",
+                            "rightExpression": {
+                              "hexValue": "31",
+                              "id": 37,
+                              "isConstant": false,
+                              "isLValue": false,
+                              "isPure": true,
+                              "kind": "number",
+                              "lValueRequested": false,
+                              "nodeType": "Literal",
+                              "src": "363:1:0",
+                              "typeDescriptions": {
+                                "typeIdentifier": "t_rational_1_by_1",
+                                "typeString": "int_const 1"
+                              },
+                              "value": "1"
+                            },
+                            "src": "359:5:0",
+                            "typeDescriptions": {
+                              "typeIdentifier": "t_uint8",
+                              "typeString": "uint8"
+                            }
+                          },
+                          "src": "342:22:0",
+                          "typeDescriptions": {
+                            "typeIdentifier": "t_uint8",
+                            "typeString": "uint8"
+                          }
+                        },
+                        "id": 40,
+                        "nodeType": "ExpressionStatement",
+                        "src": "342:22:0"
+                      },
+                      {
+                        "expression": {
+                          "components": [
+                            {
+                              "expression": {
+                                "id": 41,
+                                "name": "item",
+                                "nodeType": "Identifier",
+                                "overloadedDeclarations": [],
+                                "referencedDeclaration": 10,
+                                "src": "382:4:0",
+                                "typeDescriptions": {
+                                  "typeIdentifier": "t_struct$_Leaf_$$$12_storage_$4_storage",
+                                  "typeString": "struct Leaf_$12_storage storage ref"
+                                }
+                              },
+                              "id": 42,
+                              "isConstant": false,
+                              "isLValue": true,
+                              "isPure": false,
+                              "lValueRequested": false,
+                              "memberLocation": "387:5:0",
+                              "memberName": "value",
+                              "nodeType": "MemberAccess",
+                              "referencedDeclaration": 3,
+                              "src": "382:10:0",
+                              "typeDescriptions": {
+                                "typeIdentifier": "t_uint8",
+                                "typeString": "uint8"
+                              }
+                            },
+                            {
+                              "expression": {
+                                "baseExpression": {
+                                  "id": 43,
+                                  "name": "items",
+                                  "nodeType": "Identifier",
+                                  "overloadedDeclarations": [],
+                                  "referencedDeclaration": 15,
+                                  "src": "394:5:0",
+                                  "typeDescriptions": {
+                                    "typeIdentifier": "t_array$_t_struct$_Leaf_$$$12_storage_$4_storage_$2_storage",
+                                    "typeString": "struct Leaf_$12_storage storage ref[2] storage ref"
+                                  }
+                                },
+                                "id": 45,
+                                "indexExpression": {
+                                  "id": 44,
+                                  "name": "i",
+                                  "nodeType": "Identifier",
+                                  "overloadedDeclarations": [],
+                                  "referencedDeclaration": 17,
+                                  "src": "400:1:0",
+                                  "typeDescriptions": {
+                                    "typeIdentifier": "t_uint256",
+                                    "typeString": "uint256"
+                                  }
+                                },
+                                "isConstant": false,
+                                "isLValue": true,
+                                "isPure": false,
+                                "lValueRequested": false,
+                                "nodeType": "IndexAccess",
+                                "src": "394:8:0",
+                                "typeDescriptions": {
+                                  "typeIdentifier": "t_struct$_Leaf_$$$12_storage_$4_storage",
+                                  "typeString": "struct Leaf_$12_storage storage ref"
+                                }
+                              },
+                              "id": 46,
+                              "isConstant": false,
+                              "isLValue": true,
+                              "isPure": false,
+                              "lValueRequested": false,
+                              "memberLocation": "403:5:0",
+                              "memberName": "value",
+                              "nodeType": "MemberAccess",
+                              "referencedDeclaration": 3,
+                              "src": "394:14:0",
+                              "typeDescriptions": {
+                                "typeIdentifier": "t_uint8",
+                                "typeString": "uint8"
+                              }
+                            }
+                          ],
+                          "id": 47,
+                          "isConstant": false,
+                          "isInlineArray": false,
+                          "isLValue": false,
+                          "isPure": false,
+                          "lValueRequested": false,
+                          "nodeType": "TupleExpression",
+                          "src": "381:28:0",
+                          "typeDescriptions": {
+                            "typeIdentifier": "t_tuple$_t_uint8_$_t_uint8_$",
+                            "typeString": "tuple(uint8,uint8)"
+                          }
+                        },
+                        "functionReturnParameters": 25,
+                        "id": 48,
+                        "nodeType": "Return",
+                        "src": "374:35:0"
+                      }
+                    ]
+                  },
+                  "functionSelector": "15a334e0",
+                  "id": 50,
+                  "implemented": true,
+                  "kind": "function",
+                  "modifiers": [],
+                  "name": "put",
+                  "nameLocation": "254:3:0",
+                  "nodeType": "FunctionDefinition",
+                  "parameters": {
+                    "id": 20,
+                    "nodeType": "ParameterList",
+                    "parameters": [
+                      {
+                        "constant": false,
+                        "id": 17,
+                        "mutability": "mutable",
+                        "name": "i",
+                        "nameLocation": "266:1:0",
+                        "nodeType": "VariableDeclaration",
+                        "scope": 50,
+                        "src": "258:9:0",
+                        "stateVariable": false,
+                        "storageLocation": "default",
+                        "typeDescriptions": {
+                          "typeIdentifier": "t_uint256",
+                          "typeString": "uint256"
+                        },
+                        "typeName": {
+                          "id": 16,
+                          "name": "uint256",
+                          "nodeType": "ElementaryTypeName",
+                          "src": "258:7:0",
+                          "typeDescriptions": {
+                            "typeIdentifier": "t_uint256",
+                            "typeString": "uint256"
+                          }
+                        },
+                        "visibility": "internal"
+                      },
+                      {
+                        "constant": false,
+                        "id": 19,
+                        "mutability": "mutable",
+                        "name": "x",
+                        "nameLocation": "275:1:0",
+                        "nodeType": "VariableDeclaration",
+                        "scope": 50,
+                        "src": "269:7:0",
+                        "stateVariable": false,
+                        "storageLocation": "default",
+                        "typeDescriptions": {
+                          "typeIdentifier": "t_uint8",
+                          "typeString": "uint8"
+                        },
+                        "typeName": {
+                          "id": 18,
+                          "name": "uint8",
+                          "nodeType": "ElementaryTypeName",
+                          "src": "269:5:0",
+                          "typeDescriptions": {
+                            "typeIdentifier": "t_uint8",
+                            "typeString": "uint8"
+                          }
+                        },
+                        "visibility": "internal"
+                      }
+                    ],
+                    "src": "257:20:0"
+                  },
+                  "returnParameters": {
+                    "id": 25,
+                    "nodeType": "ParameterList",
+                    "parameters": [
+                      {
+                        "constant": false,
+                        "id": 22,
+                        "mutability": "mutable",
+                        "name": "",
+                        "nameLocation": "-1:-1:-1",
+                        "nodeType": "VariableDeclaration",
+                        "scope": 50,
+                        "src": "294:5:0",
+                        "stateVariable": false,
+                        "storageLocation": "default",
+                        "typeDescriptions": {
+                          "typeIdentifier": "t_uint8",
+                          "typeString": "uint8"
+                        },
+                        "typeName": {
+                          "id": 21,
+                          "name": "uint8",
+                          "nodeType": "ElementaryTypeName",
+                          "src": "294:5:0",
+                          "typeDescriptions": {
+                            "typeIdentifier": "t_uint8",
+                            "typeString": "uint8"
+                          }
+                        },
+                        "visibility": "internal"
+                      },
+                      {
+                        "constant": false,
+                        "id": 24,
+                        "mutability": "mutable",
+                        "name": "",
+                        "nameLocation": "-1:-1:-1",
+                        "nodeType": "VariableDeclaration",
+                        "scope": 50,
+                        "src": "301:5:0",
+                        "stateVariable": false,
+                        "storageLocation": "default",
+                        "typeDescriptions": {
+                          "typeIdentifier": "t_uint8",
+                          "typeString": "uint8"
+                        },
+                        "typeName": {
+                          "id": 23,
+                          "name": "uint8",
+                          "nodeType": "ElementaryTypeName",
+                          "src": "301:5:0",
+                          "typeDescriptions": {
+                            "typeIdentifier": "t_uint8",
+                            "typeString": "uint8"
+                          }
+                        },
+                        "visibility": "internal"
+                      }
+                    ],
+                    "src": "293:14:0"
+                  },
+                  "scope": 51,
+                  "src": "245:171:0",
+                  "stateMutability": "nonpayable",
+                  "virtual": false,
+                  "visibility": "public"
+                }
+              ],
+              "scope": 52,
+              "src": "107:311:0",
+              "usedErrors": [],
+              "usedEvents": []
+            }
+          ],
+          "src": "36:383:0"
+        },
+        "id": 0
+      }
+    }
+  },
+  "profile": {
+    "compilerVersion": "0.8.37",
+    "settings": {
+      "debug": {
+        "revertStrings": "default"
+      },
+      "evmVersion": "osaka",
+      "metadata": {
+        "appendCBOR": false,
+        "bytecodeHash": "none"
+      },
+      "optimizer": {
+        "enabled": false,
+        "runs": 200
+      },
+      "viaIR": true
+    }
+  }
+}

@@ -275,7 +275,7 @@ End
 (* One new index from a captured fixed-array reference. The caller has already
  * evaluated the index; slot arithmetic wraps at the EVM word width. *)
 Definition fixed_array_element_def:
-  fixed_array_element addr slot element length layout (i : int) =
+  fixed_array_element env addr slot element length layout (i : int) =
     if i < 0 ∨ &length ≤ i then ValueAbrupt (PanicCompletion 50) else
     case storage_bytes element of
       SOME b =>
@@ -288,7 +288,7 @@ Definition fixed_array_element_def:
               (n2w (w2n slot + Num i DIV per_slot))
               (b * (Num i MOD per_slot)) element layout))
     | NONE =>
-        case fixed_storage_slots element of
+        case fixed_storage_slots env element of
           SOME slots =>
             ValueOk (ReferenceValue
               (StorageReference PersistentStorage addr
@@ -300,7 +300,7 @@ End
  * A nested mapping starts at the preceding mapping's hashed slot.
  *)
 Definition navigate_storage_def:
-  navigate_storage accounts r s =
+  navigate_storage env accounts r s =
     case r of
       StorageReference PersistentStorage addr slot 0 (MappingT key value) layout =>
         (case mapping_key_bytes key s of
@@ -312,12 +312,12 @@ Definition navigate_storage_def:
     | StorageReference PersistentStorage addr slot 0
         (ArrayT element (SOME length)) layout =>
         (case s of
-           IntegerValue i => fixed_array_element addr slot element length layout i
+           IntegerValue i => fixed_array_element env addr slot element length layout i
          | _ => ValueAbrupt (InvalidCompletion "bad array index"))
     | StorageReference PersistentStorage addr slot 0 (ArrayT element NONE) layout =>
         (case s of
            IntegerValue i =>
-             fixed_array_element addr (mapping_slot [] slot) element
+             fixed_array_element env addr (mapping_slot [] slot) element
                (w2n (lookup_storage slot (lookup_account addr accounts).storage)) layout i
          | _ => ValueAbrupt (InvalidCompletion "bad array index"))
     | _ => ValueAbrupt (InvalidCompletion "unsupported storage navigation")
@@ -352,10 +352,24 @@ Definition eval_operation_def:
                  (&(w2n (lookup_storage slot
                     (lookup_account addr st.world.accounts).storage)))))
          | _ => ValueAbrupt (InvalidCompletion "bad dynamic array reference"))
+    | NavigateOperation ty root_expr (FieldNavigation member_id) =>
+        (case eval_atom st.scopes root_expr of
+           SOME (ReferenceValue
+             (StorageReference PersistentStorage addr slot 0 (StructT id) layout)) =>
+               (case lookup_struct_layout env id of
+                  SOME s =>
+                    (case ALOOKUP (MAP (λv. (v.state_id, v)) s.struct_fields) member_id of
+                       SOME v =>
+                         ValueOk (ReferenceValue
+                           (StorageReference PersistentStorage addr
+                             (slot + v.state_slot) v.state_offset v.state_type layout))
+                     | NONE => ValueAbrupt (InvalidCompletion "unknown struct field"))
+                | NONE => ValueAbrupt (InvalidCompletion "missing struct layout"))
+         | _ => ValueAbrupt (InvalidCompletion "bad struct reference"))
     | NavigateOperation ty root_expr (IndexNavigation index) =>
         (case (eval_atom st.scopes root_expr, eval_atom st.scopes index) of
            (SOME (ReferenceValue r), SOME (ScalarValue s)) =>
-             navigate_storage st.world.accounts r s
+             navigate_storage env st.world.accounts r s
          | _ => ValueAbrupt (InvalidCompletion "bad index operands"))
     | _ => eval_pure_operation env st.scopes op
 End
@@ -463,7 +477,7 @@ End
  * Update length before the value write, including in the presence of slot
  * collisions; pop clears the scalar before updating length. *)
 Definition push_storage_array_def:
-  push_storage_array x annotation a value (st : source_state) gas =
+  push_storage_array env x annotation a value (st : source_state) gas =
     if st.frame.static_context then
       abrupt_result (InvalidCompletion "array push in static frame") st gas
     else case eval_atom st.scopes a of
@@ -472,7 +486,7 @@ Definition push_storage_array_def:
         let old_length = w2n (lookup_storage slot
               (lookup_account addr st.world.accounts).storage) in
         if 2 ** 64 ≤ old_length then abrupt_result (PanicCompletion 65) st gas else
-        (case fixed_array_element addr (mapping_slot [] slot) element
+        (case fixed_array_element env addr (mapping_slot [] slot) element
                 (old_length + 1) layout (&old_length) of
            ValueOk (ReferenceValue
              (StorageReference PersistentStorage _ data_slot offset _ _)) =>
@@ -510,7 +524,7 @@ Definition pop_storage_array_def:
         let old_length = w2n (lookup_storage slot
               (lookup_account addr st.world.accounts).storage) in
         if old_length = 0 then abrupt_result (PanicCompletion 49) st gas else
-        (case (fixed_array_element addr (mapping_slot [] slot) element
+        (case (fixed_array_element env addr (mapping_slot [] slot) element
                  old_length layout (&(old_length - 1)), default_scalar env element) of
            (ValueOk (ReferenceValue
              (StorageReference PersistentStorage _ data_slot offset _ _)), SOME scalar_zero) =>
@@ -533,7 +547,7 @@ Definition simple_stmt_def:
   simple_stmt env s st gas =
     case s of
       DefineStmt x ty (ArrayPushOperation a value) =>
-        push_storage_array x ty a value st gas
+        push_storage_array env x ty a value st gas
     | DefineStmt x ty (ArrayPopOperation a) =>
         pop_storage_array env x ty a st gas
     | DefineStmt x ty op =>

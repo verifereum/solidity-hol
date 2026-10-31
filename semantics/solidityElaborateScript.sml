@@ -2,8 +2,8 @@
  * core, for the pinned profile solc-0.8.37-via-ir-osaka.
  *
  * Admitted: one contract of functions over elementary value types, with
- * value-type state variables, scalar-key nested mappings and fixed storage
- * arrays at their layout entries, indexed scalar reads/updates, fixed lengths, locals
+ * value-type state variables, storage structs, scalar-key mappings and
+ * fixed/dynamic storage arrays, member/indexed scalar reads and updates, locals
  * (including tuple declarations with holes), internal calls with single or
  * multiple returns, explicit elementary conversions, literals, unary, binary,
  * comparison and short-circuit operators, simple and compound assignment to
@@ -608,14 +608,14 @@ Definition elab_expr_def:
                        (StateReferenceOperation (AstId x))],
                     BoundAtom (AstId n), ty), n + 1)
          | NONE => NONE)
-    | SrcMemberAccess _ root_expr field _ =>
+    | SrcMemberAccess _ root_expr member_id _ =>
         (case elab_location ctx n root_expr of
            SOME ((ss, ref, StructT (AstId id)), n1) =>
-             (case source_struct_field ctx.structs id field of
+             (case source_struct_field ctx.structs id member_id of
                 SOME ty =>
                   SOME ((ss ++
                     [DefineStmt (AstId n1) (ReferenceType ty)
-                      (NavigateOperation ty ref (FieldNavigation (AstId field)))],
+                      (NavigateOperation ty ref (FieldNavigation (AstId member_id)))],
                     BoundAtom (AstId n1), ty), n1 + 1)
               | NONE => NONE)
          | _ => NONE)
@@ -924,7 +924,8 @@ Definition elab_struct_layouts_def:
         case s.struct_layout of
           NONE => SOME layouts
         | SOME (bytes, fields) =>
-            case all_some (MAP variable_binding s.struct_members) of
+            case all_some (MAP (λv. OPTION_MAP (λty. (v.var_info.node_id, ty))
+                               (field_variable_type v)) s.struct_members) of
               NONE => NONE
             | SOME types =>
                 case core_state_variables types fields of
@@ -955,7 +956,9 @@ Definition elaborate_unit_def:
                  let prog = <| procedures := p :: ps; state_variables := cvs;
                                struct_layouts := layouts;
                                entry_procedure := p.procedure_id |> in
-                 if wf_core_program (core_program_environment [] prog) prog
+                 let env = core_program_environment [] prog in
+                 if EVERY (wf_core_struct_layout env) layouts ∧
+                    EVERY (wf_core_state_variable env) cvs
                  then SOME prog else NONE
              | _ => NONE)
     | _ => NONE
@@ -1079,5 +1082,10 @@ val () = cv_auto_trans elab_function_def;
 val () = cv_auto_trans elab_functions_def;
 val () = cv_auto_trans core_state_variables_def;
 val () = cv_auto_trans elab_struct_layouts_def;
+val () = cv_auto_trans_rec solidityCoreWfTheory.inline_storage_shape_def (
+  WF_REL_TAC ‘inv_image ($< LEX $<) (λx. case x of
+    INL (env, n, ty) => (cv$c2n n, cv_size ty)
+  | INR (env, n, fields) => (cv$c2n n, cv_size fields))’ >> cv_termination_tac
+);
 val () = cv_auto_trans elaborate_unit_def;
 val () = cv_auto_trans solidityCoreWfTheory.core_program_environment_def;

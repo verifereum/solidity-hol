@@ -155,4 +155,11 @@ contract StorageStructs {
         return (containers.fixedItems.length, containers.dynamicItems.length,
                 containers.dynamicNumbers.length);
     }
+
+    function mutateContainer(uint8 x) public returns (uint8, uint256) {
+        containers.dynamicNumbers.push(x);
+        uint8 seen = containers.dynamicNumbers[containers.dynamicNumbers.length - 1];
+        containers.dynamicNumbers.pop();
+        return (seen, containers.dynamicNumbers.length);
+    }
 }

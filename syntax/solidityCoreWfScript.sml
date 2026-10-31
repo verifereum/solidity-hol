@@ -7,17 +7,16 @@
  * user-defined value types, which are integers and addresses at runtime.
  * Function values are deferred together with indirect calls; contract types
  * are deferred until contract metadata (payability, bases) is in the
- * environment. Typed storage references support mapping navigation and scalar
- * leaf reads/captures. Other navigation, copies and external calls remain
- * rejected until their validation rules exist.
+ * environment. Typed storage references support struct fields, mappings and
+ * arrays, with scalar leaf reads/captures. Aggregate copies and external calls
+ * remain rejected until their validation rules exist.
  *)
 Theory solidityCoreWf
 Ancestors
   solidityCore alist list option
 
-(* Type declarations accompany a core_program rather than living inside it;
- * the elaborator must emit both. Struct fields are recorded for stage 3;
- * recursive-struct restrictions and layout descriptors are not checked yet.
+(* Scalar type declarations accompany the program. Its struct layouts supply
+ * both field declarations and runtime layout metadata to the environment.
  *)
 Datatype:
   core_type_declaration
@@ -159,8 +158,8 @@ Definition storage_bytes_def:
     | _ => NONE
 End
 
-(* Stored elementary values and mappings to them, including nested mappings.
- * ReferenceType represents a captured storage location, even at a scalar leaf.
+(* ReferenceType represents a captured storage location, even at a scalar
+ * leaf. Struct declarations resolve through the environment's layout table.
  *)
 Definition elementary_storage_type_ok_def:
   (elementary_storage_type_ok BoolT ⇔ T) ∧
@@ -521,6 +520,7 @@ Definition wf_core_operation_def:
       BoundAtom x =>
         (case ALOOKUP ctx.bindings x of
            SOME (ReferenceType (ArrayT element NONE)) =>
+             elementary_storage_type_ok element ∧
              annotation = ReferenceType element ∧
              case value of
                NONE => T
@@ -532,7 +532,7 @@ Definition wf_core_operation_def:
     case a of
       BoundAtom x =>
         (case ALOOKUP ctx.bindings x of
-           SOME (ReferenceType (ArrayT _ NONE)) => T
+           SOME (ReferenceType (ArrayT element NONE)) => elementary_storage_type_ok element
          | _ => F)
     | _ => F) ∧
   (wf_core_operation env ctx annotation (InternalCallOperation f args) ⇔
@@ -682,12 +682,17 @@ Definition inline_storage_shape_def:
   (inline_storage_shape env n (StructT id) ⇔
     if n = 0 then F else
     case lookup_struct_layout env id of
-      SOME s => EVERY
-        (λv. inline_storage_shape env (n - 1) v.state_type) s.struct_fields
+      SOME s => inline_storage_fields env (n - 1) s.struct_fields
     | NONE => F) ∧
-  (inline_storage_shape env n _ ⇔ T)
+  (inline_storage_shape env n _ ⇔ T) ∧
+  (inline_storage_fields env n [] ⇔ T) ∧
+  (inline_storage_fields env n (v :: vs) ⇔
+    inline_storage_shape env n v.state_type ∧ inline_storage_fields env n vs)
 Termination
-  WF_REL_TAC ‘inv_image ($< LEX $<) (λ(env, n, ty). (n, sol_type_size ty))’
+  WF_REL_TAC ‘inv_image ($< LEX $<) (λx. case x of
+    INL (env, n, ty) => (n, sol_type_size ty)
+  | INR (env, n, fields) => (n, list_size (λv. sol_type_size v.state_type) fields))’ >>
+  rw[list_size_def]
 End
 
 Definition wf_core_struct_layout_def:

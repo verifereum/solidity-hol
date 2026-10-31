@@ -441,27 +441,26 @@ End
 (* Struct names are display metadata; declaration IDs determine identity.
  * Keep every other character, including location/pointer suffixes. *)
 Definition canonical_storage_identifier_def:
-  (canonical_storage_identifier (mode : num) [] = []) ∧
-  (canonical_storage_identifier mode (c :: cs) =
-    if mode = 1 then
-      if c = #"_" ∧ isPREFIX "$" cs then
-        "_$" ++ canonical_storage_identifier 0 (TL cs)
-      else canonical_storage_identifier 1 cs
+  (canonical_storage_identifier (mode : num) (skip : num) [] = []) ∧
+  (canonical_storage_identifier mode skip (c :: cs) =
+    if skip ≠ 0 then canonical_storage_identifier mode (skip - 1) cs
+    else if mode = 1 then
+      if c = #"_" ∧ isPREFIX "$" cs ∧ ¬isPREFIX "$$" cs then
+        "_$" ++ canonical_storage_identifier 0 1 cs
+      else canonical_storage_identifier 1 0 cs
     else if mode = 2 then
-      if c = #")" then ")" ++ canonical_storage_identifier 0 cs
-      else canonical_storage_identifier 2 cs
+      if c = #")" then ")" ++ canonical_storage_identifier 0 0 cs
+      else canonical_storage_identifier 2 0 cs
     else if isPREFIX "t_struct$_" (c :: cs) then
-      "t_struct$_" ++ canonical_storage_identifier 1 (DROP 10 (c :: cs))
+      "t_struct$_" ++ canonical_storage_identifier 1 9 cs
     else if isPREFIX "t_struct(" (c :: cs) then
-      "t_struct(" ++ canonical_storage_identifier 2 (DROP 9 (c :: cs))
-    else c :: canonical_storage_identifier 0 cs)
-Termination
-  WF_REL_TAC ‘measure (LENGTH o SND)’ >> simp[]
+      "t_struct(" ++ canonical_storage_identifier 2 8 cs
+    else c :: canonical_storage_identifier 0 0 cs)
 End
 
 Definition source_type_matches_def:
   source_type_matches ty tid ⇔
-    canonical_storage_identifier 0 tid = storage_type_identifier ty
+    canonical_storage_identifier 0 0 tid = storage_type_identifier ty
 End
 
 (* A parameter, return or local variable: an elementary value type in the
@@ -473,6 +472,20 @@ Definition variable_type_def:
       SOME ty =>
         if v.var_location = "default" ∧
            source_type_matches ty v.var_type_id
+        then SOME ty else NONE
+    | NONE => NONE
+End
+
+(* Struct fields use storage pointer identifiers for arrays and structs,
+ * unlike state declarations. Mappings retain their ordinary identifier. *)
+Definition field_variable_type_def:
+  field_variable_type (v : src_variable) =
+    case normalize_type_name v.var_type_name of
+      SOME ty =>
+        let suffix = case ty of ArrayT _ _ => "_ptr" | StructT _ => "_ptr" | _ => "" in
+        if v.var_location = "default" ∧
+           canonical_storage_identifier 0 0 v.var_type_id =
+             storage_type_identifier ty ++ suffix
         then SOME ty else NONE
     | NONE => NONE
 End
@@ -625,10 +638,10 @@ End
 
 Definition source_struct_field_def:
   source_struct_field structs id field =
-    case FIND (λs. s.struct_info.node_id = id) structs of
-      SOME s =>
-        (case FIND (λv. v.var_info.node_id = field) s.struct_members of
-           SOME v => variable_type v
+    case ALOOKUP (MAP (λs. (s.struct_info.node_id, s.struct_members)) structs) id of
+      SOME fields =>
+        (case ALOOKUP (MAP (λv. (v.var_info.node_id, v)) fields) field of
+           SOME v => field_variable_type v
          | NONE => NONE)
     | NONE => NONE
 End
@@ -873,34 +886,34 @@ End
 
 (* The layout has an entry for each state variable, in order. *)
 Definition storage_layout_ok_def:
-  (storage_layout_ok [] [] ⇔ T) ∧
-  (storage_layout_ok ((v : src_variable) :: vs) (e :: es) ⇔
+  (storage_layout_ok fields [] [] ⇔ T) ∧
+  (storage_layout_ok fields ((v : src_variable) :: vs) (e :: es) ⇔
      e.storage_id = v.var_info.node_id ∧
-     (case variable_type v of
-        SOME ty => canonical_storage_identifier 0 e.storage_type_id = storage_layout_identifier ty
+     (case (if fields then field_variable_type v else variable_type v) of
+        SOME ty => canonical_storage_identifier 0 0 e.storage_type_id = storage_layout_identifier ty
       | NONE => F) ∧
-     e.storage_slot < 2 ** 256 ∧ storage_layout_ok vs es) ∧
-  (storage_layout_ok _ _ ⇔ F)
+     e.storage_slot < 2 ** 256 ∧ storage_layout_ok fields vs es) ∧
+  (storage_layout_ok _ _ _ ⇔ F)
 End
 
 Definition check_struct_def:
   check_struct unit_id contract_id (s : src_struct) ⇔
     (s.struct_scope = contract_id ∨ s.struct_scope = unit_id) ∧
     s.struct_members ≠ [] ∧
-    EVERY (λv. v.var_scope = s.struct_info.node_id ∧ IS_SOME (variable_type v))
+    EVERY (λv. v.var_scope = s.struct_info.node_id ∧ IS_SOME (field_variable_type v))
       s.struct_members ∧
     case s.struct_layout of
       NONE => T
     | SOME (bytes, fields) =>
         0 < bytes ∧ bytes MOD 32 = 0 ∧ bytes DIV 32 < 2 ** 256 ∧
-        storage_layout_ok s.struct_members fields
+        storage_layout_ok T s.struct_members fields
 End
 
 Definition check_contract_def:
   check_contract unit_id (c : src_contract) ⇔
     c.contract_scope = unit_id ∧
     EVERY (check_struct unit_id c.contract_info.node_id) c.contract_structs ∧
-    storage_layout_ok c.contract_state_variables c.contract_storage ∧
+    storage_layout_ok F c.contract_state_variables c.contract_storage ∧
     case all_some (MAP (scoped_variable c.contract_info.node_id)
                      c.contract_state_variables) of
       SOME state =>
@@ -940,6 +953,7 @@ val () = cv_auto_trans canonical_storage_identifier_def;
 val () = cv_auto_trans source_type_matches_def;
 val () = cv_auto_trans storage_layout_identifier_def;
 val () = cv_auto_trans variable_type_def;
+val () = cv_auto_trans field_variable_type_def;
 val () = cv_auto_trans call_value_type_def;
 val () = cv_auto_trans_rec expr_ids_def (
   WF_REL_TAC ‘measure (λx. case x of

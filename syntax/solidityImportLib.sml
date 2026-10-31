@@ -348,7 +348,7 @@ fun struct_declaration types v = within v (fn v =>
     val key = "t_struct(" ^ string_field v "name" ^ ")" ^
               IntInf.toString (int_field v "id") ^ "_storage"
     val layout =
-      case JSONUtil.findField types key of
+      case (case types of JSON.NULL => NONE | _ => JSONUtil.findField types key) of
         NONE => NONE
       | SOME desc =>
           (require v (string_field desc "encoding" = "inplace")
@@ -371,8 +371,8 @@ fun struct_declaration types v = within v (fn v =>
          layout)]
   end)
 
-(* Contract members are functions and state variables; the layout is that
- * contract's entry of the compiler's contracts output for the source.
+(* The selected contract's layout also describes file-level struct types
+ * referenced by its state variables.
  *)
 fun contract external_structs contracts v = within v (fn v =>
   let
@@ -421,8 +421,8 @@ fun contract external_structs contracts v = within v (fn v =>
           (map function (members_of "FunctionDefinition"), function_ty))]
   end)
 
-(* Pragmas carry no semantics for the pinned profile; any other source-unit
- * member is rejected.
+(* File-level structs accompany each contract that can refer to them;
+ * pragmas carry no semantics for the pinned profile.
  *)
 fun import_source_unit v contracts = within v (fn v =>
   let

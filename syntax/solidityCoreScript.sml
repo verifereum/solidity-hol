@@ -17,8 +17,9 @@ Datatype:
   storage_backend = PersistentStorage | TransientStorage
 End
 
-(* Captured locations, never source paths to reevaluate. Layout IDs resolve in
- * an imported layout environment; validity is a future environment predicate.
+(* Captured locations, never source paths to reevaluate. The type identifies
+ * the struct layout used by subsequent field navigation; layout_id preserves
+ * the root declaration's identity through navigation.
  *)
 Datatype:
   reference

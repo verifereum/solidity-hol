@@ -210,3 +210,21 @@ Theorem compound_assignment_reads_after_rhs:
 Proof
   CONV_TAC cv_eval
 QED
+
+Definition missing_struct_layout_unit_def:
+  missing_struct_layout_unit =
+    let c = HD struct_unit.unit_contracts in
+    let s = HD c.contract_structs in
+    struct_unit with unit_contracts :=
+      [c with contract_structs :=
+        (s with struct_layout := NONE) :: TL c.contract_structs]
+End
+val () = cv_auto_trans missing_struct_layout_unit_def;
+
+Theorem struct_layout_required_for_execution:
+  IS_SOME (elaborate_unit struct_unit) ∧
+  valid_src_unit missing_struct_layout_unit ∧
+  elaborate_unit missing_struct_layout_unit = NONE
+Proof
+  CONV_TAC cv_eval
+QED
