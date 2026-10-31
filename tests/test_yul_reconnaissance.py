@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -207,6 +208,26 @@ class GeneratedArtifactTests(unittest.TestCase):
             for path in directory.glob("*.sol")
         }
         self.assertEqual(listed, expected)
+
+    @staticmethod
+    def dialect_builtin_names() -> set[str]:
+        """The builtin spellings the HOL dialect defines."""
+        text = (ROOT / "semantics" / "yulDialectScript.sml").read_text(
+            encoding="utf-8"
+        )
+        names = set(re.findall(r'builtin_name\s+Y\w+\s*=\s*"([^"]+)"', text))
+        if not names:
+            raise AssertionError("no builtin_name equations found")
+        return names
+
+    def test_dialect_defines_only_evm_dialect_builtins(self) -> None:
+        self.assertLessEqual(self.dialect_builtin_names(), recon.EVM_DIALECT_BUILTINS)
+
+    def test_dialect_covers_every_builtin_the_pinned_solc_emits(self) -> None:
+        artifact = json.loads(ARTIFACT.read_text(encoding="utf-8"))
+        emitted = set(artifact["summary"]["builtins"])
+        self.assertGreater(len(emitted), 0)
+        self.assertLessEqual(emitted, self.dialect_builtin_names())
 
     def test_builtins_are_in_the_evm_dialect(self) -> None:
         artifact = json.loads(ARTIFACT.read_text(encoding="utf-8"))

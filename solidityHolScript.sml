@@ -15,4 +15,5 @@ Ancestors
   solidityCoreProgramsTest solidityImport solidityImportTest
   solidityElaborate solidityElaborateTest solidityDifferential
   solidityDifferentialCorpus solidityDifferentialTest
+  yulAST yulDialect yulState yulEvaluator yulEvaluatorProps yulEvaluatorTest
   verifereum
