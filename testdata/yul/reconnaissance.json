@@ -89,6 +89,7 @@
           ]
         }
       ],
+      "sha256": "d95666c7e2135bfebc299d31e9a919c2c882ef6a0de332db1a225417ea169378",
       "source": "testdata/differential/builtins.sol"
     },
     {
@@ -173,6 +174,7 @@
           ]
         }
       ],
+      "sha256": "3e375714aad4b4c8f5a22c5536e1d3edcbd92c88b5a8c65df126a580373a1d18",
       "source": "testdata/differential/calls.sol"
     },
     {
@@ -261,6 +263,7 @@
           ]
         }
       ],
+      "sha256": "912a8c5e8865fc91c0d06c936bd5dc67cdea70538a9e1314c8df1f79759d1a05",
       "source": "testdata/differential/control.sol"
     },
     {
@@ -352,6 +355,7 @@
           ]
         }
       ],
+      "sha256": "7fe03327f30147b089b5b4a7ae86f4b732ee8f8f26f079b297b1049ddb05d436",
       "source": "testdata/differential/dynamic_storage_arrays.sol"
     },
     {
@@ -440,6 +444,7 @@
           ]
         }
       ],
+      "sha256": "bd8ab8ade431dc1b12c85a8278e7ed821e251c72b310afa6483bcf04c80b79ba",
       "source": "testdata/differential/mappings.sol"
     },
     {
@@ -520,6 +525,7 @@
           ]
         }
       ],
+      "sha256": "013b724827263e6de7345faadf25726608baa55149dbdf3d12321988be7662c3",
       "source": "testdata/differential/mutant.sol"
     },
     {
@@ -614,6 +620,7 @@
           ]
         }
       ],
+      "sha256": "34be21de2b336813a57a50b1712531d029725d2553cfe3ca8d7dae59cf242657",
       "source": "testdata/differential/scalars.sol"
     },
     {
@@ -693,6 +700,7 @@
           ]
         }
       ],
+      "sha256": "fe7e3bcdea9a5cdc43331ba49f3e8ad2a05cf99261af63ac4129f026863ddcb1",
       "source": "testdata/differential/shadowed_builtins.sol"
     },
     {
@@ -783,6 +791,7 @@
           ]
         }
       ],
+      "sha256": "af7ac523d2374e4fc00019e87a1971788e0dd65da28177d47ccae5240f7d8b33",
       "source": "testdata/differential/storage.sol"
     },
     {
@@ -874,6 +883,7 @@
           ]
         }
       ],
+      "sha256": "bd0620c2870d6637e580fca10e4dc19220535aaafc1580f48fbbfc2498d62403",
       "source": "testdata/differential/storage_arrays.sol"
     },
     {
@@ -965,6 +975,7 @@
           ]
         }
       ],
+      "sha256": "bfddd2a0b03235bcd1b1d3c85a3535f4ea1a0853f23f9876c6d16e1256202e77",
       "source": "testdata/differential/storage_structs.sol"
     },
     {
@@ -1055,6 +1066,7 @@
           ]
         }
       ],
+      "sha256": "07c1f66a01bb3e7b6dd68e7d4183b62074488bd023d3927ae793f9ed06075991",
       "source": "testdata/differential/storage_structs_top_level.sol"
     },
     {
@@ -1144,6 +1156,7 @@
           ]
         }
       ],
+      "sha256": "bfdb7ae32851355d656e6d4f813912c4d18588c8c4ba34b6c2ca8310efcc37ca",
       "source": "testdata/frontend/evaluation_order.sol"
     },
     {
@@ -1234,6 +1247,7 @@
           ]
         }
       ],
+      "sha256": "1473294265425cf80f7b5a972df5db1f32348c3dce454dc6fd0a5dda902d763b",
       "source": "testdata/frontend/pure_core.sol"
     },
     {
@@ -1324,6 +1338,7 @@
           ]
         }
       ],
+      "sha256": "558dd232c6a7f5f372b04f555f1de005cbab8ae215fbf2515b6e2ecfb1a2db65",
       "source": "testdata/frontend/storage_references.sol"
     },
     {
@@ -1410,6 +1425,7 @@
           ]
         }
       ],
+      "sha256": "31301a30f87e7b2d7352a21691f9afe9a640d3c2c3beeeddf5c2dda34a6ed5ed",
       "source": "testdata/frontend/types.sol"
     }
   ],

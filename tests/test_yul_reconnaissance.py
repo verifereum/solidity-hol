@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from pathlib import Path
+import hashlib
 import json
 import re
 import subprocess
@@ -199,6 +200,28 @@ class GeneratedArtifactTests(unittest.TestCase):
         for entry in artifact["summary"]["nodeKinds"].values():
             self.assertTrue(entry["fixtures"])
 
+    def test_records_the_pin_profile_and_selection_it_was_made_with(self) -> None:
+        artifact = json.loads(ARTIFACT.read_text(encoding="utf-8"))
+        pin = (ROOT / "SOLIDITY_PIN").read_text(encoding="ascii").strip()
+        profile = json.loads(
+            (ROOT / recon.DEFAULT_PROFILE).read_text(encoding="utf-8")
+        )
+        version = profile["compilerVersion"]
+        self.assertEqual(artifact["compiler"]["pin"], pin)
+        self.assertIn(f"Version: {version}+commit.{pin[:8]}.",
+                      artifact["compiler"]["reportedVersion"])
+        self.assertEqual(artifact["profile"], profile)
+        self.assertEqual(artifact["outputSelection"], recon.OUTPUT_SELECTION)
+
+    def test_every_fixture_is_the_source_it_was_made_from(self) -> None:
+        artifact = json.loads(ARTIFACT.read_text(encoding="utf-8"))
+        for fixture in artifact["fixtures"]:
+            with self.subTest(source=fixture["source"]):
+                digest = hashlib.sha256(
+                    (ROOT / fixture["source"]).read_bytes()
+                ).hexdigest()
+                self.assertEqual(fixture["sha256"], digest)
+
     def test_every_fixture_appears(self) -> None:
         artifact = json.loads(ARTIFACT.read_text(encoding="utf-8"))
         listed = {fixture["source"] for fixture in artifact["fixtures"]}
@@ -220,8 +243,25 @@ class GeneratedArtifactTests(unittest.TestCase):
             raise AssertionError("no builtin_name equations found")
         return names
 
+    @staticmethod
+    def builtin_of_name_spellings() -> set[str]:
+        """The spellings HOL's builtin_of_name accepts."""
+        text = (ROOT / "semantics" / "yulDialectScript.sml").read_text(
+            encoding="utf-8"
+        )
+        _, _, rest = text.partition("Definition builtin_of_name_def:")
+        body, _, _ = rest.partition("\nEnd\n")
+        names = set(re.findall(r'name = "([^"]+)"', body))
+        if not names:
+            raise AssertionError("no builtin_of_name equations found")
+        return names
+
     def test_dialect_defines_only_evm_dialect_builtins(self) -> None:
         self.assertLessEqual(self.dialect_builtin_names(), recon.EVM_DIALECT_BUILTINS)
+
+    def test_dialect_spells_and_looks_up_the_same_builtins(self) -> None:
+        self.assertEqual(self.builtin_of_name_spellings(),
+                         self.dialect_builtin_names())
 
     def test_dialect_covers_every_builtin_the_pinned_solc_emits(self) -> None:
         artifact = json.loads(ARTIFACT.read_text(encoding="utf-8"))

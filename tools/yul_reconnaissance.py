@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
+import hashlib
 from pathlib import Path
 import re
 import sys
@@ -679,6 +680,9 @@ def build_artifact(solc: Path, profile_path: Path) -> dict[str, Any]:
         fixtures.append(
             {
                 "source": source_name(path),
+                # The source's own hash, so a test can tell that the numbers
+                # below still describe the fixture on disk without a compiler.
+                "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
                 "contracts": [
                     {
                         "contract": name,
