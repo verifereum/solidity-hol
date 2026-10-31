@@ -737,12 +737,16 @@ fun fact_instances heads facts (asl, w) =
 fun use_facts_tac heads facts =
   let
     fun discharge asl th =
-      let val th1 = REWRITE_RULE [AND_IMP_INTRO] th
-          val (a, _) = dest_imp (concl th1)
-          (* gvs, not asm_simp_tac: the assumptions' 2 ** n must be
-             evaluated like the goal's for arithmetic to relate them *)
-          val pf = TAC_PROOF ((asl, a), gvs (sol_bind_def :: op_defs))
-      in SOME (th, MP th1 pf) end
+      let val th1 = REWRITE_RULE [AND_IMP_INTRO] th in
+        (* a callee without range hypotheses (bool or no arguments) *)
+        if not (is_imp (concl th1)) then SOME (th, th1)
+        else
+          let val (a, _) = dest_imp (concl th1)
+              (* gvs, not asm_simp_tac: the assumptions' 2 ** n must be
+                 evaluated like the goal's for arithmetic to relate them *)
+              val pf = TAC_PROOF ((asl, a), gvs (sol_bind_def :: op_defs))
+          in SOME (th, MP th1 pf) end
+      end
       handle HOL_ERR _ => NONE
     fun use used (g as (asl, _)) =
       let
@@ -972,9 +976,9 @@ fun unsupported_message (HOL_ERR e) =
 fun translate_unit {prefix, unit_def, program_def, termination, loops} =
   let
     val () = translated := []
-    val env_var = mk_var (prefix ^ "env", type_of “core_program_environment [] p”)
+    val env_var = mk_var (prefix ^ "env", type_of “core_program_environment p”)
     val env_def = new_definition (prefix ^ "env_def",
-      mk_eq (env_var, “core_program_environment [] ^(lhs (concl program_def))”))
+      mk_eq (env_var, “core_program_environment ^(lhs (concl program_def))”))
     val env = lhs (concl env_def)
     val lookup = REWRITE_CONV [lookup_procedure_def, env_def,
                                core_program_environment_def, program_def]
