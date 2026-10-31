@@ -73,6 +73,19 @@ See [translator.md](docs/translator.md) for the API, theorem preconditions and
 current coverage. Storage proofs, memory/assembly and the source external-call
 contract remain future work.
 
+## Yul
+
+The compiler's runtime Yul object has its own AST, EVM dialect, machine and
+fuel-indexed evaluator in `syntax/yulAST`, `semantics/yulDialect`,
+`semantics/yulState` and `semantics/yulEvaluator`;
+`semantics/yulEvaluatorProps` proves that a run which does not run out of fuel
+gives the same answer at any larger fuel. Input outside the modelled subset is
+an explicit invalid outcome rather than a value; the two ill-formed inputs the
+compiler rejects by itself — a `break` in a `for` loop's post block, and a call
+returning several values in argument position — are accepted. The node kinds
+and builtins the pinned compiler emits, per fixture, are enumerated in
+[testdata/yul/reconnaissance.md](testdata/yul/reconnaissance.md).
+
 ## Validation
 
 ```sh
