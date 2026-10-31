@@ -1,7 +1,7 @@
 (* Run by tools/semantic_tests_coverage.py under `holbuild run`. Imports and
  * elaborates every test listed in the file named by SEMANTIC_TESTS_MANIFEST,
  * one "name<TAB>path" line per test, where path holds a JSON object of the
- * test's ASTs by source name. Prints one coverage-result line per test.
+ * test's ASTs and storage layouts by source name. Prints one coverage-result line per test.
  *)
 load "solidityImportLib";
 load "solidityElaborateTheory";
@@ -42,7 +42,10 @@ local
   fun run_test test path =
     case JSONParser.parseFile path of
       JSON.OBJECT sources =>
-        (case SOME (map (solidityImportLib.import_source_unit o snd) sources)
+        (case SOME (map (fn (_, source) =>
+                 solidityImportLib.import_source_unit
+                   (JSONUtil.lookupField source "ast")
+                   (JSONUtil.lookupField source "contracts")) sources)
               handle solidityImportLib.ImportError msg =>
                 (emit test "import-rejected" (SOME msg); NONE) of
            NONE => ()
@@ -53,7 +56,7 @@ local
              | SOME (source, _) =>
                  emit test "elaboration-rejected"
                    (SOME ("elaborate_unit returned NONE for " ^ source)))
-    | _ => raise Fail (path ^ ": expected an object of ASTs")
+    | _ => raise Fail (path ^ ": expected source ASTs and layouts")
 
   val manifest =
     case OS.Process.getEnv "SEMANTIC_TESTS_MANIFEST" of

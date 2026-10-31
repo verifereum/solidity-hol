@@ -5,21 +5,21 @@
  * closed: an unknown nodeType, a missing required field, or a feature outside
  * the subset (public, constant, immutable or initialised state variables,
  * modifiers, inheritance, named or try calls, literal subdenominations,
- * inline arrays, non-elementary type names, ...)
+ * inline arrays, type names other than elementary types and mappings, ...)
  * raises ImportError. Every node keeps its compiler id and source range;
  * declarations are referred to by id, and names are diagnostic only. Type
  * annotations are kept as the compiler's encoded typeIdentifier and decoded
  * here, never from the display typeString.
  *
- * Types are normalized from ElementaryTypeName nodes and decoded from
- * typeIdentifiers; both yield only valid shapes (normalize_type_name_valid,
+ * Types are normalized from elementary and mapping type-name nodes; value
+ * types are decoded from typeIdentifiers. Both yield only valid shapes (normalize_type_name_valid,
  * decode_type_identifier_valid). Literals keep their exact rational type.
  *
  * valid_src_unit then establishes, for an imported unit:
  *  - all node ids are distinct;
  *  - every parameter, return, local and state variable has a normalized
- *    elementary type, the default data location, a typeIdentifier agreeing
- *    with that type, and the enclosing function, block, for statement or
+ *    elementary or admitted mapping type, the default data location, and a
+ *    type identifier agreeing with that type, and the enclosing function, block, for statement or
  *    contract as its scope;
  *  - the contract's storage layout lists its state variables in declaration
  *    order, each with its own typeIdentifier and a slot below 2 ** 256;
@@ -63,6 +63,7 @@ End
 (* ElementaryTypeName: name and, for addresses, stateMutability. *)
 Datatype:
   src_type_name = SrcElementaryTypeName node_info string (string option)
+                | SrcMappingTypeName node_info src_type_name src_type_name
 End
 
 Datatype:
@@ -93,6 +94,7 @@ Datatype:
   | SrcUnaryOperation node_info string bool src_expr string
   | SrcBinaryOperation node_info string src_expr src_expr string string
   | SrcAssignment node_info string src_expr src_expr string
+  | SrcIndexAccess node_info src_expr src_expr string
   | SrcTupleExpression node_info (src_expr option list) string
   | SrcFunctionCall node_info src_expr (src_expr list) string
   | SrcTypeConversion node_info src_type_name src_expr string
@@ -193,14 +195,19 @@ Definition elementary_type_def:
 End
 
 Definition normalize_type_name_def:
-  normalize_type_name (SrcElementaryTypeName _ name mutability) =
+  (normalize_type_name (SrcElementaryTypeName _ name mutability) =
     case elementary_type name of
       SOME (AddressT _) =>
         if mutability = SOME "nonpayable" then SOME (AddressT NonpayableAddress)
         else if mutability = SOME "payable" then SOME (AddressT PayableAddress)
         else NONE
     | SOME ty => if mutability = NONE then SOME ty else NONE
-    | NONE => NONE
+    | NONE => NONE) ∧
+  (normalize_type_name (SrcMappingTypeName _ key value) =
+    case (normalize_type_name key, normalize_type_name value) of
+      (SOME k, SOME v) =>
+        if is_elementary_type k then SOME (MappingT k v) else NONE
+    | _ => NONE)
 End
 
 (* Decoded typeIdentifiers: elementary types, rational literal types (a
@@ -297,11 +304,34 @@ Proof
   simp[valid_type_shape_def, valid_int_width_def]
 QED
 
+Theorem elementary_type_outer_free[local]:
+  elementary_type name = SOME ty ⇒ outer_location_free ty
+Proof
+  rw[elementary_type_def, AllCaseEqs()] >> simp[outer_location_free_def]
+QED
+
+Theorem elementary_mapping_key[local]:
+  is_elementary_type ty ∧ valid_type_shape ty ⇒ valid_mapping_key ty
+Proof
+  Cases_on ‘ty’ >> simp[solidityCoreWfTheory.is_elementary_type_def, valid_type_shape_def,
+                       valid_mapping_key_def]
+QED
+
+Theorem normalize_type_name_shape[local]:
+  ∀ty. normalize_type_name tn = SOME ty ⇒
+       valid_type_shape ty ∧ outer_location_free ty
+Proof
+  Induct_on ‘tn’ >> rw[normalize_type_name_def, AllCaseEqs()] >>
+  imp_res_tac elementary_type_valid >>
+  imp_res_tac elementary_type_outer_free >>
+  gvs[valid_type_shape_def, outer_location_free_def] >>
+  metis_tac[elementary_mapping_key]
+QED
+
 Theorem normalize_type_name_valid:
   normalize_type_name tn = SOME ty ⇒ valid_type_shape ty
 Proof
-  Cases_on ‘tn’ >> rw[normalize_type_name_def, AllCaseEqs()] >>
-  imp_res_tac elementary_type_valid >> gvs[valid_type_shape_def]
+  metis_tac[normalize_type_name_shape]
 QED
 
 Theorem decode_elementary_identifier_valid:
@@ -343,6 +373,34 @@ Definition identifier_integer_def:
     | _ => NONE
 End
 
+(* Canonical compiler identifiers for the admitted storage types. Mapping
+ * children are checked against their AST types, including nested mappings.
+ *)
+Definition storage_type_identifier_def:
+  (storage_type_identifier BoolT = "t_bool") ∧
+  (storage_type_identifier (UintT n) = "t_uint" ++ toString n) ∧
+  (storage_type_identifier (IntT n) = "t_int" ++ toString n) ∧
+  (storage_type_identifier (AddressT NonpayableAddress) = "t_address") ∧
+  (storage_type_identifier (AddressT PayableAddress) = "t_address_payable") ∧
+  (storage_type_identifier (FixedBytesT n) = "t_bytes" ++ toString n) ∧
+  (storage_type_identifier (MappingT key value) =
+    "t_mapping$_" ++ storage_type_identifier key ++ "_$_" ++
+    storage_type_identifier value ++ "_$") ∧
+  (storage_type_identifier _ = "")
+End
+
+(* storageLayout uses parentheses and commas where AST identifiers use $_. *)
+Definition storage_layout_identifier_def:
+  (storage_layout_identifier (MappingT key value) =
+    "t_mapping(" ++ storage_layout_identifier key ++ "," ++
+    storage_layout_identifier value ++ ")") ∧
+  (storage_layout_identifier ty = storage_type_identifier ty)
+End
+
+Definition source_type_matches_def:
+  source_type_matches ty tid ⇔ tid = storage_type_identifier ty
+End
+
 (* A parameter, return or local variable: an elementary value type in the
  * default location, agreeing with its typeIdentifier.
  *)
@@ -351,7 +409,7 @@ Definition variable_type_def:
     case normalize_type_name v.var_type_name of
       SOME ty =>
         if v.var_location = "default" ∧
-           decode_type_identifier v.var_type_id = SOME (SrcType ty)
+           source_type_matches ty v.var_type_id
         then SOME ty else NONE
     | NONE => NONE
 End
@@ -365,7 +423,9 @@ End
 (* Ids *)
 
 Definition type_name_ids_def:
-  type_name_ids (SrcElementaryTypeName info _ _) = [info.node_id]
+  (type_name_ids (SrcElementaryTypeName info _ _) = [info.node_id]) ∧
+  (type_name_ids (SrcMappingTypeName info key value) =
+    info.node_id :: type_name_ids key ++ type_name_ids value)
 End
 
 Definition variable_ids_def:
@@ -379,6 +439,8 @@ Definition expr_ids_def:
   (expr_ids (SrcUnaryOperation info _ _ e _) = info.node_id :: expr_ids e) ∧
   (expr_ids (SrcBinaryOperation info _ l r _ _) =
     info.node_id :: expr_ids l ++ expr_ids r) ∧
+  (expr_ids (SrcIndexAccess info b i _) =
+    info.node_id :: expr_ids b ++ expr_ids i) ∧
   (expr_ids (SrcAssignment info _ l r _) =
     info.node_id :: expr_ids l ++ expr_ids r) ∧
   (expr_ids (SrcTupleExpression info cs _) =
@@ -489,9 +551,14 @@ Definition check_expr_def:
   (check_expr (env : import_env) (SrcIdentifier _ _ x tid) =
     case ALOOKUP (env.variables ++ env.state) x of
       SOME ty =>
-        if decode_type_identifier tid = SOME (SrcType ty) then SOME (SrcType ty)
+        if source_type_matches ty tid then SOME (SrcType ty)
         else NONE
     | NONE => NONE) ∧
+  (check_expr env (SrcIndexAccess _ root_expr index tid) =
+    case (check_expr env root_expr, check_expr env index) of
+      (SOME (SrcType (MappingT key value)), SOME _) =>
+        if source_type_matches value tid then SOME (SrcType value) else NONE
+    | _ => NONE) ∧
   (check_expr env (SrcLiteral _ kind value tid) =
     if kind = "number" then
       case decode_type_identifier tid of
@@ -690,7 +757,10 @@ End
 Definition storage_layout_ok_def:
   (storage_layout_ok [] [] ⇔ T) ∧
   (storage_layout_ok ((v : src_variable) :: vs) (e :: es) ⇔
-     e.storage_id = v.var_info.node_id ∧ e.storage_type_id = v.var_type_id ∧
+     e.storage_id = v.var_info.node_id ∧
+     (case variable_type v of
+        SOME ty => e.storage_type_id = storage_layout_identifier ty
+      | NONE => F) ∧
      e.storage_slot < 2 ** 256 ∧ storage_layout_ok vs es) ∧
   (storage_layout_ok _ _ ⇔ F)
 End
@@ -723,6 +793,19 @@ val () = cv_auto_trans normalize_type_name_def;
 val () = cv_auto_trans decode_type_identifier_def;
 val () = cv_auto_trans identifier_type_def;
 val () = cv_auto_trans identifier_integer_def;
+(* Keccak exports a partial HEX translation; decimal identifiers use the
+ * existing total definition, including its out-of-range branch. *)
+val total_hex_pre_def = cv_trans_pre "total_hex_pre" ASCIInumbersTheory.HEX;
+
+Theorem total_hex_pre[cv_pre,local]:
+  ∀n. total_hex_pre n
+Proof
+  rw[total_hex_pre_def] >> decide_tac
+QED
+
+val () = cv_auto_trans storage_type_identifier_def;
+val () = cv_auto_trans source_type_matches_def;
+val () = cv_auto_trans storage_layout_identifier_def;
 val () = cv_auto_trans variable_type_def;
 val () = cv_auto_trans call_value_type_def;
 val () = cv_auto_trans_rec expr_ids_def (
