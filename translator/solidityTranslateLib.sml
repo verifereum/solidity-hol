@@ -3,8 +3,8 @@
  * Generation: symbolic execution of a procedure body over a map from ids to
  * shallow values. Temporaries, capture targets and copies only rename terms;
  * checked operations and calls become binds unless the path condition decides
- * their check; normal branches join before the remaining block. Branches
- * with abrupt source control flow retain their exits. A loop becomes a helper over the variables whose values on
+ * their check; pure branches merge, other branches take the rest of the block
+ * with them. A loop becomes a helper over the variables whose values on
  * entry it uses, called after the loop's first iteration; a boolean it only ever sets to one
  * constant at the top of its prelude (the elaborator's first-iteration flag)
  * is not a parameter. One loop per procedure, not nested.
@@ -247,16 +247,6 @@ fun pure_normal (Leaf (Normal, _, _)) = true
   | pure_normal (Cond (_, t1, t2)) = pure_normal t1 andalso pure_normal t2
   | pure_normal _ = false
 
-(* A checked operation or call may abort through its bind; its successful
-   continuation is still normal. Source return/break/continue do not join. *)
-fun normal_envs (Leaf (Normal, env, _)) = SOME [env]
-  | normal_envs (Bind (_, _, tr)) = normal_envs tr
-  | normal_envs (Cond (_, left, right)) =
-      (case (normal_envs left, normal_envs right) of
-         (SOME ls, SOME rs) => SOME (ls @ rs)
-       | _ => NONE)
-  | normal_envs _ = NONE
-
 fun merged_value x (Leaf (_, env, _)) = fst (lookup_val env x)
   | merged_value x (Cond (c, t1, t2)) =
       let
@@ -380,26 +370,7 @@ fun exec_stmt (ctx : context) (env : env) pc s =
                                    (x, (tidy (merged_value x tr), ty)))
                                 (#vals env),
                      targets = #targets env}, pc)
-            else
-              case normal_envs tr of
-                NONE => tr
-              | SOME leaves =>
-                  let
-                    val changed = List.filter
-                      (fn (x, (v, _)) => List.exists
-                        (fn e => not (aconv v (fst (lookup_val e x)))) leaves)
-                      (#vals env)
-                    val outs = map (fn (x, (_, ty)) => (x, ty)) changed
-                    val vs = map (fn (x, ty) => fresh (var_name ctx x) (hol_type ty)) outs
-                    fun joined (Normal, e) = mk_returns (tuple_term
-                          (map (fn (x, _) => fst (lookup_val e x)) outs))
-                      | joined _ = raise ERR "exec_stmt" "non-normal join"
-                    val env' = foldl (fn (((x, ty), v), e) => set_val e x (v, ty))
-                                     env (ListPair.zip (outs, vs))
-                  in
-                    Bind (to_term joined tr, tuple_term vs,
-                          Leaf (Normal, env', range_hyps outs vs @ pc))
-                  end
+            else tr
           end
       end
   | ("WhileStmt", [pre, c, body]) => exec_loop ctx env pc (pre, c, body)
