@@ -33,7 +33,7 @@ Definition add_code_def:
 End
 
 Theorem add_returns_five:
-  (run 20 add_code).completion = YulReturn (word_to_bytes (5w : bytes32) T)
+  (run 20 add_code).completion = YulReturn (word_to_bytes_be (5w : bytes32))
 Proof
   CONV_TAC cv_eval
 QED
@@ -57,7 +57,7 @@ Definition store_code_def:
 End
 
 Theorem storage_round_trips:
-  (run 20 store_code).completion = YulReturn (word_to_bytes (42w : bytes32) T)
+  (run 20 store_code).completion = YulReturn (word_to_bytes_be (42w : bytes32))
 Proof
   CONV_TAC cv_eval
 QED
@@ -84,7 +84,7 @@ Definition loop_code_def:
 End
 
 Theorem loop_breaks_out:
-  (run 20 loop_code).completion = YulReturn (word_to_bytes (3w : bytes32) T)
+  (run 20 loop_code).completion = YulReturn (word_to_bytes_be (3w : bytes32))
 Proof
   CONV_TAC cv_eval
 QED
@@ -115,7 +115,7 @@ End
 
 Theorem call_arguments_are_evaluated_right_to_left:
   (run 20 call_code).completion =
-  YulReturn (word_to_bytes (3w : bytes32) T ++ word_to_bytes (1w : bytes32) T)
+  YulReturn (word_to_bytes_be (3w : bytes32) ++ word_to_bytes_be (1w : bytes32))
 Proof
   CONV_TAC cv_eval
 QED

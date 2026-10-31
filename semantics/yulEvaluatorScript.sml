@@ -152,8 +152,9 @@ Definition yul_memory_byte_def:
 End
 
 Definition yul_memory_read_def:
-  yul_memory_read m offset sz =
-    GENLIST (λi. yul_memory_byte m (offset + i)) sz
+  (yul_memory_read m offset 0 = []) ∧
+  (yul_memory_read m offset (SUC k) =
+     yul_memory_byte m offset :: yul_memory_read m (offset + 1) k)
 End
 
 Definition yul_memory_write_def:
@@ -184,7 +185,7 @@ End
 
 Definition yul_mstore_def:
   yul_mstore m offset value =
-    yul_memory_write (yul_memory_touch m offset 32) offset (word_to_bytes value T)
+    yul_memory_write (yul_memory_touch m offset 32) offset (word_to_bytes_be value)
 End
 
 (* Storage, straight to the executing account's. *)
@@ -203,13 +204,24 @@ Definition yul_sstore_def:
           m.accounts
 End
 
+(* SIGNEXTEND(i, x): the low 8*(i+1) bits of x as a signed number, extended
+ * through the word; i ≥ 31 leaves x alone, since the whole word is already in
+ * view.  This is what the EVM's SIGNEXTEND does, spelled with HOL's
+ * word_sign_extend rather than vfmExecution's byte-level sign_extend, whose
+ * word_of_bytes the cv translation cannot compute.
+ *)
+Definition yul_sign_extend_def:
+  yul_sign_extend (i : bytes32) (w : bytes32) =
+    if i > 31w then w else word_sign_extend (8 * (w2n i + 1)) w
+End
+
 (* Literals *)
 
 Definition yul_literal_value_def:
   yul_literal_value (LitNumber w) = SOME w ∧
   yul_literal_value (LitBytes bs) =
     (if LENGTH bs ≤ 32 then
-       SOME (word_of_bytes T (0w : bytes32) (take_pad_0 32 bs))
+       SOME (word_of_bytes_be (take_pad_0 32 bs))
      else NONE) ∧
   yul_literal_value (LitBool b) = SOME (b2w b)
 End
@@ -238,7 +250,7 @@ Definition eval_yul_builtin_def:
     | (YMod, [a; b]) => EvalValues [with_zero word_mod a b] m
     | (YSMod, [a; b]) => EvalValues [with_zero word_rem a b] m
     | (YExp, [a; b]) => EvalValues [word_exp a b] m
-    | (YSignExtend, [a; b]) => EvalValues [sign_extend a b] m
+    | (YSignExtend, [a; b]) => EvalValues [yul_sign_extend a b] m
     | (YLt, [a; b]) => EvalValues [b2w (w2n a < w2n b)] m
     | (YGt, [a; b]) => EvalValues [b2w (w2n a > w2n b)] m
     | (YSLt, [a; b]) => EvalValues [b2w (word_lt a b)] m
@@ -254,16 +266,16 @@ Definition eval_yul_builtin_def:
     | (YSar, [n; w]) => EvalValues [word_asr w (w2n n)] m
     | (YKeccak256, [p; s]) =>
         let (m', bs) = yul_memory_region m (w2n p) (w2n s) in
-          EvalValues [word_of_bytes T (0w : bytes32) (Keccak_256_w64 bs)] m'
+          EvalValues [word_of_bytes_be (Keccak_256_w64 bs)] m'
     | (YMLoad, [p]) =>
         let (m', bs) = yul_mload m (w2n p) in
-          EvalValues [word_of_bytes T (0w : bytes32) bs] m'
+          EvalValues [word_of_bytes_be bs] m'
     | (YMStore, [p; v]) => EvalValues [] (yul_mstore m (w2n p) v)
     | (YSLoad, [s]) => EvalValues [yul_sload m s] m
     | (YSStore, [s; v]) => EvalValues [] (yul_sstore m s v)
     | (YCallDataLoad, [i]) =>
         EvalValues
-          [word_of_bytes T (0w : bytes32) (take_pad_0 32 (DROP (w2n i) m.call_data))]
+          [word_of_bytes_be (take_pad_0 32 (DROP (w2n i) m.call_data))]
           m
     | (YCallDataSize, []) => EvalValues [n2w (LENGTH m.call_data)] m
     | (YCallValue, []) => EvalValues [m.call_value] m
@@ -348,7 +360,7 @@ Proof
 QED
 
 (* The evaluator.  n is fuel, fns the functions a call may reach. *)
-Definition eval_yul_def:
+Definition eval_yul_block_def:
   (* statement lists: siblings reuse the bound, a non-normal completion stops *)
   (eval_yul_block (n : num) (fns : string |-> yul_function) [] m =
      yul_normal m) ∧
@@ -512,88 +524,11 @@ Definition run_yul_def:
       (m with scopes := (FEMPTY : string |-> bytes32) :: m.scopes)
 End
 
-(* cv translation, so compiled Yul runs under cv_compute.  Termination of the
- * translated evaluator follows a scaled (fuel, size) order on the cv
- * encodings, strictly decreasing on every cv input.
+(* cv translation, so compiled Yul runs under cv_compute.  The recursive
+ * functions come as one mutually recursive group, which cv translates through
+ * a pre-relation: the group's termination order and the totality of that
+ * relation are supplied here rather than left to the translator to guess.
  *)
-
-(* PROBE: what breaks a translation that walks a list of finite maps? *)
-fun dump_g (g : goal) =
-  (print ("PROBE goal:\n" ^
-          PP.pp_to_string 100 goalStack.std_pp_goal g ^ "\n");
-   ALL_TAC g)
-
-Definition probe_find_def:
-  probe_find x (s : string |-> bytes32) = FLOOKUP s x
-End
-
-(* Recursion over a list whose element type is a finite map. *)
-Definition probe_fmap_def:
-  (probe_fmap ((s : string |-> bytes32) :: rest) = (1 : num) + probe_fmap rest) ∧
-  (probe_fmap [] = 0)
-End
-
-(* FLOOKUP on a num-keyed map, inside recursion. *)
-Definition probe_fl_num_def:
-  (probe_fl_num ((s : num |-> word8) :: rest) =
-     (case FLOOKUP s 0 of SOME v => (1 : num) | NONE => 0) + probe_fl_num rest) ∧
-  (probe_fl_num [] = 0)
-End
-
-(* FLOOKUP on a string-keyed map, inside recursion, num result. *)
-Definition probe_fl_str_def:
-  (probe_fl_str x ((s : string |-> bytes32) :: rest) =
-     (case FLOOKUP s x of SOME v => (1 : num) | NONE => 0) + probe_fl_str x rest) ∧
-  (probe_fl_str x [] = 0)
-End
-
-(* An option result over a list of string-keyed maps, no FLOOKUP. *)
-Definition probe_opt_def:
-  (probe_opt ((s : string |-> bytes32) :: rest) =
-     case probe_opt rest of NONE => SOME (0w : word8) | SOME v => SOME v) ∧
-  (probe_opt [] = NONE)
-End
-
-(* The lookup itself. *)
-Definition probe_lookup_def:
-  (probe_lookup x ((s : string |-> bytes32) :: rest) =
-     case FLOOKUP s x of SOME v => SOME v | NONE => probe_lookup x rest) ∧
-  (probe_lookup x [] = NONE)
-End
-
-(* The lookup with its map type left to inference, and pinned. *)
-Definition probe_poly_lookup_def:
-  (probe_poly_lookup x [] = NONE) ∧
-  (probe_poly_lookup x (scope :: rest) =
-     case FLOOKUP scope x of SOME v => SOME v | NONE => probe_poly_lookup x rest)
-End
-
-Definition probe_mono_lookup_def:
-  (probe_mono_lookup (x : string) [] = NONE) ∧
-  (probe_mono_lookup (x : string) ((scope : string |-> bytes32) :: rest) =
-     case FLOOKUP scope x of SOME v => SOME v | NONE => probe_mono_lookup x rest)
-End
-
-fun probe_try name f =
-  (f (); print ("PROBE ok   " ^ name ^ "\n"))
-  handle e => print ("PROBE FAIL " ^ name ^ " :: " ^ General.exnMessage e ^ "\n")
-
-val _ = probe_try "lookup with the map type inferred"
-  (fn () => cv_auto_trans probe_poly_lookup_def);
-val _ = probe_try "lookup with the map type pinned"
-  (fn () => cv_auto_trans probe_mono_lookup_def);
-val _ = probe_try "non-recursive string fmap"
-  (fn () => cv_auto_trans probe_find_def);
-val _ = probe_try "recursive over list of string fmaps"
-  (fn () => cv_auto_trans probe_fmap_def);
-val _ = probe_try "recursive FLOOKUP num-keyed"
-  (fn () => cv_auto_trans probe_fl_num_def);
-val _ = probe_try "recursive FLOOKUP string-keyed, num result"
-  (fn () => cv_auto_trans probe_fl_str_def);
-val _ = probe_try "recursive option result, no FLOOKUP"
-  (fn () => cv_auto_trans probe_opt_def);
-val _ = probe_try "recursive lookup returning an option"
-  (fn () => cv_auto_trans probe_lookup_def);
 
 val () = cv_auto_trans yul_lookup_def;
 val () = cv_auto_trans yul_lookup_names_def;
@@ -604,25 +539,42 @@ val () = cv_auto_trans yul_literal_value_def;
 val () = cv_auto_trans eval_yul_builtin_def;
 val () = cv_auto_trans yul_env_def;
 
-val () = cv_auto_trans_rec eval_yul_def (
-  WF_REL_TAC `inv_image ($< LEX $<)
-    (\x. case x of
-           INL (n0, e0, s0, m0) => (cv$c2n n0, 2 * cv_size s0 + 2)
-         | INR (INL (n0, e0, q0, m0)) => (cv$c2n n0, 2 * cv_size q0 + 2)
-         | INR (INR (INL (n0, e0, x0, m0))) => (cv$c2n n0, 2 * cv_size x0 + 1)
-         | INR (INR (INR (INL (n0, e0, x1, m0)))) =>
-             (cv$c2n n0, 2 * cv_size x1)
-         | INR (INR (INR (INR (INL (n0, e0, c0, p0, b0, m0))))) =>
-             (cv$c2n n0,
-              2 * (cv_size c0 + cv_size b0 + cv_size p0) + 1)
-         | INR (INR (INR (INR (INR (INL (n0, e0, v0, cs0, d0, m0)))))) =>
-             (cv$c2n n0, 2 * (cv_size cs0 + cv_size d0) + 3)
-         | INR (INR (INR (INR (INR (INR (n0, e0, nm0, a0, m0)))))) =>
-             (cv$c2n n0, 0))` >>
-  cv_termination_tac >>
-  rename1 `cv_snd (cv_snd x)` >> Cases_on `x` >> gvs[] >>
-  rename1 `cv_snd y` >> Cases_on `y` >> gvs[]
-);
+(* Termination of the translated evaluator: a scaled (fuel, size) order on the
+ * cv encodings, strictly decreasing on every recursive call.  Fuel is tested
+ * for zero before a back edge or a call, and sizes fall going into a
+ * statement, an expression, a body or a case.
+ *)
+val yul_pre_def = cv_auto_trans_pre_rec "" eval_yul_block_def
+  (WF_REL_TAC `inv_image ($< LEX $<)
+     (\x. case x of
+            INL (n0, e0, s0, m0) => (cv$c2n n0, 2 * cv_size s0 + 1)
+          | INR (INL (n0, e0, q0, m0)) => (cv$c2n n0, 2 * cv_size q0 + 1)
+          | INR (INR (INL (n0, e0, x0, m0))) =>
+              (cv$c2n n0, 2 * cv_size x0 + 1)
+          | INR (INR (INR (INL (n0, e0, x1, m0)))) =>
+              (cv$c2n n0, 2 * cv_size x1 + 1)
+          | INR (INR (INR (INR (INL (n0, e0, c0, p0, b0, m0))))) =>
+              (cv$c2n n0, 2 * (cv_size c0 + cv_size b0 + cv_size p0) + 1)
+          | INR (INR (INR (INR (INR (INL (n0, e0, v0, cs0, d0, m0)))))) =>
+              (cv$c2n n0, 2 * (cv_size cs0 + cv_size d0) + 1)
+          | INR (INR (INR (INR (INR (INR (n0, e0, nm0, a0, m0)))))) =>
+              (cv$c2n n0, 0))` >>
+   cv_termination_tac);
 
+(* The pre-relation is total: every input of every function has a translated
+ * step, so the equations cv derives from it fire unconditionally.
+ *)
+Theorem yul_pre[cv_pre]:
+  (∀n fns v m. eval_yul_block_pre n fns v m) ∧
+  (∀n fns v m. eval_yul_stmt_pre n fns v m) ∧
+  (∀n fns v m. eval_yul_expr_pre n fns v m) ∧
+  (∀n fns v m. eval_yul_args_pre n fns v m) ∧
+  (∀n fns cond post body m. eval_yul_loop_pre n fns cond post body m) ∧
+  (∀n fns v cases default m. eval_yul_cases_pre n fns v cases default m) ∧
+  (∀n fns name args m. invoke_yul_pre n fns name args m)
+Proof
+  ho_match_mp_tac eval_yul_block_ind \\ rw []
+  \\ simp [Once yul_pre_def]
+QED
 
 val () = cv_auto_trans run_yul_def;
