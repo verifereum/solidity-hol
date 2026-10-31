@@ -161,4 +161,3 @@ value-transfer edge cases and full source correspondence need additional
 witnesses/proofs. The reentry and bookkeeping witnesses are concrete finite
 checks, not universal checkpoint/tail preservation or source simulation theorems. Creation fixtures execute real initcode but do not
 constitute Solidity constructor/deployment semantics.
-

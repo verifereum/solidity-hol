@@ -395,23 +395,6 @@ be reported separately rather than conflated.
 These stages describe dependency order, not promises that each stage must cover
 every feature before work begins on the next.
 
-## Contract verification interfaces
-
-The deep executable interpreter remains authoritative. The implemented
-proof-producing core-to-HOL translator defines shallow HOL functions and proves
-their correspondence to core execution. Contract properties can then be proved
-over those functions. This proof layer is separate from the runtime definitions;
-see [translator.md](translator.md) for the current API and coverage.
-
-Artifact clients first use the checked preparation boundary. They name its
-source/core terms with HOL definitions and pass those definition theorems to
-`translate_unit`. Correspondence states the actual argument-range and runtime
-binding assumptions; it does not claim progress for arbitrary well-formed core.
-The translator consumes maintained block, loop and call equations. Normal
-branches share their continuation, while abrupt source exits retain theirs.
-Broader storage proofs and the memory/assembly and external-call contracts
-remain future work.
-
 ## Open questions
 
 The following issues remain deliberately unresolved:

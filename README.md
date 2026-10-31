@@ -60,19 +60,6 @@ connecting them to source execution still needs an external-call context/gas
 contract. Core well-formedness alone does not rule out `InvalidCompletion`:
 for example, a storage write in a static frame is deliberately invalid.
 
-## Program proofs
-
-`solidityTranslateLib.translate_unit` produces shallow HOL functions and
-kernel-checked correspondence theorems for its supported core fragment. It
-consumes maintained evaluator equations; the deep interpreter remains the
-semantic definition. Normal paths through checked operations and internal calls
-join before the rest of the block, preserving one continuation. Abrupt source
-returns and failures retain their behavior.
-
-See [translator.md](docs/translator.md) for the API, theorem preconditions and
-current coverage. Storage proofs, memory/assembly and the source external-call
-contract remain future work.
-
 ## Yul
 
 The compiler's runtime Yul object has its own AST, EVM dialect, machine and
