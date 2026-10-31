@@ -48,7 +48,8 @@ End
  * Types belong to operations/bindings, not integer payloads.
  *)
 Datatype:
-  core_value_type = SingleType sol_type | ProductType (core_value_type list)
+  core_value_type = SingleType sol_type | ReferenceType sol_type
+                  | ProductType (core_value_type list)
 End
 
 Datatype:
@@ -101,6 +102,7 @@ Datatype:
   | TupleComponentOperation num core_atom
   | ReadOperation sol_type core_atom
   | ReadStateOperation ast_id
+  | StateReferenceOperation ast_id
   | NavigateOperation sol_type core_atom navigation
   | InternalCallOperation ast_id (core_atom list)
   | ExternalCallOperation external_kind (core_atom list)

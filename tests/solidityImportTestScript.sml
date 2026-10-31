@@ -12,7 +12,8 @@ Libs
 fun holbuild_extra_deps (_ : string list) = ()
 val () = holbuild_extra_deps [
   "../testdata/frontend/expected/pure_core.json",
-  "../testdata/differential/expected/storage.json"
+  "../testdata/differential/expected/storage.json",
+  "../testdata/differential/expected/mappings.json"
 ]
 
 val fixture = "../testdata/frontend/expected/pure_core.json"
@@ -180,7 +181,7 @@ val () = import_error "inheritance"
 val () =
   (import_source_unit
      (edit_first "Identifier"
-        (set_field "referencedDeclaration" (JSON.INT ~18)) ast);
+        (set_field "referencedDeclaration" (JSON.INT ~18)) ast) contracts;
    raise Fail "built-in: imported")
   handle ImportError msg =>
     if String.isPrefix "Identifier " msg andalso
@@ -390,6 +391,46 @@ QED
 
 Theorem payable_function_rejected:
   ¬valid_src_unit payable_function
+Proof
+  CONV_TAC cv_eval
+QED
+
+
+(* Mapping AST and layout identifiers have different encodings. Both must
+ * agree with the normalized key/value types, including nested declarations.
+ *)
+val mapping_fixture = "../testdata/differential/expected/mappings.json"
+val mapping_source = "testdata/differential/mappings.sol"
+val mapping_ast = artifact_part mapping_fixture ["sources", mapping_source, "ast"]
+val mapping_contracts = artifact_part mapping_fixture ["contracts", mapping_source]
+
+Definition mapping_unit_def:
+  mapping_unit = ^(import_artifact mapping_fixture mapping_source)
+End
+
+val () = cv_auto_trans mapping_unit_def;
+
+Theorem mapping_unit_valid:
+  valid_src_unit mapping_unit
+Proof
+  CONV_TAC cv_eval
+QED
+
+val () = edited_unit_with mapping_contracts "mapping_key_metadata_mismatch"
+  (edit_first "VariableDeclaration"
+     (type_identifier "t_mapping$_t_int256_$_t_uint8_$") mapping_ast)
+
+val () = edited_unit_with mapping_contracts "mapping_leaf_metadata_mismatch"
+  (edit_first "IndexAccess" (type_identifier "t_uint256") mapping_ast)
+
+Theorem mapping_key_metadata_rejected:
+  ¬valid_src_unit mapping_key_metadata_mismatch
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem mapping_leaf_metadata_rejected:
+  ¬valid_src_unit mapping_leaf_metadata_mismatch
 Proof
   CONV_TAC cv_eval
 QED

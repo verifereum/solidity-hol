@@ -78,6 +78,19 @@ reads and writes the bytes of the executing account's word in place, keeping
 the rest of a packed slot. A write in a static frame is invalid, where the EVM
 would halt exceptionally.
 
+
+Mapping navigation uses `ReferenceType ty` bindings, including scalar leaves.
+`StateReferenceOperation` obtains the root location from `state_variables`;
+`NavigateOperation` hashes the encoded key and the current slot. Each nested
+index yields a concrete reference before the next index is evaluated.
+`ReadOperation` reads a scalar leaf and `CaptureValueStmt` captures it for the
+existing `WriteScalarStmt`. Assignment evaluates and saves its RHS before
+navigating the target; compound assignment and increment/decrement read and
+write the same captured location. Integer keys are extended to 256 bits,
+addresses and booleans are zero padded, and fixed bytes are right padded.
+Dynamic keys, composite values, and local storage-reference bindings remain
+coverage work.
+
 Memory references use object identity and an abstract cell offset; this is not
 an EVM byte address. The sparse heap separates metadata from cells, avoiding a
 mandatory dense array representation. Calldata references capture an offset

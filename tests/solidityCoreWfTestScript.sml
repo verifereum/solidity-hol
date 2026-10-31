@@ -685,3 +685,39 @@ Theorem missing_entry_rejected:
 Proof
   EVAL_TAC
 QED
+
+(* A captured storage reference is not a scalar binding: passing it to scalar
+ * arithmetic or reading a whole mapping must fail validation.
+ *)
+Theorem mapping_reference_not_scalar:
+  ¬wf_core_operation test_env
+    <| bindings := [(AstId 1, ReferenceType (MappingT (IntT 8) (UintT 8)))];
+       targets := []; returns := []; in_loop := F |>
+    (SingleType (UintT 8))
+    (ReadOperation (UintT 8) (BoundAtom (AstId 1)))
+Proof
+  EVAL_TAC
+QED
+
+Theorem mapping_key_signedness_checked:
+  ¬wf_core_operation test_env
+    <| bindings := [(AstId 1, ReferenceType (MappingT (IntT 8) (UintT 8)));
+                   (AstId 2, SingleType (UintT 8))];
+       targets := []; returns := []; in_loop := F |>
+    (ReferenceType (UintT 8))
+    (NavigateOperation (UintT 8) (BoundAtom (AstId 1))
+       (IndexNavigation (BoundAtom (AstId 2))))
+Proof
+  EVAL_TAC
+QED
+
+Theorem mapping_leaf_annotation_checked:
+  ¬wf_core_operation test_env
+    <| bindings := [(AstId 1, ReferenceType (MappingT (IntT 8) (UintT 8)))];
+       targets := []; returns := []; in_loop := F |>
+    (ReferenceType (UintT 16))
+    (NavigateOperation (UintT 16) (BoundAtom (AstId 1))
+       (IndexNavigation (ConstantAtom (IntegerValue (-1)))))
+Proof
+  EVAL_TAC
+QED

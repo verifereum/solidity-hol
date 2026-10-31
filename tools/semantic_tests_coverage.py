@@ -154,10 +154,18 @@ def skip_reason(test: SemanticTest, profile: dict[str, Any]) -> str | None:
 
 
 def compile_test(solc: Path, test: SemanticTest, profile_path: Path) -> dict[str, Any]:
-    """The test's ASTs by source name; raises SystemExit, as the exporter
-    does, with solc's diagnostics if it does not compile."""
-    artifact = exporter.build_artifact_from_sources(solc, test.sources, profile_path)
-    return {name: source["ast"] for name, source in artifact["output"]["sources"].items()}
+    """ASTs and storage layouts by source; compiler diagnostics raise SystemExit."""
+    output = exporter.build_artifact_from_sources(solc, test.sources, profile_path)["output"]
+    return {
+        name: {
+            "ast": source["ast"],
+            "contracts": {
+                contract: {"storageLayout": metadata["storageLayout"]}
+                for contract, metadata in output.get("contracts", {}).get(name, {}).items()
+            },
+        }
+        for name, source in output["sources"].items()
+    }
 
 
 # The scan
@@ -176,7 +184,7 @@ class Blocker:
 
 EXPRESSIONS = {
     "Identifier", "Literal", "UnaryOperation", "BinaryOperation", "Assignment",
-    "TupleExpression", "FunctionCall",
+    "TupleExpression", "FunctionCall", "IndexAccess",
 }
 STATEMENTS = {
     "Block", "UncheckedBlock", "ExpressionStatement", "VariableDeclarationStatement",
@@ -189,7 +197,7 @@ STATEMENTS = {
 STRUCTURAL = {
     "SourceUnit", "PragmaDirective", "ContractDefinition", "FunctionDefinition",
     "ParameterList", "VariableDeclaration", "ElementaryTypeName",
-    "ElementaryTypeNameExpression", "IdentifierPath", "StructuredDocumentation",
+    "ElementaryTypeNameExpression", "IdentifierPath", "StructuredDocumentation", "Mapping",
 }
 FEATURES = {
     "ArrayTypeName": "arrays",
@@ -205,7 +213,6 @@ FEATURES = {
     "IndexRangeAccess": "array slices",
     "InheritanceSpecifier": "inheritance",
     "InlineAssembly": "inline assembly",
-    "Mapping": "mappings",
     "ModifierDefinition": "modifiers",
     "ModifierInvocation": "modifiers",
     "OverrideSpecifier": "overrides",
@@ -312,8 +319,6 @@ def node_blockers(node: dict[str, Any]) -> list[Blocker]:
         found.append(FEATURES[kind])
     elif kind == "MemberAccess":
         found.append(type_feature(node["expression"]["typeDescriptions"].get("typeIdentifier")))
-    elif kind == "IndexAccess":
-        found.append(type_feature(node["baseExpression"]["typeDescriptions"].get("typeIdentifier")))
     elif kind == "NewExpression":
         created = node["typeName"]
         found.append("contract creation (new C)" if created["nodeType"] == "UserDefinedTypeName"
@@ -341,8 +346,8 @@ def node_blockers(node: dict[str, Any]) -> list[Blocker]:
         if node["kind"] == "structConstructorCall":
             found.append("structs")
     elif kind == "VariableDeclaration":
-        if node["stateVariable"]:
-            found.append("state variables")
+        if node["stateVariable"] and node.get("visibility") == "public":
+            found.append("public state variables")
         if node["constant"]:
             found.append("constants")
         if node["mutability"] == "immutable":
@@ -373,9 +378,9 @@ def node_blockers(node: dict[str, Any]) -> list[Blocker]:
 
 
 VALUE_TYPE = re.compile(
-    r"t_(bool|address|address_payable|u?int(8|16|24|32|40|48|56|64|72|80|88|96|104|112|120"
+    r"t_(bool|address_payable|address|u?int(8|16|24|32|40|48|56|64|72|80|88|96|104|112|120"
     r"|128|136|144|152|160|168|176|184|192|200|208|216|224|232|240|248|256)"
-    r"|bytes([1-9]|[12][0-9]|3[0-2]))"
+    r"|bytes([1-9]|[12][0-9]|3[0-2]))(?=_\$_|_\$|$)"
 )
 RATIONAL = re.compile(r"t_rational_(minus_)?[0-9]+_by_[0-9]+")
 
@@ -396,13 +401,32 @@ def decodes(type_identifier: str) -> bool:
     )
 
 
+def storage_type_supported(type_identifier: str) -> bool:
+    """Elementary scalar storage, or scalar-key mappings ending in a scalar."""
+    def parse_at(start: int) -> int | None:
+        prefix = "t_mapping$_"
+        if not type_identifier.startswith(prefix, start):
+            scalar = VALUE_TYPE.match(type_identifier, start)
+            return scalar.end() if scalar is not None else None
+        key = VALUE_TYPE.match(type_identifier, start + len(prefix))
+        if key is None or not type_identifier.startswith("_$_", key.end()):
+            return None
+        value_end = parse_at(key.end() + 3)
+        if value_end is None or not type_identifier.startswith("_$", value_end):
+            return None
+        return value_end + 2
+
+    return parse_at(0) == len(type_identifier)
+
+
 UNARY_OPERATORS = {"++", "--", "-", "!", "~"}
 
 
 def elaboration_blockers(node: dict[str, Any]) -> list[Blocker]:
     """What valid_src_unit or elaborate_unit rejects at a node the importer
-    admits: variables and conversions outside the elementary types, string
-    literals, functions not declared pure, `delete`, and units that are not one
+    admits: unsupported storage/reference types and indexing, conversions
+    outside the elementary types, string literals, payable functions, `delete`,
+    and units that are not one
     contract with functions. Other expressions get their types from these, or
     are rejected by the importer."""
     kind = node["nodeType"]
@@ -411,8 +435,14 @@ def elaboration_blockers(node: dict[str, Any]) -> list[Blocker]:
             or (kind == "FunctionCall" and node["kind"] == "typeConversion")
             or (kind == "Literal" and node["kind"] not in ("number", "bool"))):
         type_identifier = node["typeDescriptions"].get("typeIdentifier") or ""
-        if not decodes(type_identifier):
+        admitted_storage = (kind == "VariableDeclaration" and node["stateVariable"]
+                            and storage_type_supported(type_identifier))
+        if not decodes(type_identifier) and not admitted_storage:
             found.append(type_feature(type_identifier))
+        if (kind == "VariableDeclaration"
+                and node["storageLocation"] not in ("default", "memory")):
+            found.append("transient storage" if node["storageLocation"] == "transient"
+                         else "local reference bindings")
     elif (kind == "TupleExpression" and not node["isInlineArray"]
           and not decodes(node["typeDescriptions"]["typeIdentifier"])):
         type_identifier = node["typeDescriptions"]["typeIdentifier"]
@@ -427,8 +457,12 @@ def elaboration_blockers(node: dict[str, Any]) -> list[Blocker]:
     elif kind == "Literal" and node["kind"] == "number" and not RATIONAL.fullmatch(
             node["typeDescriptions"].get("typeIdentifier") or ""):
         found.append("literals of non-integer types")
-    elif kind == "FunctionDefinition" and node["stateMutability"] != "pure":
-        found.append("functions not declared pure")
+    elif kind == "FunctionDefinition" and node["stateMutability"] == "payable":
+        found.append("payable functions")
+    elif kind == "IndexAccess":
+        base_type = node["baseExpression"]["typeDescriptions"].get("typeIdentifier") or ""
+        if not base_type.startswith("t_mapping$_") or not storage_type_supported(base_type):
+            found.append(type_feature(base_type))
     elif kind == "SourceUnit":
         contracts = [m for m in node["nodes"] if m["nodeType"] == "ContractDefinition"]
         if len(contracts) != 1:
@@ -500,9 +534,15 @@ def scan(asts: dict[str, Any]) -> dict[int, list[Blocker]]:
         calls = [n for n in by_id.values() if n["nodeType"] == "FunctionCall"]
         callees = {n["expression"]["id"] for n in calls}
         conversions = {n["expression"]["id"] for n in calls if n["kind"] == "typeConversion"}
+        storage_bases = {n["baseExpression"]["id"] for n in by_id.values()
+                         if n["nodeType"] == "IndexAccess"}
         for node in nodes(ast):
             blockers = (node_blockers(node) + callee_blockers(node, callees, conversions)
                         + elaboration_blockers(node) + coerced_literals(node, by_id))
+            if (node["nodeType"] in {"Identifier", "IndexAccess"}
+                    and node.get("typeDescriptions", {}).get("typeIdentifier", "").startswith("t_mapping$_")
+                    and node["id"] not in storage_bases):
+                blockers.append(Blocker(node["nodeType"], "mapping values", "elaboration"))
             if blockers:
                 found.setdefault(node["id"], []).extend(blockers)
     return found
@@ -518,7 +558,7 @@ def run_hol(holbuild: str, work: Path, units: list[tuple[str, Path]]) -> dict[st
     manifest.write_text("".join(f"{name}\t{path}\n" for name, path in units), encoding="utf-8")
     log = work / "hol.log"
     # `holbuild run` loads built theories but does not build them.
-    build = [holbuild, "build", "--skip-proof-steps", "solidityImportLib",
+    build = [holbuild, "-j8", "build", "--skip-checkpoints", "--skip-proof-steps", "solidityImportLib",
              "solidityElaborateTheory"]
     print("+", " ".join(build), file=sys.stderr, flush=True)
     subprocess.run(build, cwd=ROOT, check=True)
@@ -785,8 +825,9 @@ def main(argv: list[str] | None = None) -> int:
                 units.append((test.name, path))
         print(f"{len(tests)} tests, {len(units)} compiled", file=sys.stderr, flush=True)
         hol = run_hol(args.holbuild, work, units)
-    for name, asts in compiled.items():
-        results[name] = classify(name, scan(asts), hol[name])
+    for name, sources in compiled.items():
+        results[name] = classify(name, scan({source: data["ast"] for source, data in sources.items()}),
+                                 hol[name])
 
     report = Report(pin, args.profile.stem, [results[t.name] for t in tests])
     exporter.write_json_atomic(args.output.with_suffix(".json"), report.json())

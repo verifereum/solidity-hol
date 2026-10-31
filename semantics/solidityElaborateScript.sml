@@ -2,7 +2,8 @@
  * core, for the pinned profile solc-0.8.37-via-ir-osaka.
  *
  * Admitted: one contract of functions over elementary value types, with
- * value-type state variables at their storage layout entries, locals
+ * value-type state variables and scalar-key nested mappings at their layout
+ * entries, indexed scalar reads/updates, locals
  * (including tuple declarations with holes), internal calls with single or
  * multiple returns, explicit elementary conversions, literals, unary, binary,
  * comparison and short-circuit operators, simple and compound assignment to
@@ -130,6 +131,12 @@ Definition write_place_def:
     [CaptureStateStmt (AstId t) (AstId x); WriteScalarStmt (AstId t) ty a])
 End
 
+(* Capturing a computed scalar leaf preserves the evaluated index path. *)
+Definition write_reference_def:
+  write_reference (t : num) ty ref a =
+    [CaptureValueStmt (AstId t) ref; WriteScalarStmt (AstId t) ty a]
+End
+
 (* Operators *)
 
 Definition arithmetic_operator_def:
@@ -207,6 +214,7 @@ Definition expr_assigns_def:
     expr_assigns l ∨ expr_assigns r) ∧
   (expr_assigns (SrcTupleExpression _ cs _) ⇔ components_assign cs) ∧
   (expr_assigns (SrcFunctionCall _ _ args _) ⇔ exprs_assign args) ∧
+  (expr_assigns (SrcIndexAccess _ b i _) ⇔ expr_assigns b ∨ expr_assigns i) ∧
   (expr_assigns (SrcTypeConversion _ _ e _) ⇔ expr_assigns e) ∧
   (expr_assigns _ ⇔ F) ∧
   (components_assign [] ⇔ F) ∧
@@ -272,171 +280,225 @@ End
  * elaborated by elab_values.
  *)
 Definition elab_expr_def:
-  (elab_expr ctx n (SrcIdentifier _ _ x _) =
-    case variable_place ctx x of
-      SOME place =>
-        let (read, n1) = read_place n x place in
-        let (ss, a) = read in
-        SOME ((ss, a, ElabType (place_type place)), n1)
-    | NONE => NONE) ∧
-  (elab_expr ctx n (SrcLiteral _ kind value tid) =
-    if kind = "bool" then
-      SOME (([], ConstantAtom (BoolValue (value = "true")), ElabType BoolT), n)
-    else
-      case identifier_integer tid of
-        SOME i => SOME (([], ConstantAtom (IntegerValue i), ElabLiteral), n)
-      | NONE => NONE) ∧
-  (elab_expr ctx n (SrcUnaryOperation _ op prefix e tid) =
-    if op = "++" ∨ op = "--" then
-      case e of
-        SrcIdentifier _ _ x _ =>
-          (case variable_place ctx x of
-             SOME place =>
-               let ty = place_type place in
-               let (read, n1) = read_place n x place in
-               let (rs, cur) = read in
-               let (old, old_atom) =
-                 bind_value n1 ty (ConvertOperation ty cur) in
-               let (step, new_atom) =
-                 bind_value (n1 + 1) ty
-                   (ScalarOperation ty ctx.mode
-                      (if op = "++" then AddOp else SubtractOp)
-                      [cur; ConstantAtom (IntegerValue 1)]) in
-               SOME ((rs ++ (if prefix then [] else old) ++ step ++
-                      write_place (n1 + 2) x place new_atom,
-                      (if prefix then new_atom else old_atom), ElabType ty),
-                     n1 + 3)
+  (elab_expr ctx n expression =
+    case expression of
+      SrcIdentifier _ _ x _ =>
+        (case variable_place ctx x of
+           SOME place =>
+             if ¬is_elementary_type (place_type place) then NONE else
+             let (read, n1) = read_place n x place in
+             let (ss, a) = read in
+             SOME ((ss, a, ElabType (place_type place)), n1)
+         | NONE => NONE)
+    | SrcLiteral _ kind value tid =>
+        (if kind = "bool" then
+           SOME (([], ConstantAtom (BoolValue (value = "true")), ElabType BoolT), n)
+         else
+           case identifier_integer tid of
+             SOME i => SOME (([], ConstantAtom (IntegerValue i), ElabLiteral), n)
            | NONE => NONE)
-      | _ => NONE
-    else
-      case (unary_operator op, identifier_type tid, elab_expr ctx n e) of
-        (SOME uop, SOME ty, SOME ((ss, a, vt), n')) =>
-          (case coerce n' ty a vt of
-             SOME ((cs, a'), n'') =>
-               let (ss', v) = bind_value n'' ty
-                                (ScalarOperation ty ctx.mode uop [a']) in
-               SOME ((ss ++ cs ++ ss', v, ElabType ty), n'' + 1)
-           | NONE => NONE)
-      | _ => NONE) ∧
-  (elab_expr ctx n (SrcBinaryOperation _ op l r common tid) =
-    case (identifier_type common, elab_expr ctx n l) of
-      (SOME ty, SOME ((sl, al, vl), n1)) =>
-        if op = "&&" ∨ op = "||" then
-          (case coerce n1 BoolT al vl of
-             SOME ((cl, al'), n2) =>
-               (case elab_expr ctx (n2 + 2) r of
-                  SOME ((sr, ar, vr), n3) =>
-                    (case coerce n3 BoolT ar vr of
-                       SOME ((cr, ar'), n4) =>
-                         let (rs, res) =
-                           bind_value n2 BoolT (ConvertOperation BoolT al') in
-                         let rhs = sr ++ cr ++
-                                   assign_local (n2 + 1) n2 BoolT ar' in
-                         SOME ((sl ++ cl ++ rs ++
-                                [if op = "&&" then IfStmt res rhs []
-                                 else IfStmt res [] rhs],
-                                res, ElabType BoolT), n4)
-                     | NONE => NONE)
+    | SrcIndexAccess info root_expr index tid =>
+        (case elab_location ctx n expression of
+           SOME ((ss, ref, ty), n1) =>
+             if is_elementary_type ty then
+               let (rs, a) = bind_value n1 ty (ReadOperation ty ref) in
+               SOME ((ss ++ rs, a, ElabType ty), n1 + 1)
+             else NONE
+         | NONE => NONE)
+    | SrcUnaryOperation _ op prefix e tid =>
+        (if op = "++" ∨ op = "--" then
+           case e of
+             SrcIdentifier _ _ x _ =>
+               (case variable_place ctx x of
+                  SOME place =>
+                    let ty = place_type place in
+                    let (read, n1) = read_place n x place in
+                    let (rs, cur) = read in
+                    let (old, old_atom) =
+                      bind_value n1 ty (ConvertOperation ty cur) in
+                    let (step, new_atom) =
+                      bind_value (n1 + 1) ty
+                        (ScalarOperation ty ctx.mode
+                           (if op = "++" then AddOp else SubtractOp)
+                           [cur; ConstantAtom (IntegerValue 1)]) in
+                    SOME ((rs ++ (if prefix then [] else old) ++ step ++
+                           write_place (n1 + 2) x place new_atom,
+                           (if prefix then new_atom else old_atom), ElabType ty),
+                          n1 + 3)
                 | NONE => NONE)
-           | NONE => NONE)
-        else
-          (* flat let patterns: nested ones do not cv-translate here *)
-          let (copied, n2) =
-            if expr_assigns r then snapshot n1 al vl else (([], al), n1) in
-          let (sl', al') = copied in
-          (case elab_expr ctx n2 r of
-             SOME ((sr, ar, vr), n3) =>
-               (case arithmetic_operator op of
-                  SOME aop =>
-                    (case coerce n3 ty al' vl of
-                       SOME ((cl, al''), n4) =>
-                         (case coerce n4 (right_operand_type aop ty) ar vr of
-                            SOME ((cr, ar'), n5) =>
-                              let (ss, v) = bind_value n5 ty
-                                              (ScalarOperation ty ctx.mode aop
-                                                 [al''; ar']) in
-                              SOME ((sl ++ sl' ++ sr ++ cl ++ cr ++ ss, v,
-                                     ElabType ty), n5 + 1)
+           | _ =>
+               (case elab_location ctx n e of
+                  SOME ((ss, ref, ty), n1) =>
+                    let (rs, cur) = bind_value n1 ty (ReadOperation ty ref) in
+                    let (step, v) = bind_value (n1 + 1) ty
+                      (ScalarOperation ty ctx.mode
+                         (if op = "++" then AddOp else SubtractOp)
+                         [cur; ConstantAtom (IntegerValue 1)]) in
+                    SOME ((ss ++ rs ++ step ++ write_reference (n1 + 2) ty ref v,
+                           (if prefix then v else cur), ElabType ty), n1 + 3)
+                | NONE => NONE)
+         else
+           case (unary_operator op, identifier_type tid, elab_expr ctx n e) of
+             (SOME uop, SOME ty, SOME ((ss, a, vt), n')) =>
+               (case coerce n' ty a vt of
+                  SOME ((cs, a'), n'') =>
+                    let (ss', v) = bind_value n'' ty
+                                     (ScalarOperation ty ctx.mode uop [a']) in
+                    SOME ((ss ++ cs ++ ss', v, ElabType ty), n'' + 1)
+                | NONE => NONE)
+           | _ => NONE)
+    | SrcBinaryOperation _ op l r common tid =>
+        (case (identifier_type common, elab_expr ctx n l) of
+           (SOME ty, SOME ((sl, al, vl), n1)) =>
+             if op = "&&" ∨ op = "||" then
+               (case coerce n1 BoolT al vl of
+                  SOME ((cl, al'), n2) =>
+                    (case elab_expr ctx (n2 + 2) r of
+                       SOME ((sr, ar, vr), n3) =>
+                         (case coerce n3 BoolT ar vr of
+                            SOME ((cr, ar'), n4) =>
+                              let (rs, res) =
+                                bind_value n2 BoolT (ConvertOperation BoolT al') in
+                              let rhs = sr ++ cr ++
+                                        assign_local (n2 + 1) n2 BoolT ar' in
+                              SOME ((sl ++ cl ++ rs ++
+                                     [if op = "&&" then IfStmt res rhs []
+                                      else IfStmt res [] rhs],
+                                     res, ElabType BoolT), n4)
                           | NONE => NONE)
                      | NONE => NONE)
-                | NONE =>
-                    (case coerce n3 ty al' vl of
-                       SOME ((cl, al''), n4) =>
-                         (case coerce n4 ty ar vr of
-                            SOME ((cr, ar'), n5) =>
-                              (case comparison n5 ty op al'' ar' of
-                                 SOME ((ss, v), n6) =>
+                | NONE => NONE)
+             else
+               (* flat let patterns: nested ones do not cv-translate here *)
+               let (copied, n2) =
+                 if expr_assigns r then snapshot n1 al vl else (([], al), n1) in
+               let (sl', al') = copied in
+               (case elab_expr ctx n2 r of
+                  SOME ((sr, ar, vr), n3) =>
+                    (case arithmetic_operator op of
+                       SOME aop =>
+                         (case coerce n3 ty al' vl of
+                            SOME ((cl, al''), n4) =>
+                              (case coerce n4 (right_operand_type aop ty) ar vr of
+                                 SOME ((cr, ar'), n5) =>
+                                   let (ss, v) = bind_value n5 ty
+                                                   (ScalarOperation ty ctx.mode aop
+                                                      [al''; ar']) in
                                    SOME ((sl ++ sl' ++ sr ++ cl ++ cr ++ ss, v,
-                                          ElabType BoolT), n6)
+                                          ElabType ty), n5 + 1)
                                | NONE => NONE)
                           | NONE => NONE)
-                     | NONE => NONE))
-           | NONE => NONE)
-    | _ => NONE) ∧
-  (elab_expr ctx n (SrcAssignment _ op (SrcIdentifier _ _ x _) rhs tid) =
-    case (variable_place ctx x, elab_expr ctx n rhs) of
-      (SOME place, SOME ((sr, ar, vr), n1)) =>
-        let ty = place_type place in
-        if op = "=" then
-          (case coerce n1 ty ar vr of
-             SOME ((cr, ar'), n2) =>
-               SOME ((sr ++ cr ++ write_place n2 x place ar', ar',
-                      ElabType ty), n2 + 1)
-           | NONE => NONE)
-        else
-          (case compound_operator op of
-             SOME aop =>
-               (case coerce n1 (right_operand_type aop ty) ar vr of
-                  SOME ((cr, ar'), n2) =>
-                    let (read, n3) = read_place n2 x place in
-                    let (rs, cur) = read in
-                    let (ss, v) = bind_value n3 ty
-                                    (ScalarOperation ty ctx.mode aop
-                                       [cur; ar']) in
-                    SOME ((sr ++ cr ++ rs ++ ss ++
-                           write_place (n3 + 1) x place v,
-                           v, ElabType ty), n3 + 2)
+                     | NONE =>
+                         (case coerce n3 ty al' vl of
+                            SOME ((cl, al''), n4) =>
+                              (case coerce n4 ty ar vr of
+                                 SOME ((cr, ar'), n5) =>
+                                   (case comparison n5 ty op al'' ar' of
+                                      SOME ((ss, v), n6) =>
+                                        SOME ((sl ++ sl' ++ sr ++ cl ++ cr ++ ss, v,
+                                               ElabType BoolT), n6)
+                                    | NONE => NONE)
+                               | NONE => NONE)
+                          | NONE => NONE))
                 | NONE => NONE)
-           | NONE => NONE)
-    | _ => NONE) ∧
-  (elab_expr ctx n (SrcAssignment _ op (SrcTupleExpression _ cs _) rhs tid) =
-    if op = "=" then
-      case elab_values ctx n rhs of
-        SOME ((sr, vs), n1) =>
-          let (ss, vs', n2) = snapshot_values n1 vs in
-          (case tuple_writes ctx n2 cs vs' of
-             SOME (ws, n3) =>
-               SOME ((sr ++ ss ++ ws, ConstantAtom (BoolValue F),
-                      ElabTuple []), n3)
-           | NONE => NONE)
-      | NONE => NONE
-    else NONE) ∧
-  (elab_expr ctx n (SrcAssignment _ _ _ _ _) = NONE) ∧
-  (elab_expr ctx n (SrcTupleExpression _ [SOME e] _) = elab_expr ctx n e) ∧
-  (elab_expr ctx n (SrcTupleExpression _ _ _) = NONE) ∧
-  (elab_expr ctx n (SrcFunctionCall _ (SrcIdentifier _ _ f _) args _) =
-    case ALOOKUP ctx.functions f of
-      SOME callee =>
-        (case callee_types callee of
-           SOME (params, rets) =>
-             (case elab_args ctx n params args of
-                SOME ((sa, atoms), n1) =>
-                  SOME ((sa ++ [DefineStmt (AstId n1) (call_result_type rets)
-                                  (InternalCallOperation (AstId f) atoms)],
-                         BoundAtom (AstId n1), call_value rets), n1 + 1)
-              | NONE => NONE)
-         | NONE => NONE)
-    | NONE => NONE) ∧
-  (elab_expr ctx n (SrcFunctionCall _ _ _ _) = NONE) ∧
-  (elab_expr ctx n (SrcTypeConversion _ tn e _) =
-    case (normalize_type_name tn, elab_expr ctx n e) of
-      (SOME ty, SOME ((ss, a, vt), n1)) =>
-        (case vt of
-           ElabTuple _ => NONE
+         | _ => NONE)
+    | SrcAssignment _ op lhs rhs tid =>
+        (case lhs of
+           SrcIdentifier _ _ x _ =>
+             (case (variable_place ctx x, elab_expr ctx n rhs) of
+                (SOME place, SOME ((sr, ar, vr), n1)) =>
+                  let ty = place_type place in
+                  if op = "=" then
+                    (case coerce n1 ty ar vr of
+                       SOME ((cr, ar'), n2) =>
+                         SOME ((sr ++ cr ++ write_place n2 x place ar', ar',
+                                ElabType ty), n2 + 1)
+                     | NONE => NONE)
+                  else
+                    (case compound_operator op of
+                       SOME aop =>
+                         (case coerce n1 (right_operand_type aop ty) ar vr of
+                            SOME ((cr, ar'), n2) =>
+                              let (read, n3) = read_place n2 x place in
+                              let (rs, cur) = read in
+                              let (ss, v) = bind_value n3 ty
+                                              (ScalarOperation ty ctx.mode aop
+                                                 [cur; ar']) in
+                              SOME ((sr ++ cr ++ rs ++ ss ++
+                                     write_place (n3 + 1) x place v,
+                                     v, ElabType ty), n3 + 2)
+                          | NONE => NONE)
+                     | NONE => NONE)
+              | _ => NONE)
+         | SrcTupleExpression _ cs _ =>
+             (if op = "=" then
+                case elab_values ctx n rhs of
+                  SOME ((sr, vs), n1) =>
+                    let (ss, vs', n2) = snapshot_values n1 vs in
+                    (case tuple_writes ctx n2 cs vs' of
+                       SOME (ws, n3) =>
+                         SOME ((sr ++ ss ++ ws, ConstantAtom (BoolValue F),
+                                ElabTuple []), n3)
+                     | NONE => NONE)
+                | NONE => NONE
+              else NONE)
          | _ =>
-           let (cs, v) = bind_value n1 ty (ConvertOperation ty a) in
-           SOME ((ss ++ cs, v, ElabType ty), n1 + 1))
-    | _ => NONE) ∧
+             (case elab_expr ctx n rhs of
+                SOME ((sr, ar, vr), n1) =>
+                  let (copied, n2) = snapshot n1 ar vr in
+                  let (sc, ar') = copied in
+                  (case elab_location ctx n2 lhs of
+                     SOME ((sl, ref, ty), n3) =>
+                       if op = "=" then
+                         (case coerce n3 ty ar' vr of
+                            SOME ((cr, a), n4) =>
+                              SOME ((sr ++ sc ++ sl ++ cr ++
+                                     write_reference n4 ty ref a, a, ElabType ty), n4 + 1)
+                          | NONE => NONE)
+                       else
+                         (case compound_operator op of
+                            SOME aop =>
+                              (case coerce n3 (right_operand_type aop ty) ar' vr of
+                                 SOME ((cr, a), n4) =>
+                                   let (rs, cur) = bind_value n4 ty (ReadOperation ty ref) in
+                                   let (step, v) = bind_value (n4 + 1) ty
+                                     (ScalarOperation ty ctx.mode aop [cur; a]) in
+                                   SOME ((sr ++ sc ++ sl ++ cr ++ rs ++ step ++
+                                          write_reference (n4 + 2) ty ref v,
+                                          v, ElabType ty), n4 + 3)
+                               | NONE => NONE)
+                          | NONE => NONE)
+                   | NONE => NONE)
+              | NONE => NONE))
+    | SrcTupleExpression _ [SOME e] _ =>
+        (elab_expr ctx n e)
+    | SrcTupleExpression _ _ _ =>
+        (NONE)
+    | SrcFunctionCall _ callee args _ =>
+        (case callee of
+           SrcIdentifier _ _ f _ =>
+             (case ALOOKUP ctx.functions f of
+                SOME callee =>
+                  (case callee_types callee of
+                     SOME (params, rets) =>
+                       (case elab_args ctx n params args of
+                          SOME ((sa, atoms), n1) =>
+                            SOME ((sa ++ [DefineStmt (AstId n1) (call_result_type rets)
+                                            (InternalCallOperation (AstId f) atoms)],
+                                   BoundAtom (AstId n1), call_value rets), n1 + 1)
+                        | NONE => NONE)
+                   | NONE => NONE)
+              | NONE => NONE)
+         | _ => NONE)
+    | SrcTypeConversion _ tn e _ =>
+        (case (normalize_type_name tn, elab_expr ctx n e) of
+           (SOME ty, SOME ((ss, a, vt), n1)) =>
+             (case vt of
+                ElabTuple _ => NONE
+              | _ =>
+                let (cs, v) = bind_value n1 ty (ConvertOperation ty a) in
+                SOME ((ss ++ cs, v, ElabType ty), n1 + 1))
+         | _ => NONE)) ∧
   (* Arguments, converted to the parameter types. *)
   (elab_args ctx n [] [] = SOME (([], []), n)) ∧
   (elab_args ctx n (ty :: tys) (e :: es) =
@@ -480,14 +542,42 @@ Definition elab_expr_def:
              SOME ((ss ++ ss1 ++ ss', (a1, vt) :: vs), n3)
          | NONE => NONE)
     | NONE => NONE) ∧
-  (elab_components ctx n (NONE :: cs) = NONE)
+  (elab_components ctx n (NONE :: cs) = NONE) ∧
+  (* Only state roots and indexed suffixes are storage locations. Index keys
+   * are converted and consumed immediately, before later keys can mutate them.
+   *)
+  (elab_location ctx n e =
+    case e of
+      SrcIdentifier _ _ x _ =>
+        (case ALOOKUP ctx.state x of
+           SOME ty =>
+             SOME (([DefineStmt (AstId n) (ReferenceType ty)
+                       (StateReferenceOperation (AstId x))],
+                    BoundAtom (AstId n), ty), n + 1)
+         | NONE => NONE)
+    | SrcIndexAccess _ root_expr index _ =>
+        (case elab_location ctx n root_expr of
+           SOME ((ss, ref, MappingT key value), n1) =>
+             (case elab_expr ctx n1 index of
+                SOME ((si, a, vt), n2) =>
+                  (case coerce n2 key a vt of
+                     SOME ((cs, a'), n3) =>
+                       SOME ((ss ++ si ++ cs ++
+                              [DefineStmt (AstId n3) (ReferenceType value)
+                                (NavigateOperation value ref (IndexNavigation a'))],
+                              BoundAtom (AstId n3), value), n3 + 1)
+                   | NONE => NONE)
+              | NONE => NONE)
+         | _ => NONE)
+    | _ => NONE)
 Termination
   WF_REL_TAC ‘measure (λx. case x of
-     INL (ctx, n, e) => 2 * src_expr_size e + 1
-   | INR (INL (ctx, n, tys, es)) => 2 * list_size src_expr_size es
-   | INR (INR (INL (ctx, n, e))) => 2 * src_expr_size e + 2
-   | INR (INR (INR (ctx, n, cs))) =>
-       2 * list_size (option_size src_expr_size) cs)’ >>
+     INL (ctx, n, e) => 3 * src_expr_size e + 2
+   | INR (INL (ctx, n, tys, es)) => 3 * list_size src_expr_size es
+   | INR (INR (INL (ctx, n, e))) => 3 * src_expr_size e + 3
+   | INR (INR (INR (INL (ctx, n, cs)))) =>
+       3 * list_size (option_size src_expr_size) cs
+   | INR (INR (INR (INR (ctx, n, e)))) => 3 * src_expr_size e + 1)’ >>
   rw[solidityImportTheory.src_expr_size_def, listTheory.list_size_def,
      basicSizeTheory.option_size_def]
 End
@@ -776,6 +866,7 @@ val () = cv_auto_trans variable_place_def;
 val () = cv_auto_trans place_type_def;
 val () = cv_auto_trans read_place_def;
 val () = cv_auto_trans write_place_def;
+val () = cv_auto_trans write_reference_def;
 val () = cv_auto_trans arithmetic_operator_def;
 val () = cv_auto_trans right_operand_type_def;
 val () = cv_auto_trans compound_operator_def;
@@ -805,13 +896,14 @@ val () = cv_auto_trans_rec expr_assigns_def (
 );
 
 val elab_expr_pre_def = cv_auto_trans_pre_rec
-  "elab_expr_pre elab_args_pre elab_values_pre elab_components_pre"
+  "elab_expr_pre elab_args_pre elab_values_pre elab_components_pre elab_location_pre"
   elab_expr_def (
   WF_REL_TAC ‘measure (λx. case x of
-     INL (ctx, n, e) => 2 * cv_size e + 1
-   | INR (INL (ctx, n, tys, es)) => 2 * cv_size es
-   | INR (INR (INL (ctx, n, e))) => 2 * cv_size e + 2
-   | INR (INR (INR (ctx, n, cs))) => 2 * cv_size cs)’ >>
+     INL (ctx, n, e) => 3 * cv_size e + 2
+   | INR (INL (ctx, n, tys, es)) => 3 * cv_size es
+   | INR (INR (INL (ctx, n, e))) => 3 * cv_size e + 3
+   | INR (INR (INR (INL (ctx, n, cs)))) => 3 * cv_size cs
+   | INR (INR (INR (INR (ctx, n, e)))) => 3 * cv_size e + 1)’ >>
   cv_termination_tac
 );
 
@@ -819,7 +911,8 @@ Theorem elab_expr_pre[cv_pre,local]:
   (∀ctx n v. elab_expr_pre ctx n v) ∧
   (∀ctx n tys es. elab_args_pre ctx n tys es) ∧
   (∀ctx n e. elab_values_pre ctx n e) ∧
-  (∀ctx n cs. elab_components_pre ctx n cs)
+  (∀ctx n cs. elab_components_pre ctx n cs) ∧
+  (∀ctx n e. elab_location_pre ctx n e)
 Proof
   ho_match_mp_tac elab_expr_ind >> rpt strip_tac >>
   simp[Once elab_expr_pre_def] >> rw[] >> fs[]
