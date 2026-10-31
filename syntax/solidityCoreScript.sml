@@ -104,6 +104,9 @@ Datatype:
   | ReadStateOperation ast_id
   | StateReferenceOperation ast_id
   | NavigateOperation sol_type core_atom navigation
+  | ArrayLengthOperation core_atom
+  | ArrayPushOperation core_atom (core_atom option)
+  | ArrayPopOperation core_atom
   | InternalCallOperation ast_id (core_atom list)
   | ExternalCallOperation external_kind (core_atom list)
 End
@@ -130,6 +133,7 @@ Datatype:
   | BreakStmt
   | ContinueStmt
   | RevertStmt core_atom
+  | PanicStmt num
 End
 
 Datatype:

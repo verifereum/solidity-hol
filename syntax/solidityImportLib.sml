@@ -101,6 +101,23 @@ fun type_name v = within v (fn v =>
         con "SrcElementaryTypeName"
           [info v, mk_str name, mk_opt stringSyntax.string_ty (Option.map mk_str mutability)]
       end
+  | "ArrayTypeName" =>
+      (case optional_field v "length" of
+         NONE => con "SrcDynamicArrayTypeName" [info v, type_name (field v "baseType")]
+       | SOME length => let
+        val dimension =
+          case String.fields (fn c => c = #"_")
+                 (string_field (field length "typeDescriptions") "typeIdentifier") of
+            ["t", "rational", n, "by", "1"] =>
+              if size n > 0 andalso CharVector.all Char.isDigit n
+              then IntInf.fromString n else NONE
+          | _ => NONE
+        val n = case dimension of
+                  SOME n => if n > 0 then n else fail "nonpositive array length"
+                | NONE => fail (describe v ^ ": array length is not a positive integer constant")
+      in
+        con "SrcArrayTypeName" [info v, type_name (field v "baseType"), mk_num n]
+      end)
   | other => fail (describe v ^ ": unsupported type name " ^ other))
 
 (* Expressions *)
@@ -115,12 +132,35 @@ fun expr v = within v (fn v =>
           [info v, mk_str (string_field v "name"), mk_num declaration,
            type_id v]
       end
+  | "MemberAccess" =>
+      (case string_field v "memberName" of
+         "length" => con "SrcArrayLength" [info v, expr (field v "expression"), type_id v]
+       | member =>
+           (require v (member = "push" orelse member = "pop")
+              "only array length, push and pop members are supported";
+            con "SrcArrayMember"
+              [info v, mk_str member, expr (field v "expression"), type_id v]))
   | "Literal" =>
       (require v (not (isSome (optional_field v "subdenomination")))
          "literal subdenominations are not supported";
        con "SrcLiteral"
          [info v, mk_str (string_field v "kind"),
-          mk_str (string_field v "value"), type_id v])
+          mk_str (if List.exists (fn k => k = string_field v "kind")
+                       ["string", "unicodeString", "hexString"] then
+                    let
+                      val hex = string_field v "hexValue"
+                      fun digit c =
+                        if c >= #"0" andalso c <= #"9" then Char.ord c - 48
+                        else if c >= #"a" andalso c <= #"f" then Char.ord c - 87
+                        else if c >= #"A" andalso c <= #"F" then Char.ord c - 55
+                        else (fail (describe v ^ ": invalid hexValue"))
+                      val () = require v (size hex mod 2 = 0) "odd hexValue length"
+                    in
+                      String.implode (List.tabulate (size hex div 2, fn i =>
+                        Char.chr (16 * digit (String.sub (hex, 2*i)) +
+                                  digit (String.sub (hex, 2*i+1)))))
+                    end
+                  else string_field v "value"), type_id v])
   | "UnaryOperation" =>
       con "SrcUnaryOperation"
         [info v, mk_str (string_field v "operator"),
@@ -163,9 +203,29 @@ fun expr v = within v (fn v =>
         require v (not (bool_field v "tryCall")) "try calls are not supported";
         case string_field v "kind" of
           "functionCall" =>
-            con "SrcFunctionCall"
-              [info v, expr callee, listSyntax.mk_list (args, expr_ty),
-               type_id v]
+            if node_type callee = "Identifier" andalso
+               int_field callee "referencedDeclaration" < 0 then
+              let
+                val id = int_field callee "referencedDeclaration"
+                val builtin = if id = ~18 then "RequireBuiltin"
+                              else if id = ~3 then "AssertBuiltin"
+                              else if id = ~19 then "RevertBuiltin"
+                              else fail (describe callee ^ ": unsupported built-in declaration " ^
+                                         IntInf.toString id)
+                val (condition, message) =
+                  case (builtin, args) of
+                    ("AssertBuiltin", [c]) => (SOME c, NONE)
+                  | ("RequireBuiltin", [c]) => (SOME c, NONE)
+                  | ("RequireBuiltin", [c, m]) => (SOME c, SOME m)
+                  | ("RevertBuiltin", []) => (NONE, NONE)
+                  | ("RevertBuiltin", [m]) => (NONE, SOME m)
+                  | _ => fail (describe v ^ ": unsupported built-in arguments")
+              in
+                con "SrcBuiltinCall" [info v, info callee, con builtin [],
+                  mk_opt expr_ty condition, mk_opt expr_ty message, type_id v]
+              end
+            else con "SrcFunctionCall"
+              [info v, expr callee, listSyntax.mk_list (args, expr_ty), type_id v]
         | "typeConversion" =>
             (require v (length args = 1) "a conversion takes one argument";
              within callee (fn c => expect c "ElementaryTypeNameExpression");

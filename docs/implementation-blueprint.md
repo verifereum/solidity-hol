@@ -44,7 +44,8 @@ only, with function and contract values deferred; a `ConvertOperation` on a
 constant is the literal/default-initialisation form and checks membership only;
 return bindings are in scope from procedure entry, so the evaluator
 default-initialises them and fall-through returns their current values;
-`RevertStmt` carries a constant `BytesValue` of any length as raw revert data; a
+`RevertStmt` carries a constant `BytesValue` of any length as raw revert data;
+`PanicStmt` carries a panic code, including assertion failure `0x01`; a
 loop prelude is not a loop body, so `break`/`continue` there are rejected;
 targets are lexically scoped like bindings, so a runtime target map is saved and
 restored per scope or capture overwrites; and a `ScalarOperation`'s type is its
@@ -88,8 +89,25 @@ existing `WriteScalarStmt`. Assignment evaluates and saves its RHS before
 navigating the target; compound assignment and increment/decrement read and
 write the same captured location. Integer keys are extended to 256 bits,
 addresses and booleans are zero padded, and fixed bytes are right padded.
-Dynamic keys, composite values, and local storage-reference bindings remain
-coverage work.
+Fixed-size storage arrays use the same captured references. Scalar elements
+occupy `32 DIV storage_bytes` positions per slot, without straddling slots;
+`fixed_storage_slots` rounds each nested row up to whole slots.
+`fixed_array_element` checks bounds before computing its slot and byte offset,
+returning panic `0x32` on failure. `.length` evaluates the reference prefix and
+then returns the fixed dimension. Storage writes and panic rollback reuse the
+scalar operations and source-frame boundary.
+
+Dynamic scalar storage arrays reuse this navigation with the current length
+from the root slot and a Keccak-derived data base. `ArrayLengthOperation` reads
+the length. `ArrayPushOperation` returns a captured appended element and
+`ArrayPopOperation` clears the last scalar before shrinking the length. Both
+mutations run in `simple_stmt`, so they introduce no source fuel decrement.
+The pinned profile rejects push at length >= `2^64` with panic `0x41`; indexing
+and length reads keep the full 256-bit range. Zero-argument push preserves dirty
+bytes, while pop clears only the removed scalar's packed bytes.
+
+Dynamic keys, dynamic arrays of aggregates, memory/calldata arrays, aggregate
+copying and local storage-reference bindings remain coverage work.
 
 Memory references use object identity and an abstract cell offset; this is not
 an EVM byte address. The sparse heap separates metadata from cells, avoiding a
