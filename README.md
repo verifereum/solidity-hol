@@ -67,7 +67,9 @@ python3 tools/run_differential.py -j8
 ```
 
 The differential corpus compares source evaluation with pinned compiler
-bytecode in Verifereum. The upstream `semanticTests` coverage tool checks
+bytecode in Verifereum, including complete committed contract storage. Slot
+lists select diagnostics; they do not limit comparison. The upstream `semanticTests` coverage tool checks
 preparation acceptance; it does not execute the tests' call expectations.
-See [profiles.md](docs/profiles.md) and
+See [differential-testing.md](docs/differential-testing.md),
+[profiles.md](docs/profiles.md) and
 [semantic-tests-coverage.md](docs/semantic-tests-coverage.md).
