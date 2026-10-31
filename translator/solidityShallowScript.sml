@@ -280,6 +280,208 @@ Proof
   strip_tac >> irule LESS_TRANS >> qexists_tac ‘y’ >> simp[]
 QED
 
+(* Signed integers, and the integer operations without a dedicated form
+ * above (unchecked arithmetic, exponentiation, shifts, bitwise operators, all
+ * signed arithmetic): the evaluator's own operation on HOL integers. *)
+
+Definition int_value_def:
+  int_value (i : int) = ScalarValue (IntegerValue i)
+End
+
+Definition int_op_def:
+  int_op mode signed n op (xs : int list) =
+    case eval_integer_operation mode signed n op (MAP IntegerValue xs) of
+      ScalarOk (IntegerValue i) => Returns i
+    | ScalarPanic c => Panics c
+    | _ => Panics 0
+End
+
+Definition uint_op_def:
+  uint_op mode n op xs =
+    case int_op mode F n op xs of
+      Returns i => Returns (Num i)
+    | Reverts bs => Reverts bs
+    | Panics c => Panics c
+End
+
+Theorem int_op_range:
+  ∀mode signed n op xs r.
+    int_op mode signed n op xs = Returns r ⇒ integer_in_range signed n r
+Proof
+  rw[int_op_def, AllCaseEqs()] >> drule eval_integer_operation_in_range >>
+  rw[] >> gvs[]
+QED
+
+Theorem uint_op_range:
+  ∀mode n op xs r. uint_op mode n op xs = Returns r ⇒ r < 2 ** n
+Proof
+  rw[uint_op_def, AllCaseEqs()] >> drule int_op_range >>
+  rw[integer_in_range_def] >> intLib.ARITH_TAC
+QED
+
+(* An operation whose operands and result have the type's width *)
+Definition int_operation_typed_def:
+  int_operation_typed env ty op args ⇔
+    case scalar_operator_signature op ty of
+      SOME (tys, rty) => rty = ty ∧ scalars_have_types env tys args
+    | NONE => F
+End
+
+Theorem int_operation_eval[local]:
+  int_operation_typed env ty op args ∧
+  (ty = UintT n ∧ ¬signed ∨ ty = IntT n ∧ signed) ∧ valid_int_width n ⇒
+  eval_scalar_operation env ty mode op args =
+  eval_integer_operation mode signed n op args
+Proof
+  rw[int_operation_typed_def, AllCaseEqs()] >>
+  Cases_on ‘op’ >> gvs[scalar_operator_signature_def, AllCaseEqs()] >>
+  simp[eval_scalar_operation_def, scalar_operator_signature_def] >>
+  rpt (CASE_TAC >> gvs[])
+QED
+
+Theorem int_operation_progress[local]:
+  int_operation_typed env ty op args ∧
+  (ty = UintT n ∧ ¬signed ∨ ty = IntT n ∧ signed) ∧ valid_int_width n ⇒
+  eval_integer_operation mode signed n op args ≠ ScalarInvalid
+Proof
+  strip_tac >>
+  ‘eval_scalar_operation env ty mode op args =
+   eval_integer_operation mode signed n op args’
+    by (irule int_operation_eval >> metis_tac[]) >>
+  pop_assum (rewrite_tac o single o GSYM) >>
+  gvs[int_operation_typed_def] >> BasicProvers.EVERY_CASE_TAC >> gvs[] >>
+  irule eval_scalar_operation_progress >>
+  simp[core_scalar_type_def, is_value_type_def, is_function_type_def,
+       valid_type_shape_def, declared_type_ok_def] >> metis_tac[]
+QED
+
+Theorem uint_op_eval:
+  int_operation_typed env (UintT n) op (MAP IntegerValue xs) ∧
+  valid_int_width n ∧
+  ¬(mode = CheckedArithmetic ∧ MEM op [AddOp; SubtractOp; MultiplyOp]) ∧
+  op ≠ DivideOp ∧ op ≠ RemainderOp ⇒
+  scalar_outcome_value
+    (eval_scalar_operation env (UintT n) mode op (MAP IntegerValue xs)) =
+  result_outcome uint_value (uint_op mode n op xs)
+Proof
+  strip_tac >>
+  ‘eval_integer_operation mode F n op (MAP IntegerValue xs) ≠ ScalarInvalid’
+    by (irule int_operation_progress >> simp[] >> metis_tac[]) >>
+  drule int_operation_eval >> simp[] >> disch_then kall_tac >>
+  simp[uint_op_def, int_op_def] >>
+  Cases_on ‘eval_integer_operation mode F n op (MAP IntegerValue xs)’ >>
+  gvs[scalar_outcome_value_def, result_outcome_def] >>
+  drule eval_integer_operation_in_range >> rw[] >>
+  gvs[integer_in_range_def, uint_value_def, INT_OF_NUM]
+QED
+
+Theorem int_op_eval:
+  int_operation_typed env (IntT n) op (MAP IntegerValue xs) ∧
+  valid_int_width n ⇒
+  scalar_outcome_value
+    (eval_scalar_operation env (IntT n) mode op (MAP IntegerValue xs)) =
+  result_outcome int_value (int_op mode T n op xs)
+Proof
+  strip_tac >>
+  ‘eval_integer_operation mode T n op (MAP IntegerValue xs) ≠ ScalarInvalid’
+    by (irule int_operation_progress >> simp[] >> metis_tac[]) >>
+  drule int_operation_eval >> simp[] >> disch_then kall_tac >>
+  simp[int_op_def] >>
+  Cases_on ‘eval_integer_operation mode T n op (MAP IntegerValue xs)’ >>
+  gvs[scalar_outcome_value_def, result_outcome_def] >>
+  drule eval_integer_operation_in_range >> rw[] >> simp[int_value_def]
+QED
+
+(* The same at the operand lists the evaluator builds *)
+Theorem uint_op_eval1 = Q.INST [‘xs’ |-> ‘[i]’] uint_op_eval |> SIMP_RULE list_ss [];
+Theorem uint_op_eval2 = Q.INST [‘xs’ |-> ‘[i; j]’] uint_op_eval |> SIMP_RULE list_ss [];
+Theorem int_op_eval1 = Q.INST [‘xs’ |-> ‘[i]’] int_op_eval |> SIMP_RULE list_ss [];
+Theorem int_op_eval2 = Q.INST [‘xs’ |-> ‘[i; j]’] int_op_eval |> SIMP_RULE list_ss [];
+
+Theorem int_less_op:
+  valid_int_width n ∧ integer_in_range T n i ∧ integer_in_range T n j ⇒
+  scalar_outcome_value
+    (eval_scalar_operation env (IntT n) mode LessThanOp
+       [IntegerValue i; IntegerValue j]) = ValueOk (bool_value (i < j))
+Proof
+  simp[eval_scalar_operation_def, scalar_operator_signature_def,
+       scalars_have_types_def, scalar_has_type_def,
+       elementary_scalar_has_type_def, scalar_order_key_def,
+       scalar_outcome_value_def, bool_value_def, is_ordered_type_def]
+QED
+
+Theorem int_equal_op:
+  valid_int_width n ∧ integer_in_range T n i ∧ integer_in_range T n j ⇒
+  scalar_outcome_value
+    (eval_scalar_operation env (IntT n) mode EqualOp
+       [IntegerValue i; IntegerValue j]) = ValueOk (bool_value (i = j))
+Proof
+  simp[eval_scalar_operation_def, scalar_operator_signature_def,
+       scalars_have_types_def, scalar_has_type_def,
+       elementary_scalar_has_type_def, scalar_outcome_value_def,
+       bool_value_def, is_equality_type_def]
+QED
+
+(* Conversions between integer types: extension keeps the value, anything
+ * else wraps *)
+
+Theorem uint_conversion:
+  valid_int_width m ∧ valid_int_width n ∧ x < 2 ** m ⇒
+  eval_conversion env (UintT m) (UintT n) (IntegerValue (&x)) =
+  ScalarOk (IntegerValue (&(if m ≤ n then x else x MOD 2 ** n)))
+Proof
+  strip_tac >>
+  simp[eval_conversion_def, core_convertible_def, elementary_convertible_def,
+       uint_typed, convert_scalar_def, wrap_integer_def] >>
+  rw[] >> irule LESS_LESS_EQ_TRANS >> qexists_tac ‘2 ** m’ >> simp[]
+QED
+
+Theorem int_conversion:
+  valid_int_width m ∧ valid_int_width n ∧ integer_in_range T m i ⇒
+  eval_conversion env (IntT m) (IntT n) (IntegerValue i) =
+  ScalarOk (IntegerValue (if m ≤ n then i else wrap_integer T n i))
+Proof
+  strip_tac >>
+  simp[eval_conversion_def, core_convertible_def, elementary_convertible_def,
+       scalar_has_type_def, elementary_scalar_has_type_def,
+       convert_scalar_def] >>
+  rw[] >> irule wrap_integer_id >> gvs[valid_int_width_def] >>
+  gvs[integer_in_range_def] >>
+  ‘2 ** (m - 1) ≤ 2 ** (n - 1)’ by simp[] >> conj_tac
+  >- (irule INT_LE_TRANS >> qexists_tac ‘-&(2 ** (m - 1))’ >> simp[])
+  >- (irule INT_LTE_TRANS >> qexists_tac ‘&(2 ** (m - 1))’ >> simp[])
+QED
+
+Theorem uint_int_conversion:
+  valid_int_width n ∧ x < 2 ** n ⇒
+  eval_conversion env (UintT n) (IntT n) (IntegerValue (&x)) =
+  ScalarOk (IntegerValue (wrap_integer T n (&x)))
+Proof
+  strip_tac >>
+  simp[eval_conversion_def, core_convertible_def, elementary_convertible_def,
+       uint_typed, convert_scalar_def]
+QED
+
+Theorem int_uint_conversion:
+  valid_int_width n ∧ integer_in_range T n i ⇒
+  eval_conversion env (IntT n) (UintT n) (IntegerValue i) =
+  ScalarOk (IntegerValue (&Num (wrap_integer F n i)))
+Proof
+  strip_tac >>
+  simp[eval_conversion_def, core_convertible_def, elementary_convertible_def,
+       scalar_has_type_def, elementary_scalar_has_type_def,
+       convert_scalar_def] >>
+  ‘integer_in_range F n (wrap_integer F n i)’ by simp[wrap_integer_in_range] >>
+  gvs[integer_in_range_def] >> intLib.ARITH_TAC
+QED
+
+Theorem uint_wrap_range:
+  2 ** n ≤ m ⇒ Num (wrap_integer F n i) < m
+Proof
+  ‘integer_in_range F n (wrap_integer F n i)’ by simp[wrap_integer_in_range] >>
+  gvs[integer_in_range_def] >> intLib.ARITH_TAC
+QED
+
 (* Scopes. A loop's effect on its enclosing scopes is a list of writes,
  * set_bindings. Two results of writes to the same scopes are equal when
  * every lookup agrees (same_frames_ext). *)

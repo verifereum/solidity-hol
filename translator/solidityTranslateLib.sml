@@ -47,11 +47,12 @@ fun ast_id tm = numSyntax.int_of_term (rand tm)
 
 fun dest_list tm = fst (listSyntax.dest_list tm)
 
-datatype ty = Uint of int | Bool | Tup of ty list
+datatype ty = Uint of int | Sint of int | Bool | Tup of ty list
 
 fun dest_sol_type tm =
   case head_name tm of
     "UintT" => Uint (numSyntax.int_of_term (rand tm))
+  | "IntT" => Sint (numSyntax.int_of_term (rand tm))
   | "BoolT" => Bool
   | _ => unsupported ("type " ^ term_to_string tm)
 
@@ -63,16 +64,19 @@ fun dest_value_type tm =
   | _ => unsupported ("value type " ^ term_to_string tm)
 
 fun hol_type (Uint _) = numSyntax.num
+  | hol_type (Sint _) = intSyntax.int_ty
   | hol_type Bool = bool
   | hol_type (Tup ts) = pairSyntax.list_mk_prod (map hol_type ts)
 
 fun sol_type_term (Uint n) = mk_comb (“UintT”, numSyntax.term_of_int n)
+  | sol_type_term (Sint n) = mk_comb (“IntT”, numSyntax.term_of_int n)
   | sol_type_term Bool = “BoolT”
   | sol_type_term (Tup _) = unsupported "tuple binding"
 
 fun power_of_two n = numSyntax.mk_exp (numSyntax.term_of_int 2, numSyntax.term_of_int n)
 
 fun range_facts (Uint n) v = [numSyntax.mk_less (v, power_of_two n)]
+  | range_facts (Sint n) v = [“integer_in_range T ^(numSyntax.term_of_int n) ^v”]
   | range_facts (Tup ts) v = List.concat
       (ListPair.map (fn (t, x) => range_facts t x)
          (ts, pairSyntax.strip_pair v))
@@ -83,6 +87,7 @@ fun range_hyps decls vs =
 
 (* The core value of a shallow value *)
 fun encode (Uint _) v = mk_comb (“uint_value”, v)
+  | encode (Sint _) v = mk_comb (“int_value”, v)
   | encode Bool v = mk_comb (“bool_value”, v)
   | encode (Tup _) _ = unsupported "tuple value"
 
@@ -186,7 +191,7 @@ fun atom_value env tm =
         case head_name s of
           "IntegerValue" =>
             let val i = intSyntax.int_of_term (rand s) in
-              if Arbint.< (i, Arbint.zero) then unsupported "negative constant"
+              if Arbint.< (i, Arbint.zero) then (rand s, Sint 256)
               else (numSyntax.mk_numeral (Arbint.toNat i), Uint 256)
             end
         | "BoolValue" => (rand s, Bool)
@@ -194,29 +199,34 @@ fun atom_value env tm =
       end
   | _ => unsupported ("atom " ^ term_to_string tm)
 
-datatype opres = Pure of term | Check of term * term * term
+(* Pure: a value. Check (m, v, c): m, which is Returns v when c holds and
+   panics otherwise. Op m: m, of which nothing more is known. *)
+datatype opres = Pure of term | Check of term * term * term | Op of term
 
-fun scalar_op (Uint n) checked oper vs =
+fun as_int (v, Sint _) = v
+  | as_int (v, _) = intSyntax.mk_injected v
+
+fun scalar_op (Uint n) mode opt vs =
   let
-    fun bin f = case vs of [a, b] => f (a, b) | _ => internal "arity"
+    val oper = head_name opt
+    val checked = head_name mode = "CheckedArithmetic"
+    fun bin f = case map fst vs of [a, b] => f (a, b) | _ => internal "arity"
     val N = numSyntax.term_of_int n
     val B = power_of_two n
-    fun need_checked () =
-      if checked then () else unsupported "unchecked arithmetic"
+    fun generic () =
+      Op (list_mk_comb (“uint_op”, [mode, N, opt,
+            listSyntax.mk_list (map as_int vs, intSyntax.int_ty)]))
   in
     case oper of
-      "AddOp" => bin (fn (a, b) =>
-        (need_checked ();
+      "AddOp" => if not checked then generic () else bin (fn (a, b) =>
          Check (list_mk_comb (“uint_add”, [N, a, b]), numSyntax.mk_plus (a, b),
-                numSyntax.mk_less (numSyntax.mk_plus (a, b), B))))
-    | "SubtractOp" => bin (fn (a, b) =>
-        (need_checked ();
+                numSyntax.mk_less (numSyntax.mk_plus (a, b), B)))
+    | "SubtractOp" => if not checked then generic () else bin (fn (a, b) =>
          Check (list_mk_comb (“uint_sub”, [a, b]), numSyntax.mk_minus (a, b),
-                numSyntax.mk_leq (b, a))))
-    | "MultiplyOp" => bin (fn (a, b) =>
-        (need_checked ();
+                numSyntax.mk_leq (b, a)))
+    | "MultiplyOp" => if not checked then generic () else bin (fn (a, b) =>
          Check (list_mk_comb (“uint_mul”, [N, a, b]), numSyntax.mk_mult (a, b),
-                numSyntax.mk_less (numSyntax.mk_mult (a, b), B))))
+                numSyntax.mk_less (numSyntax.mk_mult (a, b), B)))
     | "DivideOp" => bin (fn (a, b) =>
         Check (list_mk_comb (“uint_div”, [a, b]), numSyntax.mk_div (a, b),
                mk_neg (mk_eq (b, numSyntax.zero_tm))))
@@ -225,14 +235,38 @@ fun scalar_op (Uint n) checked oper vs =
                mk_neg (mk_eq (b, numSyntax.zero_tm))))
     | "EqualOp" => bin (fn (a, b) => Pure (mk_eq (a, b)))
     | "LessThanOp" => bin (fn (a, b) => Pure (numSyntax.mk_less (a, b)))
-    | _ => unsupported oper
+    | _ => generic ()
   end
-  | scalar_op Bool _ oper vs =
-    (case (oper, vs) of
+  | scalar_op (Sint n) mode opt vs =
+    (case (head_name opt, map as_int vs) of
+       ("EqualOp", [a, b]) => Pure (mk_eq (a, b))
+     | ("LessThanOp", [a, b]) => Pure (intSyntax.mk_less (a, b))
+     | (_, is) =>
+         Op (list_mk_comb (“int_op”, [mode, T, numSyntax.term_of_int n, opt,
+               listSyntax.mk_list (is, intSyntax.int_ty)])))
+  | scalar_op Bool _ opt vs =
+    (case (head_name opt, map fst vs) of
        ("BoolNotOp", [a]) => Pure (mk_neg a)
      | ("EqualOp", [a, b]) => Pure (mk_eq (a, b))
-     | _ => unsupported oper)
-  | scalar_op _ _ oper _ = unsupported oper
+     | (oper, _) => unsupported oper)
+  | scalar_op _ _ opt _ = unsupported (head_name opt)
+
+(* A conversion: extension keeps the value, anything else wraps. A constant
+   has the target type already. *)
+fun convert (v, vty) ty is_const =
+  let fun width n = numSyntax.term_of_int n in
+    case (vty, ty) of
+      (Bool, Bool) => v
+    | (Uint m, Uint n) =>
+        if m <= n orelse is_const then v else numSyntax.mk_mod (v, power_of_two n)
+    | (Uint _, Sint n) =>
+        if is_const then intSyntax.mk_injected v
+        else “wrap_integer T ^(width n) (&^v)”
+    | (Sint m, Sint n) =>
+        if m <= n orelse is_const then v else “wrap_integer T ^(width n) ^v”
+    | (Sint _, Uint n) => “Num (wrap_integer F ^(width n) ^v)”
+    | _ => unsupported "conversion between types"
+  end
 
 fun op_result_type oper ty =
   if oper = "EqualOp" orelse oper = "LessThanOp" then Bool else ty
@@ -290,29 +324,29 @@ fun exec_stmt (ctx : context) (env : env) pc s =
           ("ScalarOperation", [ty, mode, oper, atoms]) =>
             let
               val ty = dest_sol_type ty
-              val oper = head_name oper
-              val rty = op_result_type oper ty
-              val vs = map (fst o atom_value env) (dest_list atoms)
+              val rty = op_result_type (head_name oper) ty
+              val vs = map (atom_value env) (dest_list atoms)
+              fun bind m =
+                let val v = bind_pattern ctx x rty in
+                  Bind (m, v, Leaf (Normal, set_val env x (v, rty),
+                                    range_facts rty v @ pc))
+                end
             in
-              case scalar_op ty (head_name mode = "CheckedArithmetic") oper vs of
+              case scalar_op ty mode oper vs of
                 Pure t => Leaf (Normal, set_val env x (tidy t, rty), pc)
+              | Op m => bind m
               | Check (m, plain, ok) =>
                   if decides pc ok then
                     Leaf (Normal, set_val env x (tidy plain, rty), pc)
-                  else
-                    let val v = bind_pattern ctx x rty in
-                      Bind (m, v, Leaf (Normal, set_val env x (v, rty),
-                                        range_facts rty v @ pc))
-                    end
+                  else bind m
             end
         | ("ConvertOperation", [ty, a]) =>
             let
               val ty = dest_sol_type ty
               val (v, vty) = atom_value env a
+              val w = convert (v, vty) ty (head_name a = "ConstantAtom")
             in
-              if vty = ty orelse head_name a = "ConstantAtom" then
-                Leaf (Normal, set_val env x (v, ty), pc)
-              else unsupported "conversion between types"
+              Leaf (Normal, set_val env x (w, ty), pc)
             end
         | ("TupleOperation", [atoms]) =>
             let val vs = map (atom_value env) (dest_list atoms) in
@@ -530,6 +564,7 @@ and exec_loop (ctx : context) (env : env) pc (pre, c, body) =
 (* Procedures *)
 
 fun default_value (Uint _) = numSyntax.zero_tm
+  | default_value (Sint _) = intSyntax.zero_tm
   | default_value Bool = F
   | default_value _ = unsupported "tuple return"
 
@@ -671,6 +706,12 @@ val eval_simps =
    conversion_source_type_def, scalar_outcome_value_def, loop_after_body_def,
    uint_add_op, uint_sub_op, uint_mul_op, uint_div_op, uint_mod_op,
    uint_less_op, uint_equal_op, bool_equal_op, bool_not_op, uint_copy_conversion,
+   uint_op_eval1, uint_op_eval2, int_op_eval1, int_op_eval2, int_less_op,
+   int_equal_op, uint_conversion, int_conversion, uint_int_conversion,
+   int_uint_conversion, int_value_def, int_operation_typed_def,
+   scalar_operator_signature_def, scalars_have_types_def, scalar_has_type_def,
+   elementary_scalar_has_type_def, integer_in_range_def, is_integer_type_def,
+   is_bitwise_type_def, wrap_integer_in_range, uint_wrap_range,
    bool_copy_conversion, define_binding_def, bind_local_def, write_target_def,
    set_target_def, update_binding_set_binding, set_binding_def,
    lookup_set_binding, set_bindings_def, branch_of_def, push_scope_def,
@@ -795,7 +836,11 @@ fun split_tac heads ihs facts =
 
 fun ranges_tac (g as (_, w)) =
   (if is_conj w then
-     conj_tac >- (rpt strip_tac >> gvs [] >> res_tac >> gvs [uint_div_range, uint_mod_range])
+     conj_tac >- (rpt strip_tac >> gvs [] >> res_tac >>
+                  imp_res_tac uint_op_range >> imp_res_tac int_op_range >>
+                  gvs [uint_div_range, uint_mod_range, uint_wrap_range,
+                       wrap_integer_in_range] >>
+                  gvs [integer_in_range_def] >> intLib.ARITH_TAC)
    else ALL_TAC) g
 
 (* Fuel: the sum of the fuel bounds of the facts in use, and some to spare *)
@@ -914,8 +959,10 @@ fun translate {env, lookup, name, id, names, termination, loop} =
                helper = ref NONE} : context
     val (pvars, eqn) = procedure_equation ctx fvar (ps, rs, body)
     val simps = lookup_th :: eval_simps
-    val callee_heads = map (#shallow o #callee o snd) (!translated)
-    val callee_thms = map (#thm o snd) (!translated)
+    (* the ranges of generic operations' results are used like a callee's *)
+    val callee_heads = map (#shallow o #callee o snd) (!translated) @
+                       [“uint_op”, “int_op”]
+    val callee_thms = map (#thm o snd) (!translated) @ [uint_op_range, int_op_range]
     val helpers =
       case (!(#helper ctx), loop) of
         (NONE, _) => []

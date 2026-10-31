@@ -18,22 +18,32 @@ val loops = [
   ("pure_core",
    [("count", WF_REL_TAC ‘measure (λ(n, c, i). n - i)’ >> rw[uint_add_def]),
     ("sum", WF_REL_TAC ‘measure (λ(n, s, i). n - i)’ >> rw[uint_add_def]),
-    ("doubleUntil", WF_REL_TAC ‘measure (λ(n, k). n - k)’ >> rw[uint_add_def])])]
+    ("doubleUntil", WF_REL_TAC ‘measure (λ(n, k). n - k)’ >> rw[uint_add_def])]),
+  ("control",
+   [("doContinue", WF_REL_TAC ‘measure (λ(n, i, odd). n - i)’ >> rw[]),
+    ("forever", WF_REL_TAC ‘measure (λ(n, i). n - i)’ >> rw[uint_add_def]),
+    ("overflowInLoop", WF_REL_TAC ‘measure (λ(x, i). 10 - i)’ >> rw[uint_add_def])])]
 
 (* The functions that prove today, by suite: losing one fails the build *)
 val proved = [
   ("pure_core",
    ["add", "argumentOrder", "badDivide", "compoundOrder", "count", "divmod",
-    "doubleUntil", "fact", "guardedDivide", "locals", "panicOrder",
-    "shortCircuit", "sum", "swap"]),
-  ("scalars", ["boolLogic", "increment", "subtract"]),
+    "doubleUntil", "fact", "guardedDivide", "locals", "narrow", "negate",
+    "panicOrder", "shortCircuit", "sum", "swap", "wrappingAdd"]),
+  ("scalars",
+   ["bitwise", "boolLogic", "divide", "implicitWidening", "increment",
+    "multiply", "power", "reinterpret", "remainder", "shifts", "signedLess",
+    "signedNot", "signedPower", "signedShift", "signedToUnsigned", "subtract",
+    "truncate", "widen", "wrappingDivide", "wrappingMultiply",
+    "wrappingPower", "wrappingSubtract"]),
+  ("control", ["classify", "doContinue", "forever", "overflowInLoop"]),
   ("builtins", ["localCondition"]),
   ("shadowed_builtins", ["require", "assert", "revert", "run"]),
   ("storage_arrays", ["combine"]),
   ("calls",
    ["ackermann", "argumentEffects", "decrementUnderflow", "fib", "holes",
     "minMax", "narrowSum", "operandPanics", "pair", "prefixPostfix", "rotate",
-    "sameTarget", "swapThroughCall"])]
+    "sameTarget", "swapThroughCall", "widenResult", "wrappingDecrement"])]
 
 fun json_string s =
   let
