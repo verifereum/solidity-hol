@@ -493,11 +493,6 @@ Definition wf_core_operation_def:
              if n < LENGTH tys then annotation = EL n tys else F
          | _ => F)
     | ConstantAtom _ => F) ∧
-  (wf_core_operation env ctx annotation (ReadStateOperation x) ⇔
-    case lookup_state_variable env x of
-      SOME v => annotation = SingleType v.state_type ∧
-                core_scalar_type env v.state_type
-    | NONE => F) ∧
   (wf_core_operation env ctx annotation (StateReferenceOperation x) ⇔
     case lookup_state_variable env x of
       SOME v => annotation = ReferenceType v.state_type
@@ -607,13 +602,6 @@ Definition check_core_stmts_def:
              else NONE
          | _ => NONE)
     | _ => NONE) ∧
-  (check_core_stmts env ctx (CaptureStateStmt t x :: ss) =
-    case lookup_state_variable env x of
-      SOME v =>
-        if fresh_core_id ctx t ∧ core_scalar_type env v.state_type
-        then check_core_stmts env (capture_core_target t v.state_type ctx) ss
-        else NONE
-    | NONE => NONE) ∧
   (check_core_stmts env ctx (WriteScalarStmt t ty a :: ss) =
     if ALOOKUP ctx.targets t = SOME ty ∧
        wf_core_atom env ctx (SingleType ty) a

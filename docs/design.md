@@ -2,10 +2,11 @@
 
 ## Status
 
-This document records the initial design direction for Solidity-HOL. It is a
-living document rather than a frozen specification. Decisions marked as
-*tentative* are expected to be revisited as the executable semantics and test
-coverage develop.
+This document records the initial design direction for Solidity-HOL. For the
+implemented pipeline, module ownership, and extension points, see
+[implementation-blueprint.md](implementation-blueprint.md). The memory and
+external-call proposals below remain unresolved design work, rather than
+implemented contracts. Decisions marked as *tentative* are not specifications.
 
 ## Objective
 

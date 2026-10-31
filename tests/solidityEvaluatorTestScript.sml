@@ -283,9 +283,10 @@ Definition store_proc_def:
     parameters := [(AstId 21, u8)];
     return_bindings := [(AstId 22, u8)];
     body := [
-      CaptureStateStmt (AstId 23) (AstId 200);
+      DefineStmt (AstId 25) (ReferenceType u8) (StateReferenceOperation (AstId 200));
+      CaptureValueStmt (AstId 23) (BoundAtom (AstId 25));
       WriteScalarStmt (AstId 23) u8 (BoundAtom (AstId 21));
-      DefineStmt (AstId 24) (SingleType u8) (ReadStateOperation (AstId 200));
+      DefineStmt (AstId 24) (SingleType u8) (ReadOperation u8 (BoundAtom (AstId 25)));
       ReturnStmt [BoundAtom (AstId 24)]]
   |>
 End
