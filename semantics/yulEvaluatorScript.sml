@@ -225,8 +225,9 @@ End
 (* SIGNEXTEND(i, x): the low 8*(i+1) bits of x as a signed number, extended
  * through the word; i ≥ 31 leaves x alone, since the whole word is already in
  * view.  This is what the EVM's SIGNEXTEND does, spelled with HOL's
- * word_sign_extend rather than vfmExecution's byte-level sign_extend, whose
- * word_of_bytes the cv translation cannot compute.
+ * word_sign_extend rather than vfmExecution's byte-level sign_extend: that one
+ * needs a cv pre-relation for its NULL/HD side condition and its word_to_bytes
+ * rewriting to word_to_bytes_be, which is how vfmCompute translates it.
  *)
 Definition yul_sign_extend_def:
   yul_sign_extend (i : bytes32) (w : bytes32) =
