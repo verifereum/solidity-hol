@@ -395,20 +395,22 @@ be reported separately rather than conflated.
 These stages describe dependency order, not promises that each stage must cover
 every feature before work begins on the next.
 
-## Future contract verification interfaces
+## Contract verification interfaces
 
-The authoritative semantics will remain the deep executable embedding. The
-user-facing methodology for proving properties of real contracts is left to
-future work and should not be built into the runtime definitions.
+The deep executable interpreter remains authoritative. The implemented
+proof-producing core-to-HOL translator defines shallow HOL functions and proves
+their correspondence to core execution. Contract properties can then be proved
+over those functions. This proof layer is separate from the runtime definitions;
+see [translator.md](translator.md) for the current API and coverage.
 
-A promising possibility is a proof-producing translation from validated deep
-syntax to convenient shallow HOL functions, followed by direct proofs over the
-shallow representation and a generated theorem connecting those functions to
-the deep semantics. Other possibilities include derived symbolic execution,
-program logics, or direct interpreter reasoning. No one approach is selected at
-this stage. The semantics should preserve declaration identities, types,
-layouts, source mappings, entry-point observations, and reusable evaluation
-facts needed by future translation and proof tools.
+Artifact clients first use the checked preparation boundary. They name its
+source/core terms with HOL definitions and pass those definition theorems to
+`translate_unit`. Correspondence states the actual argument-range and runtime
+binding assumptions; it does not claim progress for arbitrary well-formed core.
+The translator consumes maintained block, loop and call equations. Normal
+branches share their continuation, while abrupt source exits retain theirs.
+Broader storage proofs and the memory/assembly and external-call contracts
+remain future work.
 
 ## Open questions
 
