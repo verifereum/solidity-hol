@@ -1,7 +1,8 @@
 (* Smoke tests for the Yul evaluator, run by cv_eval: straight-line code and
  * memory, storage, a loop with a break, a call whose arguments must be
- * evaluated right to left, and the control outcomes.  The semantics test set
- * for the Solidity evaluator is solidityEvaluatorTest.
+ * evaluated right to left, a switch, sign extension, and the control
+ * outcomes.  The semantics test set for the Solidity evaluator is
+ * solidityEvaluatorTest.
  *)
 Theory yulEvaluatorTest
 Ancestors
@@ -33,6 +34,72 @@ Definition add_code_def:
 End
 
 val () = cv_auto_trans add_code_def;
+
+(* mstore(1, 5) return(0, 0) -- the return covers no memory, so the size it
+ * leaves is the one mstore's own touch raised: a word crossing the 32-byte
+ * boundary at offset 1 needs two words.
+ *)
+Definition touch_code_def:
+  touch_code =
+    [YulExprStmt (YulBuiltin YMStore
+       [YulLit (LitNumber 1w); YulLit (LitNumber 5w)]);
+     YulExprStmt (YulBuiltin YReturn
+       [YulLit (LitNumber 0w); YulLit (LitNumber 0w)])]
+End
+
+val () = cv_auto_trans touch_code_def;
+
+(* switch 2 { case 1 { mstore(0, 11) } case 2 { mstore(0, 22) } }
+ * mstore(64, 66)
+ * switch 5 { case 1 { mstore(32, 44) } default { mstore(32, 55) } }
+ * switch 7 { case 1 { mstore(64, 77) } }
+ * return(0, 96)
+ * The first switch takes its second case, the second falls through to its
+ * default, and the third has an empty default that runs nothing: word 0 is
+ * 22, word 32 is 55, and word 64 is still the 66 written before the switch.
+ *)
+Definition switch_code_def:
+  switch_code =
+    [YulSwitch (YulLit (LitNumber 2w))
+       [(LitNumber 1w, [YulExprStmt (YulBuiltin YMStore
+                         [YulLit (LitNumber 0w); YulLit (LitNumber 11w)])]);
+        (LitNumber 2w, [YulExprStmt (YulBuiltin YMStore
+                         [YulLit (LitNumber 0w); YulLit (LitNumber 22w)])])] [];
+     YulExprStmt (YulBuiltin YMStore
+       [YulLit (LitNumber 64w); YulLit (LitNumber 66w)]);
+     YulSwitch (YulLit (LitNumber 5w))
+       [(LitNumber 1w, [YulExprStmt (YulBuiltin YMStore
+                         [YulLit (LitNumber 32w); YulLit (LitNumber 44w)])])]
+       [YulExprStmt (YulBuiltin YMStore
+          [YulLit (LitNumber 32w); YulLit (LitNumber 55w)])];
+     YulSwitch (YulLit (LitNumber 7w))
+       [(LitNumber 1w, [YulExprStmt (YulBuiltin YMStore
+                         [YulLit (LitNumber 64w); YulLit (LitNumber 77w)])])] [];
+     YulExprStmt (YulBuiltin YReturn
+       [YulLit (LitNumber 0w); YulLit (LitNumber 96w)])]
+End
+
+val () = cv_auto_trans switch_code_def;
+
+(* mstore(0, signextend(0, 0xff)) mstore(32, signextend(31, 0x80)) return(0, 64)
+ * One byte in view, sign bit set, so the first word is all ones; 31 leaves the
+ * whole word in view, so the second is unchanged.
+ *)
+Definition sign_extend_code_def:
+  sign_extend_code =
+    [YulExprStmt (YulBuiltin YMStore
+       [YulLit (LitNumber 0w);
+        YulBuiltin YSignExtend
+          [YulLit (LitNumber 0w); YulLit (LitNumber 0xFFw)]]);
+     YulExprStmt (YulBuiltin YMStore
+       [YulLit (LitNumber 32w);
+        YulBuiltin YSignExtend
+          [YulLit (LitNumber 31w); YulLit (LitNumber 0x80w)]]);
+     YulExprStmt (YulBuiltin YReturn
+       [YulLit (LitNumber 0w); YulLit (LitNumber 64w)])]
+End
+
+val () = cv_auto_trans sign_extend_code_def;
 
 (* sstore(7, 42) mstore(0, sload(7)) return(0, 32) *)
 Definition store_code_def:
@@ -133,9 +200,28 @@ Proof
   CONV_TAC cv_eval
 QED
 
-(* The word stored is 32 bytes, so the active memory size is 32. *)
+(* mstore's touch is what raises the size: nothing else in this program
+ * touches memory.
+ *)
 Theorem mstore_raises_memory_size:
-  (run 20 add_code).machine.memory_size = 32
+  (run 20 touch_code).machine.memory_size = 64
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem switch_takes_the_matching_case_and_otherwise_the_default:
+  (run 20 switch_code).completion =
+  YulReturn (word_to_bytes_be (22w : bytes32) ++
+             word_to_bytes_be (55w : bytes32) ++
+             word_to_bytes_be (66w : bytes32))
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem sign_extend_extends_the_sign:
+  (run 20 sign_extend_code).completion =
+  YulReturn (word_to_bytes_be (word_1comp (0w : bytes32)) ++
+             word_to_bytes_be (0x80w : bytes32))
 Proof
   CONV_TAC cv_eval
 QED

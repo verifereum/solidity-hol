@@ -101,10 +101,12 @@ End
  * variables bound to zero.  The compiler declares the results with the
  * function, so a body assigns one without a `let` -- the pinned solc emits
  * `sum := add(x, y)` -- and that assignment is legal only because the name is
- * already bound here.  A named function rather than an update written out at
- * the call, because a mutual recursion translated through a pre-relation is
- * compared on its arguments as terms: a constant application is the same term
- * on both sides, an inlined record update is not.
+ * already bound here.  Zero is what the compiler's own codegen gives a
+ * declared result: `function g() -> x { }` is accepted, and the assembly for
+ * it starts `x`'s byte by pushing 0.  A named function rather than an update
+ * written out at the call, because a mutual recursion translated through a
+ * pre-relation is compared on its arguments as terms: a constant application
+ * is the same term on both sides, an inlined record update is not.
  *)
 Definition yul_push_frame_def:
   yul_push_frame params args results m =
@@ -511,6 +513,9 @@ Definition eval_yul_block_def:
              let r = eval_yul_block (n - 1) fns fd.function_body m1 in
              let m2 = yul_pop_scope r.machine in
                if r.completion = YulNormal ∨ r.completion = YulLeave then
+                 (* the frame scope yul_push_frame made is still on top, so
+                  * every result is bound and this lookup cannot fail; the
+                  * branch is only what keeps it total *)
                  (case yul_lookup_names fd.function_results r.machine.scopes of
                     NONE => EvalAbrupt (YulInvalid "missing return binding") m2
                   | SOME vs => EvalValues vs m2)

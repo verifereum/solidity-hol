@@ -104,8 +104,11 @@ Datatype:
   | EffectMemory    (* reads or writes the frame's memory *)
   | EffectStorage   (* reads or writes the executing account's storage *)
   | EffectFrame     (* reads the frame: its call data or call value *)
-  | EffectLog       (* appends a log entry *)
-  | EffectHalt      (* ends the frame *)
+  | EffectLog       (* appends a log entry, whose payload it reads from
+                       memory: a touch like any other, so it can raise the
+                       frame's memory size *)
+  | EffectHalt      (* ends the frame, returning or reverting data from
+                       memory *)
   | EffectObject    (* the creation object's data and subobjects *)
 End
 
