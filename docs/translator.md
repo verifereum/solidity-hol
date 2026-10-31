@@ -124,28 +124,33 @@ and pass their definition theorems here. Raw import/elaboration helpers retain
 these checks as caller preconditions. It defines
 `prefix ^ "env"` and, callees first, every function `prefix ^ f` with its
 theorem. `termination` and `loops` give, by function name, a termination
-tactic for a recursive function or a loop helper when HOL cannot find one.
+tactic for a recursive function when HOL cannot find one, and for each loop
+helper.
 
 It returns one result per function. A construct the translator does not
-cover makes that function, and its callers, `Unsupported` with a message
-starting `unsupported:`; any other failure is `Failed`, a translator bug.
+cover, or an overloaded name, makes that function and its callers
+`Unsupported` with a message starting `unsupported:`; any other failure is
+`Failed`, a translator bug. A termination proof that fails is not a result:
+under holbuild it ends the theory build even when handled, so a loop helper
+always needs a tactic.
 
 ## Corpus test
 
 `tests/solidityTranslatorCorpusScript.sml` runs the translator on every
-function of every suite of the differential corpus
+function of every elaborated suite of the differential corpus
 (`testdata/differential/corpus.json`) and prints one `translator-result` line
-per function. The build fails if a function fails other than as
-`Unsupported`, or if its proof takes longer than the test's cap. It is part of
-the `solidityHol` roll-up, so CI runs it.
+per function. The build fails if a function is `Failed`, if one the test
+lists as proved is not, or if a proof takes longer than the test's cap. It is
+part of the `solidityHol` roll-up, so CI runs it.
 
 ## Not covered yet
 
-- signed integers, addresses, fixed-size bytes, unchecked arithmetic, bit
-  operations and conversions between types
+- `revert`, `require` and `assert`: nothing translated returns `Reverts`
+- signed integers, addresses, fixed-size bytes, unchecked arithmetic,
+  exponentiation, bit operations and conversions between types
 - mutually recursive functions
 - `return` inside a loop, nested loops, and more than one loop per function
-- loops whose termination HOL cannot prove without a tactic
+- loops without a termination tactic in `loops`
 - storage, and external calls
 
 ## Branch-growth measurement

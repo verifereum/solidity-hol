@@ -23,6 +23,8 @@ open solidityASTTheory solidityShallowTheory solidityEvaluatorTheory solidityEva
 
 val ERR = mk_HOL_ERR "solidityTranslateLib"
 fun unsupported what = raise ERR "translate" ("unsupported: " ^ what)
+(* A broken invariant of the translator itself *)
+fun internal what = raise ERR "translate" what
 
 (* Polymorphic constants *)
 val returns_tm = prim_mk_const {Thy = "solidityShallow", Name = "Returns"}
@@ -122,7 +124,7 @@ type env = {vals : (int * (term * ty)) list, targets : (int * int) list}
 fun lookup_val (env : env) x =
   case List.find (fn (y, _) => y = x) (#vals env) of
     SOME (_, v) => v
-  | NONE => unsupported ("unbound id " ^ Int.toString x)
+  | NONE => internal ("unbound id " ^ Int.toString x)
 
 fun set_val (env : env) x v =
   {vals = (x, v) :: List.filter (fn (y, _) => y <> x) (#vals env),
@@ -197,7 +199,7 @@ datatype opres = Pure of term | Check of term * term * term
 
 fun scalar_op (Uint n) checked oper vs =
   let
-    fun bin f = case vs of [a, b] => f (a, b) | _ => unsupported "arity"
+    fun bin f = case vs of [a, b] => f (a, b) | _ => internal "arity"
     val N = numSyntax.term_of_int n
     val B = power_of_two n
     fun need_checked () =
@@ -256,6 +258,10 @@ fun normal_envs (Leaf (Normal, env, _)) = SOME [env]
          (SOME ls, SOME rs) => SOME (ls @ rs)
        | _ => NONE)
   | normal_envs _ = NONE
+
+fun leaf_envs (Leaf (_, env, _)) = [env]
+  | leaf_envs (Cond (_, t1, t2)) = leaf_envs t1 @ leaf_envs t2
+  | leaf_envs _ = []
 
 fun merged_value x (Leaf (_, env, _)) = fst (lookup_val env x)
   | merged_value x (Cond (c, t1, t2)) =
@@ -332,7 +338,7 @@ fun exec_stmt (ctx : context) (env : env) pc s =
                      (List.nth (pairSyntax.strip_pair v, i), List.nth (ts, i)),
                          pc)
                  end
-             | _ => unsupported "component of a non-tuple")
+             | _ => internal "component of a non-tuple")
         | ("InternalCallOperation", [f, atoms]) =>
             let
               val {shallow, returns, ...} =
@@ -346,7 +352,7 @@ fun exec_stmt (ctx : context) (env : env) pc s =
               Bind (mk_call shallow vs, p,
                     Leaf (Normal, set_val env x (p, rty), range_facts rty p @ pc))
             end
-        | _ => unsupported ("operation " ^ term_to_string opn)
+        | _ => unsupported ("operation " ^ head_name opn)
       end
   | ("CaptureBindingStmt", [t, x]) =>
       Leaf (Normal, {vals = #vals env,
@@ -355,7 +361,7 @@ fun exec_stmt (ctx : context) (env : env) pc s =
       let
         val x = case List.find (fn (u, _) => u = ast_id t) (#targets env) of
                   SOME (_, x) => x
-                | NONE => unsupported "write without capture"
+                | NONE => internal "write without capture"
       in
         Leaf (Normal, set_val env x (fst (atom_value env a), dest_sol_type ty), pc)
       end
@@ -373,13 +379,22 @@ fun exec_stmt (ctx : context) (env : env) pc s =
             val t1 = exec_block ctx env (c :: pc) ts
             val t2 = exec_block ctx env (mk_neg c :: pc) es
             val tr = Cond (c, t1, t2)
+            (* variables bound before the if, and those every branch binds:
+               a loop helper may have dropped an outer one both branches write *)
+            fun merged () =
+              let
+                val envs = leaf_envs tr
+                val added =
+                  List.filter (fn (x, _) => not (bound env x) andalso
+                                            List.all (fn e => bound e x) envs)
+                              (#vals (hd envs))
+              in
+                map (fn (x, (_, ty)) => (x, (tidy (merged_value x tr), ty)))
+                    (#vals env @ added)
+              end
           in
             if pure_normal tr then
-              Leaf (Normal,
-                    {vals = map (fn (x, (_, ty)) =>
-                                   (x, (tidy (merged_value x tr), ty)))
-                                (#vals env),
-                     targets = #targets env}, pc)
+              Leaf (Normal, {vals = merged (), targets = #targets env}, pc)
             else
               case normal_envs tr of
                 NONE => tr
@@ -408,7 +423,7 @@ fun exec_stmt (ctx : context) (env : env) pc s =
             env, pc)
   | ("BreakStmt", []) => Leaf (Break, env, pc)
   | ("ContinueStmt", []) => Leaf (Continue, env, pc)
-  | _ => unsupported ("statement " ^ term_to_string s)
+  | _ => unsupported ("statement " ^ head_name s)
 
 and exec_block ctx env pc [] = Leaf (Normal, env, pc)
   | exec_block ctx env pc (s :: ss) =
@@ -428,7 +443,7 @@ and exec_loop (ctx : context) (env : env) pc (pre, c, body) =
                  else NONE) stmts @ #targets env
     fun target t = case List.find (fn (u, _) => u = t) captures of
                      SOME (_, x) => x
-                   | NONE => unsupported "write without capture"
+                   | NONE => internal "write without capture"
     val writes =
       List.mapPartial
         (fn s => if head_name s = "WriteScalarStmt"
@@ -752,12 +767,16 @@ fun fact_instances heads facts (asl, w) =
 fun use_facts_tac heads facts =
   let
     fun discharge asl th =
-      let val th1 = REWRITE_RULE [AND_IMP_INTRO] th
-          val (a, _) = dest_imp (concl th1)
-          (* gvs, not asm_simp_tac: the assumptions' 2 ** n must be
-             evaluated like the goal's for arithmetic to relate them *)
-          val pf = TAC_PROOF ((asl, a), gvs (sol_bind_def :: op_defs))
-      in SOME (th, MP th1 pf) end
+      let val th1 = REWRITE_RULE [AND_IMP_INTRO] th in
+        (* a callee without range hypotheses (bool or no arguments) *)
+        if not (is_imp (concl th1)) then SOME (th, th1)
+        else
+          let val (a, _) = dest_imp (concl th1)
+              (* gvs, not asm_simp_tac: the assumptions' 2 ** n must be
+                 evaluated like the goal's for arithmetic to relate them *)
+              val pf = TAC_PROOF ((asl, a), gvs (sol_bind_def :: op_defs))
+          in SOME (th, MP th1 pf) end
+      end
       handle HOL_ERR _ => NONE
     fun use used (g as (asl, _)) =
       let
@@ -958,6 +977,8 @@ fun translate {env, lookup, name, id, names, termination, loop} =
                                   loop_case_tac simps)
             val _ = save_thm (fst (dest_var hvar) ^ "_correct", th)
           in [(hvar, c, th)] end
+      (* not Define: under holbuild a failed termination proof ends the
+         theory build even when handled *)
       | (SOME _, NONE) => unsupported "loop without a termination tactic"
     val s = map (fn (v, c, _) => v |-> c) helpers
     val (def, c, ind) = define name (Term.subst s eqn) termination
@@ -1031,6 +1052,9 @@ fun translate_unit {prefix, unit_def, program_def, termination, loops} =
       end
     val infos = map info fns
     val ids = map fst infos
+    (* termination and loops are keyed by name *)
+    fun overloaded name =
+      length (List.filter (fn (_, i) => #name i = name) infos) > 1
     fun calls id =
       callees (rhs (concl (lookup “lookup_procedure ^env (AstId ^(numSyntax.term_of_int id))”)))
     fun run id =
@@ -1038,13 +1062,17 @@ fun translate_unit {prefix, unit_def, program_def, termination, loops} =
         val {name, names} = Lib.assoc id infos
         val timer = Timer.startRealTimer ()
         val outcome =
-          Proved (translate {env = env, lookup = lookup, name = prefix ^ name, id = id,
-                             names = names,
-                             termination = Option.map snd (Lib.assoc1 name termination),
-                             loop = Option.map snd (Lib.assoc1 name loops)})
-          handle e => case unsupported_message e of
-                         SOME m => Unsupported m
-                       | NONE => Failed (General.exnMessage e)
+          if overloaded name then
+            Unsupported "unsupported: overloaded function"
+          else
+            Proved (translate {env = env, lookup = lookup, name = prefix ^ name,
+                               id = id, names = names,
+                               termination = Option.map snd (Lib.assoc1 name termination),
+                               loop = Option.map snd (Lib.assoc1 name loops)})
+            handle Interrupt => raise Interrupt
+                 | e => case unsupported_message e of
+                          SOME m => Unsupported m
+                        | NONE => Failed (General.exnMessage e)
       in
         {name = name, outcome = outcome,
          seconds = Time.toReal (Timer.checkRealTimer timer)}
