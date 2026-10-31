@@ -57,7 +57,8 @@ Theorem pure_core_signatures:
    ("shortCircuit", SOME [UintT 256], SOME [BoolT; UintT 256]);
    ("panicOrder", SOME [UintT 256], SOME [UintT 256]);
    ("argumentOrder", SOME [UintT 256], SOME [UintT 256; UintT 256]);
-   ("compoundOrder", SOME [UintT 256], SOME [UintT 256])]
+   ("compoundOrder", SOME [UintT 256], SOME [UintT 256]);
+   ("checkedBranchOverwrite", SOME [UintT 8; BoolT], SOME [UintT 8])]
 Proof
   EVAL_TAC
 QED
