@@ -41,8 +41,6 @@ Theorem altered_expectation_detected:
 Proof
   simp_tac std_ss [differential_verdict_def, LET_THM] >>
   CONV_TAC (cv_eval_call "observed_slots") >>
-  CONV_TAC (cv_eval_call "evm_observation") >>
-  CONV_TAC (cv_eval_call "source_observation") >>
   CONV_TAC cv_eval
 QED
 
@@ -54,8 +52,6 @@ Theorem altered_panic_code_detected:
 Proof
   simp_tac std_ss [differential_verdict_def, LET_THM] >>
   CONV_TAC (cv_eval_call "observed_slots") >>
-  CONV_TAC (cv_eval_call "evm_observation") >>
-  CONV_TAC (cv_eval_call "source_observation") >>
   CONV_TAC cv_eval
 QED
 
@@ -68,8 +64,6 @@ Theorem altered_final_storage_detected:
 Proof
   simp_tac std_ss [differential_verdict_def, LET_THM] >>
   CONV_TAC (cv_eval_call "observed_slots") >>
-  CONV_TAC (cv_eval_call "evm_observation") >>
-  CONV_TAC (cv_eval_call "source_observation") >>
   CONV_TAC cv_eval
 QED
 
@@ -81,8 +75,6 @@ Theorem mismatching_fixture_detected:
 Proof
   simp_tac std_ss [differential_verdict_def, LET_THM] >>
   CONV_TAC (cv_eval_call "observed_slots") >>
-  CONV_TAC (cv_eval_call "evm_observation") >>
-  CONV_TAC (cv_eval_call "source_observation") >>
   CONV_TAC cv_eval
 QED
 
@@ -94,8 +86,6 @@ Theorem mismatching_fixture_agrees_in_range:
 Proof
   simp_tac std_ss [differential_agrees_def, differential_verdict_def, LET_THM] >>
   CONV_TAC (cv_eval_call "observed_slots") >>
-  CONV_TAC (cv_eval_call "evm_observation") >>
-  CONV_TAC (cv_eval_call "source_observation") >>
   CONV_TAC cv_eval
 QED
 
@@ -107,8 +97,6 @@ Theorem fuel_exhaustion_inconclusive:
 Proof
   simp_tac std_ss [differential_verdict_def, LET_THM] >>
   CONV_TAC (cv_eval_call "observed_slots") >>
-  CONV_TAC (cv_eval_call "evm_observation") >>
-  CONV_TAC (cv_eval_call "source_observation") >>
   CONV_TAC cv_eval
 QED
 
@@ -120,8 +108,6 @@ Theorem unknown_function_inconclusive:
 Proof
   simp_tac std_ss [differential_verdict_def, LET_THM] >>
   CONV_TAC (cv_eval_call "observed_slots") >>
-  CONV_TAC (cv_eval_call "evm_observation") >>
-  CONV_TAC (cv_eval_call "source_observation") >>
   CONV_TAC cv_eval
 QED
 
@@ -134,7 +120,72 @@ Theorem argument_out_of_range_inconclusive:
 Proof
   simp_tac std_ss [differential_verdict_def, LET_THM] >>
   CONV_TAC (cv_eval_call "observed_slots") >>
+  CONV_TAC cv_eval
+QED
+
+(* The source-only mutant writes an unlisted mapping key. Both runs return zero
+ * and agree on every old observed slot; their complete storage differs.
+ *)
+val unlisted_write = rhs (concl (EVAL
+  “corpus_mappings_program with procedures :=
+    MAP (λproc. if proc.procedure_id = AstId 41 then
+      proc with body :=
+        [DefineStmt (AstId 900000) (ReferenceType (MappingT (UintT 256) (UintT 8)))
+           (StateReferenceOperation (AstId 5));
+         DefineStmt (AstId 900001) (ReferenceType (UintT 8))
+           (NavigateOperation (UintT 8) (BoundAtom (AstId 900000))
+             (IndexNavigation (ConstantAtom (IntegerValue 987654321))));
+         CaptureValueStmt (AstId 900002) (BoundAtom (AstId 900001));
+         WriteScalarStmt (AstId 900002) (UintT 8)
+           (ConstantAtom (IntegerValue 17))] ++ proc.body
+      else proc) corpus_mappings_program.procedures”));
+
+Definition unlisted_write_program_def:
+  unlisted_write_program = ^unlisted_write
+End
+
+val () = cv_auto_trans unlisted_write_program_def;
+
+Theorem unlisted_write_program_wf:
+  wf_core_program (core_program_environment unlisted_write_program) unlisted_write_program
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem unlisted_mapping_write_escaped_slot_projection:
+  evm_observation corpus_mappings_code corpus_mappings_unit "read" [IntArg 0]
+      [] (observed_slots unlisted_write_program [] []) =
+  source_observation corpus_mappings_code corpus_mappings_unit
+      unlisted_write_program 1000 "read" [IntArg 0] []
+      (observed_slots unlisted_write_program [] [])
+Proof
+  CONV_TAC (cv_eval_call "observed_slots") >>
   CONV_TAC (cv_eval_call "evm_observation") >>
-  CONV_TAC (cv_eval_call "source_observation") >>
+  CONV_TAC (cv_eval_call "source_observation") >> REFL_TAC
+QED
+
+Theorem unlisted_mapping_write_old_comparison_agrees:
+  compare_observations
+    (expected_outcome corpus_mappings_unit "read" (ExpectReturn [IntArg 0]), [(0,0); (1,0); (2,0); (3,0); (4,0); (5,0); (6,0)])
+    (evm_observation corpus_mappings_code corpus_mappings_unit "read" [IntArg 0]
+      [] (observed_slots unlisted_write_program [] []))
+    (source_observation corpus_mappings_code corpus_mappings_unit
+      unlisted_write_program 1000 "read" [IntArg 0] []
+      (observed_slots unlisted_write_program [] [])) = Agree (expected_outcome corpus_mappings_unit "read" (ExpectReturn [IntArg 0]))
+Proof
+  CONV_TAC (cv_eval_call "observed_slots") >>
+  CONV_TAC (cv_eval_call "evm_observation") >>
+  CONV_TAC (cv_eval_call "source_observation") >> CONV_TAC cv_eval
+QED
+
+Theorem unlisted_mapping_write_detected:
+  differential_verdict corpus_mappings_code corpus_mappings_unit
+    unlisted_write_program 1000 "read" [IntArg 0] []
+    (ExpectReturn [IntArg 0]) [] =
+  StorageMismatch [(0,0); (1,0); (2,0); (3,0); (4,0); (5,0); (6,0)]
+                  [(0,0); (1,0); (2,0); (3,0); (4,0); (5,0); (6,0)]
+Proof
+  simp_tac std_ss [differential_verdict_def, LET_THM] >>
+  CONV_TAC (cv_eval_call "observed_slots") >>
   CONV_TAC cv_eval
 QED
