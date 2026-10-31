@@ -90,6 +90,10 @@ End
  * FunctionCall (kind typeConversion): target type name, argument.
  *)
 Datatype:
+  src_builtin = RequireBuiltin | AssertBuiltin | RevertBuiltin
+End
+
+Datatype:
   src_expr
   = SrcIdentifier node_info string num string
   | SrcArrayLength node_info src_expr string
@@ -101,6 +105,8 @@ Datatype:
   | SrcIndexAccess node_info src_expr src_expr string
   | SrcTupleExpression node_info (src_expr option list) string
   | SrcFunctionCall node_info src_expr (src_expr list) string
+  | SrcBuiltinCall node_info node_info src_builtin (src_expr option)
+      (src_expr option) string
   | SrcTypeConversion node_info src_type_name src_expr string
 End
 
@@ -476,6 +482,10 @@ Definition expr_ids_def:
     info.node_id :: component_ids cs) ∧
   (expr_ids (SrcFunctionCall info f args _) =
     info.node_id :: expr_ids f ++ exprs_ids args) ∧
+  (expr_ids (SrcBuiltinCall info callee _ condition message _) =
+    [info.node_id; callee.node_id] ++
+    (case condition of NONE => [] | SOME c => expr_ids c) ++
+    (case message of NONE => [] | SOME m => expr_ids m)) ∧
   (expr_ids (SrcTypeConversion info tn e _) =
     info.node_id :: type_name_ids tn ++ expr_ids e) ∧
   (component_ids [] = []) ∧
@@ -575,6 +585,27 @@ Datatype:
   |>
 End
 
+(* Literal bytes are imported from solc's hexValue, including UTF-8 and NULs.
+ * Dynamic strings are a later runtime increment. *)
+Definition literal_message_def:
+  (literal_message (SrcLiteral _ kind value tid) =
+    if (kind = "string" ∨ kind = "unicodeString" ∨ kind = "hexString") ∧
+       isPREFIX "t_stringliteral_" tid
+    then SOME value else NONE) ∧
+  (literal_message _ = NONE)
+End
+
+Definition builtin_shape_def:
+  (builtin_shape AssertBuiltin condition message ⇔
+    IS_SOME condition ∧ message = NONE) ∧
+  (builtin_shape RequireBuiltin condition message ⇔
+    IS_SOME condition ∧
+    (case message of NONE => T | SOME m => IS_SOME (literal_message m))) ∧
+  (builtin_shape RevertBuiltin condition message ⇔
+    condition = NONE ∧
+    (case message of NONE => T | SOME m => IS_SOME (literal_message m)))
+End
+
 (* The decoded type of a checked expression. *)
 Definition check_expr_def:
   (check_expr (env : import_env) (SrcIdentifier _ _ x tid) =
@@ -655,6 +686,11 @@ Definition check_expr_def:
          | _ => NONE)
     | NONE => NONE) ∧
   (check_expr env (SrcFunctionCall _ _ _ _) = NONE) ∧
+  (check_expr env (SrcBuiltinCall _ _ builtin condition message tid) =
+    if builtin_shape builtin condition message ∧ tid = "t_tuple$__$" ∧
+       (case condition of NONE => T
+        | SOME c => check_expr env c = SOME (SrcType BoolT))
+    then SOME (SrcTupleType []) else NONE) ∧
   (check_expr env (SrcTypeConversion _ tn e tid) =
     case normalize_type_name tn of
       SOME ty =>
@@ -886,6 +922,9 @@ Proof
 QED
 
 val () = cv_auto_trans unit_ids_def;
+
+val () = cv_auto_trans literal_message_def;
+val () = cv_auto_trans builtin_shape_def;
 
 val check_expr_pre_def = cv_auto_trans_pre_rec
   "check_expr_pre check_components_pre check_exprs_pre" check_expr_def (

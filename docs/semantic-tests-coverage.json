@@ -1,15 +1,15 @@
 {
   "counts": {
-    "admitted": 129,
+    "admitted": 139,
     "compile-failure": 0,
-    "elaboration-rejected": 134,
-    "import-rejected": 1307,
+    "elaboration-rejected": 155,
+    "import-rejected": 1276,
     "skipped": 100
   },
   "features": [
     {
       "feature": "bytes and string",
-      "first_rejection": 21,
+      "first_rejection": 18,
       "node_types": [
         "FunctionCall",
         "IndexAccess",
@@ -19,8 +19,8 @@
         "TupleExpression",
         "VariableDeclaration"
       ],
-      "only_blocker": 26,
-      "tests": 413
+      "only_blocker": 32,
+      "tests": 404
     },
     {
       "feature": "arrays",
@@ -56,11 +56,11 @@
     },
     {
       "feature": "inline assembly",
-      "first_rejection": 133,
+      "first_rejection": 134,
       "node_types": [
         "InlineAssembly"
       ],
-      "only_blocker": 61,
+      "only_blocker": 65,
       "tests": 266
     },
     {
@@ -70,7 +70,7 @@
         "Identifier",
         "IndexAccess"
       ],
-      "only_blocker": 6,
+      "only_blocker": 9,
       "tests": 252
     },
     {
@@ -87,17 +87,8 @@
       "tests": 227
     },
     {
-      "feature": "require/assert/revert",
-      "first_rejection": 46,
-      "node_types": [
-        "Identifier"
-      ],
-      "only_blocker": 10,
-      "tests": 216
-    },
-    {
       "feature": "structs",
-      "first_rejection": 175,
+      "first_rejection": 176,
       "node_types": [
         "FunctionCall",
         "IndexAccess",
@@ -181,7 +172,7 @@
     },
     {
       "feature": "memory arrays (new T[](n))",
-      "first_rejection": 36,
+      "first_rejection": 38,
       "node_types": [
         "NewExpression"
       ],
@@ -330,7 +321,7 @@
         "BinaryOperation",
         "UnaryOperation"
       ],
-      "only_blocker": 10,
+      "only_blocker": 11,
       "tests": 57
     },
     {
@@ -454,14 +445,14 @@
     },
     {
       "feature": "custom errors",
-      "first_rejection": 19,
+      "first_rejection": 24,
       "node_types": [
         "ErrorDefinition",
         "MemberAccess",
         "RevertStatement",
         "TupleExpression"
       ],
-      "only_blocker": 2,
+      "only_blocker": 5,
       "tests": 38
     },
     {
@@ -579,7 +570,7 @@
     },
     {
       "feature": "try/catch",
-      "first_rejection": 2,
+      "first_rejection": 11,
       "node_types": [
         "FunctionCall",
         "TryCatchClause",
@@ -704,7 +695,7 @@
       "node_types": [
         "Identifier"
       ],
-      "only_blocker": 1,
+      "only_blocker": 2,
       "tests": 2
     },
     {
@@ -729,84 +720,84 @@
   "format": "solidity-hol-semantic-tests-coverage-v1",
   "greedy_order": [
     {
-      "admitted": 61,
+      "admitted": 65,
       "feature": "inline assembly"
     },
     {
-      "admitted": 94,
+      "admitted": 105,
       "feature": "bytes and string"
     },
     {
-      "admitted": 115,
-      "feature": "require/assert/revert"
-    },
-    {
-      "admitted": 133,
+      "admitted": 123,
       "feature": "msg/block/tx globals"
     },
     {
-      "admitted": 148,
+      "admitted": 138,
       "feature": "constant expressions over literals"
     },
     {
-      "admitted": 162,
+      "admitted": 152,
       "feature": "local reference bindings"
     },
     {
-      "admitted": 187,
+      "admitted": 177,
       "feature": "structs"
     },
     {
-      "admitted": 231,
+      "admitted": 221,
       "feature": "arrays"
     },
     {
-      "admitted": 289,
+      "admitted": 279,
       "feature": "array values"
     },
     {
-      "admitted": 318,
+      "admitted": 308,
       "feature": "memory arrays (new T[](n))"
     },
     {
-      "admitted": 342,
+      "admitted": 332,
       "feature": "operator delete"
     },
     {
-      "admitted": 363,
+      "admitted": 353,
       "feature": "events"
     },
     {
-      "admitted": 384,
+      "admitted": 374,
       "feature": "public state variables"
     },
     {
-      "admitted": 418,
+      "admitted": 408,
       "feature": "constructors"
     },
     {
-      "admitted": 446,
+      "admitted": 436,
       "feature": "mappings"
     },
     {
-      "admitted": 465,
+      "admitted": 455,
       "feature": "abi.* functions"
     },
     {
-      "admitted": 486,
+      "admitted": 476,
       "feature": "hash and signature built-ins"
     },
     {
-      "admitted": 504,
+      "admitted": 494,
       "feature": "modifiers"
     },
     {
-      "admitted": 522,
+      "admitted": 512,
       "feature": "declaration values"
     },
     {
-      "admitted": 543,
+      "admitted": 533,
       "feature": "inline arrays"
+    },
+    {
+      "admitted": 557,
+      "feature": "transient storage"
     }
   ],
   "profile": "solc-0.8.37-via-ir-osaka",
@@ -994,8 +985,7 @@
       "category": "import-rejected",
       "features": [
         "abi.* functions",
-        "bytes and string",
-        "require/assert/revert"
+        "bytes and string"
       ],
       "first": "abi.* functions",
       "reason": "MemberAccess 6: only array length, push and pop members are supported",
@@ -1011,11 +1001,10 @@
         "arrays",
         "bytes and string",
         "memory arrays (new T[](n))",
-        "require/assert/revert",
         "this"
       ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 10: built-in require is not supported",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 60: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "abicoder/abi_encode_call.sol"
     },
@@ -1029,7 +1018,6 @@
         "inheritance",
         "library calls and contract-name members",
         "members of elementary type names",
-        "require/assert/revert",
         "source units without exactly one contract",
         "this",
         "type names as values"
@@ -1049,7 +1037,6 @@
         "function members (selector, address, \u2026)",
         "function types",
         "hash and signature built-ins",
-        "require/assert/revert",
         "this",
         "tuples of literals"
       ],
@@ -1068,7 +1055,6 @@
         "external calls and contract members",
         "function members (selector, address, \u2026)",
         "function types",
-        "require/assert/revert",
         "source units without exactly one contract",
         "this"
       ],
@@ -1087,7 +1073,6 @@
         "declaration values",
         "external calls and contract members",
         "hash and signature built-ins",
-        "require/assert/revert",
         "this",
         "tuples of literals"
       ],
@@ -1125,7 +1110,6 @@
         "hash and signature built-ins",
         "local reference bindings",
         "memory arrays (new T[](n))",
-        "require/assert/revert",
         "structs",
         "this",
         "tuples of literals",
@@ -1148,7 +1132,6 @@
         "literals of non-integer types",
         "local reference bindings",
         "memory arrays (new T[](n))",
-        "require/assert/revert",
         "this"
       ],
       "first": "array slices",
@@ -1234,7 +1217,6 @@
         "abi.* functions",
         "arrays",
         "bytes and string",
-        "require/assert/revert",
         "structs"
       ],
       "first": "structs",
@@ -1412,7 +1394,6 @@
         "external calls and contract members",
         "local reference bindings",
         "msg/block/tx globals",
-        "require/assert/revert",
         "this"
       ],
       "first": "msg/block/tx globals",
@@ -1504,7 +1485,6 @@
         "function types",
         "local reference bindings",
         "memory arrays (new T[](n))",
-        "require/assert/revert",
         "this"
       ],
       "first": "function types",
@@ -2080,7 +2060,6 @@
       "features": [
         "arrays",
         "local reference bindings",
-        "require/assert/revert",
         "structs"
       ],
       "first": "structs",
@@ -2584,7 +2563,7 @@
         "constant expressions over literals"
       ],
       "first": "built-in addmod",
-      "reason": "Identifier 15: built-in addmod is not supported",
+      "reason": "Identifier 15: unsupported built-in declaration ~2",
       "scan_agrees": true,
       "test": "arithmetics/addmod_mulmod.sol"
     },
@@ -2595,7 +2574,7 @@
         "built-in mulmod"
       ],
       "first": "built-in addmod",
-      "reason": "Identifier 7: built-in addmod is not supported",
+      "reason": "Identifier 7: unsupported built-in declaration ~2",
       "scan_agrees": true,
       "test": "arithmetics/addmod_mulmod_zero.sol"
     },
@@ -2836,8 +2815,7 @@
       "features": [
         "array values",
         "arrays",
-        "memory arrays (new T[](n))",
-        "require/assert/revert"
+        "memory arrays (new T[](n))"
       ],
       "first": "memory arrays (new T[](n))",
       "reason": "NewExpression 16: unsupported expression NewExpression",
@@ -2859,9 +2837,7 @@
       "category": "import-rejected",
       "features": [
         "arrays",
-        "bytes and string",
-        "memory arrays (new T[](n))",
-        "require/assert/revert"
+        "memory arrays (new T[](n))"
       ],
       "first": "memory arrays (new T[](n))",
       "reason": "NewExpression 14: unsupported expression NewExpression",
@@ -2885,12 +2861,10 @@
       "test": "array/array_push_with_arg.sol"
     },
     {
-      "category": "import-rejected",
-      "features": [
-        "require/assert/revert"
-      ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 57: built-in require is not supported",
+      "category": "admitted",
+      "features": [],
+      "first": null,
+      "reason": null,
       "scan_agrees": true,
       "test": "array/array_storage_index_access.sol"
     },
@@ -2905,8 +2879,7 @@
     {
       "category": "import-rejected",
       "features": [
-        "inline assembly",
-        "require/assert/revert"
+        "inline assembly"
       ],
       "first": "inline assembly",
       "reason": "InlineAssembly 80: unsupported statement InlineAssembly",
@@ -2930,12 +2903,10 @@
       "test": "array/array_storage_pop_zero_length.sol"
     },
     {
-      "category": "import-rejected",
-      "features": [
-        "require/assert/revert"
-      ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 28: built-in require is not supported",
+      "category": "admitted",
+      "features": [],
+      "first": null,
+      "reason": null,
       "scan_agrees": true,
       "test": "array/array_storage_push_empty.sol"
     },
@@ -3159,8 +3130,7 @@
         "array values",
         "arrays",
         "inline assembly",
-        "memory arrays (new T[](n))",
-        "require/assert/revert"
+        "memory arrays (new T[](n))"
       ],
       "first": "memory arrays (new T[](n))",
       "reason": "NewExpression 39: unsupported expression NewExpression",
@@ -3173,8 +3143,7 @@
         "array values",
         "arrays",
         "inline assembly",
-        "memory arrays (new T[](n))",
-        "require/assert/revert"
+        "memory arrays (new T[](n))"
       ],
       "first": "memory arrays (new T[](n))",
       "reason": "NewExpression 135: unsupported expression NewExpression",
@@ -3187,8 +3156,7 @@
         "array values",
         "arrays",
         "inline assembly",
-        "memory arrays (new T[](n))",
-        "require/assert/revert"
+        "memory arrays (new T[](n))"
       ],
       "first": "memory arrays (new T[](n))",
       "reason": "NewExpression 39: unsupported expression NewExpression",
@@ -3201,8 +3169,7 @@
         "array values",
         "arrays",
         "inline assembly",
-        "memory arrays (new T[](n))",
-        "require/assert/revert"
+        "memory arrays (new T[](n))"
       ],
       "first": "memory arrays (new T[](n))",
       "reason": "NewExpression 45: unsupported expression NewExpression",
@@ -3237,8 +3204,7 @@
       "features": [
         "array values",
         "arrays",
-        "memory arrays (new T[](n))",
-        "require/assert/revert"
+        "memory arrays (new T[](n))"
       ],
       "first": "memory arrays (new T[](n))",
       "reason": "NewExpression 25: unsupported expression NewExpression",
@@ -3270,24 +3236,22 @@
       "test": "array/copying/array_copy_storage_abi_signed.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
-        "array values",
-        "require/assert/revert"
+        "array values"
       ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 53: built-in assert is not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/copying/array_copy_storage_storage_different_base.sol",
       "scan_agrees": true,
       "test": "array/copying/array_copy_storage_storage_different_base.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
-        "array values",
-        "require/assert/revert"
+        "array values"
       ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 95: built-in assert is not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/copying/array_copy_storage_storage_different_base_nested.sol",
       "scan_agrees": true,
       "test": "array/copying/array_copy_storage_storage_different_base_nested.sol"
     },
@@ -3303,13 +3267,12 @@
       "test": "array/copying/array_copy_storage_storage_dyn_dyn.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
-        "array values",
-        "require/assert/revert"
+        "array values"
       ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 53: built-in assert is not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/copying/array_copy_storage_storage_dynamic_dynamic.sol",
       "scan_agrees": true,
       "test": "array/copying/array_copy_storage_storage_dynamic_dynamic.sol"
     },
@@ -3446,7 +3409,6 @@
         "hash and signature built-ins",
         "inline arrays",
         "memory arrays (new T[](n))",
-        "require/assert/revert",
         "this"
       ],
       "first": "function types",
@@ -3467,7 +3429,6 @@
         "hash and signature built-ins",
         "inline arrays",
         "memory arrays (new T[](n))",
-        "require/assert/revert",
         "this"
       ],
       "first": "function types",
@@ -3520,7 +3481,6 @@
         "array values",
         "arrays",
         "local reference bindings",
-        "require/assert/revert",
         "structs"
       ],
       "first": "structs",
@@ -3534,7 +3494,6 @@
         "array values",
         "arrays",
         "local reference bindings",
-        "require/assert/revert",
         "structs"
       ],
       "first": "structs",
@@ -3549,7 +3508,6 @@
         "arrays",
         "inline arrays",
         "memory arrays (new T[](n))",
-        "require/assert/revert",
         "structs"
       ],
       "first": "structs",
@@ -3638,8 +3596,7 @@
     {
       "category": "import-rejected",
       "features": [
-        "bytes and string",
-        "require/assert/revert"
+        "bytes and string"
       ],
       "first": "bytes and string",
       "reason": "NewExpression 14: unsupported expression NewExpression",
@@ -3657,7 +3614,6 @@
         "immutables",
         "local reference bindings",
         "memory arrays (new T[](n))",
-        "require/assert/revert",
         "source units without exactly one contract"
       ],
       "first": "immutables",
@@ -3679,16 +3635,15 @@
       "test": "array/copying/calldata_2d_bytes_to_memory.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "array values",
         "arrays",
         "bytes and string",
-        "local reference bindings",
-        "require/assert/revert"
+        "local reference bindings"
       ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 8: built-in assert is not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/copying/calldata_2d_bytes_to_memory_2.sol",
       "scan_agrees": true,
       "test": "array/copying/calldata_2d_bytes_to_memory_2.sol"
     },
@@ -3992,8 +3947,7 @@
         "array values",
         "arrays",
         "bytes and string",
-        "memory arrays (new T[](n))",
-        "require/assert/revert"
+        "memory arrays (new T[](n))"
       ],
       "first": "memory arrays (new T[](n))",
       "reason": "NewExpression 16: unsupported expression NewExpression",
@@ -4014,28 +3968,26 @@
       "test": "array/copying/memory_to_storage_different_base.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "array values",
         "arrays",
-        "local reference bindings",
-        "require/assert/revert"
+        "local reference bindings"
       ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 20: built-in assert is not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/copying/nested_array_calldata_to_memory.sol",
       "scan_agrees": true,
       "test": "array/copying/nested_array_calldata_to_memory.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "array values",
         "arrays",
-        "local reference bindings",
-        "require/assert/revert"
+        "local reference bindings"
       ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 36: built-in assert is not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/copying/nested_array_calldata_to_storage.sol",
       "scan_agrees": true,
       "test": "array/copying/nested_array_calldata_to_storage.sol"
     },
@@ -4079,15 +4031,14 @@
       "test": "array/copying/nested_array_element_calldata_to_memory.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "array values",
         "arrays",
-        "local reference bindings",
-        "require/assert/revert"
+        "local reference bindings"
       ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 31: built-in require is not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/copying/nested_array_element_calldata_to_storage.sol",
       "scan_agrees": true,
       "test": "array/copying/nested_array_element_calldata_to_storage.sol"
     },
@@ -4104,14 +4055,13 @@
       "test": "array/copying/nested_array_element_memory_to_memory.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "array values",
-        "arrays",
-        "require/assert/revert"
+        "arrays"
       ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 31: built-in require is not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/copying/nested_array_element_memory_to_storage.sol",
       "scan_agrees": true,
       "test": "array/copying/nested_array_element_memory_to_storage.sol"
     },
@@ -4138,8 +4088,7 @@
         "constructors",
         "declaration values",
         "inline arrays",
-        "memory arrays (new T[](n))",
-        "require/assert/revert"
+        "memory arrays (new T[](n))"
       ],
       "first": "declaration values",
       "reason": "VariableDeclaration 13: declaration values are not supported",
@@ -4217,7 +4166,6 @@
         "inline arrays",
         "memory arrays (new T[](n))",
         "named arguments",
-        "require/assert/revert",
         "structs"
       ],
       "first": "structs",
@@ -4261,11 +4209,10 @@
         "array values",
         "arrays",
         "local reference bindings",
-        "memory arrays (new T[](n))",
-        "require/assert/revert"
+        "memory arrays (new T[](n))"
       ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 24: built-in require is not supported",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 92: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "array/copying/nested_dynamic_array_element_calldata_to_storage.sol"
     },
@@ -4388,8 +4335,7 @@
     {
       "category": "import-rejected",
       "features": [
-        "bytes and string",
-        "require/assert/revert"
+        "bytes and string"
       ],
       "first": "bytes and string",
       "reason": "NewExpression 8: unsupported expression NewExpression",
@@ -4401,8 +4347,7 @@
       "features": [
         "array values",
         "arrays",
-        "memory arrays (new T[](n))",
-        "require/assert/revert"
+        "memory arrays (new T[](n))"
       ],
       "first": "memory arrays (new T[](n))",
       "reason": "NewExpression 14: unsupported expression NewExpression",
@@ -4426,8 +4371,7 @@
       "features": [
         "bytes and string",
         "inline assembly",
-        "operator delete",
-        "require/assert/revert"
+        "operator delete"
       ],
       "first": "inline assembly",
       "reason": "InlineAssembly 22: unsupported statement InlineAssembly",
@@ -4481,8 +4425,7 @@
       "features": [
         "array values",
         "inline assembly",
-        "operator delete",
-        "require/assert/revert"
+        "operator delete"
       ],
       "first": "inline assembly",
       "reason": "InlineAssembly 23: unsupported statement InlineAssembly",
@@ -4938,7 +4881,6 @@
         "inline assembly",
         "local reference bindings",
         "operator delete",
-        "require/assert/revert",
         "structs",
         "type names as values",
         "type(\u2026)"
@@ -5095,13 +5037,12 @@
       "test": "array/pop/byte_array_pop_isolated.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
-        "bytes and string",
-        "require/assert/revert"
+        "bytes and string"
       ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 45: built-in require is not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/pop/byte_array_pop_long_storage_empty.sol",
       "scan_agrees": true,
       "test": "array/pop/byte_array_pop_long_storage_empty.sol"
     },
@@ -5159,8 +5100,7 @@
       "category": "import-rejected",
       "features": [
         "arrays",
-        "declaration values",
-        "require/assert/revert"
+        "declaration values"
       ],
       "first": "declaration values",
       "reason": "VariableDeclaration 3: declaration values are not supported",
@@ -5173,8 +5113,7 @@
         "array values",
         "arrays",
         "declaration values",
-        "local reference bindings",
-        "require/assert/revert"
+        "local reference bindings"
       ],
       "first": "declaration values",
       "reason": "VariableDeclaration 3: declaration values are not supported",
@@ -5188,8 +5127,7 @@
         "arrays",
         "declaration values",
         "memory arrays (new T[](n))",
-        "operator delete",
-        "require/assert/revert"
+        "operator delete"
       ],
       "first": "declaration values",
       "reason": "VariableDeclaration 3: declaration values are not supported",
@@ -5250,14 +5188,13 @@
       "test": "array/push/byte_array_push_transition.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "arrays",
-        "bytes and string",
-        "require/assert/revert"
+        "bytes and string"
       ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 25: built-in assert is not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/push/nested_bytes_push.sol",
       "scan_agrees": true,
       "test": "array/push/nested_bytes_push.sol"
     },
@@ -5379,8 +5316,7 @@
         "array values",
         "arrays",
         "inline arrays",
-        "local reference bindings",
-        "require/assert/revert"
+        "local reference bindings"
       ],
       "first": "array slices",
       "reason": "IndexRangeAccess 20: unsupported expression IndexRangeAccess",
@@ -5393,8 +5329,7 @@
         "array slices",
         "array values",
         "arrays",
-        "local reference bindings",
-        "require/assert/revert"
+        "local reference bindings"
       ],
       "first": "array slices",
       "reason": "IndexRangeAccess 19: unsupported expression IndexRangeAccess",
@@ -5498,7 +5433,7 @@
         "built-in blobhash"
       ],
       "first": "built-in blobhash",
-      "reason": "Identifier 5: built-in blobhash is not supported",
+      "reason": "Identifier 5: unsupported built-in declaration ~29",
       "scan_agrees": true,
       "test": "builtinFunctions/blobhash.sol"
     },
@@ -5516,7 +5451,7 @@
         "built-in blockhash"
       ],
       "first": "built-in blockhash",
-      "reason": "Identifier 5: built-in blockhash is not supported",
+      "reason": "Identifier 5: unsupported built-in declaration ~5",
       "scan_agrees": true,
       "test": "builtinFunctions/blockhash.sol"
     },
@@ -5536,7 +5471,6 @@
         "declaration values",
         "free functions",
         "hash and signature built-ins",
-        "require/assert/revert",
         "type names as values"
       ],
       "first": "declaration values",
@@ -5579,7 +5513,7 @@
         "bytes and string"
       ],
       "first": "built-in erc7201",
-      "reason": "Identifier 5: built-in erc7201 is not supported",
+      "reason": "Identifier 5: unsupported built-in declaration ~30",
       "scan_agrees": true,
       "test": "builtinFunctions/erc7201_overflow_expression.sol"
     },
@@ -5639,7 +5573,7 @@
         "type names as values"
       ],
       "first": "built-in erc7201",
-      "reason": "Identifier 54: built-in erc7201 is not supported",
+      "reason": "Identifier 54: unsupported built-in declaration ~30",
       "scan_agrees": true,
       "test": "builtinFunctions/erc7201_param_pure_function.sol"
     },
@@ -5698,7 +5632,7 @@
         "type names as values"
       ],
       "first": "built-in erc7201",
-      "reason": "Identifier 46: built-in erc7201 is not supported",
+      "reason": "Identifier 46: unsupported built-in declaration ~30",
       "scan_agrees": true,
       "test": "builtinFunctions/erc7201_param_unicode_string_literal.sol"
     },
@@ -5725,11 +5659,10 @@
         "fixed-size bytes members and indexing",
         "free functions",
         "hash and signature built-ins",
-        "require/assert/revert",
         "type names as values"
       ],
       "first": "hash and signature built-ins",
-      "reason": "Identifier 52: built-in keccak256 is not supported",
+      "reason": "Identifier 52: unsupported built-in declaration ~8",
       "scan_agrees": true,
       "test": "builtinFunctions/erc7201_param_with_zero_last_byte_of_inner_hash.sol"
     },
@@ -5741,7 +5674,6 @@
         "fixed-size bytes members and indexing",
         "free functions",
         "hash and signature built-ins",
-        "require/assert/revert",
         "type names as values"
       ],
       "first": "arrays",
@@ -5771,7 +5703,7 @@
         "hash and signature built-ins"
       ],
       "first": "hash and signature built-ins",
-      "reason": "Identifier 29: built-in keccak256 is not supported",
+      "reason": "Identifier 29: unsupported built-in declaration ~8",
       "scan_agrees": true,
       "test": "builtinFunctions/iterated_keccak256_with_bytes.sol"
     },
@@ -5793,7 +5725,7 @@
         "hash and signature built-ins"
       ],
       "first": "hash and signature built-ins",
-      "reason": "Identifier 5: built-in keccak256 is not supported",
+      "reason": "Identifier 5: unsupported built-in declaration ~8",
       "scan_agrees": true,
       "test": "builtinFunctions/keccak256_empty.sol"
     },
@@ -5827,7 +5759,7 @@
         "hash and signature built-ins"
       ],
       "first": "hash and signature built-ins",
-      "reason": "Identifier 6: built-in keccak256 is not supported",
+      "reason": "Identifier 6: unsupported built-in declaration ~8",
       "scan_agrees": true,
       "test": "builtinFunctions/keccak256_multiple_arguments_with_string_literals.sol"
     },
@@ -5867,7 +5799,7 @@
         "hash and signature built-ins"
       ],
       "first": "hash and signature built-ins",
-      "reason": "Identifier 25: built-in keccak256 is not supported",
+      "reason": "Identifier 25: unsupported built-in declaration ~8",
       "scan_agrees": true,
       "test": "builtinFunctions/keccak256_with_bytes.sol"
     },
@@ -5909,7 +5841,7 @@
         "hash and signature built-ins"
       ],
       "first": "hash and signature built-ins",
-      "reason": "Identifier 5: built-in ripemd160 is not supported",
+      "reason": "Identifier 5: unsupported built-in declaration ~20",
       "scan_agrees": true,
       "test": "builtinFunctions/ripemd160_empty.sol"
     },
@@ -5942,7 +5874,7 @@
         "hash and signature built-ins"
       ],
       "first": "hash and signature built-ins",
-      "reason": "Identifier 5: built-in sha256 is not supported",
+      "reason": "Identifier 5: unsupported built-in declaration ~22",
       "scan_agrees": true,
       "test": "builtinFunctions/sha256_empty.sol"
     },
@@ -5994,8 +5926,7 @@
       "category": "import-rejected",
       "features": [
         "inline assembly",
-        "literals of non-integer types",
-        "require/assert/revert"
+        "literals of non-integer types"
       ],
       "first": "inline assembly",
       "reason": "InlineAssembly 12: unsupported statement InlineAssembly",
@@ -6739,7 +6670,7 @@
         "local reference bindings"
       ],
       "first": "hash and signature built-ins",
-      "reason": "Identifier 7: built-in keccak256 is not supported",
+      "reason": "Identifier 7: unsupported built-in declaration ~8",
       "scan_agrees": true,
       "test": "conversions/calldata_bytes_to_memory.sol"
     },
@@ -6991,7 +6922,7 @@
         "hash and signature built-ins"
       ],
       "first": "hash and signature built-ins",
-      "reason": "Identifier 13: built-in ecrecover is not supported",
+      "reason": "Identifier 13: unsupported built-in declaration ~6",
       "scan_agrees": true,
       "test": "ecrecover/ecrecover.sol"
     },
@@ -7001,7 +6932,7 @@
         "hash and signature built-ins"
       ],
       "first": "hash and signature built-ins",
-      "reason": "Identifier 14: built-in ecrecover is not supported",
+      "reason": "Identifier 14: unsupported built-in declaration ~6",
       "scan_agrees": true,
       "test": "ecrecover/ecrecover_abiV2.sol"
     },
@@ -7033,8 +6964,7 @@
       "features": [
         "abi.* functions",
         "hash and signature built-ins",
-        "literals of non-integer types",
-        "require/assert/revert"
+        "literals of non-integer types"
       ],
       "first": "abi.* functions",
       "reason": "MemberAccess 36: only array length, push and pop members are supported",
@@ -7200,7 +7130,6 @@
         "interfaces",
         "libraries",
         "library calls and contract-name members",
-        "require/assert/revert",
         "source units without exactly one contract",
         "unimplemented functions"
       ],
@@ -7246,11 +7175,10 @@
         "external calls and contract members",
         "function members (selector, address, \u2026)",
         "function types",
-        "require/assert/revert",
         "structs"
       ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 36: built-in require is not supported",
+      "first": "structs",
+      "reason": "FunctionCall 75: unsupported call kind structConstructorCall",
       "scan_agrees": true,
       "test": "errors/errors_by_parameter_type.sol"
     },
@@ -7290,8 +7218,7 @@
     {
       "category": "import-rejected",
       "features": [
-        "custom errors",
-        "require/assert/revert"
+        "custom errors"
       ],
       "first": "custom errors",
       "reason": "ErrorDefinition 4: unsupported contract member",
@@ -7303,8 +7230,7 @@
       "features": [
         "custom errors",
         "declaration values",
-        "public state variables",
-        "require/assert/revert"
+        "public state variables"
       ],
       "first": "custom errors",
       "reason": "ErrorDefinition 4: unsupported contract member",
@@ -7339,11 +7265,10 @@
       "category": "import-rejected",
       "features": [
         "bytes and string",
-        "custom errors",
-        "require/assert/revert"
+        "custom errors"
       ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 19: built-in require is not supported",
+      "first": "custom errors",
+      "reason": "ErrorDefinition 16: unsupported source unit member ErrorDefinition",
       "scan_agrees": true,
       "test": "errors/require_different_errors_same_parameters.sol"
     },
@@ -7351,8 +7276,7 @@
       "category": "import-rejected",
       "features": [
         "custom errors",
-        "declaration values",
-        "require/assert/revert"
+        "declaration values"
       ],
       "first": "custom errors",
       "reason": "ErrorDefinition 7: unsupported contract member",
@@ -7371,8 +7295,7 @@
       "category": "import-rejected",
       "features": [
         "custom errors",
-        "inline assembly",
-        "require/assert/revert"
+        "inline assembly"
       ],
       "first": "custom errors",
       "reason": "ErrorDefinition 4: unsupported contract member",
@@ -7382,8 +7305,7 @@
     {
       "category": "import-rejected",
       "features": [
-        "custom errors",
-        "require/assert/revert"
+        "custom errors"
       ],
       "first": "custom errors",
       "reason": "ErrorDefinition 20: unsupported contract member",
@@ -7394,8 +7316,7 @@
       "category": "import-rejected",
       "features": [
         "bytes and string",
-        "declaration values",
-        "require/assert/revert"
+        "declaration values"
       ],
       "first": "declaration values",
       "reason": "VariableDeclaration 3: declaration values are not supported",
@@ -7414,8 +7335,7 @@
       "category": "import-rejected",
       "features": [
         "custom errors",
-        "declaration values",
-        "require/assert/revert"
+        "declaration values"
       ],
       "first": "custom errors",
       "reason": "ErrorDefinition 10: unsupported contract member",
@@ -7429,8 +7349,7 @@
         "custom errors",
         "external calls and contract members",
         "function members (selector, address, \u2026)",
-        "function types",
-        "require/assert/revert"
+        "function types"
       ],
       "first": "external calls and contract members",
       "reason": "MemberAccess 32: only array length, push and pop members are supported",
@@ -7441,11 +7360,10 @@
       "category": "import-rejected",
       "features": [
         "bytes and string",
-        "custom errors",
-        "require/assert/revert"
+        "custom errors"
       ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 11: built-in require is not supported",
+      "first": "custom errors",
+      "reason": "ErrorDefinition 8: unsupported source unit member ErrorDefinition",
       "scan_agrees": true,
       "test": "errors/require_error_multiple_arguments.sol"
     },
@@ -7454,8 +7372,7 @@
       "features": [
         "bytes and string",
         "custom errors",
-        "named arguments",
-        "require/assert/revert"
+        "named arguments"
       ],
       "first": "named arguments",
       "reason": "FunctionCall 32: named arguments are not supported",
@@ -7469,8 +7386,7 @@
         "custom errors",
         "declaration values",
         "local reference bindings",
-        "named arguments",
-        "require/assert/revert"
+        "named arguments"
       ],
       "first": "declaration values",
       "reason": "VariableDeclaration 29: declaration values are not supported",
@@ -7482,8 +7398,7 @@
       "features": [
         "bytes and string",
         "custom errors",
-        "named arguments",
-        "require/assert/revert"
+        "named arguments"
       ],
       "first": "named arguments",
       "reason": "FunctionCall 56: named arguments are not supported",
@@ -7496,8 +7411,7 @@
         "bytes and string",
         "custom errors",
         "local reference bindings",
-        "named arguments",
-        "require/assert/revert"
+        "named arguments"
       ],
       "first": "named arguments",
       "reason": "FunctionCall 16: named arguments are not supported",
@@ -7512,7 +7426,6 @@
         "function members (selector, address, \u2026)",
         "function types",
         "public state variables",
-        "require/assert/revert",
         "this"
       ],
       "first": "custom errors",
@@ -7532,11 +7445,10 @@
       "category": "import-rejected",
       "features": [
         "bytes and string",
-        "custom errors",
-        "require/assert/revert"
+        "custom errors"
       ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 7: built-in require is not supported",
+      "first": "custom errors",
+      "reason": "ErrorDefinition 4: unsupported source unit member ErrorDefinition",
       "scan_agrees": true,
       "test": "errors/require_error_string_literal.sol"
     },
@@ -7544,22 +7456,20 @@
       "category": "import-rejected",
       "features": [
         "bytes and string",
-        "custom errors",
-        "require/assert/revert"
+        "custom errors"
       ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 11: built-in require is not supported",
+      "first": "custom errors",
+      "reason": "ErrorDefinition 4: unsupported source unit member ErrorDefinition",
       "scan_agrees": true,
       "test": "errors/require_error_string_memory.sol"
     },
     {
       "category": "import-rejected",
       "features": [
-        "custom errors",
-        "require/assert/revert"
+        "custom errors"
       ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 7: built-in require is not supported",
+      "first": "custom errors",
+      "reason": "ErrorDefinition 4: unsupported source unit member ErrorDefinition",
       "scan_agrees": true,
       "test": "errors/require_error_uint256.sol"
     },
@@ -7570,7 +7480,6 @@
         "contracts without functions",
         "custom errors",
         "inheritance",
-        "require/assert/revert",
         "source units without exactly one contract"
       ],
       "first": "inheritance",
@@ -8143,7 +8052,6 @@
         "interfaces",
         "libraries",
         "library calls and contract-name members",
-        "require/assert/revert",
         "source units without exactly one contract"
       ],
       "first": "inheritance",
@@ -8158,7 +8066,6 @@
         "events",
         "libraries",
         "library calls and contract-name members",
-        "require/assert/revert",
         "source units without exactly one contract"
       ],
       "first": "events",
@@ -8174,7 +8081,6 @@
         "events",
         "libraries",
         "library calls and contract-name members",
-        "require/assert/revert",
         "source units without exactly one contract"
       ],
       "first": "events",
@@ -8545,7 +8451,6 @@
         "operator delete",
         "overrides",
         "payable functions",
-        "require/assert/revert",
         "source units without exactly one contract",
         "structs",
         "unimplemented functions",
@@ -8594,7 +8499,6 @@
         "msg/block/tx globals",
         "overrides",
         "payable functions",
-        "require/assert/revert",
         "source units without exactly one contract",
         "type names as values",
         "type(\u2026)",
@@ -8616,7 +8520,6 @@
         "inline assembly",
         "libraries",
         "library calls and contract-name members",
-        "require/assert/revert",
         "type names as values",
         "type(\u2026)",
         "using for"
@@ -8637,7 +8540,6 @@
         "inline assembly",
         "libraries",
         "library calls and contract-name members",
-        "require/assert/revert",
         "using for"
       ],
       "first": "libraries",
@@ -8657,7 +8559,6 @@
         "inline assembly",
         "libraries",
         "library calls and contract-name members",
-        "require/assert/revert",
         "type names as values",
         "type(\u2026)",
         "using for"
@@ -8682,7 +8583,6 @@
         "library calls and contract-name members",
         "members of elementary type names",
         "memory arrays (new T[](n))",
-        "require/assert/revert",
         "source units without exactly one contract",
         "structs",
         "type names as values",
@@ -9514,7 +9414,6 @@
         "abi.* functions",
         "address members (balance, call, transfer, \u2026)",
         "bytes and string",
-        "require/assert/revert",
         "this"
       ],
       "first": "abi.* functions",
@@ -9979,12 +9878,10 @@
       "test": "functionCall/send_zero_ether.sol"
     },
     {
-      "category": "import-rejected",
-      "features": [
-        "require/assert/revert"
-      ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 7: built-in revert is not supported",
+      "category": "admitted",
+      "features": [],
+      "first": null,
+      "reason": null,
       "scan_agrees": true,
       "test": "functionCall/transaction_status.sol"
     },
@@ -10069,7 +9966,6 @@
         "external calls and contract members",
         "function members (selector, address, \u2026)",
         "function types",
-        "require/assert/revert",
         "this"
       ],
       "first": "external calls and contract members",
@@ -10170,7 +10066,6 @@
         "inline arrays",
         "msg/block/tx globals",
         "payable functions",
-        "require/assert/revert",
         "this"
       ],
       "first": "msg/block/tx globals",
@@ -10348,7 +10243,6 @@
         "external calls and contract members",
         "function members (selector, address, \u2026)",
         "payable functions",
-        "require/assert/revert",
         "this"
       ],
       "first": "function members (selector, address, \u2026)",
@@ -10777,13 +10671,11 @@
     {
       "category": "import-rejected",
       "features": [
-        "bytes and string",
         "constructors",
         "declaration values",
         "immutables",
         "inline assembly",
         "payable functions",
-        "require/assert/revert",
         "type names as values",
         "type(\u2026)"
       ],
@@ -11903,8 +11795,7 @@
       "category": "import-rejected",
       "features": [
         "inline assembly",
-        "modifiers",
-        "require/assert/revert"
+        "modifiers"
       ],
       "first": "modifiers",
       "reason": "ModifierDefinition 16: unsupported contract member",
@@ -11946,8 +11837,7 @@
       "category": "import-rejected",
       "features": [
         "inline assembly",
-        "public state variables",
-        "require/assert/revert"
+        "public state variables"
       ],
       "first": "public state variables",
       "reason": "VariableDeclaration 4: public state variables are not supported",
@@ -11958,8 +11848,7 @@
       "category": "import-rejected",
       "features": [
         "inline assembly",
-        "public state variables",
-        "require/assert/revert"
+        "public state variables"
       ],
       "first": "public state variables",
       "reason": "VariableDeclaration 4: public state variables are not supported",
@@ -11973,8 +11862,7 @@
         "arrays",
         "inline assembly",
         "local reference bindings",
-        "public state variables",
-        "require/assert/revert"
+        "public state variables"
       ],
       "first": "public state variables",
       "reason": "VariableDeclaration 3: public state variables are not supported",
@@ -11987,7 +11875,6 @@
         "inline assembly",
         "local reference bindings",
         "public state variables",
-        "require/assert/revert",
         "structs"
       ],
       "first": "structs",
@@ -12010,7 +11897,6 @@
       "features": [
         "inline assembly",
         "public state variables",
-        "require/assert/revert",
         "transient storage"
       ],
       "first": "public state variables",
@@ -12071,8 +11957,7 @@
     {
       "category": "import-rejected",
       "features": [
-        "inline assembly",
-        "require/assert/revert"
+        "inline assembly"
       ],
       "first": "inline assembly",
       "reason": "InlineAssembly 8: unsupported statement InlineAssembly",
@@ -12157,8 +12042,7 @@
     {
       "category": "import-rejected",
       "features": [
-        "inline assembly",
-        "require/assert/revert"
+        "inline assembly"
       ],
       "first": "inline assembly",
       "reason": "InlineAssembly 5: unsupported statement InlineAssembly",
@@ -12267,8 +12151,7 @@
       "category": "import-rejected",
       "features": [
         "constructors",
-        "inline assembly",
-        "require/assert/revert"
+        "inline assembly"
       ],
       "first": "constructors",
       "reason": "FunctionDefinition 14: unsupported function kind constructor",
@@ -12286,7 +12169,6 @@
         "external calls and contract members",
         "inline assembly",
         "members of elementary type names",
-        "require/assert/revert",
         "source units without exactly one contract",
         "this",
         "type names as values"
@@ -12301,7 +12183,6 @@
       "features": [
         "external calls and contract members",
         "inline assembly",
-        "require/assert/revert",
         "this"
       ],
       "first": "inline assembly",
@@ -12323,8 +12204,7 @@
       "category": "import-rejected",
       "features": [
         "constructors",
-        "inline assembly",
-        "require/assert/revert"
+        "inline assembly"
       ],
       "first": "constructors",
       "reason": "FunctionDefinition 14: unsupported function kind constructor",
@@ -12350,7 +12230,6 @@
         "external calls and contract members",
         "inline assembly",
         "public state variables",
-        "require/assert/revert",
         "source units without exactly one contract",
         "this"
       ],
@@ -12399,7 +12278,6 @@
       "category": "import-rejected",
       "features": [
         "constant expressions over literals",
-        "require/assert/revert",
         "type names as values",
         "type(\u2026)"
       ],
@@ -12412,7 +12290,6 @@
       "category": "import-rejected",
       "features": [
         "constant expressions over literals",
-        "require/assert/revert",
         "type names as values",
         "type(\u2026)"
       ],
@@ -12441,7 +12318,6 @@
       "category": "import-rejected",
       "features": [
         "constant expressions over literals",
-        "require/assert/revert",
         "type names as values",
         "type(\u2026)"
       ],
@@ -12682,8 +12558,7 @@
         "address members (balance, call, transfer, \u2026)",
         "array values",
         "arrays",
-        "bytes and string",
-        "require/assert/revert"
+        "bytes and string"
       ],
       "first": "abi.* functions",
       "reason": "MemberAccess 19: only array length, push and pop members are supported",
@@ -13256,7 +13131,6 @@
         "libraries",
         "library calls and contract-name members",
         "members of elementary type names",
-        "require/assert/revert",
         "source units without exactly one contract",
         "type names as values"
       ],
@@ -13272,7 +13146,6 @@
         "address members (balance, call, transfer, \u2026)",
         "bytes and string",
         "libraries",
-        "require/assert/revert",
         "source units without exactly one contract"
       ],
       "first": "abi.* functions",
@@ -13290,7 +13163,6 @@
         "libraries",
         "library calls and contract-name members",
         "members of elementary type names",
-        "require/assert/revert",
         "source units without exactly one contract",
         "type names as values"
       ],
@@ -13834,12 +13706,12 @@
       "test": "literals/hex_string_with_non_printable_characters.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "bytes and string"
       ],
-      "first": "bytes and string",
-      "reason": "Literal 5: no definition for field \"value\" in object",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for literals/hex_string_with_underscore.sol",
       "scan_agrees": true,
       "test": "literals/hex_string_with_underscore.sol"
     },
@@ -13880,8 +13752,7 @@
       "category": "import-rejected",
       "features": [
         "arrays",
-        "inline assembly",
-        "require/assert/revert"
+        "inline assembly"
       ],
       "first": "inline assembly",
       "reason": "InlineAssembly 12: unsupported statement InlineAssembly",
@@ -14095,7 +13966,6 @@
         "library calls and contract-name members",
         "local reference bindings",
         "modifiers",
-        "require/assert/revert",
         "source units without exactly one contract",
         "structs",
         "using for"
@@ -14174,8 +14044,7 @@
       "category": "import-rejected",
       "features": [
         "modifiers",
-        "public state variables",
-        "require/assert/revert"
+        "public state variables"
       ],
       "first": "modifiers",
       "reason": "ModifierDefinition 26: unsupported contract member",
@@ -14220,11 +14089,9 @@
     {
       "category": "import-rejected",
       "features": [
-        "bytes and string",
         "declaration values",
         "modifiers",
-        "public state variables",
-        "require/assert/revert"
+        "public state variables"
       ],
       "first": "modifiers",
       "reason": "ModifierDefinition 28: unsupported contract member",
@@ -14553,8 +14420,7 @@
     {
       "category": "import-rejected",
       "features": [
-        "inline assembly",
-        "require/assert/revert"
+        "inline assembly"
       ],
       "first": "inline assembly",
       "reason": "InlineAssembly 8: unsupported statement InlineAssembly",
@@ -14922,7 +14788,6 @@
         "constants",
         "declaration values",
         "free functions",
-        "require/assert/revert",
         "user-defined value types",
         "using for"
       ],
@@ -14936,7 +14801,6 @@
       "features": [
         "constant expressions over literals",
         "free functions",
-        "require/assert/revert",
         "user-defined value types",
         "using for"
       ],
@@ -14985,12 +14849,10 @@
     {
       "category": "import-rejected",
       "features": [
-        "bytes and string",
         "constant expressions over literals",
         "constants",
         "declaration values",
         "free functions",
-        "require/assert/revert",
         "user-defined value types",
         "using for"
       ],
@@ -15125,7 +14987,6 @@
         "constants",
         "declaration values",
         "free functions",
-        "require/assert/revert",
         "user-defined value types",
         "using for"
       ],
@@ -15436,12 +15297,10 @@
       "test": "revertStrings/unknown_sig_no_fallback.sol"
     },
     {
-      "category": "import-rejected",
-      "features": [
-        "require/assert/revert"
-      ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 3: built-in assert is not supported",
+      "category": "admitted",
+      "features": [],
+      "first": null,
+      "reason": null,
       "scan_agrees": true,
       "test": "reverts/assert_require.sol"
     },
@@ -15518,8 +15377,7 @@
       "features": [
         "declaration values",
         "inline assembly",
-        "public state variables",
-        "require/assert/revert"
+        "public state variables"
       ],
       "first": "public state variables",
       "reason": "VariableDeclaration 3: declaration values are not supported",
@@ -15529,10 +15387,8 @@
     {
       "category": "import-rejected",
       "features": [
-        "bytes and string",
         "fallback functions",
         "inline assembly",
-        "require/assert/revert",
         "this"
       ],
       "first": "fallback functions",
@@ -15541,12 +15397,10 @@
       "test": "reverts/revert_return_area.sol"
     },
     {
-      "category": "import-rejected",
-      "features": [
-        "require/assert/revert"
-      ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 14: built-in revert is not supported",
+      "category": "admitted",
+      "features": [],
+      "first": null,
+      "reason": null,
       "scan_agrees": true,
       "test": "reverts/simple_throw.sol"
     },
@@ -15554,14 +15408,12 @@
       "category": "import-rejected",
       "features": [
         "abi.* functions",
-        "bytes and string",
         "call options ({value: \u2026, gas: \u2026})",
         "constructors",
         "contract creation (new C)",
         "external calls and contract members",
         "hash and signature built-ins",
         "public state variables",
-        "require/assert/revert",
         "source units without exactly one contract",
         "this",
         "type(\u2026)"
@@ -15626,7 +15478,6 @@
         "immutables",
         "inline assembly",
         "interfaces",
-        "require/assert/revert",
         "source units without exactly one contract",
         "unimplemented functions"
       ],
@@ -15714,13 +15565,12 @@
       "test": "smoke/constructor.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
-        "bytes and string",
-        "require/assert/revert"
+        "bytes and string"
       ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 3: built-in revert is not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for smoke/failure.sol",
       "scan_agrees": true,
       "test": "smoke/failure.sol"
     },
@@ -15769,8 +15619,7 @@
       "category": "import-rejected",
       "features": [
         "abi.* functions",
-        "bytes and string",
-        "require/assert/revert"
+        "bytes and string"
       ],
       "first": "abi.* functions",
       "reason": "MemberAccess 13: only array length, push and pop members are supported",
@@ -15806,7 +15655,7 @@
         "built-in blobhash"
       ],
       "first": "built-in blobhash",
-      "reason": "Identifier 7: built-in blobhash is not supported",
+      "reason": "Identifier 7: unsupported built-in declaration ~29",
       "scan_agrees": true,
       "test": "state/blobhash.sol"
     },
@@ -15934,8 +15783,7 @@
         "built-in blockhash",
         "constructors",
         "msg/block/tx globals",
-        "public state variables",
-        "require/assert/revert"
+        "public state variables"
       ],
       "first": "public state variables",
       "reason": "VariableDeclaration 2: public state variables are not supported",
@@ -15948,7 +15796,7 @@
         "built-in gasleft"
       ],
       "first": "built-in gasleft",
-      "reason": "Identifier 5: built-in gasleft is not supported",
+      "reason": "Identifier 5: unsupported built-in declaration ~7",
       "scan_agrees": true,
       "test": "state/gasleft.sol"
     },
@@ -16115,7 +15963,6 @@
         "inheritance",
         "operator delete",
         "public state variables",
-        "require/assert/revert",
         "source units without exactly one contract",
         "transient storage"
       ],
@@ -16132,7 +15979,6 @@
         "declaration values",
         "inline arrays",
         "operator delete",
-        "require/assert/revert",
         "transient storage"
       ],
       "first": "declaration values",
@@ -16145,11 +15991,10 @@
       "features": [
         "inline assembly",
         "operator delete",
-        "require/assert/revert",
         "transient storage"
       ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 25: built-in assert is not supported",
+      "first": "inline assembly",
+      "reason": "InlineAssembly 42: unsupported statement InlineAssembly",
       "scan_agrees": true,
       "test": "storage/delete_overlapping_transient_after_storage_array_pop_same_base_type.sol"
     },
@@ -16159,7 +16004,6 @@
         "declaration values",
         "operator delete",
         "public state variables",
-        "require/assert/revert",
         "transient storage"
       ],
       "first": "public state variables",
@@ -16168,14 +16012,13 @@
       "test": "storage/delete_overlapping_transient_after_storage_delete_same_value_type.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "operator delete",
-        "require/assert/revert",
         "transient storage"
       ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 27: built-in assert is not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for storage/delete_overlapping_transient_after_storage_mapping_delete_same_value_type.sol",
       "scan_agrees": true,
       "test": "storage/delete_overlapping_transient_after_storage_mapping_delete_same_value_type.sol"
     },
@@ -16184,7 +16027,6 @@
       "features": [
         "declaration values",
         "operator delete",
-        "require/assert/revert",
         "structs",
         "transient storage"
       ],
@@ -16199,7 +16041,6 @@
         "inheritance",
         "operator delete",
         "public state variables",
-        "require/assert/revert",
         "source units without exactly one contract",
         "transient storage"
       ],
@@ -16216,7 +16057,6 @@
         "declaration values",
         "inline arrays",
         "operator delete",
-        "require/assert/revert",
         "transient storage"
       ],
       "first": "declaration values",
@@ -16231,7 +16071,6 @@
         "arrays",
         "inline arrays",
         "operator delete",
-        "require/assert/revert",
         "transient storage"
       ],
       "first": "inline arrays",
@@ -16245,7 +16084,6 @@
         "declaration values",
         "operator delete",
         "public state variables",
-        "require/assert/revert",
         "transient storage"
       ],
       "first": "public state variables",
@@ -16254,14 +16092,13 @@
       "test": "storage/delete_overlapping_transient_before_storage_delete_same_value_type.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "operator delete",
-        "require/assert/revert",
         "transient storage"
       ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 22: built-in assert is not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for storage/delete_overlapping_transient_before_storage_mapping_delete_same_value_type.sol",
       "scan_agrees": true,
       "test": "storage/delete_overlapping_transient_before_storage_mapping_delete_same_value_type.sol"
     },
@@ -16270,7 +16107,6 @@
       "features": [
         "declaration values",
         "operator delete",
-        "require/assert/revert",
         "structs",
         "transient storage"
       ],
@@ -16558,7 +16394,6 @@
         "local reference bindings",
         "mappings",
         "operator delete",
-        "require/assert/revert",
         "type names as values",
         "type(\u2026)"
       ],
@@ -16698,24 +16533,21 @@
       "test": "storageLayoutSpecifier/delete.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "operator delete",
-        "require/assert/revert",
         "transient storage"
       ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 18: built-in assert is not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for storageLayoutSpecifier/delete_transient_storage.sol",
       "scan_agrees": true,
       "test": "storageLayoutSpecifier/delete_transient_storage.sol"
     },
     {
-      "category": "import-rejected",
-      "features": [
-        "require/assert/revert"
-      ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 45: built-in require is not supported",
+      "category": "admitted",
+      "features": [],
+      "first": null,
+      "reason": null,
       "scan_agrees": true,
       "test": "storageLayoutSpecifier/dynamic_array_storage_end.sol"
     },
@@ -16753,7 +16585,6 @@
         "contract creation (new C)",
         "external calls and contract members",
         "inheritance",
-        "require/assert/revert",
         "source units without exactly one contract"
       ],
       "first": "contract creation (new C)",
@@ -16802,7 +16633,6 @@
         "inheritance",
         "inline assembly",
         "overrides",
-        "require/assert/revert",
         "source units without exactly one contract",
         "type names as values",
         "virtual functions"
@@ -16883,7 +16713,6 @@
         "inheritance",
         "modifiers",
         "overrides",
-        "require/assert/revert",
         "source units without exactly one contract"
       ],
       "first": "external calls and contract members",
@@ -16919,7 +16748,6 @@
         "overrides",
         "payable functions",
         "receive functions",
-        "require/assert/revert",
         "source units without exactly one contract",
         "type names as values",
         "virtual functions"
@@ -17005,12 +16833,10 @@
       "test": "storageLayoutSpecifier/last_allowed_storage_slot.sol"
     },
     {
-      "category": "import-rejected",
-      "features": [
-        "require/assert/revert"
-      ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 46: built-in require is not supported",
+      "category": "admitted",
+      "features": [],
+      "first": null,
+      "reason": null,
       "scan_agrees": true,
       "test": "storageLayoutSpecifier/mapping_storage_end.sol"
     },
@@ -17054,8 +16880,7 @@
       "features": [
         "constants",
         "declaration values",
-        "immutables",
-        "require/assert/revert"
+        "immutables"
       ],
       "first": "constants",
       "reason": "VariableDeclaration 5: constants are not supported",
@@ -17095,7 +16920,6 @@
         "contracts without functions",
         "inheritance",
         "mappings",
-        "require/assert/revert",
         "source units without exactly one contract"
       ],
       "first": "inheritance",
@@ -17148,14 +16972,13 @@
       "test": "storageLayoutSpecifier/state_variable_struct.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "constant expressions over literals",
-        "require/assert/revert",
         "transient storage"
       ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 40: built-in require is not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for storageLayoutSpecifier/state_variables_transient.sol",
       "scan_agrees": true,
       "test": "storageLayoutSpecifier/state_variables_transient.sol"
     },
@@ -17165,8 +16988,7 @@
         "array values",
         "arrays",
         "local reference bindings",
-        "public state variables",
-        "require/assert/revert"
+        "public state variables"
       ],
       "first": "public state variables",
       "reason": "VariableDeclaration 5: public state variables are not supported",
@@ -17180,7 +17002,6 @@
         "inheritance",
         "local reference bindings",
         "public state variables",
-        "require/assert/revert",
         "source units without exactly one contract",
         "structs"
       ],
@@ -17198,7 +17019,6 @@
         "library calls and contract-name members",
         "local reference bindings",
         "public state variables",
-        "require/assert/revert",
         "source units without exactly one contract",
         "structs"
       ],
@@ -17219,13 +17039,12 @@
       "test": "storageLayoutSpecifier/transient_state_variable_slot_offset.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
-        "bytes and string",
-        "require/assert/revert"
+        "bytes and string"
       ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 44: built-in require is not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for storageLayoutSpecifier/variable_cleanup.sol",
       "scan_agrees": true,
       "test": "storageLayoutSpecifier/variable_cleanup.sol"
     },
@@ -17233,8 +17052,7 @@
       "category": "import-rejected",
       "features": [
         "bytes and string",
-        "inline assembly",
-        "require/assert/revert"
+        "inline assembly"
       ],
       "first": "inline assembly",
       "reason": "InlineAssembly 39: unsupported statement InlineAssembly",
@@ -17275,7 +17093,6 @@
         "bytes and string",
         "declaration values",
         "local reference bindings",
-        "require/assert/revert",
         "type names as values"
       ],
       "first": "declaration values",
@@ -17414,7 +17231,6 @@
         "arrays",
         "inline arrays",
         "memory arrays (new T[](n))",
-        "require/assert/revert",
         "structs"
       ],
       "first": "structs",
@@ -17487,7 +17303,6 @@
         "arrays",
         "constructors",
         "memory arrays (new T[](n))",
-        "require/assert/revert",
         "structs"
       ],
       "first": "structs",
@@ -17512,7 +17327,6 @@
       "features": [
         "arrays",
         "local reference bindings",
-        "require/assert/revert",
         "structs"
       ],
       "first": "structs",
@@ -17537,7 +17351,6 @@
         "arrays",
         "constructors",
         "inline arrays",
-        "require/assert/revert",
         "structs"
       ],
       "first": "structs",
@@ -17647,7 +17460,6 @@
         "immutables",
         "local reference bindings",
         "memory arrays (new T[](n))",
-        "require/assert/revert",
         "source units without exactly one contract",
         "structs",
         "this"
@@ -17886,7 +17698,6 @@
       "features": [
         "arrays",
         "local reference bindings",
-        "require/assert/revert",
         "structs"
       ],
       "first": "structs",
@@ -17935,7 +17746,6 @@
       "features": [
         "arrays",
         "local reference bindings",
-        "require/assert/revert",
         "structs"
       ],
       "first": "structs",
@@ -17983,7 +17793,6 @@
       "features": [
         "declaration values",
         "operator delete",
-        "require/assert/revert",
         "structs"
       ],
       "first": "structs",
@@ -17998,7 +17807,6 @@
         "inline assembly",
         "local reference bindings",
         "operator delete",
-        "require/assert/revert",
         "structs"
       ],
       "first": "structs",
@@ -18011,7 +17819,6 @@
       "features": [
         "inline assembly",
         "operator delete",
-        "require/assert/revert",
         "structs"
       ],
       "first": "structs",
@@ -18027,7 +17834,6 @@
         "inline assembly",
         "local reference bindings",
         "operator delete",
-        "require/assert/revert",
         "structs"
       ],
       "first": "structs",
@@ -18041,7 +17847,6 @@
         "arrays",
         "inline assembly",
         "operator delete",
-        "require/assert/revert",
         "structs"
       ],
       "first": "structs",
@@ -18131,7 +17936,6 @@
       "features": [
         "arrays",
         "declaration values",
-        "require/assert/revert",
         "structs"
       ],
       "first": "structs",
@@ -18205,12 +18009,11 @@
       "category": "import-rejected",
       "features": [
         "external calls and contract members",
-        "require/assert/revert",
         "this",
         "try/catch"
       ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 5: built-in assert is not supported",
+      "first": "try/catch",
+      "reason": "TryStatement 29: unsupported statement TryStatement",
       "scan_agrees": true,
       "test": "tryCatch/assert.sol"
     },
@@ -18229,7 +18032,6 @@
         "constructors",
         "contract creation (new C)",
         "external calls and contract members",
-        "require/assert/revert",
         "source units without exactly one contract",
         "try/catch"
       ],
@@ -18258,13 +18060,12 @@
       "features": [
         "bytes and string",
         "external calls and contract members",
-        "require/assert/revert",
         "this",
         "try/catch",
         "tuples of literals"
       ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 9: built-in require is not supported",
+      "first": "try/catch",
+      "reason": "TryStatement 58: unsupported statement TryStatement",
       "scan_agrees": true,
       "test": "tryCatch/lowLevel.sol"
     },
@@ -18274,7 +18075,6 @@
         "bytes and string",
         "external calls and contract members",
         "inline assembly",
-        "require/assert/revert",
         "this",
         "try/catch"
       ],
@@ -18288,7 +18088,6 @@
       "features": [
         "external calls and contract members",
         "inline assembly",
-        "require/assert/revert",
         "this",
         "try/catch"
       ],
@@ -18302,7 +18101,6 @@
       "features": [
         "external calls and contract members",
         "inline assembly",
-        "require/assert/revert",
         "this",
         "try/catch"
       ],
@@ -18317,7 +18115,6 @@
         "bytes and string",
         "external calls and contract members",
         "inline assembly",
-        "require/assert/revert",
         "this",
         "try/catch"
       ],
@@ -18332,7 +18129,6 @@
         "bytes and string",
         "external calls and contract members",
         "inline assembly",
-        "require/assert/revert",
         "this",
         "try/catch"
       ],
@@ -18346,13 +18142,12 @@
       "features": [
         "bytes and string",
         "external calls and contract members",
-        "require/assert/revert",
         "this",
         "try/catch",
         "tuples of literals"
       ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 9: built-in require is not supported",
+      "first": "try/catch",
+      "reason": "TryStatement 125: unsupported statement TryStatement",
       "scan_agrees": true,
       "test": "tryCatch/nested.sol"
     },
@@ -18361,12 +18156,11 @@
       "features": [
         "bytes and string",
         "external calls and contract members",
-        "require/assert/revert",
         "this",
         "try/catch"
       ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 11: built-in require is not supported",
+      "first": "try/catch",
+      "reason": "TryStatement 58: unsupported statement TryStatement",
       "scan_agrees": true,
       "test": "tryCatch/panic.sol"
     },
@@ -18374,12 +18168,11 @@
       "category": "import-rejected",
       "features": [
         "external calls and contract members",
-        "require/assert/revert",
         "this",
         "try/catch"
       ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 5: built-in require is not supported",
+      "first": "try/catch",
+      "reason": "TryStatement 29: unsupported statement TryStatement",
       "scan_agrees": true,
       "test": "tryCatch/require.sol"
     },
@@ -18411,13 +18204,12 @@
       "category": "import-rejected",
       "features": [
         "external calls and contract members",
-        "require/assert/revert",
         "this",
         "try/catch",
         "tuples of literals"
       ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 9: built-in require is not supported",
+      "first": "try/catch",
+      "reason": "TryStatement 56: unsupported statement TryStatement",
       "scan_agrees": true,
       "test": "tryCatch/simple.sol"
     },
@@ -18425,12 +18217,11 @@
       "category": "import-rejected",
       "features": [
         "external calls and contract members",
-        "require/assert/revert",
         "this",
         "try/catch"
       ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 7: built-in require is not supported",
+      "first": "try/catch",
+      "reason": "TryStatement 40: unsupported statement TryStatement",
       "scan_agrees": true,
       "test": "tryCatch/simple_notuple.sol"
     },
@@ -18439,13 +18230,12 @@
       "features": [
         "bytes and string",
         "external calls and contract members",
-        "require/assert/revert",
         "this",
         "try/catch",
         "tuples of literals"
       ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 9: built-in require is not supported",
+      "first": "try/catch",
+      "reason": "TryStatement 62: unsupported statement TryStatement",
       "scan_agrees": true,
       "test": "tryCatch/structured.sol"
     },
@@ -18454,13 +18244,12 @@
       "features": [
         "bytes and string",
         "external calls and contract members",
-        "require/assert/revert",
         "this",
         "try/catch",
         "tuples of literals"
       ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 9: built-in require is not supported",
+      "first": "try/catch",
+      "reason": "TryStatement 82: unsupported statement TryStatement",
       "scan_agrees": true,
       "test": "tryCatch/structuredAndLowLevel.sol"
     },
@@ -18471,7 +18260,6 @@
         "libraries",
         "library calls and contract-name members",
         "local reference bindings",
-        "require/assert/revert",
         "source units without exactly one contract",
         "structs",
         "try/catch",
@@ -18827,12 +18615,12 @@
       "test": "types/packing_unpacking_types.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "bytes and string"
       ],
-      "first": "bytes and string",
-      "reason": "Literal 5: no definition for field \"value\" in object",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for types/strings.sol",
       "scan_agrees": true,
       "test": "types/strings.sol"
     },
@@ -18957,8 +18745,7 @@
         "function members (selector, address, \u2026)",
         "function types",
         "functions as values",
-        "inline assembly",
-        "require/assert/revert"
+        "inline assembly"
       ],
       "first": "function types",
       "reason": "FunctionTypeName 3: unsupported type name FunctionTypeName",
@@ -18975,7 +18762,6 @@
         "external calls and contract members",
         "function members (selector, address, \u2026)",
         "members of elementary type names",
-        "require/assert/revert",
         "this",
         "type names as values",
         "user-defined value types"
@@ -19016,7 +18802,6 @@
         "memory arrays (new T[](n))",
         "operator delete",
         "public state variables",
-        "require/assert/revert",
         "this",
         "user-defined value types"
       ],
@@ -19048,7 +18833,6 @@
         "free functions",
         "inline assembly",
         "memory arrays (new T[](n))",
-        "require/assert/revert",
         "user-defined value types"
       ],
       "first": "user-defined value types",
@@ -19127,13 +18911,11 @@
     {
       "category": "import-rejected",
       "features": [
-        "bytes and string",
         "constructors",
         "events",
         "libraries",
         "mappings",
         "msg/block/tx globals",
-        "require/assert/revert",
         "source units without exactly one contract",
         "user-defined value types",
         "using for"
@@ -19700,7 +19482,6 @@
         "external calls and contract members",
         "function members (selector, address, \u2026)",
         "function types",
-        "require/assert/revert",
         "this",
         "transient storage"
       ],
@@ -19726,7 +19507,6 @@
       "features": [
         "enums",
         "external calls and contract members",
-        "require/assert/revert",
         "this",
         "transient storage"
       ],
@@ -19822,7 +19602,6 @@
         "bytes and string",
         "constructors",
         "public state variables",
-        "require/assert/revert",
         "this"
       ],
       "first": "public state variables",
@@ -19891,7 +19670,6 @@
         "hash and signature built-ins",
         "inline assembly",
         "public state variables",
-        "require/assert/revert",
         "source units without exactly one contract",
         "type(\u2026)"
       ],
@@ -19936,7 +19714,6 @@
         "external calls and contract members",
         "hash and signature built-ins",
         "inline assembly",
-        "require/assert/revert",
         "source units without exactly one contract",
         "type(\u2026)"
       ],
@@ -19952,7 +19729,6 @@
         "bytes and string",
         "constructors",
         "inline assembly",
-        "require/assert/revert",
         "this"
       ],
       "first": "constructors",
@@ -20037,8 +19813,7 @@
         "bytes and string",
         "constructors",
         "msg/block/tx globals",
-        "public state variables",
-        "require/assert/revert"
+        "public state variables"
       ],
       "first": "public state variables",
       "reason": "VariableDeclaration 2: public state variables are not supported",
@@ -20053,7 +19828,6 @@
         "conditional expressions",
         "hash and signature built-ins",
         "inline assembly",
-        "require/assert/revert",
         "this",
         "type names as values"
       ],
@@ -20110,7 +19884,6 @@
         "declaration values",
         "external calls and contract members",
         "public state variables",
-        "require/assert/revert",
         "source units without exactly one contract",
         "transient storage"
       ],
@@ -20130,11 +19903,9 @@
     {
       "category": "import-rejected",
       "features": [
-        "bytes and string",
         "constructors",
         "events",
-        "msg/block/tx globals",
-        "require/assert/revert"
+        "msg/block/tx globals"
       ],
       "first": "events",
       "reason": "EventDefinition 9: unsupported contract member",
@@ -20158,24 +19929,22 @@
       "test": "various/external_types_in_calls.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
-        "constant expressions over literals",
-        "require/assert/revert"
+        "constant expressions over literals"
       ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 12: built-in assert is not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for various/flipping_sign_tests.sol",
       "scan_agrees": true,
       "test": "various/flipping_sign_tests.sol"
     },
     {
       "category": "import-rejected",
       "features": [
-        "built-in gasleft",
-        "require/assert/revert"
+        "built-in gasleft"
       ],
       "first": "built-in gasleft",
-      "reason": "Identifier 9: built-in gasleft is not supported",
+      "reason": "Identifier 9: unsupported built-in declaration ~7",
       "scan_agrees": true,
       "test": "various/gasleft_decrease.sol"
     },
@@ -20326,7 +20095,6 @@
         "msg/block/tx globals",
         "payable functions",
         "public state variables",
-        "require/assert/revert",
         "source units without exactly one contract",
         "this"
       ],
@@ -20350,7 +20118,6 @@
         "literals of non-integer types",
         "payable functions",
         "public state variables",
-        "require/assert/revert",
         "source units without exactly one contract"
       ],
       "first": "declaration values",
@@ -20377,7 +20144,6 @@
         "literal subdenominations (ether, days, \u2026)",
         "payable functions",
         "public state variables",
-        "require/assert/revert",
         "source units without exactly one contract",
         "this",
         "unimplemented functions"
@@ -20625,10 +20391,8 @@
     {
       "category": "import-rejected",
       "features": [
-        "bytes and string",
         "external calls and contract members",
         "modifiers",
-        "require/assert/revert",
         "this",
         "transient storage"
       ],
@@ -20682,22 +20446,18 @@
       "test": "various/write_storage_external.sol"
     },
     {
-      "category": "import-rejected",
-      "features": [
-        "require/assert/revert"
-      ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 15: built-in assert is not supported",
+      "category": "admitted",
+      "features": [],
+      "first": null,
+      "reason": null,
       "scan_agrees": true,
       "test": "viaYul/assert.sol"
     },
     {
-      "category": "import-rejected",
-      "features": [
-        "require/assert/revert"
-      ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 15: built-in assert is not supported",
+      "category": "admitted",
+      "features": [],
+      "first": null,
+      "reason": null,
       "scan_agrees": true,
       "test": "viaYul/assert_and_require.sol"
     },
@@ -20894,7 +20654,6 @@
         "external calls and contract members",
         "function members (selector, address, \u2026)",
         "function types",
-        "require/assert/revert",
         "structs",
         "this"
       ],
@@ -21204,7 +20963,7 @@
         "hash and signature built-ins"
       ],
       "first": "hash and signature built-ins",
-      "reason": "Identifier 5: built-in keccak256 is not supported",
+      "reason": "Identifier 5: unsupported built-in declaration ~8",
       "scan_agrees": true,
       "test": "viaYul/keccak.sol"
     },
@@ -21353,13 +21112,12 @@
       "test": "viaYul/negation_bug.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
-        "bytes and string",
-        "require/assert/revert"
+        "bytes and string"
       ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 15: built-in require is not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for viaYul/require.sol",
       "scan_agrees": true,
       "test": "viaYul/require.sol"
     },
@@ -21564,22 +21322,20 @@
       "test": "viaYul/struct_member_access.sol"
     },
     {
-      "category": "import-rejected",
-      "features": [
-        "require/assert/revert"
-      ],
-      "first": "require/assert/revert",
-      "reason": "Identifier 41: built-in assert is not supported",
+      "category": "admitted",
+      "features": [],
+      "first": null,
+      "reason": null,
       "scan_agrees": true,
       "test": "viaYul/tuple_evaluation_order.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "bytes and string"
       ],
-      "first": "bytes and string",
-      "reason": "Literal 50: no definition for field \"value\" in object",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for viaYul/unary_fixedbytes.sol",
       "scan_agrees": true,
       "test": "viaYul/unary_fixedbytes.sol"
     },

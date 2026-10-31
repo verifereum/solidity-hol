@@ -175,6 +175,27 @@ evaluator. The differential corpus runs the same inputs, and a wider corpus of
 sources, through the deployed bytecode in Verifereum and requires equal
 ABI-encoded outcomes; see [differential-testing.md](differential-testing.md).
 
+## Built-in failures
+
+The pinned compiler represents `require`, `assert` and built-in `revert` as
+ordinary calls with declaration references `-18`, `-3` and `-19`. Import maps
+those references to `SrcBuiltinCall`; identifier spelling does not select a
+built-in, so user declarations with those names remain internal calls.
+Normalized checking admits `require(bool)`, `require(bool, literal)`,
+`assert(bool)`, `revert()` and `revert(literal)`. Messages are string, Unicode
+string or string-compatible hex literals, read from `hexValue` to preserve
+exact bytes, including UTF-8 and NULs.
+
+Elaboration evaluates the condition before selecting the success/failure
+branch. A failed assertion emits `PanicCompletion 1`; bare require/revert emit
+empty revert bytes. Literal messages use ABI `Error(string)` with selector
+`08c379a0`, offset 32, byte length and zero padding to a multiple of 32 bytes.
+Existing internal-call propagation preserves the failure and the source-frame
+boundary rolls back all earlier writes. Literal messages have no evaluation
+effects. Dynamic message expressions remain rejected, including on a successful
+require; future string support must evaluate them on both paths according to
+the compiler profile's argument schedule. Custom errors are a later increment.
+
 ## Required validation
 
 Before elaboration, a well-formed imported program should at least establish:
