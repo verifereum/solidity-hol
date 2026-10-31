@@ -45,7 +45,9 @@ upstream Solidity rather than describe only one permanently fixed release.
 See [docs/design.md](docs/design.md) for the current design, implementation
 stages, and open questions. The initial compiler profile is documented in
 [docs/profiles.md](docs/profiles.md), and the current compiler-AST observations
-are recorded in [docs/frontend-boundary.md](docs/frontend-boundary.md). Reviews
+are recorded in [docs/frontend-boundary.md](docs/frontend-boundary.md), and the
+Yul that the profile's via-IR output emits is enumerated in
+[testdata/yul/reconnaissance.md](testdata/yul/reconnaissance.md). Reviews
 of relevant active semantics projects are collected in
 [docs/related-work/](docs/related-work/README.md).
 
