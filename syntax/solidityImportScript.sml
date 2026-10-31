@@ -64,6 +64,7 @@ End
 Datatype:
   src_type_name = SrcElementaryTypeName node_info string (string option)
                 | SrcArrayTypeName node_info src_type_name num
+                | SrcDynamicArrayTypeName node_info src_type_name
   | SrcMappingTypeName node_info src_type_name src_type_name
 End
 
@@ -92,6 +93,7 @@ Datatype:
   src_expr
   = SrcIdentifier node_info string num string
   | SrcArrayLength node_info src_expr string
+  | SrcArrayMember node_info string src_expr string
   | SrcLiteral node_info string string string
   | SrcUnaryOperation node_info string bool src_expr string
   | SrcBinaryOperation node_info string src_expr src_expr string string
@@ -210,6 +212,8 @@ Definition normalize_type_name_def:
       SOME ty => if 0 < n ∧ n < 2 ** 256 then SOME (ArrayT ty (SOME n))
                  else NONE
     | NONE => NONE) ∧
+  (normalize_type_name (SrcDynamicArrayTypeName _ element) =
+    OPTION_MAP (λty. ArrayT ty NONE) (normalize_type_name element)) ∧
   (normalize_type_name (SrcMappingTypeName _ key value) =
     case (normalize_type_name key, normalize_type_name value) of
       (SOME k, SOME v) =>
@@ -393,6 +397,8 @@ Definition storage_type_identifier_def:
   (storage_type_identifier (ArrayT element (SOME n)) =
     "t_array$_" ++ storage_type_identifier element ++ "_$" ++ toString n ++
     "_storage") ∧
+  (storage_type_identifier (ArrayT element NONE) =
+    "t_array$_" ++ storage_type_identifier element ++ "_$dyn_storage") ∧
   (storage_type_identifier (MappingT key value) =
     "t_mapping$_" ++ storage_type_identifier key ++ "_$_" ++
     storage_type_identifier value ++ "_$") ∧
@@ -404,6 +410,8 @@ Definition storage_layout_identifier_def:
   (storage_layout_identifier (ArrayT element (SOME n)) =
     "t_array(" ++ storage_layout_identifier element ++ ")" ++ toString n ++
     "_storage") ∧
+  (storage_layout_identifier (ArrayT element NONE) =
+    "t_array(" ++ storage_layout_identifier element ++ ")dyn_storage") ∧
   (storage_layout_identifier (MappingT key value) =
     "t_mapping(" ++ storage_layout_identifier key ++ "," ++
     storage_layout_identifier value ++ ")") ∧
@@ -439,6 +447,8 @@ Definition type_name_ids_def:
   (type_name_ids (SrcElementaryTypeName info _ _) = [info.node_id]) ∧
   (type_name_ids (SrcArrayTypeName info element _) =
     info.node_id :: type_name_ids element) ∧
+  (type_name_ids (SrcDynamicArrayTypeName info element) =
+    info.node_id :: type_name_ids element) ∧
   (type_name_ids (SrcMappingTypeName info key value) =
     info.node_id :: type_name_ids key ++ type_name_ids value)
 End
@@ -450,6 +460,8 @@ End
 
 Definition expr_ids_def:
   (expr_ids (SrcIdentifier info _ _ _) = [info.node_id]) ∧
+  (expr_ids (SrcArrayMember info _ root_expr _) =
+    info.node_id :: expr_ids root_expr) ∧
   (expr_ids (SrcArrayLength info root_expr _) =
     info.node_id :: expr_ids root_expr) ∧
   (expr_ids (SrcLiteral info _ _ _) = [info.node_id]) ∧
@@ -575,7 +587,7 @@ Definition check_expr_def:
     case (check_expr env root_expr, check_expr env index) of
       (SOME (SrcType (MappingT key value)), SOME _) =>
         if source_type_matches value tid then SOME (SrcType value) else NONE
-    | (SOME (SrcType (ArrayT element (SOME _))), SOME index_type) =>
+    | (SOME (SrcType (ArrayT element _)), SOME index_type) =>
         if source_type_matches element tid ∧
            (case index_type of
               SrcType (UintT _) => T
@@ -585,9 +597,10 @@ Definition check_expr_def:
     | _ => NONE) ∧
   (check_expr env (SrcArrayLength _ root_expr tid) =
     case check_expr env root_expr of
-      SOME (SrcType (ArrayT _ (SOME _))) =>
+      SOME (SrcType (ArrayT _ _)) =>
         if tid = "t_uint256" then SOME (SrcType (UintT 256)) else NONE
     | _ => NONE) ∧
+  (check_expr env (SrcArrayMember _ _ _ _) = NONE) ∧
   (check_expr env (SrcLiteral _ kind value tid) =
     if kind = "number" then
       case decode_type_identifier tid of
@@ -618,6 +631,17 @@ Definition check_expr_def:
     else NONE) ∧
   (check_expr env (SrcTupleExpression _ cs tid) =
     if check_components env cs then decode_type_identifier tid else NONE) ∧
+  (check_expr env (SrcFunctionCall _ (SrcArrayMember _ member root_expr _) args tid) =
+    case check_expr env root_expr of
+      SOME (SrcType (ArrayT element NONE)) =>
+        if ¬elementary_storage_type_ok element then NONE else
+        if member = "push" ∧ args = [] ∧ source_type_matches element tid then
+          SOME (SrcType element)
+        else if tid = "t_tuple$__$" ∧ check_exprs env args ∧
+                ((member = "push" ∧ LENGTH args = 1) ∨
+                 (member = "pop" ∧ args = []))
+        then SOME (SrcTupleType []) else NONE
+    | _ => NONE) ∧
   (check_expr env (SrcFunctionCall _ (SrcIdentifier _ _ f _) args tid) =
     case ALOOKUP env.functions f of
       SOME callee =>

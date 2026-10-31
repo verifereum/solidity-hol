@@ -127,7 +127,8 @@ layout when reading, writing, and capturing references. The declaration IDs in
 layout entries must resolve to compatible state-variable declarations.
 
 For value-type state variables, scalar-key nested mappings and fixed-size
-storage arrays with scalar leaves (including nested arrays), this is implemented.
+storage arrays with scalar leaves (including nested arrays), and dynamic scalar
+storage arrays, this is implemented.
 The importer takes each
 contract's `storageLayout.storage` entries in declaration order, with their
 slot, byte offset and type identifier; `valid_src_unit` requires one entry per
@@ -142,8 +143,15 @@ its storage read/write, and aggregate root slots come from the layout. Fixed
 array dimensions come from the compiler's resolved integer type of the length
 expression. Scalar elements pack without straddling slots; each nested row
 starts on a fresh slot. Array indexing checks bounds with panic `0x32`, and
-`.length` still evaluates its indexed prefix. Dynamic arrays, memory/calldata
-arrays and aggregate copies remain coverage work.
+`.length` still evaluates its indexed prefix. Dynamic-array length is read from
+its root slot and packed elements start at Keccak-256 of that slot. `push(value)`,
+`push()` (also as a scalar lvalue), and `pop()` use the captured location. Empty
+pop panics with `0x31`; both push forms follow the pinned compiler's resource
+panic `0x41` at length >= `2^64`. Length reads and indexing retain the full
+256-bit range. `pop()` clears only the removed scalar bytes; `push()` preserves
+existing bytes at the appended position, as the pinned compiler does. Dynamic
+arrays of aggregates, memory/calldata arrays, local reference bindings and
+aggregate copies remain coverage work.
 
 The selected compiler also emits `transientStorageLayout`. It is empty for the
 initial corpus, so transient layout remains unvalidated.
