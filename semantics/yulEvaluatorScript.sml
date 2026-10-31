@@ -3,10 +3,11 @@
  *
  * Fuel: n bounds every recursive step that is not structural. Sibling
  * statements and the arguments of one call reuse the bound; entering a
- * function takes one off, and a loop's back edge takes one off, so
- * straight-line code and a loop's first iteration need none. The 257th nested
- * call, or the n+1th iteration of one loop, ends in YulOutOfFuel rather than
- * in a wrong answer.
+ * function takes two off, the call expression's own test and the invoked
+ * body's, and a loop's back edge takes one off, so straight-line code and a
+ * loop's first iteration need none. A run that nests deeper or iterates
+ * longer than its fuel reaches ends in YulOutOfFuel rather than in a wrong
+ * answer.
  *
  * Scopes: a block, an if branch, a switch case, a loop body, a loop's post
  * statement and a call each run in a pushed scope; leaving pops exactly that
