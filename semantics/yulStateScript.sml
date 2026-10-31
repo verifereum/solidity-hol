@@ -20,7 +20,7 @@
  *)
 Theory yulState
 Ancestors
-  yulAST vfmContext
+  vfmContext
 
 Datatype:
   yul_world = <|

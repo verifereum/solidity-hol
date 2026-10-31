@@ -12,7 +12,7 @@
  *)
 Theory yulDialect
 Ancestors
-  yulAST vfmExecution
+  yulAST
 
 Definition builtin_name_def:
   builtin_name YAdd = "add" ∧
