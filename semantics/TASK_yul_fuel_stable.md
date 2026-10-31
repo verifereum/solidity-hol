@@ -61,9 +61,10 @@ Proof
 QED
 ```
 
-The seven functions are the mutual definition `eval_yul_def` in
+The seven functions are the mutual definition `eval_yul_block_def` in
 `semantics/yulEvaluatorScript.sml`, declared in the order block, stmt, expr,
-args, loop, cases, invoke, which is the order of the seven conjuncts.
+args, loop, cases, invoke, which is the order of the seven conjuncts.  Its
+induction principle is `eval_yul_block_ind`.
 
 **Do not modify these statements.**  Prove them as-is, or produce a
 counterexample.  In particular, do not change the definitions in
@@ -109,8 +110,9 @@ theory) are fine.
 
 ## Build
 
+From the root of this worktree (the directory holding `holproject.toml`):
+
 ```
-cd /home/claude/workspace/solidity-hol/.claude/worktrees/yul-semantics
 holbuild -j4 build yulEvaluatorPropsTheory
 ```
 
@@ -162,7 +164,7 @@ arguments of one call, runs at the same bound.
 
 | Resource | Location | Description |
 |----------|----------|-------------|
-| The evaluator and its definition | `semantics/yulEvaluatorScript.sml` | `eval_yul_def` (the seven mutually recursive functions), `run_yul_def`, `eval_yul_builtin_def`, the `Termination` blocks and the cv translations |
+| The evaluator and its definition | `semantics/yulEvaluatorScript.sml` | `eval_yul_block_def` (the seven mutually recursive functions), `run_yul_def`, `eval_yul_builtin_def`, the `Termination` blocks and the cv translations |
 | The existing Solidity evaluator's fuel-stability proof | `semantics/solidityEvaluatorPropsScript.sml` | the closest analogue: the same statement shape for a four-function mutual definition, proved by `ho_match_mp_tac eval_block_ind`, `qpat_x_assum '_.completion ≠ FuelExhausted' mp_tac`, `once_rewrite_tac[eval_block_def]`, then `>~` per recursive call |
 | The Solidity evaluator's definition, for comparison | `semantics/solidityEvaluatorScript.sml` | the same fuel discipline |
 | Result types, completion, machine | `semantics/yulStateScript.sml` | `yul_result`, `yul_completion` (`YulNormal`, `YulReturn`, `YulRevert`, `YulInvalid`, `YulOutOfFuel`, `YulBreak`, `YulContinue`, `YulLeave`), `yul_machine` |
@@ -175,7 +177,7 @@ arguments of one call, runs at the same bound.
 ## Notes
 
 - The statement's conjunct order must stay as it is: `ho_match_mp_tac
-  eval_yul_ind` matches the induction principle's seven parts, which the
+  eval_yul_block_ind` matches the induction principle's seven parts, which the
   definition generates in declaration order.
 - The side condition is a completion test for the four functions that return a
   `yul_result` (block, stmt, loop, cases), and `yul_running` for the three that
