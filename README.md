@@ -57,6 +57,19 @@ connecting them to source execution still needs an external-call context/gas
 contract. Core well-formedness alone does not rule out `InvalidCompletion`:
 for example, a storage write in a static frame is deliberately invalid.
 
+## Yul
+
+The compiler's runtime Yul object has its own AST, EVM dialect, machine and
+fuel-indexed evaluator in `syntax/yulAST`, `semantics/yulDialect`,
+`semantics/yulState` and `semantics/yulEvaluator`;
+`semantics/yulEvaluatorProps` proves that a run which does not run out of fuel
+gives the same answer at any larger fuel. Input outside the modelled subset is
+an explicit invalid outcome rather than a value; the two ill-formed inputs the
+compiler rejects by itself — a `break` in a `for` loop's post block, and a call
+returning several values in argument position — are accepted. The node kinds
+and builtins the pinned compiler emits, per fixture, are enumerated in
+[testdata/yul/reconnaissance.md](testdata/yul/reconnaissance.md).
+
 ## Validation
 
 ```sh
