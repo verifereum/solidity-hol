@@ -259,10 +259,6 @@ fun normal_envs (Leaf (Normal, env, _)) = SOME [env]
        | _ => NONE)
   | normal_envs _ = NONE
 
-fun leaf_envs (Leaf (_, env, _)) = [env]
-  | leaf_envs (Cond (_, t1, t2)) = leaf_envs t1 @ leaf_envs t2
-  | leaf_envs _ = []
-
 fun merged_value x (Leaf (_, env, _)) = fst (lookup_val env x)
   | merged_value x (Cond (c, t1, t2)) =
       let
@@ -379,31 +375,29 @@ fun exec_stmt (ctx : context) (env : env) pc s =
             val t1 = exec_block ctx env (c :: pc) ts
             val t2 = exec_block ctx env (mk_neg c :: pc) es
             val tr = Cond (c, t1, t2)
-            (* variables bound before the if, and those every branch binds:
-               a loop helper may have dropped an outer one both branches write *)
-            fun merged () =
-              let
-                val envs = leaf_envs tr
-                val added =
-                  List.filter (fn (x, _) => not (bound env x) andalso
-                                            List.all (fn e => bound e x) envs)
-                              (#vals (hd envs))
-              in
-                map (fn (x, (_, ty)) => (x, (tidy (merged_value x tr), ty)))
-                    (#vals env @ added)
-              end
           in
-            if pure_normal tr then
-              Leaf (Normal, {vals = merged (), targets = #targets env}, pc)
-            else
-              case normal_envs tr of
-                NONE => tr
-              | SOME leaves =>
-                  let
+            case normal_envs tr of
+              NONE => tr
+            | SOME leaves =>
+                let
+                  (* A loop helper may omit an overwritten input, so bindings
+                     established by every successful arm must join too. *)
+                  val added = List.filter
+                    (fn (x, _) => not (bound env x) andalso
+                                  List.all (fn e => bound e x) leaves)
+                    (#vals (hd leaves))
+                  val bindings = #vals env @ added
+                in
+                  if pure_normal tr then
+                    Leaf (Normal,
+                          {vals = map (fn (x, (_, ty)) =>
+                                   (x, (tidy (merged_value x tr), ty))) bindings,
+                           targets = #targets env}, pc)
+                  else let
                     val changed = List.filter
-                      (fn (x, (v, _)) => List.exists
+                      (fn (x, (v, _)) => not (bound env x) orelse List.exists
                         (fn e => not (aconv v (fst (lookup_val e x)))) leaves)
-                      (#vals env)
+                      bindings
                     val outs = map (fn (x, (_, ty)) => (x, ty)) changed
                     val vs = map (fn (x, ty) => fresh (var_name ctx x) (hol_type ty)) outs
                     fun joined (Normal, e) = mk_returns (tuple_term
@@ -415,6 +409,7 @@ fun exec_stmt (ctx : context) (env : env) pc s =
                     Bind (to_term joined tr, tuple_term vs,
                           Leaf (Normal, env', range_hyps outs vs @ pc))
                   end
+                end
           end
       end
   | ("WhileStmt", [pre, c, body]) => exec_loop ctx env pc (pre, c, body)

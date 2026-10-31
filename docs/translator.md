@@ -80,7 +80,8 @@ over a map from declaration ids to HOL terms. Temporaries, capture targets and
 copies only update the map, so they never become names in the output. When both
 branches of an `if` fall through and neither can fail, each changed variable
 becomes a conditional. Checked/calling branches whose successful paths all
-continue return the changed outer bindings; one `sol_bind` receives those values
+continue return the changed bindings, including variables assigned by every
+successful arm that a loop helper omitted from its inputs; one `sol_bind` receives those values
 and translates the remaining block once. Failures propagate through that bind.
 Source `return`, `break` and `continue` retain their separate exits. The elaborator's first-iteration flag of `for` and `do`-`while` loops
 is removed by peeling the first iteration, after which the flag is constant.
@@ -142,6 +143,36 @@ function of every elaborated suite of the differential corpus
 per function. The build fails if a function is `Failed`, if one the test
 lists as proved is not, or if a proof takes longer than the test's cap. It is
 part of the `solidityHol` roll-up, so CI runs it.
+
+## Contract coverage
+
+The current corpus contains 199 functions: 37 produce correspondence proofs,
+162 are unsupported, and none fail. This is a function inventory, not a count
+of verified contracts or codebases.
+
+| Source contract | Functions proved / enumerated | Whole contract translated? |
+| --- | --- | --- |
+| `ShadowedBuiltins` | 4 / 4 | Yes: `run` and its three internal callees |
+| `PureCore` | 15 / 19 | No: unchecked arithmetic, signed values and addresses remain unsupported |
+| `Calls` | 13 / 17 | No: mutual recursion, conversions and unchecked arithmetic remain unsupported |
+| `Scalars` | 3 / 22 | No: signed values and the other arithmetic/type cases remain unsupported |
+| `Builtins` | 1 / 23 | No: only `localCondition` translates; builtin revert behavior is unsupported |
+| `StorageArrays` | 1 / 22 | No: only the local helper `combine` translates; storage is unsupported |
+
+Every other enumerated contract has no translated function. A supported entry
+point includes the proofs for its internal call graph: for example,
+`ShadowedBuiltins.run` uses `require`, `assert` and `revert` (ordinary functions
+that shadow the builtin names), and `Calls.swapThroughCall` uses `pair`.
+These are small fixtures. No stateful application or multi-contract codebase
+has been translated, and external-call dependencies remain unsupported.
+
+Artifact acceptance checks the input and elaborated core. Differential tests
+check concrete executions. Translation proves evaluator correspondence for
+all in-range arguments of the supported function; it does not prove a user's
+functional, security or application property. Such a property needs a separate
+proof over the generated shallow functions, then composition with their
+correspondence theorems. Deployment and cross-contract behavior are outside
+this translator's current contract.
 
 ## Not covered yet
 

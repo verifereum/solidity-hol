@@ -18,12 +18,13 @@ val loops = [
   ("pure_core",
    [("count", WF_REL_TAC ‘measure (λ(n, c, i). n - i)’ >> rw[uint_add_def]),
     ("sum", WF_REL_TAC ‘measure (λ(n, s, i). n - i)’ >> rw[uint_add_def]),
-    ("doubleUntil", WF_REL_TAC ‘measure (λ(n, k). n - k)’ >> rw[uint_add_def])])]
+    ("doubleUntil", WF_REL_TAC ‘measure (λ(n, k). n - k)’ >> rw[uint_add_def]),
+    ("checkedBranchOverwrite", WF_REL_TAC ‘measure (λ(a, b). a)’)])]
 
 (* The functions that prove today, by suite: losing one fails the build *)
 val proved = [
   ("pure_core",
-   ["add", "argumentOrder", "badDivide", "compoundOrder", "count", "divmod",
+   ["add", "argumentOrder", "badDivide", "checkedBranchOverwrite", "compoundOrder", "count", "divmod",
     "doubleUntil", "fact", "guardedDivide", "locals", "panicOrder",
     "shortCircuit", "sum", "swap"]),
   ("scalars", ["boolLogic", "increment", "subtract"]),

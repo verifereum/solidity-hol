@@ -99,4 +99,14 @@ contract PureCore {
         x += (x = 5);
         return x;
     }
+
+    function checkedBranchOverwrite(uint8 a, bool b) public pure returns (uint8) {
+        uint8 x;
+        while (true) {
+            if (b) x = a + 1;
+            else x = a + 2;
+            break;
+        }
+        return x;
+    }
 }
