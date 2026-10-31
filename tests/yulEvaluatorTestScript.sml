@@ -32,18 +32,7 @@ Definition add_code_def:
        [YulLit (LitNumber 0w); YulLit (LitNumber 32w)])]
 End
 
-Theorem add_returns_five:
-  (run 20 add_code).completion = YulReturn (word_to_bytes_be (5w : bytes32))
-Proof
-  CONV_TAC cv_eval
-QED
-
-(* The word stored is 32 bytes, so the active memory size is 32. *)
-Theorem mstore_raises_memory_size:
-  (run 20 add_code).machine.memory_size = 32
-Proof
-  CONV_TAC cv_eval
-QED
+val () = cv_auto_trans add_code_def;
 
 (* sstore(7, 42) mstore(0, sload(7)) return(0, 32) *)
 Definition store_code_def:
@@ -56,11 +45,7 @@ Definition store_code_def:
        [YulLit (LitNumber 0w); YulLit (LitNumber 32w)])]
 End
 
-Theorem storage_round_trips:
-  (run 20 store_code).completion = YulReturn (word_to_bytes_be (42w : bytes32))
-Proof
-  CONV_TAC cv_eval
-QED
+val () = cv_auto_trans store_code_def;
 
 (* let acc := 0
  * for { let i := 0 } lt(i, 3) { i := add(i, 1) } {
@@ -83,11 +68,7 @@ Definition loop_code_def:
        [YulLit (LitNumber 0w); YulLit (LitNumber 32w)])]
 End
 
-Theorem loop_breaks_out:
-  (run 20 loop_code).completion = YulReturn (word_to_bytes_be (3w : bytes32))
-Proof
-  CONV_TAC cv_eval
-QED
+val () = cv_auto_trans loop_code_def;
 
 (* function f(a, b) -> c { c := add(a, b) }
  * function g(a) -> b { b := a  sstore(0, a) }
@@ -113,18 +94,70 @@ Definition call_code_def:
        [YulLit (LitNumber 0w); YulLit (LitNumber 64w)])]
 End
 
-Theorem call_arguments_are_evaluated_right_to_left:
-  (run 20 call_code).completion =
-  YulReturn (word_to_bytes_be (3w : bytes32) ++ word_to_bytes_be (1w : bytes32))
-Proof
-  CONV_TAC cv_eval
-QED
+val () = cv_auto_trans call_code_def;
 
 (* for {} 1 {} {} -- never leaves the loop. *)
 Definition spin_code_def:
   spin_code =
     [YulFor [] (YulLit (LitNumber 1w)) [] []]
 End
+
+val () = cv_auto_trans spin_code_def;
+
+Definition revert_code_def:
+  revert_code =
+    [YulExprStmt (YulBuiltin YRevert
+       [YulLit (LitNumber 0w); YulLit (LitNumber 0w)])]
+End
+
+val () = cv_auto_trans revert_code_def;
+
+Definition leave_code_def:
+  leave_code =
+    [YulIf (YulLit (LitNumber 1w)) [YulLeave];
+     YulExprStmt (YulBuiltin YRevert
+       [YulLit (LitNumber 0w); YulLit (LitNumber 0w)])]
+End
+
+val () = cv_auto_trans leave_code_def;
+
+Definition unbound_code_def:
+  unbound_code = [YulLet ["x"] (SOME (YulName "y"))]
+End
+
+val () = cv_auto_trans unbound_code_def;
+
+Theorem add_returns_five:
+  (run 20 add_code).completion = YulReturn (word_to_bytes_be (5w : bytes32))
+Proof
+  CONV_TAC cv_eval
+QED
+
+(* The word stored is 32 bytes, so the active memory size is 32. *)
+Theorem mstore_raises_memory_size:
+  (run 20 add_code).machine.memory_size = 32
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem storage_round_trips:
+  (run 20 store_code).completion = YulReturn (word_to_bytes_be (42w : bytes32))
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem loop_breaks_out:
+  (run 20 loop_code).completion = YulReturn (word_to_bytes_be (3w : bytes32))
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem call_arguments_are_evaluated_right_to_left:
+  (run 20 call_code).completion =
+  YulReturn (word_to_bytes_be (3w : bytes32) ++ word_to_bytes_be (1w : bytes32))
+Proof
+  CONV_TAC cv_eval
+QED
 
 Theorem spin_exhausts_fuel:
   (run 5 spin_code).completion = YulOutOfFuel
@@ -141,24 +174,11 @@ Proof
   CONV_TAC cv_eval
 QED
 
-Definition revert_code_def:
-  revert_code =
-    [YulExprStmt (YulBuiltin YRevert
-       [YulLit (LitNumber 0w); YulLit (LitNumber 0w)])]
-End
-
 Theorem revert_returns_no_data:
   (run 20 revert_code).completion = YulRevert []
 Proof
   CONV_TAC cv_eval
 QED
-
-Definition leave_code_def:
-  leave_code =
-    [YulIf (YulLit (LitNumber 1w)) [YulLeave];
-     YulExprStmt (YulBuiltin YRevert
-       [YulLit (LitNumber 0w); YulLit (LitNumber 0w)])]
-End
 
 (* leave ends the frame's code, so the revert after it never runs. *)
 Theorem leave_leaves_the_code:
@@ -166,10 +186,6 @@ Theorem leave_leaves_the_code:
 Proof
   CONV_TAC cv_eval
 QED
-
-Definition unbound_code_def:
-  unbound_code = [YulLet ["x"] (SOME (YulName "y"))]
-End
 
 Theorem unbound_name_is_invalid:
   (run 20 unbound_code).completion = YulInvalid "unbound name"

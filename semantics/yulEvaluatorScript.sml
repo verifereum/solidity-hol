@@ -97,16 +97,21 @@ Definition yul_bind_scope_def:
      yul_bind_scope (scope |+ (x, v)) ps)
 End
 
-(* A call's own scope, holding its parameters.  A named function rather than
- * an update written out at the call, because a mutual recursion translated
- * through a pre-relation is compared on its arguments as terms: a constant
- * application is the same term on both sides, an inlined record update is
- * not.
+(* A call's own scope: its parameters bound to the arguments, and its result
+ * variables bound to zero.  The compiler declares the results with the
+ * function, so a body assigns one without a `let` -- the pinned solc emits
+ * `sum := add(x, y)` -- and that assignment is legal only because the name is
+ * already bound here.  A named function rather than an update written out at
+ * the call, because a mutual recursion translated through a pre-relation is
+ * compared on its arguments as terms: a constant application is the same term
+ * on both sides, an inlined record update is not.
  *)
-Definition yul_push_params_def:
-  yul_push_params params args m =
+Definition yul_push_frame_def:
+  yul_push_frame params args results m =
     m with scopes :=
-      yul_bind_scope (FEMPTY : string |-> bytes32) (ZIP (params, args)) ::
+      yul_bind_scope (FEMPTY : string |-> bytes32)
+        (ZIP (params, args) ++
+         ZIP (results, REPLICATE (LENGTH results) 0w)) ::
       m.scopes
 End
 
@@ -500,7 +505,8 @@ Definition eval_yul_block_def:
            if LENGTH fd.function_params ≠ LENGTH args then
              EvalAbrupt (YulInvalid "bad call arity") m
            else
-             let m1 = yul_push_params fd.function_params args m in
+             let m1 = yul_push_frame fd.function_params args
+                        fd.function_results m in
              let r = eval_yul_block (n - 1) fns fd.function_body m1 in
              let m2 = yul_pop_scope r.machine in
                if r.completion = YulNormal ∨ r.completion = YulLeave then
