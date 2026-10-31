@@ -170,7 +170,8 @@ kernel primitive-inference count and new axiom count. The measured interval
 includes translation of the unit and its common callee; HOL startup and the
 core well-formedness check are outside it. The comparison uses clean worktrees
 with the same proof engine and fixture; only branch joining differs. Repeated
-measurements and their limitations are recorded alongside this document.
+measurements and their limitations are in
+[translator-measurements.md](translator-measurements.md).
 
 Memory and inline assembly, and the source-visible external-call context/gas
 contract, remain unresolved design work beyond this consolidation.
