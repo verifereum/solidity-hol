@@ -2,10 +2,11 @@
 
 ## Status
 
-This document records the initial design direction for Solidity-HOL. It is a
-living document rather than a frozen specification. Decisions marked as
-*tentative* are expected to be revisited as the executable semantics and test
-coverage develop.
+This document records the initial design direction for Solidity-HOL. For the
+implemented pipeline, module ownership, and extension points, see
+[implementation-blueprint.md](implementation-blueprint.md). The memory and
+external-call proposals below remain unresolved design work, rather than
+implemented contracts. Decisions marked as *tentative* are not specifications.
 
 ## Objective
 
@@ -393,21 +394,6 @@ be reported separately rather than conflated.
 
 These stages describe dependency order, not promises that each stage must cover
 every feature before work begins on the next.
-
-## Future contract verification interfaces
-
-The authoritative semantics will remain the deep executable embedding. The
-user-facing methodology for proving properties of real contracts is left to
-future work and should not be built into the runtime definitions.
-
-A promising possibility is a proof-producing translation from validated deep
-syntax to convenient shallow HOL functions, followed by direct proofs over the
-shallow representation and a generated theorem connecting those functions to
-the deep semantics. Other possibilities include derived symbolic execution,
-program logics, or direct interpreter reasoning. No one approach is selected at
-this stage. The semantics should preserve declaration identities, types,
-layouts, source mappings, entry-point observations, and reusable evaluation
-facts needed by future translation and proof tools.
 
 ## Open questions
 

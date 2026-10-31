@@ -8,6 +8,8 @@
       "contract": "PureCore",
       "artifact": "testdata/frontend/expected/pure_core.json",
       "cases": [
+        {"name": "checked_branch_overwrite_returns", "function": "checkedBranchOverwrite", "args": [7, true], "expect": {"return": [8]}},
+        {"name": "checked_branch_overwrite_panics", "function": "checkedBranchOverwrite", "args": [254, false], "expect": {"panic": "0x11"}},
         {"name": "add_returns", "function": "add", "args": [2, 3], "expect": {"return": [5]}},
         {"name": "add_boundary", "function": "add", "args": [255, 0], "expect": {"return": [255]}},
         {"name": "add_overflow_panics", "function": "add", "args": [200, 100], "expect": {"panic": "0x11"}},

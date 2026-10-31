@@ -47,7 +47,10 @@ their importer coverage is still deferred.
 The evaluator executes elementary scalar operations and conversions, locals,
 tuples, structured control flow, internal calls, built-in failures, packed
 state values, scalar-key mappings, storage arrays and storage struct members.
-Storage references capture concrete locations. Scalar writes, reference
+Assignment, compound assignment, increment and tuple writes share local or
+captured-reference destinations. `solidityStorage` owns packed access and
+navigation; the evaluator owns bindings, frame checks and control flow.
+Scalar writes, reference
 rebinding and content copying are distinct core operations; the latter two
 remain extension points rather than implemented aggregate semantics.
 
@@ -86,3 +89,6 @@ preparation acceptance; it does not execute the tests' call expectations.
 See [differential-testing.md](docs/differential-testing.md),
 [profiles.md](docs/profiles.md) and
 [semantic-tests-coverage.md](docs/semantic-tests-coverage.md).
+
+See [implementation-blueprint.md](docs/implementation-blueprint.md) for module
+ownership, evaluator interfaces and extension points.
