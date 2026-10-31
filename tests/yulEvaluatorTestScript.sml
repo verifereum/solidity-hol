@@ -1,8 +1,9 @@
 (* Smoke tests for the Yul evaluator, run by cv_eval: straight-line code and
- * memory, storage, a loop with a break, a call whose arguments must be
- * evaluated right to left, a switch, sign extension, and the control
- * outcomes.  The semantics test set for the Solidity evaluator is
- * solidityEvaluatorTest.
+ * memory, storage, a battery over the arithmetic, comparison, bitwise and
+ * memory builtins, loops with a break and with a continue, a call whose
+ * arguments must be evaluated right to left, a switch, sign extension, a
+ * revert inside a callee, and the invalid outcomes.  The semantics test set
+ * for the Solidity evaluator is solidityEvaluatorTest.
  *)
 Theory yulEvaluatorTest
 Ancestors
@@ -115,24 +116,29 @@ End
 val () = cv_auto_trans store_code_def;
 
 (* let acc := 0
- * for { let i := 0 } lt(i, 3) { i := add(i, 1) } {
+ * for { let i := 0 } lt(i, 3) { i := add(i, 1)  j := add(j, 1) } {
  *   acc := add(acc, i)
  *   if eq(i, 2) { break } }
- * mstore(0, acc) return(0, 32)
- * The loop leaves when i reaches 2, so acc is 0 + 1 + 2.
+ * mstore(0, acc) mstore(32, j) return(0, 64)
+ * The loop leaves when i reaches 2, so acc is 0 + 1 + 2.  j counts how often
+ * the post statement ran: twice, because the break skipped it the last time
+ * round and a break that ran it anyway would leave j at 3.
  *)
 Definition loop_code_def:
   loop_code =
     [YulLet ["acc"] (SOME (YulLit (LitNumber 0w)));
+     YulLet ["j"] (SOME (YulLit (LitNumber 0w)));
      YulFor
        [YulLet ["i"] (SOME (YulLit (LitNumber 0w)))]
        (YulBuiltin YLt [YulName "i"; YulLit (LitNumber 3w)])
-       [YulAssign ["i"] (YulBuiltin YAdd [YulName "i"; YulLit (LitNumber 1w)])]
+       [YulAssign ["i"] (YulBuiltin YAdd [YulName "i"; YulLit (LitNumber 1w)]);
+        YulAssign ["j"] (YulBuiltin YAdd [YulName "j"; YulLit (LitNumber 1w)])]
        [YulAssign ["acc"] (YulBuiltin YAdd [YulName "acc"; YulName "i"]);
         YulIf (YulBuiltin YEq [YulName "i"; YulLit (LitNumber 2w)]) [YulBreak]];
      YulExprStmt (YulBuiltin YMStore [YulLit (LitNumber 0w); YulName "acc"]);
+     YulExprStmt (YulBuiltin YMStore [YulLit (LitNumber 32w); YulName "j"]);
      YulExprStmt (YulBuiltin YReturn
-       [YulLit (LitNumber 0w); YulLit (LitNumber 32w)])]
+       [YulLit (LitNumber 0w); YulLit (LitNumber 64w)])]
 End
 
 val () = cv_auto_trans loop_code_def;
@@ -194,6 +200,126 @@ End
 
 val () = cv_auto_trans unbound_code_def;
 
+(* One store per builtin, in the order the words are returned:
+ *   sub(7, 3)          operand order
+ *   div(1, 0)          a division by zero is zero
+ *   sdiv(not(0), 0)    and so is a signed one, of minus one
+ *   mod(5, 0)
+ *   sar(255, not(0))   an arithmetic shift of a negative keeps the sign
+ *   exp(2, 10)
+ *   slt(not(0), 1)     a signed comparison: minus one is below one
+ *   mload(0)           reads back what the first store wrote
+ *   xor(12, 10)
+ *   keccak256(0, 32)   the known hash of 32 zero bytes: stored last, in the
+ *                      word after those, so that its own store cannot clobber
+ *                      what it hashed
+ *)
+Definition builtins_code_def:
+  builtins_code =
+    [YulExprStmt (YulBuiltin YMStore
+       [YulLit (LitNumber 288w); YulBuiltin YKeccak256
+          [YulLit (LitNumber 0w); YulLit (LitNumber 32w)]]);
+     YulExprStmt (YulBuiltin YMStore
+       [YulLit (LitNumber 0w);
+        YulBuiltin YSub [YulLit (LitNumber 7w); YulLit (LitNumber 3w)]]);
+     YulExprStmt (YulBuiltin YMStore
+       [YulLit (LitNumber 32w);
+        YulBuiltin YDiv [YulLit (LitNumber 1w); YulLit (LitNumber 0w)]]);
+     YulExprStmt (YulBuiltin YMStore
+       [YulLit (LitNumber 64w);
+        YulBuiltin YSDiv
+          [YulBuiltin YNot [YulLit (LitNumber 0w)]; YulLit (LitNumber 0w)]]);
+     YulExprStmt (YulBuiltin YMStore
+       [YulLit (LitNumber 96w);
+        YulBuiltin YMod [YulLit (LitNumber 5w); YulLit (LitNumber 0w)]]);
+     YulExprStmt (YulBuiltin YMStore
+       [YulLit (LitNumber 128w);
+        YulBuiltin YSar
+          [YulLit (LitNumber 255w); YulBuiltin YNot [YulLit (LitNumber 0w)]]]);
+     YulExprStmt (YulBuiltin YMStore
+       [YulLit (LitNumber 160w);
+        YulBuiltin YExp [YulLit (LitNumber 2w); YulLit (LitNumber 10w)]]);
+     YulExprStmt (YulBuiltin YMStore
+       [YulLit (LitNumber 192w);
+        YulBuiltin YSLt
+          [YulBuiltin YNot [YulLit (LitNumber 0w)]; YulLit (LitNumber 1w)]]);
+     YulExprStmt (YulBuiltin YMStore
+       [YulLit (LitNumber 224w); YulBuiltin YMLoad [YulLit (LitNumber 0w)]]);
+     YulExprStmt (YulBuiltin YMStore
+       [YulLit (LitNumber 256w);
+        YulBuiltin YXor [YulLit (LitNumber 12w); YulLit (LitNumber 10w)]]);
+     YulExprStmt (YulBuiltin YReturn
+       [YulLit (LitNumber 0w); YulLit (LitNumber 320w)])]
+End
+
+val () = cv_auto_trans builtins_code_def;
+
+(* function g() { revert(0, 0) }
+ * function f() { g()  sstore(0, 7) }
+ * f() sstore(1, 9)
+ * A revert inside a callee ends the whole frame, not just the callee: neither
+ * store runs, and nothing the frame did is committed.
+ *)
+Definition revert_in_call_code_def:
+  revert_in_call_code =
+    [YulFunction "g" [] []
+       [YulExprStmt (YulBuiltin YRevert
+          [YulLit (LitNumber 0w); YulLit (LitNumber 0w)])];
+     YulFunction "f" [] []
+       [YulExprStmt (YulApply "g" []);
+        YulExprStmt (YulBuiltin YSStore [YulLit (LitNumber 0w); YulLit (LitNumber 7w)])];
+     YulExprStmt (YulApply "f" []);
+     YulExprStmt (YulBuiltin YSStore [YulLit (LitNumber 1w); YulLit (LitNumber 9w)])]
+End
+
+val () = cv_auto_trans revert_in_call_code_def;
+
+(* let acc := 0
+ * for { let i := 0 } lt(i, 3) { i := add(i, 1) } {
+ *   if eq(i, 1) { continue }
+ *   acc := add(acc, i) }
+ * mstore(0, acc) return(0, 32)
+ * The iteration with i = 1 skips the accumulation but still runs the post, so
+ * acc is 0 + 2; a continue that ran the rest of the body anyway would make it
+ * 0 + 1 + 2.
+ *)
+Definition continue_code_def:
+  continue_code =
+    [YulLet ["acc"] (SOME (YulLit (LitNumber 0w)));
+     YulFor
+       [YulLet ["i"] (SOME (YulLit (LitNumber 0w)))]
+       (YulBuiltin YLt [YulName "i"; YulLit (LitNumber 3w)])
+       [YulAssign ["i"] (YulBuiltin YAdd [YulName "i"; YulLit (LitNumber 1w)])]
+       [YulIf (YulBuiltin YEq [YulName "i"; YulLit (LitNumber 1w)]) [YulContinue];
+        YulAssign ["acc"] (YulBuiltin YAdd [YulName "acc"; YulName "i"])];
+     YulExprStmt (YulBuiltin YMStore [YulLit (LitNumber 0w); YulName "acc"]);
+     YulExprStmt (YulBuiltin YReturn
+       [YulLit (LitNumber 0w); YulLit (LitNumber 32w)])]
+End
+
+val () = cv_auto_trans continue_code_def;
+
+(* let x, y := 1 *)
+Definition bad_binding_code_def:
+  bad_binding_code =
+    [YulLet ["x"; "y"] (SOME (YulLit (LitNumber 1w)))]
+End
+
+val () = cv_auto_trans bad_binding_code_def;
+
+Definition unknown_function_code_def:
+  unknown_function_code = [YulExprStmt (YulApply "nope" [])]
+End
+
+val () = cv_auto_trans unknown_function_code_def;
+
+Definition bad_builtin_arity_code_def:
+  bad_builtin_arity_code =
+    [YulExprStmt (YulBuiltin YAdd [YulLit (LitNumber 1w)])]
+End
+
+val () = cv_auto_trans bad_builtin_arity_code_def;
+
 Theorem add_returns_five:
   (run 20 add_code).completion = YulReturn (word_to_bytes_be (5w : bytes32))
 Proof
@@ -232,8 +358,47 @@ Proof
   CONV_TAC cv_eval
 QED
 
+Theorem builtins_agree_with_the_evm:
+  (run 40 builtins_code).completion =
+  YulReturn (word_to_bytes_be (4w : bytes32) ++
+             word_to_bytes_be (0w : bytes32) ++
+             word_to_bytes_be (0w : bytes32) ++
+             word_to_bytes_be (0w : bytes32) ++
+             word_to_bytes_be (word_1comp (0w : bytes32)) ++
+             word_to_bytes_be (1024w : bytes32) ++
+             word_to_bytes_be (1w : bytes32) ++
+             word_to_bytes_be (4w : bytes32) ++
+             word_to_bytes_be (6w : bytes32) ++
+             word_to_bytes_be
+               (0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563w : bytes32))
+Proof
+  CONV_TAC cv_eval
+QED
+
 Theorem loop_breaks_out:
-  (run 20 loop_code).completion = YulReturn (word_to_bytes_be (3w : bytes32))
+  (run 20 loop_code).completion =
+  YulReturn (word_to_bytes_be (3w : bytes32) ++ word_to_bytes_be (2w : bytes32))
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem continue_runs_the_post_and_skips_the_rest:
+  (run 20 continue_code).completion = YulReturn (word_to_bytes_be (2w : bytes32))
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem revert_in_a_callee_ends_the_frame:
+  (run 20 revert_in_call_code).completion = YulRevert [] ∧
+  (run 20 revert_in_call_code).machine.accounts = yul_test_machine.accounts
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem malformed_programs_are_invalid:
+  (run 20 bad_binding_code).completion = YulInvalid "bad binding" ∧
+  (run 20 unknown_function_code).completion = YulInvalid "unknown function" ∧
+  (run 20 bad_builtin_arity_code).completion = YulInvalid "bad builtin call"
 Proof
   CONV_TAC cv_eval
 QED
