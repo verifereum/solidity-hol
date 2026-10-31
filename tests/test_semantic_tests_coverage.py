@@ -184,7 +184,7 @@ class ClassifyTests(unittest.TestCase):
         v["storageLocation"] = "storage"
         self.assertIn("local reference bindings", {b.feature for b in coverage.elaboration_blockers(v)})
 
-    def test_mapping_and_fixed_storage_array_indexing_are_admitted(self) -> None:
+    def test_mapping_and_storage_array_indexing_are_admitted(self) -> None:
         base = {"nodeType": "Identifier", "id": 5, "name": "m", "referencedDeclaration": 3,
                 "typeDescriptions": {"typeIdentifier": "t_mapping$_t_uint256_$_t_uint8_$"}}
         index = {"nodeType": "IndexAccess", "id": 6, "baseExpression": base,
@@ -196,8 +196,9 @@ class ClassifyTests(unittest.TestCase):
         self.assertEqual(coverage.node_blockers(index), [])
         self.assertEqual(coverage.scan({"t.sol": unit([function(4, [index])])}), {})
         base["typeDescriptions"]["typeIdentifier"] = "t_array$_t_uint8_$dyn_storage"
-        self.assertEqual(coverage.elaboration_blockers(index), [
-            coverage.Blocker("IndexAccess", "arrays", "elaboration")])
+        self.assertEqual(coverage.scan({"t.sol": unit([function(4, [index])])}), {})
+        self.assertFalse(coverage.storage_type_supported("t_array$_t_array$_t_uint8_$dyn_storage_$dyn_storage"))
+        self.assertFalse(coverage.storage_type_supported("t_array$_t_array$_t_uint8_$dyn_storage_$2_storage"))
 
     def test_nested_array_types_and_fixed_length_prefix(self) -> None:
         tid = "t_array$_t_array$_t_uint24_$11_storage_$2_storage"

@@ -96,8 +96,17 @@ returning panic `0x32` on failure. `.length` evaluates the reference prefix and
 then returns the fixed dimension. Storage writes and panic rollback reuse the
 scalar operations and source-frame boundary.
 
-Dynamic keys, dynamic arrays, memory/calldata arrays, aggregate copying and
-local storage-reference bindings remain coverage work.
+Dynamic scalar storage arrays reuse this navigation with the current length
+from the root slot and a Keccak-derived data base. `ArrayLengthOperation` reads
+the length. `ArrayPushOperation` returns a captured appended element and
+`ArrayPopOperation` clears the last scalar before shrinking the length. Both
+mutations run in `simple_stmt`, so they introduce no source fuel decrement.
+The pinned profile rejects push at length >= `2^64` with panic `0x41`; indexing
+and length reads keep the full 256-bit range. Zero-argument push preserves dirty
+bytes, while pop clears only the removed scalar's packed bytes.
+
+Dynamic keys, dynamic arrays of aggregates, memory/calldata arrays, aggregate
+copying and local storage-reference bindings remain coverage work.
 
 Memory references use object identity and an abstract cell offset; this is not
 an EVM byte address. The sparse heap separates metadata from cells, avoiding a

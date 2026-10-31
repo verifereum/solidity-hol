@@ -504,8 +504,35 @@ Definition wf_core_operation_def:
         (case ALOOKUP ctx.bindings x of
            SOME (ReferenceType (MappingT key value)) =>
              value = ty ∧ wf_core_atom env ctx (SingleType key) index
-         | SOME (ReferenceType (ArrayT element (SOME _))) =>
+         | SOME (ReferenceType (ArrayT element _)) =>
              element = ty ∧ wf_core_atom env ctx (SingleType (UintT 256)) index
+         | _ => F)
+    | _ => F) ∧
+  (wf_core_operation env ctx annotation (ArrayLengthOperation a) ⇔
+    annotation = SingleType (UintT 256) ∧
+    case a of
+      BoundAtom x =>
+        (case ALOOKUP ctx.bindings x of
+           SOME (ReferenceType (ArrayT _ NONE)) => T
+         | _ => F)
+    | _ => F) ∧
+  (wf_core_operation env ctx annotation (ArrayPushOperation a value) ⇔
+    case a of
+      BoundAtom x =>
+        (case ALOOKUP ctx.bindings x of
+           SOME (ReferenceType (ArrayT element NONE)) =>
+             annotation = ReferenceType element ∧
+             case value of
+               NONE => T
+             | SOME v => wf_core_atom env ctx (SingleType element) v
+         | _ => F)
+    | _ => F) ∧
+  (wf_core_operation env ctx annotation (ArrayPopOperation a) ⇔
+    annotation = ProductType [] ∧
+    case a of
+      BoundAtom x =>
+        (case ALOOKUP ctx.bindings x of
+           SOME (ReferenceType (ArrayT _ NONE)) => T
          | _ => F)
     | _ => F) ∧
   (wf_core_operation env ctx annotation (InternalCallOperation f args) ⇔

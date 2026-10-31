@@ -322,10 +322,10 @@ def node_blockers(node: dict[str, Any]) -> list[Blocker]:
         length = node.get("length")
         tid = (length or {}).get("typeDescriptions", {}).get("typeIdentifier", "")
         match = re.fullmatch(r"t_rational_([0-9]+)_by_1", tid)
-        if match is None or int(match[1]) == 0:
+        if length is not None and (match is None or int(match[1]) == 0):
             found.append("arrays")
     elif kind == "MemberAccess":
-        if node["memberName"] != "length":
+        if node["memberName"] not in {"length", "push", "pop"}:
             found.append(type_feature(node["expression"]["typeDescriptions"].get("typeIdentifier")))
     elif kind == "NewExpression":
         created = node["typeName"]
@@ -410,13 +410,19 @@ def decodes(type_identifier: str) -> bool:
 
 
 def storage_type_supported(type_identifier: str) -> bool:
-    """Scalar storage, fixed scalar-leaf arrays, and scalar-key mappings."""
-    def parse_at(start: int, *, allow_mapping: bool = True) -> int | None:
+    """Scalar storage, fixed arrays, dynamic scalar arrays, and mappings."""
+    def parse_at(start: int, *, allow_mapping: bool = True,
+                 allow_dynamic: bool = True) -> int | None:
         array = "t_array$_"
         if type_identifier.startswith(array, start):
-            end = parse_at(start + len(array), allow_mapping=False)
+            end = parse_at(start + len(array), allow_mapping=False, allow_dynamic=False)
             if end is None:
                 return None
+            if type_identifier.startswith("_$dyn_storage", end):
+                scalar = VALUE_TYPE.match(type_identifier, start + len(array))
+                return (end + len("_$dyn_storage")
+                        if allow_dynamic and scalar is not None and scalar.end() == end
+                        else None)
             dimension = re.match(r"_\$([0-9]+)_storage", type_identifier[end:])
             if dimension is None or not 0 < int(dimension[1]) < 2**256:
                 return None
@@ -483,9 +489,10 @@ def elaboration_blockers(node: dict[str, Any]) -> list[Blocker]:
         if (not base_type.startswith(("t_mapping$_", "t_array$_"))
                 or not storage_type_supported(base_type)):
             found.append(type_feature(base_type))
-    elif kind == "MemberAccess" and node["memberName"] == "length":
+    elif kind == "MemberAccess" and node["memberName"] in {"length", "push", "pop"}:
         base_type = node["expression"]["typeDescriptions"].get("typeIdentifier") or ""
-        if not base_type.startswith("t_array$_") or not storage_type_supported(base_type):
+        if (not base_type.startswith("t_array$_") or not storage_type_supported(base_type)
+                or (node["memberName"] != "length" and not base_type.endswith("_$dyn_storage"))):
             found.append(type_feature(base_type))
     elif kind == "SourceUnit":
         contracts = [m for m in node["nodes"] if m["nodeType"] == "ContractDefinition"]
@@ -506,6 +513,8 @@ def callee_blockers(node: dict[str, Any], callees: set[int],
         return [Blocker(node["nodeType"], "conversions to non-elementary types", "import")]
     if node["id"] in callees:
         return []
+    if node["nodeType"] == "MemberAccess" and node["memberName"] in {"push", "pop"}:
+        return [Blocker("MemberAccess", "array members as values", "elaboration")]
     if node["nodeType"] == "ElementaryTypeNameExpression":
         return [Blocker(node["nodeType"], "type names as values", "import")]
     if (node["nodeType"] == "Identifier"
@@ -540,6 +549,14 @@ def coerced_literals(node: dict[str, Any], by_id: dict[int, dict[str, Any]]) -> 
         callee = by_id.get(node["expression"].get("referencedDeclaration"), {})
         if callee.get("nodeType") == "FunctionDefinition":
             expected.extend(zip(node["arguments"], callee["parameters"]["parameters"]))
+        member = node["expression"]
+        if (member.get("nodeType") == "MemberAccess" and member["memberName"] == "push"
+                and len(node["arguments"]) == 1):
+            array_type = member["expression"]["typeDescriptions"].get("typeIdentifier", "")
+            match = re.fullmatch(r"t_array\$_(t_[^$]+)_\$dyn_storage", array_type)
+            if match is not None:
+                expected.append((node["arguments"][0],
+                                 {"typeDescriptions": {"typeIdentifier": match[1]}}))
     for value, target in expected:
         target_type = target["typeDescriptions"].get("typeIdentifier") or ""
         if (value is not None and value["nodeType"] == "Literal"
@@ -561,7 +578,8 @@ def scan(asts: dict[str, Any]) -> dict[int, list[Blocker]]:
         storage_bases = {n["baseExpression"]["id"] for n in by_id.values()
                          if n["nodeType"] == "IndexAccess"}
         storage_bases.update(n["expression"]["id"] for n in by_id.values()
-                             if n["nodeType"] == "MemberAccess" and n["memberName"] == "length")
+                             if n["nodeType"] == "MemberAccess"
+                             and n["memberName"] in {"length", "push", "pop"})
         for node in nodes(ast):
             blockers = (node_blockers(node) + callee_blockers(node, callees, conversions)
                         + elaboration_blockers(node) + coerced_literals(node, by_id))

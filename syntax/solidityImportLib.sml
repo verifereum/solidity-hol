@@ -112,10 +112,9 @@ fun type_name v = within v (fn v =>
           [info v, mk_str name, mk_opt stringSyntax.string_ty (Option.map mk_str mutability)]
       end
   | "ArrayTypeName" =>
-      let
-        val length = case optional_field v "length" of
-                       SOME e => e
-                     | NONE => fail (describe v ^ ": dynamic arrays are not supported")
+      (case optional_field v "length" of
+         NONE => con "SrcDynamicArrayTypeName" [info v, type_name (field v "baseType")]
+       | SOME length => let
         val dimension =
           case String.fields (fn c => c = #"_")
                  (string_field (field length "typeDescriptions") "typeIdentifier") of
@@ -128,7 +127,7 @@ fun type_name v = within v (fn v =>
                 | NONE => fail (describe v ^ ": array length is not a positive integer constant")
       in
         con "SrcArrayTypeName" [info v, type_name (field v "baseType"), mk_num n]
-      end
+      end)
   | other => fail (describe v ^ ": unsupported type name " ^ other))
 
 (* Expressions *)
@@ -150,9 +149,14 @@ fun expr v = within v (fn v =>
              [info v, expr (field v "expression"),
               mk_num (JSONUtil.asIntInf declaration), type_id v]
        | NONE =>
-           (require v (string_field v "memberName" = "length")
-              "unsupported built-in member";
-            con "SrcArrayLength" [info v, expr (field v "expression"), type_id v]))
+           (case string_field v "memberName" of
+              "length" => con "SrcArrayLength"
+                [info v, expr (field v "expression"), type_id v]
+            | member =>
+                (require v (member = "push" orelse member = "pop")
+                   "unsupported built-in member";
+                 con "SrcArrayMember"
+                   [info v, mk_str member, expr (field v "expression"), type_id v])))
   | "Literal" =>
       (require v (not (isSome (optional_field v "subdenomination")))
          "literal subdenominations are not supported";

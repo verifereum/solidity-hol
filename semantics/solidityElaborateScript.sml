@@ -214,7 +214,9 @@ Definition expr_assigns_def:
   (expr_assigns (SrcBinaryOperation _ _ l r _ _) ⇔
     expr_assigns l ∨ expr_assigns r) ∧
   (expr_assigns (SrcTupleExpression _ cs _) ⇔ components_assign cs) ∧
-  (expr_assigns (SrcFunctionCall _ _ args _) ⇔ exprs_assign args) ∧
+  (expr_assigns (SrcFunctionCall _ callee args _) ⇔
+    expr_assigns callee ∨ exprs_assign args) ∧
+  (expr_assigns (SrcArrayMember _ _ root_expr _) ⇔ expr_assigns root_expr) ∧
   (expr_assigns (SrcIndexAccess _ b i _) ⇔ expr_assigns b ∨ expr_assigns i) ∧
   (expr_assigns (SrcMemberAccess _ root_expr _ _) ⇔ expr_assigns root_expr) ∧
   (expr_assigns (SrcArrayLength _ root_expr _) ⇔ expr_assigns root_expr) ∧
@@ -298,6 +300,9 @@ Definition elab_expr_def:
            SOME ((ss, _, ArrayT _ (SOME length)), n1) =>
              SOME ((ss, ConstantAtom (IntegerValue (&length)),
                     ElabType (UintT 256)), n1)
+         | SOME ((ss, ref, ArrayT _ NONE), n1) =>
+             let (rs, a) = bind_value n1 (UintT 256) (ArrayLengthOperation ref) in
+             SOME ((ss ++ rs, a, ElabType (UintT 256)), n1 + 1)
          | _ => NONE)
     | SrcLiteral _ kind value tid =>
         (if kind = "bool" then
@@ -491,9 +496,40 @@ Definition elab_expr_def:
         (elab_expr ctx n e)
     | SrcTupleExpression _ _ _ =>
         (NONE)
+    | SrcArrayMember _ _ _ _ => NONE
     | SrcFunctionCall _ callee args _ =>
         (case callee of
-           SrcIdentifier _ _ f _ =>
+           SrcArrayMember _ member root_expr _ =>
+             (case elab_location ctx n root_expr of
+                SOME ((ss, ref, ArrayT element NONE), n1) =>
+                  if member = "push" then
+                    (case args of
+                       [] =>
+                         let target = BoundAtom (AstId n1) in
+                         let (rs, a) = bind_value (n1 + 1) element
+                                         (ReadOperation element target) in
+                         SOME ((ss ++ [DefineStmt (AstId n1) (ReferenceType element)
+                                         (ArrayPushOperation ref NONE)] ++ rs,
+                                a, ElabType element), n1 + 2)
+                     | [arg] =>
+                         (case elab_expr ctx n1 arg of
+                            SOME ((sa, a, vt), n2) =>
+                              (case coerce n2 element a vt of
+                                 SOME ((cs, a'), n3) =>
+                                   SOME ((ss ++ sa ++ cs ++
+                                            [DefineStmt (AstId n3) (ReferenceType element)
+                                               (ArrayPushOperation ref (SOME a'))],
+                                          ConstantAtom (BoolValue F), ElabTuple []), n3 + 1)
+                               | NONE => NONE)
+                          | NONE => NONE)
+                     | _ => NONE)
+                  else if member = "pop" ∧ args = [] then
+                    SOME ((ss ++ [DefineStmt (AstId n1) (ProductType [])
+                                    (ArrayPopOperation ref)],
+                           ConstantAtom (BoolValue F), ElabTuple []), n1 + 1)
+                  else NONE
+              | _ => NONE)
+         | SrcIdentifier _ _ f _ =>
              (case ALOOKUP ctx.functions f of
                 SOME callee =>
                   (case callee_types callee of
@@ -596,7 +632,7 @@ Definition elab_expr_def:
                               BoundAtom (AstId n3), value), n3 + 1)
                    | NONE => NONE)
               | NONE => NONE)
-         | SOME ((ss, ref, ArrayT element (SOME _)), n1) =>
+         | SOME ((ss, ref, ArrayT element _), n1) =>
              (case elab_expr ctx n1 index of
                 SOME ((si, a, vt), n2) =>
                   (case coerce n2 (UintT 256) a vt of
@@ -607,6 +643,14 @@ Definition elab_expr_def:
                               BoundAtom (AstId n3), element), n3 + 1)
                    | NONE => NONE)
               | NONE => NONE)
+         | _ => NONE)
+    | SrcFunctionCall _ (SrcArrayMember _ member root_expr _) [] _ =>
+        (if member ≠ "push" then NONE else
+         case elab_location ctx n root_expr of
+           SOME ((ss, ref, ArrayT element NONE), n1) =>
+             SOME ((ss ++ [DefineStmt (AstId n1) (ReferenceType element)
+                             (ArrayPushOperation ref NONE)],
+                    BoundAtom (AstId n1), element), n1 + 1)
          | _ => NONE)
     | _ => NONE)
 Termination

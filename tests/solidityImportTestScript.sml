@@ -14,7 +14,8 @@ val () = holbuild_extra_deps [
   "../testdata/frontend/expected/pure_core.json",
   "../testdata/differential/expected/storage.json",
   "../testdata/differential/expected/mappings.json",
-  "../testdata/differential/expected/storage_arrays.json"
+  "../testdata/differential/expected/storage_arrays.json",
+  "../testdata/differential/expected/dynamic_storage_arrays.json"
 ]
 
 val fixture = "../testdata/frontend/expected/pure_core.json"
@@ -438,7 +439,8 @@ QED
 
 (* The compiler uses different array encodings in AST types and storageLayout;
  * changing only the resolved dimension or the indexed leaf must be rejected. *)
-val array_fixture = "../testdata/differential/expected/storage_arrays.json"
+val array_fixture = "../testdata/differential/expected/storage_arrays.json",
+  "../testdata/differential/expected/dynamic_storage_arrays.json"
 val array_source = "testdata/differential/storage_arrays.sol"
 val array_ast = artifact_part array_fixture ["sources", array_source, "ast"]
 val array_contracts = artifact_part array_fixture ["contracts", array_source]
@@ -454,8 +456,14 @@ Proof
   CONV_TAC cv_eval
 QED
 
-val () = import_error_with array_contracts "dynamic array"
+val () = edited_unit_with array_contracts "array_dynamic_dimension_mismatch"
   (edit_first "ArrayTypeName" (set_field "length" JSON.NULL) array_ast)
+
+Theorem array_dynamic_dimension_metadata_rejected:
+  ¬valid_src_unit array_dynamic_dimension_mismatch
+Proof
+  CONV_TAC cv_eval
+QED
 
 val () = import_error_with array_contracts "malformed resolved array dimension"
   (edit_first "ArrayTypeName"
@@ -480,6 +488,20 @@ val () = edited_unit_with array_contracts "array_leaf_mismatch"
 
 Theorem array_leaf_metadata_rejected:
   ¬valid_src_unit array_leaf_mismatch
+Proof
+  CONV_TAC cv_eval
+QED
+
+
+Definition dynamic_array_unit_def:
+  dynamic_array_unit =
+    ^(import_artifact "../testdata/differential/expected/dynamic_storage_arrays.json"
+                      "testdata/differential/dynamic_storage_arrays.sol")
+End
+val () = cv_auto_trans dynamic_array_unit_def;
+
+Theorem dynamic_array_unit_valid:
+  valid_src_unit dynamic_array_unit
 Proof
   CONV_TAC cv_eval
 QED
