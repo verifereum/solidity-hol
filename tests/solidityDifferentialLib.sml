@@ -276,7 +276,9 @@ fun run_case {suite, code, unit, program, fuel} c =
             [b, x] => (b, x)
           | _ => raise ERR "run_case" "unexpected verdict"
       in
-        emit (base @ [("status", json_string (if mismatch then "storage-mismatch"
+        emit (base @ [("message", json_string
+                        "Complete storage is compared; displayed values cover the listed slots."),
+                      ("status", json_string (if mismatch then "storage-mismatch"
                                               else "storage-unexpected")),
                       ("bytecode_storage", storage_json bytecode),
                       (if mismatch then "source_storage" else "expected_storage",

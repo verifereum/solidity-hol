@@ -4,9 +4,10 @@
  *
  * Both runs start from the same storage of the contract account, given as
  * slot/value pairs, and are observed by their outcome and by the contract's
- * final storage at every slot of the layout, of the initial storage and of
- * the expected final storage, which lists the slots that end with a value
- * other than their initial one.
+ * complete committed storage, including unlisted hashed slots. Listed slots
+ * from the layout/initial/expected storage are retained for diagnostics and
+ * the existing observation interface; agreement additionally checks exact
+ * storage-function equality through Verifereum's sparse cv representation.
  *
  * Encoding convention: both runs are observed as ABI-encoded data. A return
  * is the encoding of the declared return types; a panic is the revert data
@@ -24,6 +25,7 @@
  *)
 Theory solidityDifferential
 Ancestors
+  solidityStorage
   solidityElaborate contractABI keccak vfmCompute
 Libs
   cv_transLib wordsLib intLib
@@ -181,11 +183,19 @@ Definition observed_slots_def:
        MAP FST final)
 End
 
+Definition storage_values_def:
+  storage_values st slots = MAP (λk. (k, w2n (lookup_storage (n2w k) st))) slots
+End
+
 Definition storage_at_def:
   storage_at accounts slots =
-    MAP (λk. (k, w2n (lookup_storage (n2w k)
-                        (lookup_account contract_address accounts).storage)))
-      slots
+    storage_values (lookup_account contract_address accounts).storage slots
+End
+
+(* A projection for diagnostics and the retained listed-slot interface. *)
+Definition project_observation_def:
+  project_observation slots (outcome, st) =
+    (outcome, case st of NONE => [] | SOME store => storage_values store slots)
 End
 
 (* A listed slot ends with its listed value, any other with its initial one. *)
@@ -239,24 +249,29 @@ Definition committed_world_def:
 End
 
 (* The outcome, and the final storage at the slots, of the evaluator run. *)
-Definition source_observation_def:
-  source_observation code u prog fuel name args storage slots =
+Definition source_execution_def:
+  source_execution code u prog fuel name args storage =
     case unit_function u name of
-      NONE => (Diagnostic UnknownFunction, [])
+      NONE => (Diagnostic UnknownFunction, NONE)
     | SOME f =>
         case callee_types f of
-          NONE => (Diagnostic UnknownFunction, [])
+          NONE => (Diagnostic UnknownFunction, NONE)
         | SOME (params, rets) =>
             case argument_values params args of
-              NONE => (Diagnostic UnencodableArguments, [])
+              NONE => (Diagnostic UnencodableArguments, NONE)
             | SOME vs =>
                 let st = differential_state (contract_accounts code storage) in
                 let r = invoke_source fuel (core_program_environment [] prog)
                           (AstId f.fn_info.node_id) vs st [] in
                 (completion_outcome rets r.completion,
                  case committed_world st.world r.state.world r.completion of
-                   SOME w => storage_at w.accounts slots
-                 | NONE => [])
+                   SOME w => SOME (lookup_account contract_address w.accounts).storage
+                 | NONE => NONE)
+End
+
+Definition source_observation_def:
+  source_observation code u prog fuel name args storage slots =
+    project_observation slots (source_execution code u prog fuel name args storage)
 End
 
 (* The bytecode run *)
@@ -290,27 +305,32 @@ End
 (* A call of the code deployed at 0x1000 from 0x2000: its outcome, and the
  * final storage at the slots.
  *)
-Definition evm_observation_def:
-  evm_observation code u name args storage slots =
+Definition evm_execution_def:
+  evm_execution code u name args storage =
     case function_types u name of
-      NONE => (Diagnostic UnknownFunction, [])
+      NONE => (Diagnostic UnknownFunction, NONE)
     | SOME (params, rets) =>
         case argument_values params args of
-          NONE => (Diagnostic UnencodableArguments, [])
+          NONE => (Diagnostic UnencodableArguments, NONE)
         | SOME vs =>
             case call_data name params vs of
-              NONE => (Diagnostic UnencodableArguments, [])
+              NONE => (Diagnostic UnencodableArguments, NONE)
             | SOME data =>
                 case run_transaction (Collect empty_domain) F 1 []
                        differential_block (contract_accounts code storage)
                        (differential_tx data) of
                   SOME (r, accounts) =>
                     (case r.result of
-                       NONE => (Returned r.output, storage_at accounts slots)
+                       NONE => (Returned r.output, SOME (lookup_account contract_address accounts).storage)
                      | SOME Reverted =>
-                         (Reverted r.output, storage_at accounts slots)
-                     | SOME _ => (Diagnostic ExceptionalHalt, []))
-                | NONE => (Diagnostic InvalidTransaction, [])
+                         (Reverted r.output, SOME (lookup_account contract_address accounts).storage)
+                     | SOME _ => (Diagnostic ExceptionalHalt, NONE))
+                | NONE => (Diagnostic InvalidTransaction, NONE)
+End
+
+Definition evm_observation_def:
+  evm_observation code u name args storage slots =
+    project_observation slots (evm_execution code u name args storage)
 End
 
 (* Expected outcomes *)
@@ -367,10 +387,18 @@ End
 Definition differential_verdict_def:
   differential_verdict code u prog fuel name args storage e final =
     let slots = observed_slots prog storage final in
-    compare_observations
-      (expected_outcome u name e, expected_storage storage final slots)
-      (evm_observation code u name args storage slots)
-      (source_observation code u prog fuel name args storage slots)
+    let evm_run = evm_execution code u name args storage in
+    let src_run = source_execution code u prog fuel name args storage in
+    let evm = project_observation slots evm_run in
+    let src = project_observation slots src_run in
+    case compare_observations
+      (expected_outcome u name e, expected_storage storage final slots) evm src of
+      Agree outcome =>
+        if SND evm_run ≠ SND src_run then StorageMismatch (SND evm) (SND src)
+        else if SND evm_run ≠ SOME (seed_storage (final ++ storage)) then
+          StorageUnexpected (SND evm) (expected_storage storage final slots)
+        else Agree outcome
+    | other => other
 End
 
 Definition is_agreement_def:
@@ -393,6 +421,20 @@ Proof
   gvs[is_agreement_def]
 QED
 
+Theorem complete_storage_check_agreement[local]:
+  is_agreement
+    (case verdict of
+       Agree outcome =>
+         if evm_st ≠ src_st then StorageMismatch evm_slots src_slots
+         else if src_st ≠ expected_st then StorageUnexpected evm_slots expected_slots
+         else Agree outcome
+     | other => other) ⇒
+  is_agreement verdict
+Proof
+  Cases_on ‘verdict’ >> simp[is_agreement_def] >>
+  rpt IF_CASES_TAC >> simp[is_agreement_def]
+QED
+
 (* What an agreement establishes: both runs produce the expected outcome,
  * which is a return or a revert, never a diagnostic, and the expected final
  * storage at the observed slots.
@@ -406,7 +448,9 @@ Theorem differential_agrees_outcomes:
   source_observation code u prog fuel name args storage slots =
     (expected_outcome u name e, expected_storage storage final slots)
 Proof
-  rw[differential_agrees_def, differential_verdict_def] >>
+  rw[differential_agrees_def, differential_verdict_def,
+     evm_observation_def, source_observation_def] >>
+  drule complete_storage_check_agreement >> strip_tac >>
   drule compare_observations_agree >> simp[]
 QED
 
@@ -428,11 +472,15 @@ val () = cv_auto_trans seed_storage_def;
 val () = cv_auto_trans contract_accounts_def;
 val () = cv_auto_trans listTheory.nub_def;
 val () = cv_auto_trans observed_slots_def;
+val () = cv_auto_trans storage_values_def;
 val () = cv_auto_trans storage_at_def;
+val () = cv_auto_trans project_observation_def;
 val () = cv_auto_trans expected_storage_def;
 val () = cv_auto_trans committed_world_def;
+val () = cv_auto_trans source_execution_def;
 val () = cv_auto_trans source_observation_def;
 val () = cv_auto_trans call_data_def;
+val () = cv_auto_trans evm_execution_def;
 val () = cv_auto_trans evm_observation_def;
 val () = cv_auto_trans expected_outcome_def;
 val () = cv_auto_trans compare_observations_def;
