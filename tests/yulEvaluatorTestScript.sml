@@ -320,6 +320,35 @@ End
 
 val () = cv_auto_trans bad_builtin_arity_code_def;
 
+(* let x := 1  { let x := 2  mstore(0, x) }  mstore(32, x) return(0, 64)
+ * A block runs in a scope of its own: the inner binding shadows the outer name
+ * and is gone when the block ends, so the two stores hold 2 and then 1.
+ *)
+Definition block_code_def:
+  block_code =
+    [YulLet ["x"] (SOME (YulLit (LitNumber 1w)));
+     YulBlock [YulLet ["x"] (SOME (YulLit (LitNumber 2w)));
+               YulExprStmt (YulBuiltin YMStore [YulLit (LitNumber 0w); YulName "x"])];
+     YulExprStmt (YulBuiltin YMStore [YulLit (LitNumber 32w); YulName "x"]);
+     YulExprStmt (YulBuiltin YReturn
+       [YulLit (LitNumber 0w); YulLit (LitNumber 64w)])]
+End
+
+val () = cv_auto_trans block_code_def;
+
+(* mstore(0, "ab") return(0, 32)
+ * A string literal is a value: its bytes left-aligned, the rest zero.
+ *)
+Definition string_literal_code_def:
+  string_literal_code =
+    [YulExprStmt (YulBuiltin YMStore
+       [YulLit (LitNumber 0w); YulLit (LitBytes [0x61w; 0x62w])]);
+     YulExprStmt (YulBuiltin YReturn
+       [YulLit (LitNumber 0w); YulLit (LitNumber 32w)])]
+End
+
+val () = cv_auto_trans string_literal_code_def;
+
 Theorem add_returns_five:
   (run 20 add_code).completion = YulReturn (word_to_bytes_be (5w : bytes32))
 Proof
@@ -399,6 +428,24 @@ Theorem malformed_programs_are_invalid:
   (run 20 bad_binding_code).completion = YulInvalid "bad binding" ∧
   (run 20 unknown_function_code).completion = YulInvalid "unknown function" ∧
   (run 20 bad_builtin_arity_code).completion = YulInvalid "bad builtin call"
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem a_block_shadows_and_is_popped:
+  (run 20 block_code).completion =
+  YulReturn (word_to_bytes_be (2w : bytes32) ++ word_to_bytes_be (1w : bytes32))
+Proof
+  CONV_TAC cv_eval
+QED
+
+(* The value of "ab" is 0x6162 shifted up to the top of the word, so that the
+ * store puts 'a', 'b' and then zeros -- what the compiler's revert messages
+ * rely on.
+ *)
+Theorem a_string_literal_is_left_aligned_bytes:
+  (run 20 string_literal_code).completion =
+  YulReturn (word_to_bytes_be (word_lsl (0x6162w : bytes32) 240))
 Proof
   CONV_TAC cv_eval
 QED
