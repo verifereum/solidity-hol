@@ -3,7 +3,8 @@
  *
  * Admitted: one contract of functions over elementary value types, with
  * value-type state variables, storage structs, scalar-key mappings and
- * fixed/dynamic storage arrays, member/indexed scalar reads and updates, locals
+ * fixed/dynamic storage arrays, member/indexed scalar reads and updates,
+ * array lengths, scalar push/pop and locals
  * (including tuple declarations with holes), internal calls with single or
  * multiple returns, explicit elementary conversions, literals, unary, binary,
  * comparison and short-circuit operators, simple and compound assignment to

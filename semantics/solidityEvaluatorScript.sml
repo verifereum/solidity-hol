@@ -323,7 +323,7 @@ Definition navigate_storage_def:
     | _ => ValueAbrupt (InvalidCompletion "unsupported storage navigation")
 End
 
-(* Every operation except an internal call, which needs the evaluator. *)
+(* Pure operations; calls and array mutations are handled by statements. *)
 Definition eval_operation_def:
   eval_operation env (st : source_state) op =
     case op of

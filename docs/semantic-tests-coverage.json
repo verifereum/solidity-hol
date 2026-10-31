@@ -1,15 +1,15 @@
 {
   "counts": {
-    "admitted": 113,
+    "admitted": 129,
     "compile-failure": 0,
-    "elaboration-rejected": 83,
-    "import-rejected": 1374,
+    "elaboration-rejected": 134,
+    "import-rejected": 1307,
     "skipped": 100
   },
   "features": [
     {
       "feature": "bytes and string",
-      "first_rejection": 36,
+      "first_rejection": 21,
       "node_types": [
         "FunctionCall",
         "IndexAccess",
@@ -19,12 +19,12 @@
         "TupleExpression",
         "VariableDeclaration"
       ],
-      "only_blocker": 27,
+      "only_blocker": 26,
       "tests": 413
     },
     {
       "feature": "arrays",
-      "first_rejection": 170,
+      "first_rejection": 2,
       "node_types": [
         "ArrayTypeName",
         "FunctionCall",
@@ -34,7 +34,7 @@
         "VariableDeclaration"
       ],
       "only_blocker": 4,
-      "tests": 402
+      "tests": 363
     },
     {
       "feature": "source units without exactly one contract",
@@ -44,16 +44,6 @@
       ],
       "only_blocker": 0,
       "tests": 341
-    },
-    {
-      "feature": "array values",
-      "first_rejection": 0,
-      "node_types": [
-        "Identifier",
-        "IndexAccess"
-      ],
-      "only_blocker": 5,
-      "tests": 292
     },
     {
       "feature": "local reference bindings",
@@ -66,16 +56,26 @@
     },
     {
       "feature": "inline assembly",
-      "first_rejection": 122,
+      "first_rejection": 133,
       "node_types": [
         "InlineAssembly"
       ],
-      "only_blocker": 60,
+      "only_blocker": 61,
       "tests": 266
     },
     {
+      "feature": "array values",
+      "first_rejection": 0,
+      "node_types": [
+        "Identifier",
+        "IndexAccess"
+      ],
+      "only_blocker": 6,
+      "tests": 252
+    },
+    {
       "feature": "external calls and contract members",
-      "first_rejection": 43,
+      "first_rejection": 52,
       "node_types": [
         "FunctionCall",
         "MemberAccess",
@@ -88,16 +88,16 @@
     },
     {
       "feature": "require/assert/revert",
-      "first_rejection": 34,
+      "first_rejection": 46,
       "node_types": [
         "Identifier"
       ],
-      "only_blocker": 7,
+      "only_blocker": 10,
       "tests": 216
     },
     {
       "feature": "structs",
-      "first_rejection": 174,
+      "first_rejection": 175,
       "node_types": [
         "FunctionCall",
         "IndexAccess",
@@ -112,7 +112,7 @@
     },
     {
       "feature": "constructors",
-      "first_rejection": 24,
+      "first_rejection": 32,
       "node_types": [
         "FunctionDefinition"
       ],
@@ -181,7 +181,7 @@
     },
     {
       "feature": "memory arrays (new T[](n))",
-      "first_rejection": 0,
+      "first_rejection": 36,
       "node_types": [
         "NewExpression"
       ],
@@ -190,7 +190,7 @@
     },
     {
       "feature": "library calls and contract-name members",
-      "first_rejection": 19,
+      "first_rejection": 22,
       "node_types": [
         "IndexAccess",
         "MemberAccess"
@@ -209,7 +209,7 @@
     },
     {
       "feature": "abi.* functions",
-      "first_rejection": 26,
+      "first_rejection": 37,
       "node_types": [
         "Identifier",
         "MemberAccess"
@@ -219,7 +219,7 @@
     },
     {
       "feature": "function types",
-      "first_rejection": 42,
+      "first_rejection": 50,
       "node_types": [
         "FunctionTypeName"
       ],
@@ -228,7 +228,7 @@
     },
     {
       "feature": "type names as values",
-      "first_rejection": 6,
+      "first_rejection": 8,
       "node_types": [
         "ElementaryTypeNameExpression"
       ],
@@ -274,7 +274,7 @@
     },
     {
       "feature": "msg/block/tx globals",
-      "first_rejection": 28,
+      "first_rejection": 32,
       "node_types": [
         "Identifier",
         "MemberAccess"
@@ -292,11 +292,11 @@
         "VariableDeclaration"
       ],
       "only_blocker": 0,
-      "tests": 68
+      "tests": 67
     },
     {
       "feature": "hash and signature built-ins",
-      "first_rejection": 9,
+      "first_rejection": 11,
       "node_types": [
         "Identifier"
       ],
@@ -390,7 +390,7 @@
     },
     {
       "feature": "type(\u2026)",
-      "first_rejection": 13,
+      "first_rejection": 14,
       "node_types": [
         "Identifier",
         "MemberAccess"
@@ -418,7 +418,7 @@
     },
     {
       "feature": "inline arrays",
-      "first_rejection": 8,
+      "first_rejection": 10,
       "node_types": [
         "TupleExpression"
       ],
@@ -454,7 +454,7 @@
     },
     {
       "feature": "custom errors",
-      "first_rejection": 18,
+      "first_rejection": 19,
       "node_types": [
         "ErrorDefinition",
         "MemberAccess",
@@ -590,7 +590,7 @@
     },
     {
       "feature": "array slices",
-      "first_rejection": 5,
+      "first_rejection": 10,
       "node_types": [
         "IndexRangeAccess"
       ],
@@ -672,6 +672,15 @@
       "tests": 3
     },
     {
+      "feature": "array members as values",
+      "first_rejection": 0,
+      "node_types": [
+        "MemberAccess"
+      ],
+      "only_blocker": 1,
+      "tests": 3
+    },
+    {
       "feature": "built-in blockhash",
       "first_rejection": 1,
       "node_types": [
@@ -720,7 +729,7 @@
   "format": "solidity-hol-semantic-tests-coverage-v1",
   "greedy_order": [
     {
-      "admitted": 60,
+      "admitted": 61,
       "feature": "inline assembly"
     },
     {
@@ -728,75 +737,75 @@
       "feature": "bytes and string"
     },
     {
-      "admitted": 112,
-      "feature": "msg/block/tx globals"
-    },
-    {
-      "admitted": 128,
+      "admitted": 115,
       "feature": "require/assert/revert"
     },
     {
-      "admitted": 143,
+      "admitted": 133,
+      "feature": "msg/block/tx globals"
+    },
+    {
+      "admitted": 148,
       "feature": "constant expressions over literals"
     },
     {
-      "admitted": 157,
+      "admitted": 162,
       "feature": "local reference bindings"
     },
     {
-      "admitted": 182,
+      "admitted": 187,
       "feature": "structs"
     },
     {
-      "admitted": 222,
+      "admitted": 231,
       "feature": "arrays"
     },
     {
-      "admitted": 307,
+      "admitted": 289,
       "feature": "array values"
     },
     {
-      "admitted": 336,
+      "admitted": 318,
       "feature": "memory arrays (new T[](n))"
     },
     {
-      "admitted": 360,
+      "admitted": 342,
       "feature": "operator delete"
     },
     {
-      "admitted": 381,
+      "admitted": 363,
       "feature": "events"
     },
     {
-      "admitted": 402,
+      "admitted": 384,
       "feature": "public state variables"
     },
     {
-      "admitted": 435,
+      "admitted": 418,
       "feature": "constructors"
     },
     {
-      "admitted": 464,
+      "admitted": 446,
       "feature": "mappings"
     },
     {
-      "admitted": 483,
+      "admitted": 465,
       "feature": "abi.* functions"
     },
     {
-      "admitted": 504,
+      "admitted": 486,
       "feature": "hash and signature built-ins"
     },
     {
-      "admitted": 522,
+      "admitted": 504,
       "feature": "modifiers"
     },
     {
-      "admitted": 540,
+      "admitted": 522,
       "feature": "declaration values"
     },
     {
-      "admitted": 561,
+      "admitted": 543,
       "feature": "inline arrays"
     }
   ],
@@ -827,8 +836,8 @@
         "members of elementary type names",
         "type names as values"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 5: dynamic arrays are not supported",
+      "first": "type names as values",
+      "reason": "ElementaryTypeNameExpression 12: unsupported expression ElementaryTypeNameExpression",
       "scan_agrees": true,
       "test": "abicoder/abi_decode_from_calldata_dynamic_array.sol"
     },
@@ -922,8 +931,8 @@
         "members of elementary type names",
         "type names as values"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 12: dynamic arrays are not supported",
+      "first": "type names as values",
+      "reason": "ElementaryTypeNameExpression 21: unsupported expression ElementaryTypeNameExpression",
       "scan_agrees": true,
       "test": "abicoder/abi_decode_overlapping_dynamic_arrays.sol"
     },
@@ -989,7 +998,7 @@
         "require/assert/revert"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 6: only fixed-array length members are supported",
+      "reason": "MemberAccess 6: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "abicoder/abi_encode.sol"
     },
@@ -1005,8 +1014,8 @@
         "require/assert/revert",
         "this"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 6: dynamic arrays are not supported",
+      "first": "require/assert/revert",
+      "reason": "Identifier 10: built-in require is not supported",
       "scan_agrees": true,
       "test": "abicoder/abi_encode_call.sol"
     },
@@ -1156,7 +1165,7 @@
         "type names as values"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 14: only fixed-array length members are supported",
+      "reason": "MemberAccess 14: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "abicoder/abi_encode_decode_simple.sol"
     },
@@ -1167,7 +1176,7 @@
         "bytes and string"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 8: only fixed-array length members are supported",
+      "reason": "MemberAccess 8: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "abicoder/abi_encode_empty_string_not_bytes0.sol"
     },
@@ -1188,8 +1197,8 @@
         "bytes and string",
         "local reference bindings"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 3: dynamic arrays are not supported",
+      "first": "abi.* functions",
+      "reason": "MemberAccess 12: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "abicoder/abi_encode_memory_dynamic_array_and_calldata_bytes_v1.sol"
     },
@@ -1201,7 +1210,7 @@
         "constant expressions over literals"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 6: only fixed-array length members are supported",
+      "reason": "MemberAccess 6: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "abicoder/abi_encode_rational.sol"
     },
@@ -1214,8 +1223,8 @@
         "bytes and string",
         "local reference bindings"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 5: dynamic arrays are not supported",
+      "first": "abi.* functions",
+      "reason": "MemberAccess 21: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "abicoder/abi_encode_storage_array_v2.sol"
     },
@@ -1278,7 +1287,7 @@
         "type(\u2026)"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 7: only fixed-array length members are supported",
+      "reason": "MemberAccess 7: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "abicoder/abi_encode_with_selector_v1.sol"
     },
@@ -1309,7 +1318,7 @@
         "type(\u2026)"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 7: only fixed-array length members are supported",
+      "reason": "MemberAccess 7: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "abicoder/abi_encode_with_signature_v1.sol"
     },
@@ -1364,8 +1373,8 @@
         "local reference bindings",
         "this"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 4: dynamic arrays are not supported",
+      "first": "external calls and contract members",
+      "reason": "MemberAccess 65: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_2d_dynamic_dynamic_v2.sol"
     },
@@ -1378,8 +1387,8 @@
         "local reference bindings",
         "this"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 3: dynamic arrays are not supported",
+      "first": "external calls and contract members",
+      "reason": "MemberAccess 69: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_2d_dynamic_static_v2.sol"
     },
@@ -1406,8 +1415,8 @@
         "require/assert/revert",
         "this"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 3: dynamic arrays are not supported",
+      "first": "msg/block/tx globals",
+      "reason": "MemberAccess 10: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_dynamic_of_uint_v2.sol"
     },
@@ -1422,8 +1431,8 @@
         "local reference bindings",
         "this"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 3: dynamic arrays are not supported",
+      "first": "abi.* functions",
+      "reason": "MemberAccess 10: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_dynamic_of_value_types_v2.sol"
     },
@@ -1439,8 +1448,8 @@
         "msg/block/tx globals",
         "this"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 6: dynamic arrays are not supported",
+      "first": "msg/block/tx globals",
+      "reason": "MemberAccess 13: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_dynamic_static_dynamic_v2.sol"
     },
@@ -1454,20 +1463,20 @@
         "local reference bindings",
         "source units without exactly one contract"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 25: dynamic arrays are not supported",
+      "first": "library calls and contract-name members",
+      "reason": "MemberAccess 41: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_dynamic_static_in_library_v2.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "array values",
         "arrays",
         "local reference bindings"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 6: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/array/calldata_array_dynamic_static_short_decode_v2.sol",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_dynamic_static_short_decode_v2.sol"
     },
@@ -1480,8 +1489,8 @@
         "local reference bindings",
         "this"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 6: dynamic arrays are not supported",
+      "first": "external calls and contract members",
+      "reason": "MemberAccess 27: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_dynamic_static_short_reencode_v2.sol"
     },
@@ -1498,19 +1507,19 @@
         "require/assert/revert",
         "this"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 7: dynamic arrays are not supported",
+      "first": "function types",
+      "reason": "FunctionTypeName 6: unsupported type name FunctionTypeName",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_function_types_v2.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "arrays",
         "local reference bindings"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 3: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/array/calldata_array_indexing_1d_2d_v2.sol",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_indexing_1d_2d_v2.sol"
     },
@@ -1523,13 +1532,13 @@
       "test": "abicoder/calldataDecoding/array/calldata_array_indexing_3d_dynamic_v2.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "arrays",
         "local reference bindings"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 6: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/array/calldata_array_indexing_3d_v2.sol",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_indexing_3d_v2.sol"
     },
@@ -1541,8 +1550,8 @@
         "inline arrays",
         "local reference bindings"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 207: dynamic arrays are not supported",
+      "first": "inline arrays",
+      "reason": "TupleExpression 265: inline arrays are not supported",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_indexing_dynamic_bytes_v2.sol"
     },
@@ -1557,8 +1566,8 @@
         "local reference bindings",
         "this"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 3: dynamic arrays are not supported",
+      "first": "abi.* functions",
+      "reason": "MemberAccess 10: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_indexing_dynamic_v2.sol"
     },
@@ -1574,18 +1583,18 @@
         "this"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 11: only fixed-array length members are supported",
+      "reason": "MemberAccess 11: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_indexing_static_v2.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "arrays",
         "local reference bindings"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 3: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/array/calldata_array_length_v2.sol",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_length_v2.sol"
     },
@@ -1600,8 +1609,8 @@
         "local reference bindings",
         "this"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 4: dynamic arrays are not supported",
+      "first": "abi.* functions",
+      "reason": "MemberAccess 11: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_multi_dynamic_v2.sol"
     },
@@ -1616,8 +1625,8 @@
         "members of elementary type names",
         "type names as values"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 3: dynamic arrays are not supported",
+      "first": "array slices",
+      "reason": "IndexRangeAccess 19: unsupported expression IndexRangeAccess",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_slicing_v2.sol"
     },
@@ -1634,8 +1643,8 @@
         "msg/block/tx globals",
         "this"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 5: dynamic arrays are not supported",
+      "first": "msg/block/tx globals",
+      "reason": "MemberAccess 14: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_static_dynamic_static_v2.sol"
     },
@@ -1662,7 +1671,7 @@
         "this"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 11: only fixed-array length members are supported",
+      "reason": "MemberAccess 11: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_static_of_value_types_v2.sol"
     },
@@ -1706,8 +1715,8 @@
         "local reference bindings",
         "this"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 3: dynamic arrays are not supported",
+      "first": "abi.* functions",
+      "reason": "MemberAccess 16: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_two_dynamic_v2.sol"
     },
@@ -1723,7 +1732,7 @@
         "this"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 18: only fixed-array length members are supported",
+      "reason": "MemberAccess 18: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_two_static_v2.sol"
     },
@@ -1736,14 +1745,14 @@
       "test": "abicoder/calldataDecoding/array/calldata_bytes_bytes32_arrays_v1.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "array values",
         "arrays",
         "local reference bindings"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 4: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/array/calldata_dynamic_array_to_memory_v2.sol",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_dynamic_array_to_memory_v2.sol"
     },
@@ -1763,8 +1772,8 @@
         "arrays",
         "local reference bindings"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 5: dynamic arrays are not supported",
+      "first": "abi.* functions",
+      "reason": "MemberAccess 11: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_nested_array_static_reencode_v2.sol"
     },
@@ -1777,8 +1786,8 @@
         "bytes and string",
         "local reference bindings"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 3: dynamic arrays are not supported",
+      "first": "abi.* functions",
+      "reason": "MemberAccess 43: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_overlapping_dynamic_arrays_v2.sol"
     },
@@ -1791,20 +1800,20 @@
         "bytes and string",
         "local reference bindings"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 3: dynamic arrays are not supported",
+      "first": "abi.* functions",
+      "reason": "MemberAccess 32: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_overlapping_nested_dynamic_arrays_v2.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "arrays",
         "bytes and string",
         "local reference bindings"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 3: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/array/calldata_string_array_v2.sol",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_string_array_v2.sol"
     },
@@ -1842,8 +1851,8 @@
         "bytes and string",
         "local reference bindings"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "first": "abi.* functions",
+      "reason": "MemberAccess 11: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/memory_dynamic_array_and_calldata_bytes.sol"
     },
@@ -1856,18 +1865,18 @@
         "bytes and string",
         "local reference bindings"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "first": "abi.* functions",
+      "reason": "MemberAccess 13: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/memory_dynamic_array_and_calldata_static_array.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "arrays"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 4: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/array/memory_dynamic_arrays.sol",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/memory_dynamic_arrays.sol"
     },
@@ -1880,8 +1889,8 @@
         "memory arrays (new T[](n))",
         "this"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 6: dynamic arrays are not supported",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 86: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/memory_dynamic_nested_arrays_v2.sol"
     },
@@ -1896,8 +1905,8 @@
         "memory arrays (new T[](n))",
         "this"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 6: dynamic arrays are not supported",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 62: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/memory_params_in_external_function.sol"
     },
@@ -1911,7 +1920,7 @@
         "this"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 7: only fixed-array length members are supported",
+      "reason": "MemberAccess 7: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/copy_from_calldata_removes_bytes_data.sol"
     },
@@ -2231,8 +2240,8 @@
         "msg/block/tx globals",
         "this"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 3: dynamic arrays are not supported",
+      "first": "msg/block/tx globals",
+      "reason": "MemberAccess 14: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "abicoder/cleanup/dynamic_array_v2.sol"
     },
@@ -2312,7 +2321,7 @@
         "this"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 15: only fixed-array length members are supported",
+      "reason": "MemberAccess 15: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "abicoder/cleanup/static_array_v2.sol"
     },
@@ -2369,8 +2378,8 @@
         "local reference bindings",
         "memory arrays (new T[](n))"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 6: dynamic arrays are not supported",
+      "first": "external calls and contract members",
+      "reason": "UserDefinedTypeName 5: unsupported type name UserDefinedTypeName",
       "scan_agrees": true,
       "test": "abicoder/contract_array.sol"
     },
@@ -2387,8 +2396,8 @@
         "local reference bindings",
         "memory arrays (new T[](n))"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 7: dynamic arrays are not supported",
+      "first": "external calls and contract members",
+      "reason": "UserDefinedTypeName 6: unsupported type name UserDefinedTypeName",
       "scan_agrees": true,
       "test": "abicoder/contract_array_v2.sol"
     },
@@ -2422,8 +2431,8 @@
         "type names as values",
         "type(\u2026)"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 7: dynamic arrays are not supported",
+      "first": "type(\u2026)",
+      "reason": "MemberAccess 21: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "abicoder/return_dynamic_types_cross_call_advanced.sol"
     },
@@ -2456,18 +2465,18 @@
         "this"
       ],
       "first": "external calls and contract members",
-      "reason": "MemberAccess 14: only fixed-array length members are supported",
+      "reason": "MemberAccess 14: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "abicoder/return_dynamic_types_cross_call_simple.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "arrays",
         "local reference bindings"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for abicoder/validation/array_exceeds_calldatasize_no_revert_string.sol",
       "scan_agrees": true,
       "test": "abicoder/validation/array_exceeds_calldatasize_no_revert_string.sol"
     },
@@ -2597,7 +2606,7 @@
         "type(\u2026)"
       ],
       "first": "type(\u2026)",
-      "reason": "MemberAccess 11: only fixed-array length members are supported",
+      "reason": "MemberAccess 11: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "arithmetics/block_inside_unchecked.sol"
     },
@@ -2677,7 +2686,7 @@
         "type(\u2026)"
       ],
       "first": "type(\u2026)",
-      "reason": "MemberAccess 27: only fixed-array length members are supported",
+      "reason": "MemberAccess 27: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "arithmetics/signed_mod.sol"
     },
@@ -2706,8 +2715,8 @@
         "mappings",
         "memory arrays (new T[](n))"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 43: dynamic arrays are not supported",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 48: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "array/arrayMemoryAllocation/array_2d_zeroed_memory_index_access.sol"
     },
@@ -2719,20 +2728,20 @@
         "mappings",
         "memory arrays (new T[](n))"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 40: dynamic arrays are not supported",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 46: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "array/arrayMemoryAllocation/array_array_static.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "arrays",
         "bytes and string",
         "mappings"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 31: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/arrayMemoryAllocation/array_static_return_param_zeroed_memory_index_access.sol",
       "scan_agrees": true,
       "test": "array/arrayMemoryAllocation/array_static_return_param_zeroed_memory_index_access.sol"
     },
@@ -2756,8 +2765,8 @@
         "mappings",
         "memory arrays (new T[](n))"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 38: dynamic arrays are not supported",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 42: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "array/arrayMemoryAllocation/array_zeroed_memory_index_access.sol"
     },
@@ -2768,8 +2777,8 @@
         "arrays",
         "memory arrays (new T[](n))"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 11: dynamic arrays are not supported",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 16: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "array/array_2d_assignment.sol"
     },
@@ -2780,8 +2789,8 @@
         "arrays",
         "memory arrays (new T[](n))"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 11: dynamic arrays are not supported",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 16: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "array/array_2d_new.sol"
     },
@@ -2792,8 +2801,8 @@
         "arrays",
         "memory arrays (new T[](n))"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 12: dynamic arrays are not supported",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 18: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "array/array_3d_assignment.sol"
     },
@@ -2804,8 +2813,8 @@
         "arrays",
         "memory arrays (new T[](n))"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 12: dynamic arrays are not supported",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 18: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "array/array_3d_new.sol"
     },
@@ -2817,8 +2826,8 @@
         "function types",
         "memory arrays (new T[](n))"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 12: dynamic arrays are not supported",
+      "first": "function types",
+      "reason": "FunctionTypeName 11: unsupported type name FunctionTypeName",
       "scan_agrees": true,
       "test": "array/array_function_pointers.sol"
     },
@@ -2830,8 +2839,8 @@
         "memory arrays (new T[](n))",
         "require/assert/revert"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 12: dynamic arrays are not supported",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 16: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "array/array_memory_as_parameter.sol"
     },
@@ -2841,8 +2850,8 @@
         "arrays",
         "memory arrays (new T[](n))"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 10: dynamic arrays are not supported",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 14: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "array/array_memory_create.sol"
     },
@@ -2854,122 +2863,95 @@
         "memory arrays (new T[](n))",
         "require/assert/revert"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 10: dynamic arrays are not supported",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 14: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "array/array_memory_index_access.sol"
     },
     {
-      "category": "import-rejected",
-      "features": [
-        "array values",
-        "arrays"
-      ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "category": "admitted",
+      "features": [],
+      "first": null,
+      "reason": null,
       "scan_agrees": true,
       "test": "array/array_push_return_reference.sol"
     },
     {
-      "category": "import-rejected",
-      "features": [
-        "array values",
-        "arrays"
-      ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "category": "admitted",
+      "features": [],
+      "first": null,
+      "reason": null,
       "scan_agrees": true,
       "test": "array/array_push_with_arg.sol"
     },
     {
       "category": "import-rejected",
       "features": [
-        "array values",
-        "arrays",
         "require/assert/revert"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "first": "require/assert/revert",
+      "reason": "Identifier 57: built-in require is not supported",
       "scan_agrees": true,
       "test": "array/array_storage_index_access.sol"
     },
     {
-      "category": "import-rejected",
-      "features": [
-        "array values",
-        "arrays"
-      ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "category": "admitted",
+      "features": [],
+      "first": null,
+      "reason": null,
       "scan_agrees": true,
       "test": "array/array_storage_index_boundary_test.sol"
     },
     {
       "category": "import-rejected",
       "features": [
-        "array values",
-        "arrays",
         "inline assembly",
         "require/assert/revert"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "first": "inline assembly",
+      "reason": "InlineAssembly 80: unsupported statement InlineAssembly",
       "scan_agrees": true,
       "test": "array/array_storage_index_zeroed_test.sol"
     },
     {
-      "category": "import-rejected",
-      "features": [
-        "array values",
-        "arrays"
-      ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "category": "admitted",
+      "features": [],
+      "first": null,
+      "reason": null,
       "scan_agrees": true,
       "test": "array/array_storage_length_access.sol"
     },
     {
-      "category": "import-rejected",
-      "features": [
-        "array values",
-        "arrays"
-      ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "category": "admitted",
+      "features": [],
+      "first": null,
+      "reason": null,
       "scan_agrees": true,
       "test": "array/array_storage_pop_zero_length.sol"
     },
     {
       "category": "import-rejected",
       "features": [
-        "array values",
-        "arrays",
         "require/assert/revert"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "first": "require/assert/revert",
+      "reason": "Identifier 28: built-in require is not supported",
       "scan_agrees": true,
       "test": "array/array_storage_push_empty.sol"
     },
     {
-      "category": "import-rejected",
-      "features": [
-        "array values",
-        "arrays"
-      ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "category": "admitted",
+      "features": [],
+      "first": null,
+      "reason": null,
       "scan_agrees": true,
       "test": "array/array_storage_push_empty_length_address.sol"
     },
     {
-      "category": "import-rejected",
-      "features": [
-        "array values",
-        "arrays"
-      ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "category": "admitted",
+      "features": [],
+      "first": null,
+      "reason": null,
       "scan_agrees": true,
       "test": "array/array_storage_push_pop.sol"
     },
@@ -2997,12 +2979,12 @@
       "test": "array/byte_array_storage_layout.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "bytes and string"
       ],
-      "first": "bytes and string",
-      "reason": "MemberAccess 19: only fixed-array length members are supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/byte_array_transitional_2.sol",
       "scan_agrees": true,
       "test": "array/byte_array_transitional_2.sol"
     },
@@ -3013,7 +2995,7 @@
         "msg/block/tx globals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 7: only fixed-array length members are supported",
+      "reason": "MemberAccess 7: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "array/bytes_length_member.sol"
     },
@@ -3058,14 +3040,14 @@
       "test": "array/bytes_to_fixed_bytes_too_long.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "arrays",
         "bytes and string",
         "local reference bindings"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 3: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/calldata_array_bounds_check_nested_bytes.sol",
       "scan_agrees": true,
       "test": "array/calldata_array_bounds_check_nested_bytes.sol"
     },
@@ -3076,7 +3058,7 @@
         "type names as values"
       ],
       "first": "bytes and string",
-      "reason": "MemberAccess 11: only fixed-array length members are supported",
+      "reason": "MemberAccess 11: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "array/concat/bytes_concat_2_args.sol"
     },
@@ -3087,7 +3069,7 @@
         "type names as values"
       ],
       "first": "bytes and string",
-      "reason": "MemberAccess 13: only fixed-array length members are supported",
+      "reason": "MemberAccess 13: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "array/concat/bytes_concat_3_args.sol"
     },
@@ -3099,7 +3081,7 @@
         "type names as values"
       ],
       "first": "bytes and string",
-      "reason": "MemberAccess 12: only fixed-array length members are supported",
+      "reason": "MemberAccess 12: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "array/concat/bytes_concat_as_argument.sol"
     },
@@ -3118,7 +3100,7 @@
         "type names as values"
       ],
       "first": "bytes and string",
-      "reason": "MemberAccess 7: only fixed-array length members are supported",
+      "reason": "MemberAccess 7: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "array/concat/bytes_concat_empty_argument_list.sol"
     },
@@ -3129,7 +3111,7 @@
         "type names as values"
       ],
       "first": "bytes and string",
-      "reason": "MemberAccess 14: only fixed-array length members are supported",
+      "reason": "MemberAccess 14: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "array/concat/bytes_concat_empty_strings.sol"
     },
@@ -3140,7 +3122,7 @@
         "type names as values"
       ],
       "first": "bytes and string",
-      "reason": "MemberAccess 16: only fixed-array length members are supported",
+      "reason": "MemberAccess 16: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "array/concat/bytes_concat_nested.sol"
     },
@@ -3160,14 +3142,14 @@
       "test": "array/constant_var_as_array_length.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "array values",
         "arrays",
         "local reference bindings"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 6: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/copying/array_copy_calldata_storage.sol",
       "scan_agrees": true,
       "test": "array/copying/array_copy_calldata_storage.sol"
     },
@@ -3180,8 +3162,8 @@
         "memory arrays (new T[](n))",
         "require/assert/revert"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 39: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "array/copying/array_copy_cleanup_uint128.sol"
     },
@@ -3194,8 +3176,8 @@
         "memory arrays (new T[](n))",
         "require/assert/revert"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 135: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "array/copying/array_copy_cleanup_uint40.sol"
     },
@@ -3208,8 +3190,8 @@
         "memory arrays (new T[](n))",
         "require/assert/revert"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 39: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "array/copying/array_copy_clear_storage.sol"
     },
@@ -3222,8 +3204,8 @@
         "memory arrays (new T[](n))",
         "require/assert/revert"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 45: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "array/copying/array_copy_clear_storage_packed.sol"
     },
@@ -3231,23 +3213,22 @@
       "category": "import-rejected",
       "features": [
         "array values",
-        "arrays",
         "memory arrays (new T[](n))"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 22: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "array/copying/array_copy_different_packing.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "array values",
         "arrays",
         "operator delete"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 6: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/copying/array_copy_including_array.sol",
       "scan_agrees": true,
       "test": "array/copying/array_copy_including_array.sol"
     },
@@ -3259,32 +3240,32 @@
         "memory arrays (new T[](n))",
         "require/assert/revert"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 6: dynamic arrays are not supported",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 25: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "array/copying/array_copy_memory_to_storage.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "array values",
         "arrays",
         "local reference bindings"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 4: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/copying/array_copy_nested_array.sol",
       "scan_agrees": true,
       "test": "array/copying/array_copy_nested_array.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "array values",
         "arrays",
         "constant expressions over literals"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/copying/array_copy_storage_abi_signed.sol",
       "scan_agrees": true,
       "test": "array/copying/array_copy_storage_abi_signed.sol"
     },
@@ -3292,11 +3273,10 @@
       "category": "import-rejected",
       "features": [
         "array values",
-        "arrays",
         "require/assert/revert"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "first": "require/assert/revert",
+      "reason": "Identifier 53: built-in assert is not supported",
       "scan_agrees": true,
       "test": "array/copying/array_copy_storage_storage_different_base.sol"
     },
@@ -3315,11 +3295,10 @@
       "category": "import-rejected",
       "features": [
         "array values",
-        "arrays",
         "memory arrays (new T[](n))"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 18: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "array/copying/array_copy_storage_storage_dyn_dyn.sol"
     },
@@ -3327,22 +3306,20 @@
       "category": "import-rejected",
       "features": [
         "array values",
-        "arrays",
         "require/assert/revert"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "first": "require/assert/revert",
+      "reason": "Identifier 53: built-in assert is not supported",
       "scan_agrees": true,
       "test": "array/copying/array_copy_storage_storage_dynamic_dynamic.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
-        "array values",
-        "arrays"
+        "array values"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 6: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/copying/array_copy_storage_storage_static_dynamic.sol",
       "scan_agrees": true,
       "test": "array/copying/array_copy_storage_storage_static_dynamic.sol"
     },
@@ -3379,24 +3356,24 @@
       "test": "array/copying/array_copy_storage_storage_struct.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "array values",
         "arrays"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/copying/array_copy_storage_to_memory.sol",
       "scan_agrees": true,
       "test": "array/copying/array_copy_storage_to_memory.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "array values",
         "arrays"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 4: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/copying/array_copy_storage_to_memory_nested.sol",
       "scan_agrees": true,
       "test": "array/copying/array_copy_storage_to_memory_nested.sol"
     },
@@ -3451,8 +3428,8 @@
         "mappings",
         "memory arrays (new T[](n))"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 5: dynamic arrays are not supported",
+      "first": "constructors",
+      "reason": "FunctionDefinition 84: unsupported function kind constructor",
       "scan_agrees": true,
       "test": "array/copying/array_elements_to_mapping.sol"
     },
@@ -3472,8 +3449,8 @@
         "require/assert/revert",
         "this"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 16: dynamic arrays are not supported",
+      "first": "function types",
+      "reason": "FunctionTypeName 15: unsupported type name FunctionTypeName",
       "scan_agrees": true,
       "test": "array/copying/array_of_function_external_storage_to_storage_dynamic.sol"
     },
@@ -3493,8 +3470,8 @@
         "require/assert/revert",
         "this"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 16: dynamic arrays are not supported",
+      "first": "function types",
+      "reason": "FunctionTypeName 15: unsupported type name FunctionTypeName",
       "scan_agrees": true,
       "test": "array/copying/array_of_function_external_storage_to_storage_dynamic_different_mutability.sol"
     },
@@ -3598,8 +3575,8 @@
         "mappings",
         "memory arrays (new T[](n))"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 5: dynamic arrays are not supported",
+      "first": "constructors",
+      "reason": "FunctionDefinition 84: unsupported function kind constructor",
       "scan_agrees": true,
       "test": "array/copying/array_to_mapping.sol"
     },
@@ -3633,7 +3610,7 @@
         "msg/block/tx globals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 11: only fixed-array length members are supported",
+      "reason": "MemberAccess 11: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "array/copying/bytes_inside_mappings.sol"
     },
@@ -3716,14 +3693,14 @@
       "test": "array/copying/calldata_2d_bytes_to_memory_2.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "array values",
         "arrays",
         "local reference bindings"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 3: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/copying/calldata_array_dynamic_to_storage.sol",
       "scan_agrees": true,
       "test": "array/copying/calldata_array_dynamic_to_storage.sol"
     },
@@ -3753,27 +3730,27 @@
       "test": "array/copying/calldata_array_static_to_memory.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "array values",
         "arrays",
         "local reference bindings",
         "mappings"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 5: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/copying/calldata_array_to_mapping.sol",
       "scan_agrees": true,
       "test": "array/copying/calldata_array_to_mapping.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "arrays",
         "bytes and string",
         "local reference bindings"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 3: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/copying/calldata_bytes_array_to_memory.sol",
       "scan_agrees": true,
       "test": "array/copying/calldata_bytes_array_to_memory.sol"
     },
@@ -3789,26 +3766,26 @@
       "test": "array/copying/calldata_bytes_to_storage.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "array values",
         "arrays",
         "local reference bindings"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 3: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/copying/calldata_dyn_2d_bytes_to_memory.sol",
       "scan_agrees": true,
       "test": "array/copying/calldata_dyn_2d_bytes_to_memory.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "array values",
         "arrays",
         "local reference bindings"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 4: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/copying/calldata_dynamic_array_to_memory.sol",
       "scan_agrees": true,
       "test": "array/copying/calldata_dynamic_array_to_memory.sol"
     },
@@ -3826,14 +3803,14 @@
       "test": "array/copying/calldata_nested_array_copy_to_memory.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "array values",
         "arrays",
         "local reference bindings"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 3: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/copying/calldata_to_storage_different_base.sol",
       "scan_agrees": true,
       "test": "array/copying/calldata_to_storage_different_base.sol"
     },
@@ -3846,8 +3823,8 @@
         "inline arrays",
         "tuples of literals"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "first": "constructors",
+      "reason": "FunctionDefinition 17: unsupported function kind constructor",
       "scan_agrees": true,
       "test": "array/copying/cleanup_during_multi_element_per_slot_copy.sol"
     },
@@ -3885,8 +3862,8 @@
         "functions as values",
         "memory arrays (new T[](n))"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 6: dynamic arrays are not supported",
+      "first": "function types",
+      "reason": "FunctionTypeName 5: unsupported type name FunctionTypeName",
       "scan_agrees": true,
       "test": "array/copying/copy_function_internal_storage_array.sol"
     },
@@ -3909,7 +3886,7 @@
         "msg/block/tx globals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 7: only fixed-array length members are supported",
+      "reason": "MemberAccess 7: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "array/copying/copy_removes_bytes_data.sol"
     },
@@ -3987,7 +3964,7 @@
         "type(\u2026)"
       ],
       "first": "type(\u2026)",
-      "reason": "MemberAccess 26: only fixed-array length members are supported",
+      "reason": "MemberAccess 26: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "array/copying/empty_bytes_copy.sol"
     },
@@ -4004,8 +3981,8 @@
         "this",
         "type names as values"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 6: dynamic arrays are not supported",
+      "first": "function types",
+      "reason": "FunctionTypeName 5: unsupported type name FunctionTypeName",
       "scan_agrees": true,
       "test": "array/copying/function_type_array_to_storage.sol"
     },
@@ -4018,8 +3995,8 @@
         "memory arrays (new T[](n))",
         "require/assert/revert"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 3: dynamic arrays are not supported",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 16: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "array/copying/memory_dyn_2d_bytes_to_storage.sol"
     },
@@ -4031,8 +4008,8 @@
         "bytes and string",
         "memory arrays (new T[](n))"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 3: dynamic arrays are not supported",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 22: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "array/copying/memory_to_storage_different_base.sol"
     },
@@ -4044,8 +4021,8 @@
         "local reference bindings",
         "require/assert/revert"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 4: dynamic arrays are not supported",
+      "first": "require/assert/revert",
+      "reason": "Identifier 20: built-in assert is not supported",
       "scan_agrees": true,
       "test": "array/copying/nested_array_calldata_to_memory.sol"
     },
@@ -4057,8 +4034,8 @@
         "local reference bindings",
         "require/assert/revert"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 4: dynamic arrays are not supported",
+      "first": "require/assert/revert",
+      "reason": "Identifier 36: built-in assert is not supported",
       "scan_agrees": true,
       "test": "array/copying/nested_array_calldata_to_storage.sol"
     },
@@ -4096,8 +4073,8 @@
         "local reference bindings",
         "memory arrays (new T[](n))"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 5: dynamic arrays are not supported",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 79: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "array/copying/nested_array_element_calldata_to_memory.sol"
     },
@@ -4121,8 +4098,8 @@
         "arrays",
         "memory arrays (new T[](n))"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 5: dynamic arrays are not supported",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 79: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "array/copying/nested_array_element_memory_to_memory.sol"
     },
@@ -4176,8 +4153,8 @@
         "arrays",
         "memory arrays (new T[](n))"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 7: dynamic arrays are not supported",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 33: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "array/copying/nested_array_memory_to_storage.sol"
     },
@@ -4273,8 +4250,8 @@
         "inline arrays",
         "memory arrays (new T[](n))"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 4: dynamic arrays are not supported",
+      "first": "constructors",
+      "reason": "FunctionDefinition 101: unsupported function kind constructor",
       "scan_agrees": true,
       "test": "array/copying/nested_array_storage_to_memory.sol"
     },
@@ -4287,43 +4264,43 @@
         "memory arrays (new T[](n))",
         "require/assert/revert"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 4: dynamic arrays are not supported",
+      "first": "require/assert/revert",
+      "reason": "Identifier 24: built-in require is not supported",
       "scan_agrees": true,
       "test": "array/copying/nested_dynamic_array_element_calldata_to_storage.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "array values",
         "arrays"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 4: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/copying/storage_memory_nested.sol",
       "scan_agrees": true,
       "test": "array/copying/storage_memory_nested.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "array values",
         "arrays",
         "bytes and string"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 3: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/copying/storage_memory_nested_bytes.sol",
       "scan_agrees": true,
       "test": "array/copying/storage_memory_nested_bytes.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "array values",
         "arrays",
         "local reference bindings"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 4: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/copying/storage_memory_nested_from_pointer.sol",
       "scan_agrees": true,
       "test": "array/copying/storage_memory_nested_from_pointer.sol"
     },
@@ -4351,13 +4328,13 @@
       "test": "array/copying/storage_memory_packed.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "array values",
         "arrays"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/copying/storage_memory_packed_dyn.sol",
       "scan_agrees": true,
       "test": "array/copying/storage_memory_packed_dyn.sol"
     },
@@ -4378,8 +4355,8 @@
         "arrays",
         "memory arrays (new T[](n))"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 9: dynamic arrays are not supported",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 14: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "array/create_dynamic_array_with_zero_length.sol"
     },
@@ -4403,8 +4380,8 @@
         "constant expressions over literals",
         "memory arrays (new T[](n))"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 16: dynamic arrays are not supported",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 20: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "array/create_memory_array_too_large.sol"
     },
@@ -4427,8 +4404,8 @@
         "memory arrays (new T[](n))",
         "require/assert/revert"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 9: dynamic arrays are not supported",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 14: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "array/create_multiple_dynamic_arrays.sol"
     },
@@ -4452,8 +4429,8 @@
         "operator delete",
         "require/assert/revert"
       ],
-      "first": "bytes and string",
-      "reason": "MemberAccess 9: only fixed-array length members are supported",
+      "first": "inline assembly",
+      "reason": "InlineAssembly 22: unsupported statement InlineAssembly",
       "scan_agrees": true,
       "test": "array/delete/delete_bytes_array.sol"
     },
@@ -4466,8 +4443,8 @@
         "memory arrays (new T[](n))",
         "operator delete"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 8: dynamic arrays are not supported",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 12: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "array/delete/delete_memory_array.sol"
     },
@@ -4503,13 +4480,12 @@
       "category": "import-rejected",
       "features": [
         "array values",
-        "arrays",
         "inline assembly",
         "operator delete",
         "require/assert/revert"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "first": "inline assembly",
+      "reason": "InlineAssembly 23: unsupported statement InlineAssembly",
       "scan_agrees": true,
       "test": "array/delete/delete_storage_array.sol"
     },
@@ -4517,12 +4493,11 @@
       "category": "import-rejected",
       "features": [
         "array values",
-        "arrays",
         "inline assembly",
         "operator delete"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "first": "inline assembly",
+      "reason": "InlineAssembly 33: unsupported statement InlineAssembly",
       "scan_agrees": true,
       "test": "array/delete/delete_storage_array_packed.sol"
     },
@@ -4604,21 +4579,19 @@
       "test": "array/delete/memory_bytes_delete_element_neighbor.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "array values",
-        "arrays",
         "operator delete"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 6: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/dynamic_array_cleanup.sol",
       "scan_agrees": true,
       "test": "array/dynamic_array_cleanup.sol"
     },
     {
       "category": "import-rejected",
       "features": [
-        "array values",
         "arrays",
         "structs"
       ],
@@ -4641,13 +4614,10 @@
       "test": "array/dynamic_multi_array_cleanup.sol"
     },
     {
-      "category": "import-rejected",
-      "features": [
-        "array values",
-        "arrays"
-      ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "category": "admitted",
+      "features": [],
+      "first": null,
+      "reason": null,
       "scan_agrees": true,
       "test": "array/dynamic_out_of_bounds_array_access.sol"
     },
@@ -4665,13 +4635,13 @@
       "test": "array/evm_exceptions_out_of_band_access.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "arrays",
         "local reference bindings"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 6: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/external_array_args.sol",
       "scan_agrees": true,
       "test": "array/external_array_args.sol"
     },
@@ -4755,8 +4725,8 @@
         "source units without exactly one contract",
         "this"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 69: dynamic arrays are not supported",
+      "first": "function types",
+      "reason": "FunctionTypeName 68: unsupported type name FunctionTypeName",
       "scan_agrees": true,
       "test": "array/function_array_cross_calls.sol"
     },
@@ -4768,18 +4738,18 @@
         "functions as values",
         "memory arrays (new T[](n))"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 76: dynamic arrays are not supported",
+      "first": "function types",
+      "reason": "FunctionTypeName 75: unsupported type name FunctionTypeName",
       "scan_agrees": true,
       "test": "array/function_memory_array.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "arrays"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 4: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/indexAccess/arrays_complex_memory_index_access.sol",
       "scan_agrees": true,
       "test": "array/indexAccess/arrays_complex_memory_index_access.sol"
     },
@@ -4819,7 +4789,6 @@
       "category": "import-rejected",
       "features": [
         "array values",
-        "arrays",
         "bytes and string",
         "fixed-size bytes members and indexing",
         "inline arrays",
@@ -4866,13 +4835,13 @@
       "test": "array/indexAccess/inline_array_index_access_strings.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "array values",
         "arrays"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 4: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/indexAccess/memory_arrays_dynamic_index_access_write.sol",
       "scan_agrees": true,
       "test": "array/indexAccess/memory_arrays_dynamic_index_access_write.sol"
     },
@@ -4894,8 +4863,8 @@
         "arrays",
         "inline arrays"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "first": "inline arrays",
+      "reason": "TupleExpression 15: inline arrays are not supported",
       "scan_agrees": true,
       "test": "array/inline_array_return.sol"
     },
@@ -5004,7 +4973,7 @@
         "this"
       ],
       "first": "external calls and contract members",
-      "reason": "MemberAccess 37: only fixed-array length members are supported",
+      "reason": "MemberAccess 37: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "array/memory.sol"
     },
@@ -5015,19 +4984,16 @@
         "arrays",
         "memory arrays (new T[](n))"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 13: dynamic arrays are not supported",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 18: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "array/memory_arrays_of_various_sizes.sol"
     },
     {
-      "category": "import-rejected",
-      "features": [
-        "array values",
-        "arrays"
-      ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "category": "admitted",
+      "features": [],
+      "first": null,
+      "reason": null,
       "scan_agrees": true,
       "test": "array/pop/array_pop.sol"
     },
@@ -5046,97 +5012,85 @@
       "test": "array/pop/array_pop_array_transition.sol"
     },
     {
-      "category": "import-rejected",
-      "features": [
-        "array values",
-        "arrays"
-      ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "category": "admitted",
+      "features": [],
+      "first": null,
+      "reason": null,
       "scan_agrees": true,
       "test": "array/pop/array_pop_empty_exception.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
-        "array values",
-        "arrays"
+        "array members as values"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/pop/array_pop_isolated.sol",
       "scan_agrees": true,
       "test": "array/pop/array_pop_isolated.sol"
     },
     {
-      "category": "import-rejected",
-      "features": [
-        "array values",
-        "arrays"
-      ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "category": "admitted",
+      "features": [],
+      "first": null,
+      "reason": null,
       "scan_agrees": true,
       "test": "array/pop/array_pop_storage_empty.sol"
     },
     {
-      "category": "import-rejected",
-      "features": [
-        "array values",
-        "arrays"
-      ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "category": "admitted",
+      "features": [],
+      "first": null,
+      "reason": null,
       "scan_agrees": true,
       "test": "array/pop/array_pop_uint16_transition.sol"
     },
     {
-      "category": "import-rejected",
-      "features": [
-        "array values",
-        "arrays"
-      ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 8: dynamic arrays are not supported",
+      "category": "admitted",
+      "features": [],
+      "first": null,
+      "reason": null,
       "scan_agrees": true,
       "test": "array/pop/array_pop_uint24_transition.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "bytes and string"
       ],
-      "first": "bytes and string",
-      "reason": "MemberAccess 13: only fixed-array length members are supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/pop/byte_array_pop.sol",
       "scan_agrees": true,
       "test": "array/pop/byte_array_pop.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "bytes and string"
       ],
-      "first": "bytes and string",
-      "reason": "MemberAccess 19: only fixed-array length members are supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/pop/byte_array_pop_copy_long.sol",
       "scan_agrees": true,
       "test": "array/pop/byte_array_pop_copy_long.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "bytes and string"
       ],
-      "first": "bytes and string",
-      "reason": "MemberAccess 15: only fixed-array length members are supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/pop/byte_array_pop_empty_exception.sol",
       "scan_agrees": true,
       "test": "array/pop/byte_array_pop_empty_exception.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
+        "array members as values",
         "bytes and string"
       ],
-      "first": "bytes and string",
-      "reason": "MemberAccess 13: only fixed-array length members are supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/pop/byte_array_pop_isolated.sol",
       "scan_agrees": true,
       "test": "array/pop/byte_array_pop_isolated.sol"
     },
@@ -5146,8 +5100,8 @@
         "bytes and string",
         "require/assert/revert"
       ],
-      "first": "bytes and string",
-      "reason": "MemberAccess 25: only fixed-array length members are supported",
+      "first": "require/assert/revert",
+      "reason": "Identifier 45: built-in require is not supported",
       "scan_agrees": true,
       "test": "array/pop/byte_array_pop_long_storage_empty.sol"
     },
@@ -5157,58 +5111,53 @@
         "bytes and string",
         "inline assembly"
       ],
-      "first": "bytes and string",
-      "reason": "MemberAccess 21: only fixed-array length members are supported",
+      "first": "inline assembly",
+      "reason": "InlineAssembly 36: unsupported statement InlineAssembly",
       "scan_agrees": true,
       "test": "array/pop/byte_array_pop_long_storage_empty_garbage_ref.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "bytes and string"
       ],
-      "first": "bytes and string",
-      "reason": "MemberAccess 19: only fixed-array length members are supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/pop/byte_array_pop_masking_long.sol",
       "scan_agrees": true,
       "test": "array/pop/byte_array_pop_masking_long.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "bytes and string"
       ],
-      "first": "bytes and string",
-      "reason": "MemberAccess 7: only fixed-array length members are supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/pop/byte_array_pop_storage_empty.sol",
       "scan_agrees": true,
       "test": "array/pop/byte_array_pop_storage_empty.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
-        "array values",
-        "arrays",
+        "array members as values",
         "function members (selector, address, \u2026)"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/pop/parenthesized.sol",
       "scan_agrees": true,
       "test": "array/pop/parenthesized.sol"
     },
     {
-      "category": "import-rejected",
-      "features": [
-        "array values",
-        "arrays"
-      ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "category": "admitted",
+      "features": [],
+      "first": null,
+      "reason": null,
       "scan_agrees": true,
       "test": "array/push/array_push.sol"
     },
     {
       "category": "import-rejected",
       "features": [
-        "array values",
         "arrays",
         "declaration values",
         "require/assert/revert"
@@ -5248,20 +5197,16 @@
       "test": "array/push/array_push_nested_from_memory.sol"
     },
     {
-      "category": "import-rejected",
-      "features": [
-        "array values",
-        "arrays"
-      ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "category": "admitted",
+      "features": [],
+      "first": null,
+      "reason": null,
       "scan_agrees": true,
       "test": "array/push/array_push_packed_array.sol"
     },
     {
       "category": "import-rejected",
       "features": [
-        "array values",
         "arrays",
         "memory arrays (new T[](n))",
         "structs"
@@ -5274,7 +5219,6 @@
     {
       "category": "import-rejected",
       "features": [
-        "array values",
         "arrays",
         "local reference bindings",
         "structs"
@@ -5285,76 +5229,70 @@
       "test": "array/push/array_push_struct_from_calldata.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "bytes and string",
         "literals of non-integer types"
       ],
-      "first": "bytes and string",
-      "reason": "MemberAccess 9: only fixed-array length members are supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/push/byte_array_push.sol",
       "scan_agrees": true,
       "test": "array/push/byte_array_push.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "bytes and string"
       ],
-      "first": "bytes and string",
-      "reason": "MemberAccess 19: only fixed-array length members are supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/push/byte_array_push_transition.sol",
       "scan_agrees": true,
       "test": "array/push/byte_array_push_transition.sol"
     },
     {
       "category": "import-rejected",
       "features": [
-        "array values",
         "arrays",
         "bytes and string",
         "require/assert/revert"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 3: dynamic arrays are not supported",
+      "first": "require/assert/revert",
+      "reason": "Identifier 25: built-in assert is not supported",
       "scan_agrees": true,
       "test": "array/push/nested_bytes_push.sol"
     },
     {
-      "category": "import-rejected",
-      "features": [
-        "array values",
-        "arrays"
-      ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "category": "admitted",
+      "features": [],
+      "first": null,
+      "reason": null,
       "scan_agrees": true,
       "test": "array/push/push_no_args_1d.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
-        "array values",
         "arrays",
         "local reference bindings"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 3: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/push/push_no_args_2d.sol",
       "scan_agrees": true,
       "test": "array/push/push_no_args_2d.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "bytes and string"
       ],
-      "first": "bytes and string",
-      "reason": "MemberAccess 7: only fixed-array length members are supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/push/push_no_args_bytes.sol",
       "scan_agrees": true,
       "test": "array/push/push_no_args_bytes.sol"
     },
     {
       "category": "import-rejected",
       "features": [
-        "array values",
         "arrays",
         "local reference bindings",
         "structs"
@@ -5377,7 +5315,7 @@
         "this"
       ],
       "first": "external calls and contract members",
-      "reason": "MemberAccess 49: only fixed-array length members are supported",
+      "reason": "MemberAccess 49: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "array/reusing_memory.sol"
     },
@@ -5393,14 +5331,14 @@
       "test": "array/short_fixed_array_cleanup.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "array values",
         "arrays",
         "local reference bindings"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/slices/array_calldata_assignment.sol",
       "scan_agrees": true,
       "test": "array/slices/array_calldata_assignment.sol"
     },
@@ -5444,8 +5382,8 @@
         "local reference bindings",
         "require/assert/revert"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "first": "array slices",
+      "reason": "IndexRangeAccess 20: unsupported expression IndexRangeAccess",
       "scan_agrees": true,
       "test": "array/slices/array_slice_calldata_to_memory.sol"
     },
@@ -5458,8 +5396,8 @@
         "local reference bindings",
         "require/assert/revert"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "first": "array slices",
+      "reason": "IndexRangeAccess 19: unsupported expression IndexRangeAccess",
       "scan_agrees": true,
       "test": "array/slices/array_slice_calldata_to_storage.sol"
     },
@@ -5471,8 +5409,8 @@
         "arrays",
         "local reference bindings"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "first": "array slices",
+      "reason": "IndexRangeAccess 13: unsupported expression IndexRangeAccess",
       "scan_agrees": true,
       "test": "array/slices/calldata_array_slicing.sol"
     },
@@ -5656,7 +5594,7 @@
         "type names as values"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 50: only fixed-array length members are supported",
+      "reason": "MemberAccess 50: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "builtinFunctions/erc7201_param_abi_encode.sol"
     },
@@ -5715,7 +5653,7 @@
         "type names as values"
       ],
       "first": "bytes and string",
-      "reason": "MemberAccess 53: only fixed-array length members are supported",
+      "reason": "MemberAccess 53: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "builtinFunctions/erc7201_param_string_concat.sol"
     },
@@ -5832,8 +5770,8 @@
         "bytes and string",
         "hash and signature built-ins"
       ],
-      "first": "bytes and string",
-      "reason": "MemberAccess 9: only fixed-array length members are supported",
+      "first": "hash and signature built-ins",
+      "reason": "Identifier 29: built-in keccak256 is not supported",
       "scan_agrees": true,
       "test": "builtinFunctions/iterated_keccak256_with_bytes.sol"
     },
@@ -5844,7 +5782,7 @@
         "hash and signature built-ins"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 9: only fixed-array length members are supported",
+      "reason": "MemberAccess 9: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "builtinFunctions/keccak256.sol"
     },
@@ -5866,7 +5804,7 @@
         "hash and signature built-ins"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 14: only fixed-array length members are supported",
+      "reason": "MemberAccess 14: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "builtinFunctions/keccak256_multiple_arguments.sol"
     },
@@ -5877,7 +5815,7 @@
         "hash and signature built-ins"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 12: only fixed-array length members are supported",
+      "reason": "MemberAccess 12: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "builtinFunctions/keccak256_multiple_arguments_with_numeric_literals.sol"
     },
@@ -5900,7 +5838,7 @@
         "hash and signature built-ins"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 27: only fixed-array length members are supported",
+      "reason": "MemberAccess 27: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "builtinFunctions/keccak256_packed.sol"
     },
@@ -5917,8 +5855,8 @@
         "type names as values",
         "type(\u2026)"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 16: dynamic arrays are not supported",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 20: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "builtinFunctions/keccak256_packed_complex_types.sol"
     },
@@ -5928,8 +5866,8 @@
         "bytes and string",
         "hash and signature built-ins"
       ],
-      "first": "bytes and string",
-      "reason": "MemberAccess 9: only fixed-array length members are supported",
+      "first": "hash and signature built-ins",
+      "reason": "Identifier 25: built-in keccak256 is not supported",
       "scan_agrees": true,
       "test": "builtinFunctions/keccak256_with_bytes.sol"
     },
@@ -5939,7 +5877,7 @@
         "msg/block/tx globals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 8: only fixed-array length members are supported",
+      "reason": "MemberAccess 8: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "builtinFunctions/msg_sig.sol"
     },
@@ -5949,7 +5887,7 @@
         "msg/block/tx globals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 6: only fixed-array length members are supported",
+      "reason": "MemberAccess 6: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "builtinFunctions/msg_sig_after_internal_call_is_same.sol"
     },
@@ -5960,7 +5898,7 @@
         "hash and signature built-ins"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 9: only fixed-array length members are supported",
+      "reason": "MemberAccess 9: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "builtinFunctions/ripemd160.sol"
     },
@@ -5982,7 +5920,7 @@
         "hash and signature built-ins"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 27: only fixed-array length members are supported",
+      "reason": "MemberAccess 27: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "builtinFunctions/ripemd160_packed.sol"
     },
@@ -5993,7 +5931,7 @@
         "hash and signature built-ins"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 9: only fixed-array length members are supported",
+      "reason": "MemberAccess 9: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "builtinFunctions/sha256.sol"
     },
@@ -6015,7 +5953,7 @@
         "hash and signature built-ins"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 27: only fixed-array length members are supported",
+      "reason": "MemberAccess 27: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "builtinFunctions/sha256_packed.sol"
     },
@@ -6148,8 +6086,8 @@
         "inline assembly",
         "local reference bindings"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "first": "inline assembly",
+      "reason": "InlineAssembly 23: unsupported statement InlineAssembly",
       "scan_agrees": true,
       "test": "cleanup/dirty_calldata_dynamic_array.sol"
     },
@@ -6324,7 +6262,7 @@
         "this"
       ],
       "first": "external calls and contract members",
-      "reason": "MemberAccess 31: only fixed-array length members are supported",
+      "reason": "MemberAccess 31: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "constants/constant_read_via_external_call_from_unchecked.sol"
     },
@@ -6470,8 +6408,8 @@
         "public state variables",
         "source units without exactly one contract"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 69: dynamic arrays are not supported",
+      "first": "external calls and contract members",
+      "reason": "UserDefinedTypeName 78: unsupported type name UserDefinedTypeName",
       "scan_agrees": true,
       "test": "constructor/arrays_in_constructors.sol"
     },
@@ -6813,7 +6751,7 @@
         "local reference bindings"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 8: only fixed-array length members are supported",
+      "reason": "MemberAccess 8: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "conversions/calldata_bytes_to_memory_reencode.sol"
     },
@@ -7075,7 +7013,7 @@
         "type(\u2026)"
       ],
       "first": "type(\u2026)",
-      "reason": "MemberAccess 12: only fixed-array length members are supported",
+      "reason": "MemberAccess 12: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "ecrecover/failing_ecrecover_invalid_input.sol"
     },
@@ -7099,7 +7037,7 @@
         "require/assert/revert"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 36: only fixed-array length members are supported",
+      "reason": "MemberAccess 36: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "ecrecover/failing_ecrecover_invalid_input_proper.sol"
     },
@@ -7495,7 +7433,7 @@
         "require/assert/revert"
       ],
       "first": "external calls and contract members",
-      "reason": "MemberAccess 32: only fixed-array length members are supported",
+      "reason": "MemberAccess 32: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "errors/require_error_function_pointer_parameter.sol"
     },
@@ -7656,8 +7594,8 @@
         "bytes and string",
         "custom errors"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 9: dynamic arrays are not supported",
+      "first": "custom errors",
+      "reason": "RevertStatement 23: unsupported statement RevertStatement",
       "scan_agrees": true,
       "test": "errors/revert_conversion.sol"
     },
@@ -7720,15 +7658,13 @@
     {
       "category": "import-rejected",
       "features": [
-        "array values",
-        "arrays",
         "contract creation (new C)",
         "custom errors",
         "external calls and contract members",
         "source units without exactly one contract"
       ],
       "first": "external calls and contract members",
-      "reason": "MemberAccess 41: only fixed-array length members are supported",
+      "reason": "MemberAccess 41: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "errors/small_error_optimization.sol"
     },
@@ -8058,7 +7994,7 @@
         "source units without exactly one contract"
       ],
       "first": "library calls and contract-name members",
-      "reason": "MemberAccess 18: only fixed-array length members are supported",
+      "reason": "MemberAccess 18: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "events/event_emit_interface_event_via_library.sol"
     },
@@ -8226,7 +8162,7 @@
         "source units without exactly one contract"
       ],
       "first": "events",
-      "reason": "MemberAccess 14: only fixed-array length members are supported",
+      "reason": "MemberAccess 14: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "events/event_selector_file_level.sol"
     },
@@ -8551,7 +8487,7 @@
         "imports"
       ],
       "first": "imports",
-      "reason": "MemberAccess 19: only fixed-array length members are supported",
+      "reason": "MemberAccess 19: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "expressions/module_from_ternary_expression.sol"
     },
@@ -9172,13 +9108,13 @@
       "test": "freeFunctions/storage_calldata_refs.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "arrays",
         "local reference bindings"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for functionCall/array_multiple_local_vars.sol",
       "scan_agrees": true,
       "test": "functionCall/array_multiple_local_vars.sol"
     },
@@ -9189,7 +9125,7 @@
         "bytes and string"
       ],
       "first": "address members (balance, call, transfer, \u2026)",
-      "reason": "MemberAccess 11: only fixed-array length members are supported",
+      "reason": "MemberAccess 11: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "functionCall/bare_call_no_returndatacopy.sol"
     },
@@ -9328,7 +9264,7 @@
         "this"
       ],
       "first": "external calls and contract members",
-      "reason": "MemberAccess 18: only fixed-array length members are supported",
+      "reason": "MemberAccess 18: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "functionCall/calldata_argument_external_bytes.sol"
     },
@@ -9351,8 +9287,8 @@
         "arrays",
         "local reference bindings"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 3: dynamic arrays are not supported",
+      "first": "array slices",
+      "reason": "IndexRangeAccess 52: unsupported expression IndexRangeAccess",
       "scan_agrees": true,
       "test": "functionCall/calldata_argument_internal_dynamic_array_v2.sol"
     },
@@ -9369,7 +9305,7 @@
         "this"
       ],
       "first": "library calls and contract-name members",
-      "reason": "MemberAccess 25: only fixed-array length members are supported",
+      "reason": "MemberAccess 25: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "functionCall/calldata_argument_internal_library_bytes.sol"
     },
@@ -9412,8 +9348,8 @@
         "memory arrays (new T[](n))",
         "this"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 3: dynamic arrays are not supported",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 77: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "functionCall/calldata_argument_internal_multi_array_v2.sol"
     },
@@ -9427,7 +9363,7 @@
         "this"
       ],
       "first": "external calls and contract members",
-      "reason": "MemberAccess 93: only fixed-array length members are supported",
+      "reason": "MemberAccess 93: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "functionCall/calldata_argument_internal_multi_static_array_v2.sol"
     },
@@ -9538,7 +9474,7 @@
         "source units without exactly one contract"
       ],
       "first": "external calls and contract members",
-      "reason": "MemberAccess 20: only fixed-array length members are supported",
+      "reason": "MemberAccess 20: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "functionCall/creation_function_call_no_args.sol"
     },
@@ -9582,7 +9518,7 @@
         "this"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 33: only fixed-array length members are supported",
+      "reason": "MemberAccess 33: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "functionCall/delegatecall_return_value.sol"
     },
@@ -9611,7 +9547,7 @@
         "this"
       ],
       "first": "external calls and contract members",
-      "reason": "MemberAccess 21: only fixed-array length members are supported",
+      "reason": "MemberAccess 21: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "functionCall/external_call.sol"
     },
@@ -9638,8 +9574,8 @@
         "memory arrays (new T[](n))",
         "this"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 6: dynamic arrays are not supported",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 16: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "functionCall/external_call_dynamic_returndata.sol"
     },
@@ -9680,7 +9616,7 @@
         "this"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 11: only fixed-array length members are supported",
+      "reason": "MemberAccess 11: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "functionCall/external_call_value.sol"
     },
@@ -10059,7 +9995,7 @@
         "payable functions"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 6: only fixed-array length members are supported",
+      "reason": "MemberAccess 6: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "functionCall/value_test.sol"
     },
@@ -10072,7 +10008,7 @@
         "source units without exactly one contract"
       ],
       "first": "function members (selector, address, \u2026)",
-      "reason": "MemberAccess 39: only fixed-array length members are supported",
+      "reason": "MemberAccess 39: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "functionSelector/function_selector_via_contract_name.sol"
     },
@@ -10086,7 +10022,7 @@
         "inline arrays"
       ],
       "first": "function members (selector, address, \u2026)",
-      "reason": "MemberAccess 15: only fixed-array length members are supported",
+      "reason": "MemberAccess 15: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "functionTypes/address_member.sol"
     },
@@ -10137,7 +10073,7 @@
         "this"
       ],
       "first": "external calls and contract members",
-      "reason": "MemberAccess 23: only fixed-array length members are supported",
+      "reason": "MemberAccess 23: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "functionTypes/comparison_operators_for_external_functions.sol"
     },
@@ -10220,8 +10156,8 @@
         "library calls and contract-name members",
         "source units without exactly one contract"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 62: dynamic arrays are not supported",
+      "first": "library calls and contract-name members",
+      "reason": "MemberAccess 72: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "functionTypes/function_type_library_internal.sol"
     },
@@ -10238,7 +10174,7 @@
         "this"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 7: only fixed-array length members are supported",
+      "reason": "MemberAccess 7: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "functionTypes/inline_array_with_value_call_option.sol"
     },
@@ -10283,7 +10219,7 @@
         "this"
       ],
       "first": "external calls and contract members",
-      "reason": "MemberAccess 10: only fixed-array length members are supported",
+      "reason": "MemberAccess 10: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "functionTypes/pass_function_types_externally.sol"
     },
@@ -10347,7 +10283,7 @@
         "source units without exactly one contract"
       ],
       "first": "function members (selector, address, \u2026)",
-      "reason": "MemberAccess 18: only fixed-array length members are supported",
+      "reason": "MemberAccess 18: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "functionTypes/selector_2.sol"
     },
@@ -10373,7 +10309,7 @@
         "this"
       ],
       "first": "function members (selector, address, \u2026)",
-      "reason": "MemberAccess 10: only fixed-array length members are supported",
+      "reason": "MemberAccess 10: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "functionTypes/selector_expression_side_effect.sol"
     },
@@ -10386,7 +10322,7 @@
         "this"
       ],
       "first": "function members (selector, address, \u2026)",
-      "reason": "MemberAccess 22: only fixed-array length members are supported",
+      "reason": "MemberAccess 22: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "functionTypes/selector_ternary.sol"
     },
@@ -10416,7 +10352,7 @@
         "this"
       ],
       "first": "function members (selector, address, \u2026)",
-      "reason": "MemberAccess 16: only fixed-array length members are supported",
+      "reason": "MemberAccess 16: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "functionTypes/stack_height_check_on_adding_gas_variable_to_function.sol"
     },
@@ -10560,7 +10496,6 @@
     {
       "category": "import-rejected",
       "features": [
-        "array values",
         "arrays",
         "constructors",
         "mappings",
@@ -10575,7 +10510,6 @@
     {
       "category": "import-rejected",
       "features": [
-        "array values",
         "arrays",
         "constructors",
         "public state variables"
@@ -10611,7 +10545,6 @@
     {
       "category": "import-rejected",
       "features": [
-        "array values",
         "arrays",
         "constructors",
         "mappings",
@@ -10980,7 +10913,6 @@
     {
       "category": "import-rejected",
       "features": [
-        "arrays",
         "constructors",
         "immutables",
         "memory arrays (new T[](n))",
@@ -11012,7 +10944,7 @@
         "source units without exactly one contract"
       ],
       "first": "external calls and contract members",
-      "reason": "MemberAccess 31: only fixed-array length members are supported",
+      "reason": "MemberAccess 31: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "inheritance/address_overload_resolution.sol"
     },
@@ -11233,8 +11165,8 @@
         "source units without exactly one contract",
         "unimplemented functions"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 26: dynamic arrays are not supported",
+      "first": "external calls and contract members",
+      "reason": "UserDefinedTypeName 43: unsupported type name UserDefinedTypeName",
       "scan_agrees": true,
       "test": "inheritance/inherited_function_calldata_calldata_interface.sol"
     },
@@ -11273,8 +11205,8 @@
         "source units without exactly one contract",
         "unimplemented functions"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 26: dynamic arrays are not supported",
+      "first": "external calls and contract members",
+      "reason": "UserDefinedTypeName 43: unsupported type name UserDefinedTypeName",
       "scan_agrees": true,
       "test": "inheritance/inherited_function_calldata_memory_interface.sol"
     },
@@ -11286,7 +11218,7 @@
         "source units without exactly one contract"
       ],
       "first": "library calls and contract-name members",
-      "reason": "MemberAccess 23: only fixed-array length members are supported",
+      "reason": "MemberAccess 23: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "inheritance/inherited_function_from_a_library.sol"
     },
@@ -11608,8 +11540,8 @@
         "inline assembly",
         "local reference bindings"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 4: dynamic arrays are not supported",
+      "first": "inline assembly",
+      "reason": "InlineAssembly 13: unsupported statement InlineAssembly",
       "scan_agrees": true,
       "test": "inlineAssembly/calldata_array_assign_dynamic.sol"
     },
@@ -11634,8 +11566,8 @@
         "inline assembly",
         "local reference bindings"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 4: dynamic arrays are not supported",
+      "first": "inline assembly",
+      "reason": "InlineAssembly 14: unsupported statement InlineAssembly",
       "scan_agrees": true,
       "test": "inlineAssembly/calldata_array_read.sol"
     },
@@ -12139,12 +12071,11 @@
     {
       "category": "import-rejected",
       "features": [
-        "arrays",
         "inline assembly",
         "require/assert/revert"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "first": "inline assembly",
+      "reason": "InlineAssembly 8: unsupported statement InlineAssembly",
       "scan_agrees": true,
       "test": "inlineAssembly/keccak256_optimizer_cache_bug.sol"
     },
@@ -12167,7 +12098,7 @@
         "type(\u2026)"
       ],
       "first": "type(\u2026)",
-      "reason": "MemberAccess 11: only fixed-array length members are supported",
+      "reason": "MemberAccess 11: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "inlineAssembly/keccak_yul_optimization.sol"
     },
@@ -12473,7 +12404,7 @@
         "type(\u2026)"
       ],
       "first": "type(\u2026)",
-      "reason": "MemberAccess 11: only fixed-array length members are supported",
+      "reason": "MemberAccess 11: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "integer/basic.sol"
     },
@@ -12486,7 +12417,7 @@
         "type(\u2026)"
       ],
       "first": "type(\u2026)",
-      "reason": "MemberAccess 11: only fixed-array length members are supported",
+      "reason": "MemberAccess 11: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "integer/int.sol"
     },
@@ -12515,7 +12446,7 @@
         "type(\u2026)"
       ],
       "first": "type(\u2026)",
-      "reason": "MemberAccess 11: only fixed-array length members are supported",
+      "reason": "MemberAccess 11: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "integer/uint.sol"
     },
@@ -12636,7 +12567,7 @@
         "msg/block/tx globals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 7: only fixed-array length members are supported",
+      "reason": "MemberAccess 7: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "isoltestTesting/account.sol"
     },
@@ -12755,7 +12686,7 @@
         "require/assert/revert"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 19: only fixed-array length members are supported",
+      "reason": "MemberAccess 19: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "isoltestTesting/precompiles_ignoring_trailing_input.sol"
     },
@@ -12904,7 +12835,7 @@
         "this"
       ],
       "first": "external calls and contract members",
-      "reason": "MemberAccess 43: only fixed-array length members are supported",
+      "reason": "MemberAccess 43: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "libraries/external_call_with_function_pointer_parameter.sol"
     },
@@ -12919,7 +12850,7 @@
         "source units without exactly one contract"
       ],
       "first": "library calls and contract-name members",
-      "reason": "MemberAccess 41: only fixed-array length members are supported",
+      "reason": "MemberAccess 41: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "libraries/external_call_with_storage_array_parameter.sol"
     },
@@ -12934,7 +12865,7 @@
         "source units without exactly one contract"
       ],
       "first": "library calls and contract-name members",
-      "reason": "MemberAccess 41: only fixed-array length members are supported",
+      "reason": "MemberAccess 41: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "libraries/external_call_with_storage_mapping_parameter.sol"
     },
@@ -12963,7 +12894,7 @@
         "source units without exactly one contract"
       ],
       "first": "library calls and contract-name members",
-      "reason": "MemberAccess 15: only fixed-array length members are supported",
+      "reason": "MemberAccess 15: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "libraries/internal_call_unattached_with_parentheses.sol"
     },
@@ -12977,8 +12908,8 @@
         "memory arrays (new T[](n))",
         "source units without exactly one contract"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 22: dynamic arrays are not supported",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 26: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "libraries/internal_library_function.sol"
     },
@@ -13011,7 +12942,6 @@
     {
       "category": "import-rejected",
       "features": [
-        "array values",
         "arrays",
         "libraries",
         "source units without exactly one contract",
@@ -13263,8 +13193,8 @@
         "memory arrays (new T[](n))",
         "source units without exactly one contract"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 33: dynamic arrays are not supported",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 37: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "libraries/internal_library_function_calling_private.sol"
     },
@@ -13312,8 +13242,8 @@
         "type names as values",
         "type(\u2026)"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 41: dynamic arrays are not supported",
+      "first": "library calls and contract-name members",
+      "reason": "MemberAccess 81: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "libraries/internal_types_in_library.sol"
     },
@@ -13331,7 +13261,7 @@
         "type names as values"
       ],
       "first": "library calls and contract-name members",
-      "reason": "MemberAccess 49: only fixed-array length members are supported",
+      "reason": "MemberAccess 49: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "libraries/library_address.sol"
     },
@@ -13346,7 +13276,7 @@
         "source units without exactly one contract"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 50: only fixed-array length members are supported",
+      "reason": "MemberAccess 50: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "libraries/library_address_homestead.sol"
     },
@@ -13365,7 +13295,7 @@
         "type names as values"
       ],
       "first": "imports",
-      "reason": "MemberAccess 34: only fixed-array length members are supported",
+      "reason": "MemberAccess 34: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "libraries/library_address_via_module.sol"
     },
@@ -13402,8 +13332,8 @@
         "source units without exactly one contract",
         "type names as values"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 14: dynamic arrays are not supported",
+      "first": "constructors",
+      "reason": "FunctionDefinition 27: unsupported function kind constructor",
       "scan_agrees": true,
       "test": "libraries/library_delegatecall_guard_pure.sol"
     },
@@ -13426,8 +13356,8 @@
         "source units without exactly one contract",
         "type names as values"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 15: dynamic arrays are not supported",
+      "first": "constructors",
+      "reason": "FunctionDefinition 28: unsupported function kind constructor",
       "scan_agrees": true,
       "test": "libraries/library_delegatecall_guard_view_needed.sol"
     },
@@ -13450,8 +13380,8 @@
         "source units without exactly one contract",
         "type names as values"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 14: dynamic arrays are not supported",
+      "first": "constructors",
+      "reason": "FunctionDefinition 25: unsupported function kind constructor",
       "scan_agrees": true,
       "test": "libraries/library_delegatecall_guard_view_not_needed.sol"
     },
@@ -13488,7 +13418,7 @@
         "source units without exactly one contract"
       ],
       "first": "library calls and contract-name members",
-      "reason": "MemberAccess 11: only fixed-array length members are supported",
+      "reason": "MemberAccess 11: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "libraries/library_enum_as_an_expression.sol"
     },
@@ -13510,7 +13440,6 @@
       "features": [
         "abi.* functions",
         "address members (balance, call, transfer, \u2026)",
-        "array values",
         "arrays",
         "bytes and string",
         "constructors",
@@ -13525,8 +13454,8 @@
         "source units without exactly one contract",
         "type names as values"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 37: dynamic arrays are not supported",
+      "first": "constructors",
+      "reason": "FunctionDefinition 53: unsupported function kind constructor",
       "scan_agrees": true,
       "test": "libraries/library_function_selectors.sol"
     },
@@ -13595,7 +13524,7 @@
         "this"
       ],
       "first": "external calls and contract members",
-      "reason": "MemberAccess 21: only fixed-array length members are supported",
+      "reason": "MemberAccess 21: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "libraries/library_staticcall_delegatecall.sol"
     },
@@ -13607,7 +13536,7 @@
         "source units without exactly one contract"
       ],
       "first": "library calls and contract-name members",
-      "reason": "MemberAccess 26: only fixed-array length members are supported",
+      "reason": "MemberAccess 26: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "libraries/library_stray_values.sol"
     },
@@ -13621,7 +13550,7 @@
         "structs"
       ],
       "first": "library calls and contract-name members",
-      "reason": "MemberAccess 13: only fixed-array length members are supported",
+      "reason": "MemberAccess 13: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "libraries/library_struct_as_an_expression.sol"
     },
@@ -13636,7 +13565,7 @@
         "source units without exactly one contract"
       ],
       "first": "library calls and contract-name members",
-      "reason": "MemberAccess 51: only fixed-array length members are supported",
+      "reason": "MemberAccess 51: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "libraries/mapping_arguments_in_library.sol"
     },
@@ -13652,7 +13581,7 @@
         "source units without exactly one contract"
       ],
       "first": "library calls and contract-name members",
-      "reason": "MemberAccess 48: only fixed-array length members are supported",
+      "reason": "MemberAccess 48: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "libraries/mapping_returns_in_library.sol"
     },
@@ -13667,7 +13596,7 @@
         "source units without exactly one contract"
       ],
       "first": "library calls and contract-name members",
-      "reason": "MemberAccess 62: only fixed-array length members are supported",
+      "reason": "MemberAccess 62: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "libraries/mapping_returns_in_library_named.sol"
     },
@@ -13680,7 +13609,7 @@
         "source units without exactly one contract"
       ],
       "first": "library calls and contract-name members",
-      "reason": "MemberAccess 15: only fixed-array length members are supported",
+      "reason": "MemberAccess 15: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "libraries/payable_function_calls_library.sol"
     },
@@ -13692,7 +13621,7 @@
         "source units without exactly one contract"
       ],
       "first": "library calls and contract-name members",
-      "reason": "MemberAccess 21: only fixed-array length members are supported",
+      "reason": "MemberAccess 21: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "libraries/stub.sol"
     },
@@ -13704,7 +13633,7 @@
         "source units without exactly one contract"
       ],
       "first": "library calls and contract-name members",
-      "reason": "MemberAccess 21: only fixed-array length members are supported",
+      "reason": "MemberAccess 21: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "libraries/stub_internal.sol"
     },
@@ -13789,7 +13718,7 @@
         "source units without exactly one contract"
       ],
       "first": "library calls and contract-name members",
-      "reason": "MemberAccess 44: only fixed-array length members are supported",
+      "reason": "MemberAccess 44: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "libraries/using_library_mappings_public.sol"
     },
@@ -13804,7 +13733,7 @@
         "source units without exactly one contract"
       ],
       "first": "library calls and contract-name members",
-      "reason": "MemberAccess 44: only fixed-array length members are supported",
+      "reason": "MemberAccess 44: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "libraries/using_library_mappings_return.sol"
     },
@@ -13853,7 +13782,7 @@
         "bytes and string"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 13: only fixed-array length members are supported",
+      "reason": "MemberAccess 13: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "literals/escape.sol"
     },
@@ -13954,18 +13883,18 @@
         "inline assembly",
         "require/assert/revert"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 6: dynamic arrays are not supported",
+      "first": "inline assembly",
+      "reason": "InlineAssembly 12: unsupported statement InlineAssembly",
       "scan_agrees": true,
       "test": "memoryManagement/assembly_access.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "arrays"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 21: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for memoryManagement/memory_types_initialisation.sol",
       "scan_agrees": true,
       "test": "memoryManagement/memory_types_initialisation.sol"
     },
@@ -15012,7 +14941,7 @@
         "using for"
       ],
       "first": "user-defined value types",
-      "reason": "MemberAccess 5304: only fixed-array length members are supported",
+      "reason": "MemberAccess 5304: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "operators/userDefined/all_possible_user_defined_value_types_with_operators.sol"
     },
@@ -15754,7 +15683,7 @@
         "tuples of literals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 11: only fixed-array length members are supported",
+      "reason": "MemberAccess 11: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "smoke/basic.sol"
     },
@@ -15844,7 +15773,7 @@
         "require/assert/revert"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 13: only fixed-array length members are supported",
+      "reason": "MemberAccess 13: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "specialFunctions/abi_encode_with_signature_from_string.sol"
     },
@@ -15854,7 +15783,7 @@
         "abi.* functions"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 5: only fixed-array length members are supported",
+      "reason": "MemberAccess 5: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "specialFunctions/abi_functions_member_access.sol"
     },
@@ -15888,7 +15817,7 @@
         "msg/block/tx globals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 6: only fixed-array length members are supported",
+      "reason": "MemberAccess 6: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "state/block_basefee.sol"
     },
@@ -15899,7 +15828,7 @@
         "msg/block/tx globals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 6: only fixed-array length members are supported",
+      "reason": "MemberAccess 6: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "state/block_blobbasefee.sol"
     },
@@ -15909,7 +15838,7 @@
         "msg/block/tx globals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 6: only fixed-array length members are supported",
+      "reason": "MemberAccess 6: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "state/block_chainid.sol"
     },
@@ -15919,7 +15848,7 @@
         "msg/block/tx globals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 6: only fixed-array length members are supported",
+      "reason": "MemberAccess 6: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "state/block_coinbase.sol"
     },
@@ -15937,7 +15866,7 @@
         "msg/block/tx globals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 6: only fixed-array length members are supported",
+      "reason": "MemberAccess 6: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "state/block_difficulty_post_paris.sol"
     },
@@ -15947,7 +15876,7 @@
         "msg/block/tx globals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 6: only fixed-array length members are supported",
+      "reason": "MemberAccess 6: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "state/block_gaslimit.sol"
     },
@@ -15968,7 +15897,7 @@
         "msg/block/tx globals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 6: only fixed-array length members are supported",
+      "reason": "MemberAccess 6: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "state/block_prevrandao.sol"
     },
@@ -16031,7 +15960,7 @@
         "msg/block/tx globals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 6: only fixed-array length members are supported",
+      "reason": "MemberAccess 6: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "state/msg_data.sol"
     },
@@ -16041,7 +15970,7 @@
         "msg/block/tx globals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 6: only fixed-array length members are supported",
+      "reason": "MemberAccess 6: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "state/msg_sender.sol"
     },
@@ -16051,7 +15980,7 @@
         "msg/block/tx globals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 6: only fixed-array length members are supported",
+      "reason": "MemberAccess 6: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "state/msg_sig.sol"
     },
@@ -16062,7 +15991,7 @@
         "payable functions"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 6: only fixed-array length members are supported",
+      "reason": "MemberAccess 6: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "state/msg_value.sol"
     },
@@ -16072,7 +16001,7 @@
         "msg/block/tx globals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 6: only fixed-array length members are supported",
+      "reason": "MemberAccess 6: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "state/tx_gasprice.sol"
     },
@@ -16082,7 +16011,7 @@
         "msg/block/tx globals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 6: only fixed-array length members are supported",
+      "reason": "MemberAccess 6: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "state/tx_origin.sol"
     },
@@ -16105,7 +16034,7 @@
         "msg/block/tx globals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 8: only fixed-array length members are supported",
+      "reason": "MemberAccess 8: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "state/uncalled_blockhash.sol"
     },
@@ -16128,10 +16057,7 @@
     {
       "category": "import-rejected",
       "features": [
-        "array values",
-        "arrays",
         "constructors",
-        "mappings",
         "public state variables"
       ],
       "first": "public state variables",
@@ -16217,15 +16143,13 @@
     {
       "category": "import-rejected",
       "features": [
-        "array values",
-        "arrays",
         "inline assembly",
         "operator delete",
         "require/assert/revert",
         "transient storage"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "first": "require/assert/revert",
+      "reason": "Identifier 25: built-in assert is not supported",
       "scan_agrees": true,
       "test": "storage/delete_overlapping_transient_after_storage_array_pop_same_base_type.sol"
     },
@@ -16386,27 +16310,27 @@
       "test": "storage/mapping_string_key.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "array values",
         "arrays",
         "local reference bindings",
         "operator delete"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 5: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for storage/mappings_array2d_pop_delete.sol",
       "scan_agrees": true,
       "test": "storage/mappings_array2d_pop_delete.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "array values",
         "arrays",
         "operator delete"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 4: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for storage/mappings_array_pop_delete.sol",
       "scan_agrees": true,
       "test": "storage/mappings_array_pop_delete.sol"
     },
@@ -16765,7 +16689,6 @@
       "category": "import-rejected",
       "features": [
         "array values",
-        "arrays",
         "operator delete",
         "public state variables"
       ],
@@ -16789,12 +16712,10 @@
     {
       "category": "import-rejected",
       "features": [
-        "array values",
-        "arrays",
         "require/assert/revert"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 8: dynamic arrays are not supported",
+      "first": "require/assert/revert",
+      "reason": "Identifier 45: built-in require is not supported",
       "scan_agrees": true,
       "test": "storageLayoutSpecifier/dynamic_array_storage_end.sol"
     },
@@ -16851,7 +16772,7 @@
         "source units without exactly one contract"
       ],
       "first": "external calls and contract members",
-      "reason": "MemberAccess 67: only fixed-array length members are supported",
+      "reason": "MemberAccess 67: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "storageLayoutSpecifier/inheritance_constructor_order_setting_storage_var.sol"
     },
@@ -16966,7 +16887,7 @@
         "source units without exactly one contract"
       ],
       "first": "external calls and contract members",
-      "reason": "MemberAccess 74: only fixed-array length members are supported",
+      "reason": "MemberAccess 74: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "storageLayoutSpecifier/inheritance_modifier_calling_revert.sol"
     },
@@ -17145,7 +17066,6 @@
       "category": "import-rejected",
       "features": [
         "array values",
-        "arrays",
         "contracts without functions",
         "inheritance",
         "memory arrays (new T[](n))",
@@ -17344,7 +17264,7 @@
         "type names as values"
       ],
       "first": "bytes and string",
-      "reason": "MemberAccess 11: only fixed-array length members are supported",
+      "reason": "MemberAccess 11: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "strings/concat/string_concat_2_args.sol"
     },
@@ -17370,7 +17290,7 @@
         "type names as values"
       ],
       "first": "bytes and string",
-      "reason": "MemberAccess 7: only fixed-array length members are supported",
+      "reason": "MemberAccess 7: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "strings/concat/string_concat_empty_argument_list.sol"
     },
@@ -17381,7 +17301,7 @@
         "type names as values"
       ],
       "first": "bytes and string",
-      "reason": "MemberAccess 14: only fixed-array length members are supported",
+      "reason": "MemberAccess 14: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "strings/concat/string_concat_empty_strings.sol"
     },
@@ -17392,7 +17312,7 @@
         "type names as values"
       ],
       "first": "bytes and string",
-      "reason": "MemberAccess 16: only fixed-array length members are supported",
+      "reason": "MemberAccess 16: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "strings/concat/string_concat_nested.sol"
     },
@@ -17570,8 +17490,8 @@
         "require/assert/revert",
         "structs"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 8: dynamic arrays are not supported",
+      "first": "structs",
+      "reason": "UserDefinedTypeName 6: unsupported type name UserDefinedTypeName",
       "scan_agrees": true,
       "test": "structs/copy_struct_array_from_storage.sol"
     },
@@ -17711,7 +17631,7 @@
         "structs"
       ],
       "first": "library calls and contract-name members",
-      "reason": "MemberAccess 27: only fixed-array length members are supported",
+      "reason": "MemberAccess 27: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "structs/event.sol"
     },
@@ -18209,7 +18129,6 @@
     {
       "category": "import-rejected",
       "features": [
-        "array values",
         "arrays",
         "declaration values",
         "require/assert/revert",
@@ -18688,7 +18607,7 @@
         "this"
       ],
       "first": "function members (selector, address, \u2026)",
-      "reason": "MemberAccess 7: only fixed-array length members are supported",
+      "reason": "MemberAccess 7: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "types/external_function_to_address.sol"
     },
@@ -18951,7 +18870,7 @@
         "type(\u2026)"
       ],
       "first": "type(\u2026)",
-      "reason": "MemberAccess 19: only fixed-array length members are supported",
+      "reason": "MemberAccess 19: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "types/type_conversion_cleanup.sol"
     },
@@ -19404,7 +19323,7 @@
         "user-defined value types"
       ],
       "first": "user-defined value types",
-      "reason": "MemberAccess 7: only fixed-array length members are supported",
+      "reason": "MemberAccess 7: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "userDefinedValueType/wrap_unwrap.sol"
     },
@@ -19798,7 +19717,7 @@
         "transient storage"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 9: only fixed-array length members are supported",
+      "reason": "MemberAccess 9: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "variables/transient_state_address_variable_members.sol"
     },
@@ -19923,7 +19842,7 @@
         "source units without exactly one contract"
       ],
       "first": "address members (balance, call, transfer, \u2026)",
-      "reason": "MemberAccess 18: only fixed-array length members are supported",
+      "reason": "MemberAccess 18: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "various/address_code_complex.sol"
     },
@@ -19992,7 +19911,7 @@
         "type(\u2026)"
       ],
       "first": "type(\u2026)",
-      "reason": "MemberAccess 29: only fixed-array length members are supported",
+      "reason": "MemberAccess 29: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "various/code_access_create.sol"
     },
@@ -20005,7 +19924,7 @@
         "type(\u2026)"
       ],
       "first": "type(\u2026)",
-      "reason": "MemberAccess 19: only fixed-array length members are supported",
+      "reason": "MemberAccess 19: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "various/code_access_padding.sol"
     },
@@ -20075,7 +19994,7 @@
         "this"
       ],
       "first": "address members (balance, call, transfer, \u2026)",
-      "reason": "MemberAccess 9: only fixed-array length members are supported",
+      "reason": "MemberAccess 9: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "various/codehash.sol"
     },
@@ -20530,8 +20449,8 @@
         "this",
         "tuples of literals"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 5: dynamic arrays are not supported",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 13: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "various/skip_dynamic_types.sol"
     },
@@ -20600,7 +20519,7 @@
         "unimplemented functions"
       ],
       "first": "external calls and contract members",
-      "reason": "MemberAccess 37: only fixed-array length members are supported",
+      "reason": "MemberAccess 37: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "various/staticcall_for_view_and_pure.sol"
     },
@@ -20630,7 +20549,7 @@
         "msg/block/tx globals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 11: only fixed-array length members are supported",
+      "reason": "MemberAccess 11: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "various/store_bytes.sol"
     },
@@ -20729,8 +20648,8 @@
         "tuples of literals",
         "tuples with empty components"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "first": "external calls and contract members",
+      "reason": "MemberAccess 55: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "various/tuples.sol"
     },
@@ -20970,7 +20889,6 @@
     {
       "category": "import-rejected",
       "features": [
-        "array values",
         "arrays",
         "declaration values",
         "external calls and contract members",
@@ -21100,8 +21018,8 @@
         "inline assembly",
         "memory arrays (new T[](n))"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 8: dynamic arrays are not supported",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 12: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "viaYul/dirty_memory_dynamic_array.sol"
     },
@@ -21232,18 +21150,18 @@
         "this"
       ],
       "first": "function members (selector, address, \u2026)",
-      "reason": "MemberAccess 12: only fixed-array length members are supported",
+      "reason": "MemberAccess 12: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "viaYul/function_address.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "arrays",
         "payable functions"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 49: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for viaYul/function_entry_checks.sol",
       "scan_agrees": true,
       "test": "viaYul/function_entry_checks.sol"
     },
@@ -21267,7 +21185,7 @@
         "this"
       ],
       "first": "function members (selector, address, \u2026)",
-      "reason": "MemberAccess 7: only fixed-array length members are supported",
+      "reason": "MemberAccess 7: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "viaYul/function_selector.sol"
     },
@@ -21430,7 +21348,7 @@
         "type(\u2026)"
       ],
       "first": "type(\u2026)",
-      "reason": "MemberAccess 14: only fixed-array length members are supported",
+      "reason": "MemberAccess 14: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "viaYul/negation_bug.sol"
     },
@@ -21464,14 +21382,14 @@
       "test": "viaYul/return_and_convert.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "array values",
         "arrays",
         "local reference bindings"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for viaYul/return_storage_pointers.sol",
       "scan_agrees": true,
       "test": "viaYul/return_storage_pointers.sol"
     },
@@ -21552,12 +21470,10 @@
     {
       "category": "import-rejected",
       "features": [
-        "array values",
-        "arrays",
         "inline assembly"
       ],
-      "first": "arrays",
-      "reason": "ArrayTypeName 2: dynamic arrays are not supported",
+      "first": "inline assembly",
+      "reason": "InlineAssembly 13: unsupported statement InlineAssembly",
       "scan_agrees": true,
       "test": "viaYul/storage/dirty_storage_dynamic_array.sol"
     },
@@ -21593,7 +21509,7 @@
         "type(\u2026)"
       ],
       "first": "type(\u2026)",
-      "reason": "MemberAccess 50: only fixed-array length members are supported",
+      "reason": "MemberAccess 50: only array length, push and pop members are supported",
       "scan_agrees": true,
       "test": "viaYul/storage/mappings.sol"
     },
