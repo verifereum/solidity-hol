@@ -7,15 +7,16 @@
  *     invoke_source m env f_id (encoded args) st gas =
  *       <| completion := result_completion enc (f args); state := st;
  *          unused_gas_evidence := gas |>
- * Values: uintN is num and bool is bool. Revert and panic are Reverts and
- * Panics; return, break and continue are control flow in the shallow terms.
+ * Values: uintN is num and bool is bool. A failed arithmetic check is Panics;
+ * Reverts is not produced yet (docs/translator.md lists what is not covered).
+ * Return, break and continue are control flow in the shallow terms.
  *)
 Theory solidityShallow
 Ancestors
   arithmetic integer finite_map solidityAST solidityCore solidityCoreWf solidityScalar solidityState
   solidityEvaluator solidityEvaluatorProps
 Libs
-  intLib monadsyntax
+  intLib
 
 Datatype:
   sol_result = Returns 'a | Reverts (byte list) | Panics num
@@ -35,12 +36,6 @@ Theorem sol_bind_cong[defncong]:
 Proof
   Cases_on ‘m2’ >> rw[sol_bind_def]
 QED
-
-val () = declare_monad ("sol",
-  {bind = “sol_bind”, unit = “Returns”, ignorebind = NONE, choice = NONE,
-   fail = NONE, guard = NONE});
-val () = enable_monadsyntax ();
-val () = enable_monad "sol";
 
 (* Checked unsigned arithmetic *)
 

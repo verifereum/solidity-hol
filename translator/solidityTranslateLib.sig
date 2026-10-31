@@ -15,9 +15,10 @@ sig
    * a loop gets a helper prefix ^ f ^ "_loop" with its own theorem.
    *
    * termination and loops give, by function name, a tactic proving the
-   * termination of the function's definition when Define cannot, and of its
-   * loop helper. A function the translator does not cover yet is Unsupported,
-   * and so are its callers; any other failure is Failed, a translator bug. *)
+   * termination of the function's definition and of its loop helper when
+   * Define cannot; a loop helper always needs one. A function the translator
+   * does not cover yet is Unsupported, and so are its callers; so are
+   * overloaded functions. Any other failure is Failed, a translator bug. *)
   val translate_unit :
     {prefix : string, unit_def : thm, program_def : thm,
      termination : (string * tactic) list, loops : (string * tactic) list} ->
