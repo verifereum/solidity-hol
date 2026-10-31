@@ -2,8 +2,10 @@
   "counts": {
     "admitted": 142,
     "compile-failure": 0,
-    "elaboration-rejected": 215,
-    "import-rejected": 1213,
+    "elaboration-rejected": 225,
+    "import-rejected": 1203,
+    "invalid-core": 0,
+    "malformed-input": 0,
     "skipped": 100
   },
   "features": [
@@ -76,7 +78,7 @@
     },
     {
       "feature": "external calls and contract members",
-      "first_rejection": 32,
+      "first_rejection": 31,
       "node_types": [
         "FunctionCall",
         "MemberAccess",
@@ -229,7 +231,7 @@
     },
     {
       "feature": "type names as values",
-      "first_rejection": 8,
+      "first_rejection": 6,
       "node_types": [
         "ElementaryTypeNameExpression"
       ],
@@ -334,7 +336,7 @@
     },
     {
       "feature": "imports",
-      "first_rejection": 9,
+      "first_rejection": 1,
       "node_types": [
         "ImportDirective",
         "MemberAccess",
@@ -446,7 +448,7 @@
     },
     {
       "feature": "conditional expressions",
-      "first_rejection": 22,
+      "first_rejection": 21,
       "node_types": [
         "Conditional"
       ],
@@ -666,7 +668,7 @@
     },
     {
       "feature": "array type expressions",
-      "first_rejection": 1,
+      "first_rejection": 3,
       "node_types": [
         "IndexAccess"
       ],
@@ -857,8 +859,8 @@
         "members of elementary type names",
         "type names as values"
       ],
-      "first": "type names as values",
-      "reason": "ElementaryTypeNameExpression 12: unsupported expression ElementaryTypeNameExpression",
+      "first": "array type expressions",
+      "reason": "IndexAccess 13: array type expressions are not supported",
       "scan_agrees": true,
       "test": "abicoder/abi_decode_from_calldata_dynamic_array.sol"
     },
@@ -956,8 +958,8 @@
         "members of elementary type names",
         "type names as values"
       ],
-      "first": "type names as values",
-      "reason": "ElementaryTypeNameExpression 21: unsupported expression ElementaryTypeNameExpression",
+      "first": "array type expressions",
+      "reason": "IndexAccess 22: array type expressions are not supported",
       "scan_agrees": true,
       "test": "abicoder/abi_decode_overlapping_dynamic_arrays.sol"
     },
@@ -1369,7 +1371,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for abicoder/bug_abi_encoder_v2_head_overflow_with_static_array_cleanup.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "abicoder/bug_abi_encoder_v2_head_overflow_with_static_array_cleanup.sol"
     },
@@ -1380,7 +1382,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/array/byte_arrays.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/byte_arrays.sol"
     },
@@ -1419,7 +1421,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/array/calldata_array_bytes_v2.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_bytes_v2.sol"
     },
@@ -1495,7 +1497,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/array/calldata_array_dynamic_static_short_decode_v2.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_dynamic_static_short_decode_v2.sol"
     },
@@ -1537,7 +1539,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/array/calldata_array_indexing_1d_2d_v2.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_indexing_1d_2d_v2.sol"
     },
@@ -1556,7 +1558,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/array/calldata_array_indexing_3d_v2.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_indexing_3d_v2.sol"
     },
@@ -1612,7 +1614,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/array/calldata_array_length_v2.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_length_v2.sol"
     },
@@ -1674,7 +1676,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/array/calldata_array_static_of_uint_v2.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_static_of_uint_v2.sol"
     },
@@ -1718,7 +1720,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/array/calldata_array_struct_static_v2.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_struct_static_v2.sol"
     },
@@ -1770,7 +1772,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/array/calldata_dynamic_array_to_memory_v2.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_dynamic_array_to_memory_v2.sol"
     },
@@ -1831,7 +1833,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/array/calldata_string_array_v2.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_string_array_v2.sol"
     },
@@ -1857,7 +1859,7 @@
         "arrays"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/array/memory_arrays_static.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/memory_arrays_static.sol"
     },
@@ -1895,7 +1897,7 @@
         "arrays"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/array/memory_dynamic_arrays.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/memory_dynamic_arrays.sol"
     },
@@ -1975,7 +1977,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/struct/member_array_dynamic2_v2.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/struct/member_array_dynamic2_v2.sol"
     },
@@ -1987,7 +1989,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/struct/member_array_dynamic_multiple_fields_v2.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/struct/member_array_dynamic_multiple_fields_v2.sol"
     },
@@ -2015,7 +2017,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/struct/member_array_static_mulitple_fields_v2.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/struct/member_array_static_mulitple_fields_v2.sol"
     },
@@ -2057,7 +2059,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/struct/multiple_structs_v2.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/struct/multiple_structs_v2.sol"
     },
@@ -2068,7 +2070,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/struct/nested_static_3_fields_v2.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/struct/nested_static_3_fields_v2.sol"
     },
@@ -2079,7 +2081,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/struct/nested_static_4_fields_v2.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/struct/nested_static_4_fields_v2.sol"
     },
@@ -2091,7 +2093,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/struct/nested_with_bytes_v2.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/struct/nested_with_bytes_v2.sol"
     },
@@ -2104,7 +2106,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/struct/nested_with_dynamic_array_v2.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/struct/nested_with_dynamic_array_v2.sol"
     },
@@ -2116,7 +2118,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/struct/nested_with_dynamic_struct_array_v2.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/struct/nested_with_dynamic_struct_array_v2.sol"
     },
@@ -2127,7 +2129,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/struct/short_v2.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/struct/short_v2.sol"
     },
@@ -2137,7 +2139,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/struct/simple_multiple_fields_short_types_v2.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/struct/simple_multiple_fields_short_types_v2.sol"
     },
@@ -2148,7 +2150,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/struct/simple_multiple_fields_v2.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/struct/simple_multiple_fields_v2.sol"
     },
@@ -2175,7 +2177,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/struct/struct_and_ints_v2.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/struct/struct_and_ints_v2.sol"
     },
@@ -2503,7 +2505,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for abicoder/validation/array_exceeds_calldatasize_no_revert_string.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "abicoder/validation/array_exceeds_calldatasize_no_revert_string.sol"
     },
@@ -2768,7 +2770,7 @@
         "mappings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/arrayMemoryAllocation/array_static_return_param_zeroed_memory_index_access.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/arrayMemoryAllocation/array_static_return_param_zeroed_memory_index_access.sol"
     },
@@ -2780,7 +2782,7 @@
         "mappings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/arrayMemoryAllocation/array_static_zeroed_memory_index_access.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/arrayMemoryAllocation/array_static_zeroed_memory_index_access.sol"
     },
@@ -3003,7 +3005,7 @@
         "bytes and string"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/byte_array_transitional_2.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/byte_array_transitional_2.sol"
     },
@@ -3066,7 +3068,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/calldata_array_bounds_check_nested_bytes.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/calldata_array_bounds_check_nested_bytes.sol"
     },
@@ -3168,7 +3170,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/array_copy_calldata_storage.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/array_copy_calldata_storage.sol"
     },
@@ -3243,7 +3245,7 @@
         "operator delete"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/array_copy_including_array.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/array_copy_including_array.sol"
     },
@@ -3267,7 +3269,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/array_copy_nested_array.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/array_copy_nested_array.sol"
     },
@@ -3279,7 +3281,7 @@
         "constant expressions over literals"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/array_copy_storage_abi_signed.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/array_copy_storage_abi_signed.sol"
     },
@@ -3289,7 +3291,7 @@
         "array values"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/array_copy_storage_storage_different_base.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/array_copy_storage_storage_different_base.sol"
     },
@@ -3299,7 +3301,7 @@
         "array values"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/array_copy_storage_storage_different_base_nested.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/array_copy_storage_storage_different_base_nested.sol"
     },
@@ -3320,7 +3322,7 @@
         "array values"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/array_copy_storage_storage_dynamic_dynamic.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/array_copy_storage_storage_dynamic_dynamic.sol"
     },
@@ -3330,7 +3332,7 @@
         "array values"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/array_copy_storage_storage_static_dynamic.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/array_copy_storage_storage_static_dynamic.sol"
     },
@@ -3340,7 +3342,7 @@
         "array values"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/array_copy_storage_storage_static_simple.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/array_copy_storage_storage_static_simple.sol"
     },
@@ -3350,7 +3352,7 @@
         "array values"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/array_copy_storage_storage_static_static.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/array_copy_storage_storage_static_static.sol"
     },
@@ -3361,7 +3363,7 @@
         "array values"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/array_copy_storage_storage_struct.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/array_copy_storage_storage_struct.sol"
     },
@@ -3372,7 +3374,7 @@
         "arrays"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/array_copy_storage_to_memory.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/array_copy_storage_to_memory.sol"
     },
@@ -3384,7 +3386,7 @@
         "arrays"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/array_copy_storage_to_memory_nested.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/array_copy_storage_to_memory_nested.sol"
     },
@@ -3395,7 +3397,7 @@
         "literals of non-integer types"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/array_copy_target_leftover.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/array_copy_target_leftover.sol"
     },
@@ -3405,7 +3407,7 @@
         "array values"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/array_copy_target_leftover2.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/array_copy_target_leftover2.sol"
     },
@@ -3415,7 +3417,7 @@
         "array values"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/array_copy_target_simple.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/array_copy_target_simple.sol"
     },
@@ -3425,7 +3427,7 @@
         "array values"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/array_copy_target_simple_2.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/array_copy_target_simple_2.sol"
     },
@@ -3492,7 +3494,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/array_of_struct_calldata_to_memory.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/array_of_struct_calldata_to_memory.sol"
     },
@@ -3504,7 +3506,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/array_of_struct_calldata_to_storage.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/array_of_struct_calldata_to_storage.sol"
     },
@@ -3530,7 +3532,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/array_of_structs_containing_arrays_calldata_to_memory.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/array_of_structs_containing_arrays_calldata_to_memory.sol"
     },
@@ -3543,7 +3545,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/array_of_structs_containing_arrays_calldata_to_storage.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/array_of_structs_containing_arrays_calldata_to_storage.sol"
     },
@@ -3603,7 +3605,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/bytes_calldata_to_string_calldata.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/bytes_calldata_to_string_calldata.sol"
     },
@@ -3624,7 +3626,7 @@
         "bytes and string"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/bytes_memory_to_storage.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/bytes_memory_to_storage.sol"
     },
@@ -3676,7 +3678,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/calldata_2d_bytes_to_memory.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/calldata_2d_bytes_to_memory.sol"
     },
@@ -3689,7 +3691,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/calldata_2d_bytes_to_memory_2.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/calldata_2d_bytes_to_memory_2.sol"
     },
@@ -3701,7 +3703,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/calldata_array_dynamic_to_storage.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/calldata_array_dynamic_to_storage.sol"
     },
@@ -3714,7 +3716,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/calldata_array_of_struct_to_memory.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/calldata_array_of_struct_to_memory.sol"
     },
@@ -3726,7 +3728,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/calldata_array_static_to_memory.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/calldata_array_static_to_memory.sol"
     },
@@ -3738,7 +3740,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/calldata_array_to_mapping.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/calldata_array_to_mapping.sol"
     },
@@ -3750,7 +3752,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/calldata_bytes_array_to_memory.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/calldata_bytes_array_to_memory.sol"
     },
@@ -3761,7 +3763,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/calldata_bytes_to_storage.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/calldata_bytes_to_storage.sol"
     },
@@ -3773,7 +3775,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/calldata_dyn_2d_bytes_to_memory.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/calldata_dyn_2d_bytes_to_memory.sol"
     },
@@ -3785,7 +3787,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/calldata_dynamic_array_to_memory.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/calldata_dynamic_array_to_memory.sol"
     },
@@ -3810,7 +3812,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/calldata_to_storage_different_base.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/calldata_to_storage_different_base.sol"
     },
@@ -3836,7 +3838,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/copy_byte_array_in_struct_to_storage.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/copy_byte_array_in_struct_to_storage.sol"
     },
@@ -3938,7 +3940,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/elements_of_nested_array_of_structs_calldata_to_storage.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/elements_of_nested_array_of_structs_calldata_to_storage.sol"
     },
@@ -3950,7 +3952,7 @@
         "arrays"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/elements_of_nested_array_of_structs_memory_to_storage.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/elements_of_nested_array_of_structs_memory_to_storage.sol"
     },
@@ -4021,7 +4023,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/nested_array_calldata_to_memory.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/nested_array_calldata_to_memory.sol"
     },
@@ -4033,7 +4035,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/nested_array_calldata_to_storage.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/nested_array_calldata_to_storage.sol"
     },
@@ -4084,7 +4086,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/nested_array_element_calldata_to_storage.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/nested_array_element_calldata_to_storage.sol"
     },
@@ -4107,7 +4109,7 @@
         "arrays"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/nested_array_element_memory_to_storage.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/nested_array_element_memory_to_storage.sol"
     },
@@ -4160,7 +4162,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/nested_array_of_structs_calldata_to_memory.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/nested_array_of_structs_calldata_to_memory.sol"
     },
@@ -4172,7 +4174,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/nested_array_of_structs_calldata_to_storage.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/nested_array_of_structs_calldata_to_storage.sol"
     },
@@ -4183,7 +4185,7 @@
         "arrays"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/nested_array_of_structs_memory_to_memory.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/nested_array_of_structs_memory_to_memory.sol"
     },
@@ -4194,7 +4196,7 @@
         "arrays"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/nested_array_of_structs_memory_to_storage.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/nested_array_of_structs_memory_to_storage.sol"
     },
@@ -4267,7 +4269,7 @@
         "arrays"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/storage_memory_nested.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/storage_memory_nested.sol"
     },
@@ -4279,7 +4281,7 @@
         "bytes and string"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/storage_memory_nested_bytes.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/storage_memory_nested_bytes.sol"
     },
@@ -4292,7 +4294,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/storage_memory_nested_from_pointer.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/storage_memory_nested_from_pointer.sol"
     },
@@ -4305,7 +4307,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/storage_memory_nested_struct.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/storage_memory_nested_struct.sol"
     },
@@ -4316,7 +4318,7 @@
         "arrays"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/storage_memory_packed.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/storage_memory_packed.sol"
     },
@@ -4327,7 +4329,7 @@
         "arrays"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/storage_memory_packed_dyn.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/storage_memory_packed_dyn.sol"
     },
@@ -4338,7 +4340,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/copying/string_calldata_to_bytes_calldata.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/copying/string_calldata_to_bytes_calldata.sol"
     },
@@ -4449,7 +4451,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/delete/delete_on_array_of_structs.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/delete/delete_on_array_of_structs.sol"
     },
@@ -4498,7 +4500,7 @@
         "operator delete"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/delete/memory_arrays_delete.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/delete/memory_arrays_delete.sol"
     },
@@ -4509,7 +4511,7 @@
         "operator delete"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/delete/memory_bytes_delete_element.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/delete/memory_bytes_delete_element.sol"
     },
@@ -4574,7 +4576,7 @@
         "operator delete"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/dynamic_array_cleanup.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/dynamic_array_cleanup.sol"
     },
@@ -4584,7 +4586,7 @@
         "aggregate array mutation"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/dynamic_arrays_in_storage.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/dynamic_arrays_in_storage.sol"
     },
@@ -4596,7 +4598,7 @@
         "operator delete"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/dynamic_multi_array_cleanup.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/dynamic_multi_array_cleanup.sol"
     },
@@ -4628,7 +4630,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/external_array_args.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/external_array_args.sol"
     },
@@ -4639,7 +4641,7 @@
         "operator delete"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/fixed_array_cleanup.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/fixed_array_cleanup.sol"
     },
@@ -4683,7 +4685,7 @@
         "fixed-size bytes members and indexing"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/fixed_bytes_length_access.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/fixed_bytes_length_access.sol"
     },
@@ -4733,7 +4735,7 @@
         "arrays"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/indexAccess/arrays_complex_memory_index_access.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/indexAccess/arrays_complex_memory_index_access.sol"
     },
@@ -4755,7 +4757,7 @@
         "bytes and string"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/indexAccess/bytes_index_access_memory.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/indexAccess/bytes_index_access_memory.sol"
     },
@@ -4765,7 +4767,7 @@
         "bytes and string"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/indexAccess/bytes_memory_index_access.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/indexAccess/bytes_memory_index_access.sol"
     },
@@ -4826,7 +4828,7 @@
         "arrays"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/indexAccess/memory_arrays_dynamic_index_access_write.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/indexAccess/memory_arrays_dynamic_index_access_write.sol"
     },
@@ -4837,7 +4839,7 @@
         "arrays"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/indexAccess/memory_arrays_index_access_write.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/indexAccess/memory_arrays_index_access_write.sol"
     },
@@ -5009,7 +5011,7 @@
         "array members as values"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/pop/array_pop_isolated.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/pop/array_pop_isolated.sol"
     },
@@ -5043,7 +5045,7 @@
         "bytes and string"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/pop/byte_array_pop.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/pop/byte_array_pop.sol"
     },
@@ -5053,7 +5055,7 @@
         "bytes and string"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/pop/byte_array_pop_copy_long.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/pop/byte_array_pop_copy_long.sol"
     },
@@ -5063,7 +5065,7 @@
         "bytes and string"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/pop/byte_array_pop_empty_exception.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/pop/byte_array_pop_empty_exception.sol"
     },
@@ -5074,7 +5076,7 @@
         "bytes and string"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/pop/byte_array_pop_isolated.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/pop/byte_array_pop_isolated.sol"
     },
@@ -5084,7 +5086,7 @@
         "bytes and string"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/pop/byte_array_pop_long_storage_empty.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/pop/byte_array_pop_long_storage_empty.sol"
     },
@@ -5105,7 +5107,7 @@
         "bytes and string"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/pop/byte_array_pop_masking_long.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/pop/byte_array_pop_masking_long.sol"
     },
@@ -5115,7 +5117,7 @@
         "bytes and string"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/pop/byte_array_pop_storage_empty.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/pop/byte_array_pop_storage_empty.sol"
     },
@@ -5126,7 +5128,7 @@
         "function members (selector, address, \u2026)"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/pop/parenthesized.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/pop/parenthesized.sol"
     },
@@ -5210,7 +5212,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/push/array_push_struct_from_calldata.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/push/array_push_struct_from_calldata.sol"
     },
@@ -5221,7 +5223,7 @@
         "literals of non-integer types"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/push/byte_array_push.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/push/byte_array_push.sol"
     },
@@ -5231,7 +5233,7 @@
         "bytes and string"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/push/byte_array_push_transition.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/push/byte_array_push_transition.sol"
     },
@@ -5242,7 +5244,7 @@
         "bytes and string"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/push/nested_bytes_push.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/push/nested_bytes_push.sol"
     },
@@ -5262,7 +5264,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/push/push_no_args_2d.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/push/push_no_args_2d.sol"
     },
@@ -5272,7 +5274,7 @@
         "bytes and string"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/push/push_no_args_bytes.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/push/push_no_args_bytes.sol"
     },
@@ -5285,7 +5287,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/push/push_no_args_struct.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/push/push_no_args_struct.sol"
     },
@@ -5313,7 +5315,7 @@
         "operator delete"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/short_fixed_array_cleanup.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/short_fixed_array_cleanup.sol"
     },
@@ -5325,7 +5327,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/slices/array_calldata_assignment.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/slices/array_calldata_assignment.sol"
     },
@@ -5434,7 +5436,7 @@
         "bytes and string"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for array/string_bytes_conversion.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "array/string_bytes_conversion.sol"
     },
@@ -5997,7 +5999,7 @@
         "literals of non-integer types"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for cleanup/cleanup_address_types_v2.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "cleanup/cleanup_address_types_v2.sol"
     },
@@ -6035,7 +6037,7 @@
         "literals of non-integer types"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for cleanup/cleanup_bytes_types_v2.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "cleanup/cleanup_bytes_types_v2.sol"
     },
@@ -6132,7 +6134,7 @@
         "constant expressions over literals"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for constantEvaluator/negative_fractional_mod.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "constantEvaluator/negative_fractional_mod.sol"
     },
@@ -6758,7 +6760,7 @@
         "bytes and string"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for conversions/string_to_bytes.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "conversions/string_to_bytes.sol"
     },
@@ -8256,7 +8258,7 @@
         "constant expressions over literals"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for exponentiation/literal_base.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "exponentiation/literal_base.sol"
     },
@@ -8297,7 +8299,7 @@
         "bytes and string"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for expressions/bytes_comparison.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "expressions/bytes_comparison.sol"
     },
@@ -8407,7 +8409,7 @@
         "constant expressions over literals"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for expressions/exp_operator_const.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "expressions/exp_operator_const.sol"
     },
@@ -8417,7 +8419,7 @@
         "constant expressions over literals"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for expressions/exp_operator_const_signed.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "expressions/exp_operator_const_signed.sol"
     },
@@ -8427,7 +8429,7 @@
         "constant expressions over literals"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for expressions/exp_zero_literal.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "expressions/exp_zero_literal.sol"
     },
@@ -8440,15 +8442,15 @@
       "test": "expressions/inc_dec_operators.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "conditional expressions",
         "contracts without functions",
         "imports"
       ],
-      "first": "conditional expressions",
-      "reason": "Conditional 17: unsupported expression Conditional",
-      "scan_agrees": true,
+      "first": null,
+      "reason": "elaborate_unit returned NONE (unsupported lowering)",
+      "scan_agrees": false,
       "test": "expressions/module_from_ternary_expression.sol"
     },
     {
@@ -8468,7 +8470,7 @@
         "constant expressions over literals"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for expressions/unary_too_long_literal.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "expressions/unary_too_long_literal.sol"
     },
@@ -8674,80 +8676,80 @@
       "test": "externalContracts/strings.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "contracts without functions",
         "imports"
       ],
-      "first": "imports",
-      "reason": "ImportDirective 4: unsupported source unit member ImportDirective",
-      "scan_agrees": true,
+      "first": null,
+      "reason": "elaborate_unit returned NONE (unsupported lowering)",
+      "scan_agrees": false,
       "test": "externalSource/multiple_equals_signs.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "contracts without functions",
         "imports"
       ],
-      "first": "imports",
-      "reason": "ImportDirective 8: unsupported source unit member ImportDirective",
-      "scan_agrees": true,
+      "first": null,
+      "reason": "elaborate_unit returned NONE (unsupported lowering)",
+      "scan_agrees": false,
       "test": "externalSource/multiple_external_source.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "contracts without functions",
         "imports"
       ],
-      "first": "imports",
-      "reason": "ImportDirective 4: unsupported source unit member ImportDirective",
-      "scan_agrees": true,
+      "first": null,
+      "reason": "elaborate_unit returned NONE (unsupported lowering)",
+      "scan_agrees": false,
       "test": "externalSource/multisource.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "contracts without functions",
         "imports"
       ],
-      "first": "imports",
-      "reason": "ImportDirective 12: unsupported source unit member ImportDirective",
-      "scan_agrees": true,
+      "first": null,
+      "reason": "elaborate_unit returned NONE (unsupported lowering)",
+      "scan_agrees": false,
       "test": "externalSource/non_normalized_paths.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "contracts without functions",
         "imports"
       ],
-      "first": "imports",
-      "reason": "ImportDirective 6: unsupported source unit member ImportDirective",
-      "scan_agrees": true,
+      "first": null,
+      "reason": "elaborate_unit returned NONE (unsupported lowering)",
+      "scan_agrees": false,
       "test": "externalSource/relative_imports.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "contracts without functions",
         "imports"
       ],
-      "first": "imports",
-      "reason": "ImportDirective 4: unsupported source unit member ImportDirective",
-      "scan_agrees": true,
+      "first": null,
+      "reason": "elaborate_unit returned NONE (unsupported lowering)",
+      "scan_agrees": false,
       "test": "externalSource/source.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "contracts without functions",
         "imports"
       ],
-      "first": "imports",
-      "reason": "ImportDirective 8: unsupported source unit member ImportDirective",
-      "scan_agrees": true,
+      "first": null,
+      "reason": "elaborate_unit returned NONE (unsupported lowering)",
+      "scan_agrees": false,
       "test": "externalSource/source_import.sol"
     },
     {
@@ -8763,27 +8765,27 @@
       "test": "externalSource/source_import_subdir.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "contracts without functions",
         "imports",
         "source units without exactly one contract"
       ],
-      "first": "imports",
-      "reason": "ImportDirective 12: unsupported source unit member ImportDirective",
-      "scan_agrees": true,
+      "first": null,
+      "reason": "elaborate_unit returned NONE (unsupported lowering)",
+      "scan_agrees": false,
       "test": "externalSource/source_name_starting_with_dots.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "contracts without functions",
         "external calls and contract members",
         "imports"
       ],
-      "first": "external calls and contract members",
-      "reason": "UserDefinedTypeName 8: only struct user-defined types are supported",
-      "scan_agrees": true,
+      "first": null,
+      "reason": "elaborate_unit returned NONE (unsupported lowering)",
+      "scan_agrees": false,
       "test": "externalSource/source_remapping.sol"
     },
     {
@@ -9071,7 +9073,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for functionCall/array_multiple_local_vars.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "functionCall/array_multiple_local_vars.sol"
     },
@@ -9232,7 +9234,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for functionCall/calldata_argument_internal_bytes.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "functionCall/calldata_argument_internal_bytes.sol"
     },
@@ -9335,7 +9337,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for functionCall/calldata_argument_internal_struct_as_memory_v2.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "functionCall/calldata_argument_internal_struct_as_memory_v2.sol"
     },
@@ -9347,7 +9349,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for functionCall/calldata_argument_internal_struct_v2.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "functionCall/calldata_argument_internal_struct_v2.sol"
     },
@@ -9780,7 +9782,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for functionCall/mapping_array_internal_argument.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "functionCall/mapping_array_internal_argument.sol"
     },
@@ -9792,7 +9794,7 @@
         "mappings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for functionCall/mapping_internal_argument.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "functionCall/mapping_internal_argument.sol"
     },
@@ -9804,7 +9806,7 @@
         "mappings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for functionCall/mapping_internal_return.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "functionCall/mapping_internal_return.sol"
     },
@@ -12532,7 +12534,7 @@
         "contracts without functions"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for isoltestTesting/balance_without_balance.sol",
+      "reason": "elaborate_unit returned NONE (unsupported lowering)",
       "scan_agrees": true,
       "test": "isoltestTesting/balance_without_balance.sol"
     },
@@ -12542,7 +12544,7 @@
         "contracts without functions"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for isoltestTesting/builtins.sol",
+      "reason": "elaborate_unit returned NONE (unsupported lowering)",
       "scan_agrees": true,
       "test": "isoltestTesting/builtins.sol"
     },
@@ -12552,7 +12554,7 @@
         "contracts without functions"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for isoltestTesting/effects.sol",
+      "reason": "elaborate_unit returned NONE (unsupported lowering)",
       "scan_agrees": true,
       "test": "isoltestTesting/effects.sol"
     },
@@ -12562,7 +12564,7 @@
         "contracts without functions"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for isoltestTesting/empty_contract.sol",
+      "reason": "elaborate_unit returned NONE (unsupported lowering)",
       "scan_agrees": true,
       "test": "isoltestTesting/empty_contract.sol"
     },
@@ -12572,7 +12574,7 @@
         "bytes and string"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for isoltestTesting/format_raw_string_with_control_chars.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "isoltestTesting/format_raw_string_with_control_chars.sol"
     },
@@ -12616,7 +12618,7 @@
         "contracts without functions"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for isoltestTesting/storage/storage_empty.sol",
+      "reason": "elaborate_unit returned NONE (unsupported lowering)",
       "scan_agrees": true,
       "test": "isoltestTesting/storage/storage_empty.sol"
     },
@@ -13754,7 +13756,7 @@
         "bytes and string"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for literals/hex_string_with_underscore.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "literals/hex_string_with_underscore.sol"
     },
@@ -13808,7 +13810,7 @@
         "arrays"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for memoryManagement/memory_types_initialisation.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "memoryManagement/memory_types_initialisation.sol"
     },
@@ -14439,7 +14441,7 @@
         "transient storage"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for operators/compound_assign_transient_storage.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "operators/compound_assign_transient_storage.sol"
     },
@@ -14691,7 +14693,7 @@
         "constant expressions over literals"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for operators/shifts/shift_right_negative_literal.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "operators/shifts/shift_right_negative_literal.sol"
     },
@@ -14823,7 +14825,7 @@
         "transient storage"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for operators/transient_storage_variable_increment_decrement.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "operators/transient_storage_variable_increment_decrement.sol"
     },
@@ -15590,7 +15592,7 @@
         "tuples of literals"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for smoke/bytes_and_strings.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "smoke/bytes_and_strings.sol"
     },
@@ -15615,7 +15617,7 @@
         "bytes and string"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for smoke/failure.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "smoke/failure.sol"
     },
@@ -16060,7 +16062,7 @@
         "transient storage"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for storage/delete_overlapping_transient_after_storage_mapping_delete_same_value_type.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "storage/delete_overlapping_transient_after_storage_mapping_delete_same_value_type.sol"
     },
@@ -16141,7 +16143,7 @@
         "transient storage"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for storage/delete_overlapping_transient_before_storage_mapping_delete_same_value_type.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "storage/delete_overlapping_transient_before_storage_mapping_delete_same_value_type.sol"
     },
@@ -16165,7 +16167,7 @@
         "bytes and string"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for storage/empty_nonempty_empty.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "storage/empty_nonempty_empty.sol"
     },
@@ -16185,7 +16187,7 @@
         "mappings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for storage/mapping_string_key.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "storage/mapping_string_key.sol"
     },
@@ -16199,7 +16201,7 @@
         "operator delete"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for storage/mappings_array2d_pop_delete.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "storage/mappings_array2d_pop_delete.sol"
     },
@@ -16211,7 +16213,7 @@
         "operator delete"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for storage/mappings_array_pop_delete.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "storage/mappings_array_pop_delete.sol"
     },
@@ -16247,7 +16249,7 @@
         "constant expressions over literals"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for storage/packed_storage_signed.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "storage/packed_storage_signed.sol"
     },
@@ -16258,7 +16260,7 @@
         "literals of non-integer types"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for storage/packed_storage_structs_bytes.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "storage/packed_storage_structs_bytes.sol"
     },
@@ -16582,7 +16584,7 @@
         "transient storage"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for storageLayoutSpecifier/delete_transient_storage.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "storageLayoutSpecifier/delete_transient_storage.sol"
     },
@@ -17018,7 +17020,7 @@
         "transient storage"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for storageLayoutSpecifier/state_variables_transient.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "storageLayoutSpecifier/state_variables_transient.sol"
     },
@@ -17086,7 +17088,7 @@
         "bytes and string"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for storageLayoutSpecifier/variable_cleanup.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "storageLayoutSpecifier/variable_cleanup.sol"
     },
@@ -17210,7 +17212,7 @@
         "bytes and string"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for strings/empty_string.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "strings/empty_string.sol"
     },
@@ -17221,7 +17223,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for strings/empty_string_input.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "strings/empty_string_input.sol"
     },
@@ -17243,7 +17245,7 @@
         "bytes and string"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for strings/string_escapes.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "strings/string_escapes.sol"
     },
@@ -17253,7 +17255,7 @@
         "bytes and string"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for strings/unicode_escapes.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "strings/unicode_escapes.sol"
     },
@@ -17263,7 +17265,7 @@
         "bytes and string"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for strings/unicode_string.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "strings/unicode_string.sol"
     },
@@ -17365,7 +17367,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for structs/copy_struct_with_nested_array_from_calldata_to_memory.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "structs/copy_struct_with_nested_array_from_calldata_to_memory.sol"
     },
@@ -17377,7 +17379,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for structs/copy_struct_with_nested_array_from_calldata_to_storage.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "structs/copy_struct_with_nested_array_from_calldata_to_storage.sol"
     },
@@ -17388,7 +17390,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for structs/copy_struct_with_nested_array_from_memory_to_memory.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "structs/copy_struct_with_nested_array_from_memory_to_memory.sol"
     },
@@ -17413,7 +17415,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for structs/copy_struct_with_nested_struct_from_calldata_to_memory.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "structs/copy_struct_with_nested_struct_from_calldata_to_memory.sol"
     },
@@ -17524,7 +17526,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for structs/global.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "structs/global.sol"
     },
@@ -17536,7 +17538,7 @@
         "structs"
       ],
       "first": "array type expressions",
-      "reason": "IndexAccess 13: no definition for field \"indexExpression\" in object",
+      "reason": "IndexAccess 13: array type expressions are not supported",
       "scan_agrees": true,
       "test": "structs/lone_struct_array_type.sol"
     },
@@ -17558,7 +17560,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for structs/memory_structs_as_function_args.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "structs/memory_structs_as_function_args.sol"
     },
@@ -17569,7 +17571,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for structs/memory_structs_nested.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "structs/memory_structs_nested.sol"
     },
@@ -17581,7 +17583,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for structs/memory_structs_nested_load.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "structs/memory_structs_nested_load.sol"
     },
@@ -17593,7 +17595,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for structs/memory_structs_read_write.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "structs/memory_structs_read_write.sol"
     },
@@ -17644,7 +17646,7 @@
         "struct values and copying"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for structs/packed_storage_structs_delete.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "structs/packed_storage_structs_delete.sol"
     },
@@ -17724,7 +17726,7 @@
         "struct values and copying"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for structs/struct_containing_bytes_copy_and_delete.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "structs/struct_containing_bytes_copy_and_delete.sol"
     },
@@ -17734,7 +17736,7 @@
         "struct values and copying"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for structs/struct_copy.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "structs/struct_copy.sol"
     },
@@ -17747,7 +17749,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for structs/struct_copy_calldata_to_memory_nested_bytes_v2.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "structs/struct_copy_calldata_to_memory_nested_bytes_v2.sol"
     },
@@ -17760,7 +17762,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for structs/struct_copy_calldata_to_memory_nested_dynamic_array_v2.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "structs/struct_copy_calldata_to_memory_nested_dynamic_array_v2.sol"
     },
@@ -17773,7 +17775,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for structs/struct_copy_calldata_to_memory_nested_static_array_v2.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "structs/struct_copy_calldata_to_memory_nested_static_array_v2.sol"
     },
@@ -17786,7 +17788,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for structs/struct_copy_calldata_to_memory_tuple.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "structs/struct_copy_calldata_to_memory_tuple.sol"
     },
@@ -17799,7 +17801,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for structs/struct_copy_calldata_to_memory_v2.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "structs/struct_copy_calldata_to_memory_v2.sol"
     },
@@ -17812,7 +17814,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for structs/struct_copy_calldata_to_storage_nested_dynamic_array_v2.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "structs/struct_copy_calldata_to_storage_nested_dynamic_array_v2.sol"
     },
@@ -17825,7 +17827,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for structs/struct_copy_calldata_to_storage_v2.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "structs/struct_copy_calldata_to_storage_v2.sol"
     },
@@ -17836,7 +17838,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for structs/struct_copy_via_local.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "structs/struct_copy_via_local.sol"
     },
@@ -17982,7 +17984,7 @@
         "structs"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for structs/struct_reference.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "structs/struct_reference.sol"
     },
@@ -18020,7 +18022,7 @@
         "struct values and copying"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for structs/struct_storage_to_mapping.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "structs/struct_storage_to_mapping.sol"
     },
@@ -18663,7 +18665,7 @@
         "tuples with empty components"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for types/nested_tuples.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "types/nested_tuples.sol"
     },
@@ -18689,7 +18691,7 @@
         "bytes and string"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for types/strings.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "types/strings.sol"
     },
@@ -18716,7 +18718,7 @@
         "bytes and string"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for types/tuple_assign_multi_slot_grow.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "types/tuple_assign_multi_slot_grow.sol"
     },
@@ -18737,7 +18739,7 @@
         "functions as values"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for underscore/as_function.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "underscore/as_function.sol"
     },
@@ -19414,7 +19416,7 @@
         "operator delete"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for variables/delete_local.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "variables/delete_local.sol"
     },
@@ -19424,7 +19426,7 @@
         "operator delete"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for variables/delete_locals.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "variables/delete_locals.sol"
     },
@@ -19435,7 +19437,7 @@
         "transient storage"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for variables/delete_transient_state_variable.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "variables/delete_transient_state_variable.sol"
     },
@@ -19447,7 +19449,7 @@
         "transient storage"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for variables/delete_transient_state_variable_non_zero_offset.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "variables/delete_transient_state_variable_non_zero_offset.sol"
     },
@@ -19459,7 +19461,7 @@
         "mappings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for variables/mapping_local_assignment.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "variables/mapping_local_assignment.sol"
     },
@@ -19471,7 +19473,7 @@
         "mappings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for variables/mapping_local_compound_assignment.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "variables/mapping_local_compound_assignment.sol"
     },
@@ -19484,7 +19486,7 @@
         "tuples of literals"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for variables/mapping_local_tuple_assignment.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "variables/mapping_local_tuple_assignment.sol"
     },
@@ -19635,7 +19637,7 @@
         "transient storage"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for variables/transient_state_variable_slots_and_offsets.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "variables/transient_state_variable_slots_and_offsets.sol"
     },
@@ -19645,7 +19647,7 @@
         "transient storage"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for variables/transient_state_variable_tuple_assignment.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "variables/transient_state_variable_tuple_assignment.sol"
     },
@@ -20001,7 +20003,7 @@
         "constant expressions over literals"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for various/flipping_sign_tests.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "various/flipping_sign_tests.sol"
     },
@@ -20104,7 +20106,7 @@
         "literals of non-integer types"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for various/memory_overwrite.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "various/memory_overwrite.sol"
     },
@@ -20370,7 +20372,7 @@
         "mappings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for various/storage_string_as_mapping_key_without_variable.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "various/storage_string_as_mapping_key_without_variable.sol"
     },
@@ -20392,7 +20394,7 @@
         "tuples of literals"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for various/string_tuples.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "various/string_tuples.sol"
     },
@@ -20493,7 +20495,7 @@
         "tuples of literals"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for various/typed_multi_variable_declaration.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "various/typed_multi_variable_declaration.sol"
     },
@@ -20536,7 +20538,7 @@
         "tuples with empty components"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for viaYul/assign_tuple_from_function_call.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "viaYul/assign_tuple_from_function_call.sol"
     },
@@ -20566,7 +20568,7 @@
         "bytes and string"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for viaYul/comparison.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "viaYul/comparison.sol"
     },
@@ -20737,7 +20739,7 @@
         "tuples of literals"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for viaYul/define_tuple_from_function_call.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "viaYul/define_tuple_from_function_call.sol"
     },
@@ -20923,7 +20925,7 @@
         "constant expressions over literals"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for viaYul/exp_literals.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "viaYul/exp_literals.sol"
     },
@@ -20933,7 +20935,7 @@
         "constant expressions over literals"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for viaYul/exp_literals_success.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "viaYul/exp_literals_success.sol"
     },
@@ -20990,7 +20992,7 @@
         "payable functions"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for viaYul/function_entry_checks.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "viaYul/function_entry_checks.sol"
     },
@@ -21144,7 +21146,7 @@
         "mappings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for viaYul/mapping_string_key.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "viaYul/mapping_string_key.sol"
     },
@@ -21187,7 +21189,7 @@
         "bytes and string"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for viaYul/require.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "viaYul/require.sol"
     },
@@ -21217,7 +21219,7 @@
         "local reference bindings"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for viaYul/return_storage_pointers.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "viaYul/return_storage_pointers.sol"
     },
@@ -21253,7 +21255,7 @@
         "contracts without functions"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for viaYul/smoke_test.sol",
+      "reason": "elaborate_unit returned NONE (unsupported lowering)",
       "scan_agrees": true,
       "test": "viaYul/smoke_test.sol"
     },
@@ -21362,7 +21364,7 @@
         "literals of non-integer types"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for viaYul/string_format.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "viaYul/string_format.sol"
     },
@@ -21372,7 +21374,7 @@
         "bytes and string"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for viaYul/string_literals.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "viaYul/string_literals.sol"
     },
@@ -21404,7 +21406,7 @@
         "bytes and string"
       ],
       "first": null,
-      "reason": "elaborate_unit returned NONE for viaYul/unary_fixedbytes.sol",
+      "reason": "valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "viaYul/unary_fixedbytes.sol"
     },
