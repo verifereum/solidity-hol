@@ -167,11 +167,20 @@ Datatype:
   |>
 End
 
+(* Semantic declarations do not depend on storage layout metadata. *)
+Datatype:
+  core_type_declaration
+  = EnumDeclaration num
+  | UserValueDeclaration sol_type
+  | StructDeclaration ((ast_id # sol_type) list)
+End
+
 Datatype:
   core_program = <|
     procedures : core_procedure list;
     state_variables : core_state_variable list;
     struct_layouts : core_struct_layout list;
+    type_declarations : (ast_id # core_type_declaration) list;
     entry_procedure : ast_id
   |>
 End

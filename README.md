@@ -1,58 +1,73 @@
 # Solidity-HOL
 
-Formal and executable semantics for the [Solidity](https://soliditylang.org/)
-programming language in the
-[HOL4 theorem prover](https://hol-theorem-prover.org/).
+Formal and executable [Solidity](https://soliditylang.org/) semantics in
+[HOL4](https://hol-theorem-prover.org/), using concrete EVM storage and execution
+from [Verifereum](https://verifereum.org/).
 
-This project is intended to support formal reasoning about Solidity programs,
-validation against the upstream Solidity semantic tests, compositional
-reasoning about interactions through an EVM world state, and future work on
-compiler correctness.
+## Execution pipeline
 
-## Planned approach
+The semantic definition is compiler artifact → imported source unit →
+`elaborate_unit` → ordered core → fuel-indexed evaluator. There is no separate
+source-unit execution relation. Elaboration names effectful intermediate
+results and fixes evaluation order for the pinned compiler profile; core
+operands are pure bindings or constants. Fuel bounds recursive calls and loop
+iterations independently of EVM gas.
 
-The initial semantics will operate on compiler-produced, analyzed Solidity AST
-and metadata rather than raw source text. This includes resolved types and
-declarations, inheritance information, ABI metadata, and storage layouts. The
-imported representation will be elaborated into a smaller HOL AST with explicit
-well-formedness assumptions.
+`solidityPrepareLib.prepare_artifact` is the checked entry point for artifact
+consumers. It checks the artifact format, compiler version/commit, profile and
+Standard JSON settings against `SOLIDITY_PIN` and
+`profiles/solc-0.8.37-via-ir-osaka.json`. It then imports and validates the source,
+elaborates it, and checks the complete `wf_core_program` with `cv_eval`.
+Success retains the checked artifact alongside the source/core terms and HOL theorems for source validation,
+elaboration and core well-formedness. Artifact metadata checks run in SML;
+they do not certify that the compiler produced the recorded output. The Python
+runner's solc-free artifact checks provide earlier diagnostics; acceptance is
+always decided by this SML preparation boundary.
 
-Execution will primarily be defined by a deterministic, fuel-indexed
-definitional interpreter. Fuel provides totality in HOL for recursive functions
-and unbounded loops, but is separate from observable EVM gas.
+Malformed artifacts, unsupported import/lowering, source-validation rejection
+and invalid generated core have distinct diagnostics. Source validation also
+contains supported-subset restrictions. Invalid generated core is an
+implementation failure. Unexpected HOL evaluation failures propagate.
 
-Persistent state and external interaction will be grounded in the EVM semantics
-provided by [Verifereum](https://verifereum.org/):
+The raw importer and `elaborate_unit` remain available for reasoning and
+frontend inspection. Their callers own the compiler/profile contract, source
+validation and full core check. `prepare_unit` performs the semantic checks for
+an already imported unit whose provenance the caller has established.
 
-- Solidity storage operations will access concrete EVM storage slots;
-- compiler-produced layout metadata will initially provide slot and offset
-  assignments;
-- external calls and contract creation will execute through the EVM over a
-  shared world state; and
-- EVM execution will own gas, call checkpoints, rollback, value transfer, and
-  nested bytecode execution.
+## Core and storage
 
-Solidity leaves sibling-expression evaluation order unspecified, and compiler
-pipelines do not make one uniform choice. Solidity-HOL will therefore use a
-canonical deterministic order—tentatively left-to-right—while allowing
-compiler-profile elaboration to make different orders explicit when matching a
-particular compiler pipeline.
+A `core_program` owns its procedures, state variables, semantic type
+declarations and storage layouts. `core_program_environment` derives the
+checking/runtime environment from that program. Struct declarations describe
+field identities and types even when there is no storage layout. Storage
+layouts separately describe slots and offsets and must agree with the declared
+fields. Enum and user-defined value declarations also live in the program;
+their importer coverage is still deferred.
 
-The semantics and its generated test fixtures will be versioned against pinned
-Solidity compiler and EVM revisions. The repository is intended to evolve with
-upstream Solidity rather than describe only one permanently fixed release.
+The evaluator executes elementary scalar operations and conversions, locals,
+tuples, structured control flow, internal calls, built-in failures, packed
+state values, scalar-key mappings, storage arrays and storage struct members.
+Storage references capture concrete locations. Scalar writes, reference
+rebinding and content copying are distinct core operations; the latter two
+remain extension points rather than implemented aggregate semantics.
 
-See [docs/design.md](docs/design.md) for the current design, implementation
-stages, and open questions. The initial compiler profile is documented in
-[docs/profiles.md](docs/profiles.md), and the current compiler-AST observations
-are recorded in [docs/frontend-boundary.md](docs/frontend-boundary.md). Reviews
-of relevant active semantics projects are collected in
-[docs/related-work/](docs/related-work/README.md).
+Memory/calldata execution and a memory model compatible with inline assembly
+remain unresolved. Concrete CALL/CREATE boundary experiments exist separately;
+connecting them to source execution still needs an external-call context/gas
+contract. Core well-formedness alone does not rule out `InvalidCompletion`:
+for example, a storage write in a static frame is deliberately invalid.
 
-## Status
+## Validation
 
-The project has a build-checked core/state blueprint and executable concrete EVM
-boundary experiments, alongside compiler frontend reconnaissance. No supported
-Solidity subset or source interpreter has been implemented yet. See
-[docs/implementation-blueprint.md](docs/implementation-blueprint.md) for artifacts,
-validation commands, limitations, and next gates.
+```sh
+holbuild buildhol
+holbuild -j8 build solidityHolTheory
+python3 -m unittest discover -s tests -p 'test_*.py'
+python3 tools/run_differential.py -j8
+```
+
+The differential corpus compares source evaluation with pinned compiler
+bytecode in Verifereum. The upstream `semanticTests` coverage tool checks
+preparation acceptance; it does not execute the tests' call expectations.
+See [profiles.md](docs/profiles.md) and
+[semantic-tests-coverage.md](docs/semantic-tests-coverage.md).
