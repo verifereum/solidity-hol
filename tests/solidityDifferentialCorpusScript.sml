@@ -16,6 +16,8 @@ Libs
 fun holbuild_extra_deps (_ : string list) = ()
 val () = holbuild_extra_deps [
   "../testdata/differential/corpus.json",
+  "../SOLIDITY_PIN",
+  "../profiles/solc-0.8.37-via-ir-osaka.json",
   "../testdata/frontend/expected/pure_core.json",
   "../testdata/differential/expected/scalars.json",
   "../testdata/differential/expected/control.json",

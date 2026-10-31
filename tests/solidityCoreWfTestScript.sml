@@ -3,7 +3,7 @@ Theory solidityCoreWfTest
 Ancestors
   solidityCoreWf
 Libs
-  intLib wordsLib
+  intLib wordsLib cv_transLib
 
 Overload u256 = “UintT 256”
 
@@ -197,15 +197,17 @@ Definition test_program_def:
   test_program = <|
     procedures := [add_proc; count_proc; pair_proc; first_proc; fact_proc;
                    wrapper_proc; void_proc; convert_proc; scope_proc];
-    struct_layouts := [];
+    struct_layouts := []; type_declarations := test_decls;
     state_variables := [];
     entry_procedure := AstId 6
   |>
 End
 
 Definition test_env_def:
-  test_env = core_program_environment test_decls test_program
+  test_env = core_program_environment test_program
 End
+
+val () = cv_auto_trans test_env_def;
 
 Theorem test_program_wf:
   wf_core_program test_env test_program
@@ -223,6 +225,8 @@ Definition with_body_def:
     body := body
   |>
 End
+
+val () = cv_auto_trans with_body_def;
 
 Theorem unbound_atom_rejected:
   ¬wf_core_procedure test_env (with_body [ReturnStmt [BoundAtom (AstId 99)]])
@@ -394,14 +398,13 @@ QED
  *)
 Definition struct_env_def:
   struct_env = core_program_environment
-    [(AstId 910, StructDeclaration [(AstId 1, MappingT u256 u256)]);
+    (test_program with type_declarations := [(AstId 910, StructDeclaration [(AstId 1, MappingT u256 u256)]);
      (AstId 911,
       StructDeclaration [(AstId 1, ArrayT (StructT (AstId 910)) NONE)]);
      (AstId 912, StructDeclaration [(AstId 1, u256)]);
      (AstId 913,
       StructDeclaration [(AstId 1, u256);
-                         (AstId 2, ArrayT (StructT (AstId 913)) NONE)])]
-    test_program
+                         (AstId 2, ArrayT (StructT (AstId 913)) NONE)])])
 End
 
 Theorem memory_struct_mapping_rejected:
@@ -479,7 +482,7 @@ Theorem tuple_index_out_of_range_rejected:
      DefineStmt (AstId 83) (SingleType u256)
        (TupleComponentOperation 2 (BoundAtom (AstId 82)))])
 Proof
-  EVAL_TAC
+  CONV_TAC cv_eval
 QED
 
 Theorem product_constant_rejected:
@@ -674,7 +677,7 @@ QED
 
 Theorem duplicate_procedure_rejected:
   ¬wf_core_program
-     (core_program_environment test_decls
+     (core_program_environment
         (test_program with procedures := add_proc :: test_program.procedures))
      (test_program with procedures := add_proc :: test_program.procedures)
 Proof
@@ -747,13 +750,25 @@ Definition packed_struct_layout_def:
 End
 
 Definition struct_layout_environment_def:
-  struct_layout_environment layouts = core_program_environment []
+  struct_layout_environment layouts = core_program_environment
     <| procedures := []; state_variables := []; struct_layouts := layouts;
+       type_declarations := MAP (λs. (s.struct_id, StructDeclaration
+         (MAP (λv. (v.state_id, v.state_type)) s.struct_fields))) layouts;
        entry_procedure := AstId 0 |>
 End
 
 Theorem packed_struct_layout_checked:
   wf_core_environment (struct_layout_environment [packed_struct_layout])
+Proof
+  EVAL_TAC
+QED
+
+Theorem struct_declarations_must_match_layout:
+  ¬wf_core_environment
+    (struct_layout_environment [packed_struct_layout] with type_declarations := []) ∧
+  ¬wf_core_environment
+    (struct_layout_environment [packed_struct_layout] with type_declarations :=
+      [(AstId 950, StructDeclaration [(AstId 951, UintT 16); (AstId 952, IntT 16)])])
 Proof
   EVAL_TAC
 QED
@@ -807,4 +822,29 @@ Theorem recursive_struct_behind_mapping_checked:
             state_slot := 1w; state_offset := 0 |>] |>])
 Proof
   EVAL_TAC
+QED
+
+(* Array push must reject an absent binding, not leave a partial case. *)
+Theorem array_push_missing_binding_rejected:
+  ¬wf_core_operation test_env
+    <| bindings := []; targets := []; returns := []; in_loop := F |>
+    (ReferenceType (UintT 8)) (ArrayPushOperation (BoundAtom (AstId 1)) NONE)
+Proof
+  CONV_TAC cv_eval
+QED
+
+Definition layoutless_program_def:
+  layoutless_program = test_program with type_declarations :=
+    test_decls ++ [(AstId 960, StructDeclaration [(AstId 961, UintT 8)])]
+End
+
+val () = cv_auto_trans layoutless_program_def;
+
+Theorem layoutless_struct_declaration_retained:
+  wf_core_program (core_program_environment layoutless_program) layoutless_program ∧
+  lookup_struct (core_program_environment layoutless_program) (AstId 960) =
+    SOME [(AstId 961, UintT 8)] ∧
+  lookup_struct_layout (core_program_environment layoutless_program) (AstId 960) = NONE
+Proof
+  CONV_TAC cv_eval
 QED

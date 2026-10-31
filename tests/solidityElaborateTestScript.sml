@@ -24,7 +24,7 @@ Proof
 QED
 
 Theorem pure_core_program_wf:
-  wf_core_program (core_program_environment [] pure_core_program)
+  wf_core_program (core_program_environment pure_core_program)
     pure_core_program
 Proof
   EVAL_TAC
@@ -60,7 +60,7 @@ End
 
 Definition run_function_def:
   run_function fuel name args =
-    (invoke_source fuel (core_program_environment [] pure_core_program)
+    (invoke_source fuel (core_program_environment pure_core_program)
        (function_id name) (MAP iv args) initial_state []).completion
 End
 
@@ -226,7 +226,11 @@ val () = cv_auto_trans missing_struct_layout_unit_def;
 Theorem struct_layout_required_for_execution:
   IS_SOME (elaborate_unit struct_unit) ∧
   valid_src_unit missing_struct_layout_unit ∧
-  elaborate_unit missing_struct_layout_unit = NONE
+  IS_SOME (elaborate_unit missing_struct_layout_unit) ∧
+  ¬wf_core_program
+    (core_program_environment (THE (elaborate_unit missing_struct_layout_unit)))
+    (THE (elaborate_unit missing_struct_layout_unit))
 Proof
+  simp_tac std_ss [cv_eval “elaborate_unit missing_struct_layout_unit”] >>
   CONV_TAC cv_eval
 QED

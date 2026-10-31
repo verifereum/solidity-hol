@@ -14,16 +14,8 @@
 Theory solidityCoreWf
 Ancestors
   solidityCore alist list option
-
-(* Scalar type declarations accompany the program. Its struct layouts supply
- * both field declarations and runtime layout metadata to the environment.
- *)
-Datatype:
-  core_type_declaration
-  = EnumDeclaration num
-  | UserValueDeclaration sol_type
-  | StructDeclaration ((ast_id # sol_type) list)
-End
+Libs
+  cv_transLib wordsLib intLib
 
 Datatype:
   core_environment = <|
@@ -35,13 +27,11 @@ Datatype:
 End
 
 Definition core_program_environment_def:
-  core_program_environment decls (prog : core_program) = <|
+  core_program_environment (prog : core_program) = <|
     procedures := MAP (λp. (p.procedure_id, p)) prog.procedures;
     state_variables := MAP (λv. (v.state_id, v)) prog.state_variables;
     struct_layouts := MAP (λs. (s.struct_id, s)) prog.struct_layouts;
-    type_declarations := decls ++ MAP
-      (λs. (s.struct_id, StructDeclaration
-        (MAP (λv. (v.state_id, v.state_type)) s.struct_fields))) prog.struct_layouts
+    type_declarations := prog.type_declarations
   |>
 End
 
@@ -100,11 +90,17 @@ Definition mapping_reachable_def:
   (mapping_reachable env n (StructT id) ⇔
     if n = 0 then F else
     case lookup_struct env id of
-      SOME fields => EXISTS (mapping_reachable env (n - 1)) (MAP SND fields)
+      SOME fields => mapping_reachable_types env (n - 1) (MAP SND fields)
     | NONE => F) ∧
-  (mapping_reachable env n _ ⇔ F)
+  (mapping_reachable env n _ ⇔ F) ∧
+  (mapping_reachable_types env n [] ⇔ F) ∧
+  (mapping_reachable_types env n (ty :: tys) ⇔
+    mapping_reachable env n ty ∨ mapping_reachable_types env n tys)
 Termination
-  WF_REL_TAC ‘inv_image ($< LEX $<) (λ(env, n, ty). (n, sol_type_size ty))’
+  WF_REL_TAC ‘inv_image ($< LEX $<) (λx. case x of
+    INL (env, n, ty) => (n, sol_type_size ty)
+  | INR (env, n, tys) => (n, list_size sol_type_size tys))’ >>
+  rw[list_size_def]
 End
 
 (* Environment-aware type validation: declared ids resolve, and memory and
@@ -120,15 +116,21 @@ Definition declared_type_ok_def:
   (declared_type_ok env (UserValueT id) ⇔ IS_SOME (lookup_user_value env id)) ∧
   (declared_type_ok env (ContractT _) ⇔ F) ∧
   (declared_type_ok env (FunctionT _ _ parameters returns) ⇔
-    EVERY (declared_type_ok env) parameters ∧
-    EVERY (declared_type_ok env) returns) ∧
+    declared_types_ok env parameters ∧
+    declared_types_ok env returns) ∧
   (declared_type_ok env (LocatedT loc ty) ⇔
     declared_type_ok env ty ∧
     (loc ≠ StorageLoc ⇒
      ¬mapping_reachable env (LENGTH env.type_declarations) ty)) ∧
-  (declared_type_ok env _ ⇔ T)
+  (declared_type_ok env _ ⇔ T) ∧
+  (declared_types_ok env [] ⇔ T) ∧
+  (declared_types_ok env (ty :: tys) ⇔
+    declared_type_ok env ty ∧ declared_types_ok env tys)
 Termination
-  WF_REL_TAC ‘measure (sol_type_size o SND)’
+  WF_REL_TAC ‘measure (λx. case x of
+    INL (env, ty) => sol_type_size ty
+  | INR (env, tys) => list_size sol_type_size tys)’ >>
+  rw[solidityASTTheory.sol_type_size_def, list_size_def]
 End
 
 Definition is_function_type_def[simp]:
@@ -208,9 +210,15 @@ Definition wf_core_value_type_def:
   (wf_core_value_type env (SingleType ty) ⇔ core_scalar_type env ty) ∧
   (wf_core_value_type env (ReferenceType ty) ⇔ storage_type_ok env ty) ∧
   (wf_core_value_type env (ProductType tys) ⇔
-    LENGTH tys ≠ 1 ∧ EVERY (wf_core_value_type env) tys)
+    LENGTH tys ≠ 1 ∧ wf_core_value_types env tys) ∧
+  (wf_core_value_types env [] ⇔ T) ∧
+  (wf_core_value_types env (ty :: tys) ⇔
+    wf_core_value_type env ty ∧ wf_core_value_types env tys)
 Termination
-  WF_REL_TAC ‘measure (core_value_type_size o SND)’
+  WF_REL_TAC ‘measure (λx. case x of
+    INL (env, ty) => core_value_type_size ty
+  | INR (env, tys) => list_size core_value_type_size tys)’ >>
+  rw[solidityCoreTheory.core_value_type_size_def, list_size_def]
 End
 
 Definition wf_type_declaration_def:
@@ -291,7 +299,7 @@ End
 
 Definition fresh_core_id_def:
   fresh_core_id ctx x ⇔
-    ¬MEM x (MAP FST ctx.bindings) ∧ ¬MEM x (MAP FST ctx.targets)
+    ALOOKUP ctx.bindings x = NONE ∧ ALOOKUP ctx.targets x = NONE
 End
 
 Definition bind_core_id_def:
@@ -312,6 +320,20 @@ Definition wf_core_atom_def:
 End
 
 (* Operations *)
+
+Definition wf_core_atoms_def:
+  (wf_core_atoms env ctx [] [] ⇔ T) ∧
+  (wf_core_atoms env ctx (ty :: tys) (a :: atoms) ⇔
+    wf_core_atom env ctx ty a ∧ wf_core_atoms env ctx tys atoms) ∧
+  (wf_core_atoms env ctx _ _ ⇔ F)
+End
+
+Theorem wf_core_atoms_list_rel:
+  wf_core_atoms env ctx tys atoms ⇔ LIST_REL (wf_core_atom env ctx) tys atoms
+Proof
+  qid_spec_tac ‘atoms’ >> Induct_on ‘tys’ >> Cases_on ‘atoms’ >>
+  simp[wf_core_atoms_def]
+QED
 
 Definition is_integer_type_def[simp]:
   (is_integer_type (UintT _) ⇔ T) ∧
@@ -448,8 +470,7 @@ Definition wf_core_operation_def:
     core_scalar_type env ty ∧
     case scalar_operator_signature op ty of
       SOME (operand_tys, result) =>
-        LIST_REL (λoperand_ty a. wf_core_atom env ctx (SingleType operand_ty) a)
-          operand_tys args ∧
+        wf_core_atoms env ctx (MAP SingleType operand_tys) args ∧
         annotation = SingleType result
     | NONE => F) ∧
   (wf_core_operation env ctx annotation (ConvertOperation ty a) ⇔
@@ -462,13 +483,14 @@ Definition wf_core_operation_def:
          | _ => F)) ∧
   (wf_core_operation env ctx annotation (TupleOperation atoms) ⇔
     case annotation of
-      ProductType tys => LIST_REL (wf_core_atom env ctx) tys atoms
+      ProductType tys => wf_core_atoms env ctx tys atoms
     | _ => F) ∧
   (wf_core_operation env ctx annotation (TupleComponentOperation n a) ⇔
     case a of
       BoundAtom x =>
         (case ALOOKUP ctx.bindings x of
-           SOME (ProductType tys) => n < LENGTH tys ∧ annotation = EL n tys
+           SOME (ProductType tys) =>
+             if n < LENGTH tys then annotation = EL n tys else F
          | _ => F)
     | ConstantAtom _ => F) ∧
   (wf_core_operation env ctx annotation (ReadStateOperation x) ⇔
@@ -522,9 +544,9 @@ Definition wf_core_operation_def:
            SOME (ReferenceType (ArrayT element NONE)) =>
              elementary_storage_type_ok element ∧
              annotation = ReferenceType element ∧
-             case value of
-               NONE => T
-             | SOME v => wf_core_atom env ctx (SingleType element) v
+             (case value of
+                NONE => T
+              | SOME v => wf_core_atom env ctx (SingleType element) v)
          | _ => F)
     | _ => F) ∧
   (wf_core_operation env ctx annotation (ArrayPopOperation a) ⇔
@@ -538,8 +560,7 @@ Definition wf_core_operation_def:
   (wf_core_operation env ctx annotation (InternalCallOperation f args) ⇔
     case lookup_procedure env f of
       SOME p =>
-        LIST_REL (λ(_, ty) a. wf_core_atom env ctx (SingleType ty) a)
-          p.parameters args ∧
+        wf_core_atoms env ctx (MAP (λ(_, ty). SingleType ty) p.parameters) args ∧
         annotation = call_result_type (MAP SND p.return_bindings)
     | NONE => F) ∧
   (wf_core_operation env ctx annotation _ ⇔ F)
@@ -613,8 +634,7 @@ Definition check_core_stmts_def:
         then check_core_stmts env ctx ss
         else NONE) ∧
   (check_core_stmts env ctx (ReturnStmt atoms :: ss) =
-    if LIST_REL (λty a. wf_core_atom env ctx (SingleType ty) a)
-         ctx.returns atoms
+    if wf_core_atoms env ctx (MAP SingleType ctx.returns) atoms
     then check_core_stmts env ctx ss
     else NONE) ∧
   (check_core_stmts env ctx (BreakStmt :: ss) =
@@ -772,8 +792,56 @@ Proof
 QED
 
 Theorem core_program_environment_procedures:
-  (core_program_environment decls prog).procedures =
+  (core_program_environment prog).procedures =
     MAP (λp. (p.procedure_id, p)) prog.procedures
 Proof
   simp[core_program_environment_def]
 QED
+
+(* The checked preparation boundary executes the complete checker through cv. *)
+val () = cv_auto_trans core_program_environment_def;
+val () = cv_auto_trans_rec mapping_reachable_def (
+  WF_REL_TAC ‘inv_image ($< LEX $<) (λx. case x of
+    INL (env, n, ty) => (cv$c2n n, cv_size ty)
+  | INR (env, n, tys) => (cv$c2n n, cv_size tys))’ >>
+  cv_termination_tac
+);
+val () = cv_auto_trans_rec declared_type_ok_def (
+  WF_REL_TAC ‘measure (λx. case x of
+    INL (env, ty) => cv_size ty
+  | INR (env, tys) => cv_size tys)’ >> cv_termination_tac
+);
+val () = cv_auto_trans_rec wf_core_value_type_def (
+  WF_REL_TAC ‘measure (λx. case x of
+    INL (env, ty) => cv_size ty
+  | INR (env, tys) => cv_size tys)’ >> cv_termination_tac
+);
+val () = cv_auto_trans_rec inline_storage_shape_def (
+  WF_REL_TAC ‘inv_image ($< LEX $<) (λx. case x of
+    INL (env, n, ty) => (cv$c2n n, cv_size ty)
+  | INR (env, n, tys) => (cv$c2n n, cv_size tys))’ >> cv_termination_tac
+);
+val () = cv_auto_trans (SPEC_ALL wf_core_operation_def);
+val () = cv_auto_trans fresh_core_id_def;
+val () = cv_auto_trans bind_core_id_def;
+val () = cv_auto_trans capture_core_target_def;
+val check_core_stmts_pre_def = cv_auto_trans_pre_rec "check_core_stmts_pre"
+  (SPEC_ALL check_core_stmts_def) (
+  WF_REL_TAC ‘measure (λ(env, ctx, ss). cv_size ss)’ >> cv_termination_tac
+);
+Theorem core_check_context_in_loop_update[local]:
+  (case ctx of core_check_context bs ts rs old => core_check_context bs ts rs flag) =
+  (ctx with in_loop := flag)
+Proof
+  Cases_on ‘ctx’ >> simp[fetch "-" "core_check_context_fn_updates"]
+QED
+
+Theorem check_core_stmts_pre[cv_pre,local]:
+  ∀env ctx ss. check_core_stmts_pre env ctx ss
+Proof
+  ho_match_mp_tac check_core_stmts_ind >> rpt strip_tac >>
+  simp[Once check_core_stmts_pre_def, core_check_context_in_loop_update] >>
+  rw[] >> fs[]
+QED
+
+val () = cv_auto_trans wf_core_program_def;

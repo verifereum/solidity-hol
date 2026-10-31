@@ -137,11 +137,17 @@ fun type_identifier tid =
     (JSON.OBJECT [("typeIdentifier", JSON.STRING tid),
                   ("typeString", JSON.STRING "")])
 
-fun import_error_with contracts name v =
-  (import_source_unit v contracts; raise Fail (name ^ ": imported"))
-  handle ImportError _ => ()
+datatype import_failure = Unsupported | Malformed
 
-val import_error = import_error_with contracts
+fun import_error_with expected contracts name v =
+  (import_source_unit v contracts; raise Fail (name ^ ": imported"))
+  handle ImportError _ =>
+           if expected = Unsupported then () else raise Fail (name ^ ": expected malformed input")
+       | MalformedInput _ =>
+           if expected = Malformed then () else raise Fail (name ^ ": expected unsupported input")
+
+val import_error = import_error_with Unsupported contracts
+val malformed_input = import_error_with Malformed contracts
 
 (* An edited unit that imports, as a cv-translated constant. *)
 fun edited_unit_with contracts name v =
@@ -160,13 +166,13 @@ val () = import_error "unknown statement"
   (edit_first "Break" (set_field "nodeType" (JSON.STRING "InlineAssembly")) ast)
 val () = import_error "unknown expression"
   (edit_first "Literal" (set_field "nodeType" (JSON.STRING "Conditional")) ast)
-val () = import_error "missing type annotation"
+val () = malformed_input "missing type annotation"
   (edit_first "Identifier" (drop_field "typeDescriptions") ast)
-val () = import_error "missing declaration reference"
+val () = malformed_input "missing declaration reference"
   (edit_first "Identifier" (drop_field "referencedDeclaration") ast)
-val () = import_error "missing common type"
+val () = malformed_input "missing common type"
   (edit_first "BinaryOperation" (drop_field "commonType") ast)
-val () = import_error "function as state variable"
+val () = malformed_input "function as state variable"
   (edit_first "FunctionDefinition"
      (set_field "nodeType" (JSON.STRING "VariableDeclaration")) ast)
 val () = import_error "modifier"
@@ -311,22 +317,22 @@ val storage_contracts =
   artifact_part storage_fixture ["contracts", storage_source]
 
 (* The first variable declaration is the state variable total. *)
-val () = import_error_with storage_contracts "public state variable"
+val () = import_error_with Unsupported storage_contracts "public state variable"
   (edit_first "VariableDeclaration"
      (set_field "visibility" (JSON.STRING "public")) storage_ast)
-val () = import_error_with storage_contracts "constant state variable"
+val () = import_error_with Unsupported storage_contracts "constant state variable"
   (edit_first "VariableDeclaration" (set_field "constant" (JSON.BOOL true))
      storage_ast)
-val () = import_error_with storage_contracts "immutable state variable"
+val () = import_error_with Unsupported storage_contracts "immutable state variable"
   (edit_first "VariableDeclaration"
      (set_field "mutability" (JSON.STRING "immutable")) storage_ast)
-val () = import_error_with storage_contracts "state variable initialiser"
+val () = import_error_with Unsupported storage_contracts "state variable initialiser"
   (edit_first "VariableDeclaration"
      (fn JSON.OBJECT kvs =>
            JSON.OBJECT (kvs @ [("value", edit_first "Literal" I storage_ast)])
        | v => v)
      storage_ast)
-val () = import_error_with (JSON.OBJECT []) "missing storage layout" storage_ast
+val () = import_error_with Malformed (JSON.OBJECT []) "missing storage layout" storage_ast
 
 (* The contracts output with an edit to the layout entries; the first is
  * total's. *)
@@ -446,6 +452,14 @@ val array_source = "testdata/differential/storage_arrays.sol"
 val array_ast = artifact_part array_fixture ["sources", array_source, "ast"]
 val array_contracts = artifact_part array_fixture ["contracts", array_source]
 
+(* A null index is a valid array type expression, not malformed compiler JSON. *)
+val () =
+  (import_source_unit
+     (edit_first "IndexAccess" (set_field "indexExpression" JSON.NULL) array_ast)
+     array_contracts;
+   raise Fail "array type expression imported")
+  handle ImportError _ => ();
+
 Definition array_unit_def:
   array_unit = ^(import_artifact array_fixture array_source)
 End
@@ -466,7 +480,7 @@ Proof
   CONV_TAC cv_eval
 QED
 
-val () = import_error_with array_contracts "malformed resolved array dimension"
+val () = import_error_with Unsupported array_contracts "malformed resolved array dimension"
   (edit_first "ArrayTypeName"
      (fn v => set_field "length"
        (type_identifier "t_rational_35x_by_1" (JSONUtil.lookupField v "length")) v)
@@ -536,7 +550,7 @@ Proof
   CONV_TAC cv_eval
 QED
 
-val () = import_error_with builtins_contracts "unknown builtin declaration"
+val () = import_error_with Unsupported builtins_contracts "unknown builtin declaration"
   (edit_callee (set_field "referencedDeclaration" (JSON.INT ~999)) builtins_ast)
 
 (* A nonliteral message must not be silently ignored on success. *)
@@ -589,8 +603,8 @@ Proof
   CONV_TAC cv_eval
 QED
 
-val () = import_error_with struct_contracts "missing field identity"
+val () = import_error_with Malformed struct_contracts "missing field identity"
   (edit_first "MemberAccess" (drop_field "referencedDeclaration") struct_ast)
 
-val () = import_error_with struct_contracts "missing struct type identity"
+val () = import_error_with Malformed struct_contracts "missing struct type identity"
   (edit_first "UserDefinedTypeName" (drop_field "referencedDeclaration") struct_ast)

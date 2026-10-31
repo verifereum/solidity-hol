@@ -171,55 +171,34 @@ fun storage_json tm =
 fun define name tm =
   new_definition (name ^ "_def", mk_eq (mk_var (name, type_of tm), tm))
 
-val elaborate_unit_tm = prim_mk_const {Thy = "solidityElaborate", Name = "elaborate_unit"}
-
-fun unit_constant prefix artifact source =
+fun prepared_constants prefix (prepared : solidityPrepareLib.prepared) =
   let
-    val def = define (prefix ^ "_unit")
-                (solidityImportLib.import_artifact artifact source)
-    val () = cv_auto_trans def
+    val unit_def = define (prefix ^ "_unit") (#unit prepared)
+    val () = cv_auto_trans unit_def
+    val program_def = define (prefix ^ "_program") (#program prepared)
+    val () = cv_auto_trans program_def
+    fun named name th = save_thm (prefix ^ name,
+      REWRITE_RULE [SYM unit_def, SYM program_def] th)
+    val _ = named "_source_valid" (#source_valid prepared)
+    val _ = named "_elaborates" (#elaborates prepared)
+    val _ = named "_program_wf" (#core_wf prepared)
   in
-    lhs (concl def)
+    (lhs (concl unit_def), lhs (concl program_def))
   end
 
 fun code_constant prefix artifact source contract =
   let
-    val hex = solidityImportLib.artifact_deployed_bytecode artifact source contract
+    val hex = JSONUtil.asString (JSONUtil.get (artifact,
+      map JSONUtil.SEL ["output", "contracts", source, contract, "evm",
+                        "deployedBytecode", "object"]))
+      handle e as JSONUtil.JSONError _ => fail (JSONUtil.exnMessage e)
+           | e as JSONUtil.FieldNotFound _ => fail (JSONUtil.exnMessage e)
     val def = define (prefix ^ "_code")
                 “REVERSE $ hex_to_rev_bytes [] ^(stringSyntax.fromMLstring hex)”
     val () = cv_trans_deep_embedding EVAL def
   in
     lhs (concl def)
   end
-
-(* The elaborated program, or NONE if elaboration rejects the unit. *)
-fun program_constant prefix unit =
-  let
-    val elaborated = cv_eval (mk_comb (elaborate_unit_tm, unit))
-    val result = rhs (concl elaborated)
-  in
-    if optionSyntax.is_none result then NONE
-    else
-      let
-        val def = define (prefix ^ "_program") (optionSyntax.dest_some result)
-        val () = cv_auto_trans def
-        val th = CONV_RULE (RAND_CONV (RAND_CONV (REWR_CONV (SYM def)))) elaborated
-      in
-        SOME (lhs (concl def), def, save_thm (prefix ^ "_elaborates", th))
-      end
-  end
-
-fun program_wf prefix program def =
-  let
-    val th = (PURE_REWRITE_CONV [def] THENC EVAL)
-               “wf_core_program (core_program_environment [] ^program) ^program”
-  in
-    if rhs (concl th) ~~ T then
-      SOME (save_thm (prefix ^ "_program_wf",
-                      EQT_ELIM (CONV_RULE (LAND_CONV (REWRITE_CONV [SYM def])) th)))
-    else NONE
-  end
-  handle HOL_ERR _ => NONE
 
 (* Cases *)
 
@@ -328,34 +307,26 @@ fun run_suite root fuel s =
     val contract = string_field s "contract"
     val cases = array_field s "cases"
   in
-    case (SOME (unit_constant prefix artifact source)
-          handle solidityImportLib.ImportError msg =>
-            (suite_failure suite "import-rejected" msg; NONE)) of
-      NONE => false
-    | SOME unit =>
-      case program_constant prefix unit of
-        NONE => suite_failure suite "elaboration-rejected"
-                  "elaborate_unit returned NONE"
-      | SOME (program, def, _) =>
-        case program_wf prefix program def of
-          NONE => suite_failure suite "invalid-core"
-                    "wf_core_program does not hold"
-        | SOME _ =>
-          let
-            val code = code_constant prefix artifact source contract
-            val () = emit [("kind", json_string "suite"),
-                           ("suite", json_string suite),
-                           ("status", json_string "ok"),
-                           ("theorems",
-                            json_array (map json_string
-                              [prefix ^ "_elaborates", prefix ^ "_program_wf"]))]
-            val env = {suite = suite, code = code, unit = unit,
-                       program = program, fuel = fuel}
-          in
-            List.foldl (fn (c, ok) => run_case env c andalso ok) true cases
-          end
+    let
+      val checked = solidityPrepareLib.prepare_artifact
+        {root = root, path = artifact, source = source}
+      val (unit, program) = prepared_constants prefix (#prepared checked)
+      val code = code_constant prefix (#artifact checked) source contract
+      val () = emit [("kind", json_string "suite"),
+                     ("suite", json_string suite),
+                     ("status", json_string "ok"),
+                     ("theorems", json_array (map json_string
+                       [prefix ^ "_elaborates", prefix ^ "_program_wf"]))]
+      val env = {suite = suite, code = code, unit = unit,
+                 program = program, fuel = fuel}
+    in
+      List.foldl (fn (c, ok) => run_case env c andalso ok) true cases
+    end
   end
-  handle CorpusError msg => suite_failure (string_field s "name" handle _ => "?")
+  handle solidityPrepareLib.PreparationError (kind, message) =>
+           suite_failure (string_field s "name" handle _ => "?")
+             (solidityPrepareLib.failure_name kind) message
+       | CorpusError msg => suite_failure (string_field s "name" handle _ => "?")
                               "error" msg
        | e as HOL_ERR _ => suite_failure (string_field s "name" handle _ => "?")
                              "error" (General.exnMessage e)
