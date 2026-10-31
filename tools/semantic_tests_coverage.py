@@ -317,6 +317,8 @@ def node_blockers(node: dict[str, Any]) -> list[Blocker]:
     found: list[str] = []
     if kind in FEATURES:
         found.append(FEATURES[kind])
+    elif kind == "IndexAccess" and node.get("indexExpression") is None:
+        found.append("array type expressions")
     elif kind == "ArrayTypeName":
         length = node.get("length")
         tid = (length or {}).get("typeDescriptions", {}).get("typeIdentifier", "")

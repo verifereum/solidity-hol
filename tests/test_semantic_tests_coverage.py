@@ -213,6 +213,11 @@ class ClassifyTests(unittest.TestCase):
                   "typeDescriptions": {"typeIdentifier": "t_uint256"}}
         self.assertEqual(coverage.scan({"t.sol": unit([function(4, [length])])}), {})
 
+    def test_array_type_expression_without_index_is_import_rejection(self) -> None:
+        node = {"nodeType": "IndexAccess", "id": 13}
+        self.assertEqual(coverage.node_blockers(node),
+                         [coverage.Blocker("IndexAccess", "array type expressions", "import")])
+
     def test_struct_fixtures_have_no_coverage_blockers(self) -> None:
         for name in ("storage_structs", "storage_structs_top_level"):
             with self.subTest(name=name):

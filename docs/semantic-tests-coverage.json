@@ -1,15 +1,15 @@
 {
   "counts": {
-    "admitted": 129,
+    "admitted": 132,
     "compile-failure": 0,
-    "elaboration-rejected": 134,
-    "import-rejected": 1307,
+    "elaboration-rejected": 188,
+    "import-rejected": 1250,
     "skipped": 100
   },
   "features": [
     {
       "feature": "bytes and string",
-      "first_rejection": 21,
+      "first_rejection": 25,
       "node_types": [
         "FunctionCall",
         "IndexAccess",
@@ -23,6 +23,15 @@
       "tests": 413
     },
     {
+      "feature": "source units without exactly one contract",
+      "first_rejection": 0,
+      "node_types": [
+        "SourceUnit"
+      ],
+      "only_blocker": 0,
+      "tests": 341
+    },
+    {
       "feature": "arrays",
       "first_rejection": 2,
       "node_types": [
@@ -34,16 +43,7 @@
         "VariableDeclaration"
       ],
       "only_blocker": 4,
-      "tests": 363
-    },
-    {
-      "feature": "source units without exactly one contract",
-      "first_rejection": 0,
-      "node_types": [
-        "SourceUnit"
-      ],
-      "only_blocker": 0,
-      "tests": 341
+      "tests": 323
     },
     {
       "feature": "local reference bindings",
@@ -56,11 +56,11 @@
     },
     {
       "feature": "inline assembly",
-      "first_rejection": 133,
+      "first_rejection": 149,
       "node_types": [
         "InlineAssembly"
       ],
-      "only_blocker": 61,
+      "only_blocker": 62,
       "tests": 266
     },
     {
@@ -68,14 +68,15 @@
       "first_rejection": 0,
       "node_types": [
         "Identifier",
-        "IndexAccess"
+        "IndexAccess",
+        "MemberAccess"
       ],
       "only_blocker": 6,
-      "tests": 252
+      "tests": 261
     },
     {
       "feature": "external calls and contract members",
-      "first_rejection": 52,
+      "first_rejection": 32,
       "node_types": [
         "FunctionCall",
         "MemberAccess",
@@ -88,7 +89,7 @@
     },
     {
       "feature": "require/assert/revert",
-      "first_rejection": 46,
+      "first_rejection": 52,
       "node_types": [
         "Identifier"
       ],
@@ -96,23 +97,8 @@
       "tests": 216
     },
     {
-      "feature": "structs",
-      "first_rejection": 175,
-      "node_types": [
-        "FunctionCall",
-        "IndexAccess",
-        "MemberAccess",
-        "StructDefinition",
-        "TupleExpression",
-        "UserDefinedTypeName",
-        "VariableDeclaration"
-      ],
-      "only_blocker": 9,
-      "tests": 214
-    },
-    {
       "feature": "constructors",
-      "first_rejection": 32,
+      "first_rejection": 54,
       "node_types": [
         "FunctionDefinition"
       ],
@@ -121,7 +107,7 @@
     },
     {
       "feature": "public state variables",
-      "first_rejection": 104,
+      "first_rejection": 119,
       "node_types": [
         "VariableDeclaration"
       ],
@@ -130,7 +116,7 @@
     },
     {
       "feature": "this",
-      "first_rejection": 2,
+      "first_rejection": 17,
       "node_types": [
         "Identifier"
       ],
@@ -138,8 +124,21 @@
       "tests": 167
     },
     {
+      "feature": "structs",
+      "first_rejection": 5,
+      "node_types": [
+        "FunctionCall",
+        "IndexAccess",
+        "MemberAccess",
+        "TupleExpression",
+        "VariableDeclaration"
+      ],
+      "only_blocker": 3,
+      "tests": 165
+    },
+    {
       "feature": "declaration values",
-      "first_rejection": 38,
+      "first_rejection": 46,
       "node_types": [
         "VariableDeclaration"
       ],
@@ -172,7 +171,7 @@
     },
     {
       "feature": "libraries",
-      "first_rejection": 7,
+      "first_rejection": 29,
       "node_types": [
         "ContractDefinition"
       ],
@@ -181,7 +180,7 @@
     },
     {
       "feature": "memory arrays (new T[](n))",
-      "first_rejection": 36,
+      "first_rejection": 44,
       "node_types": [
         "NewExpression"
       ],
@@ -190,13 +189,24 @@
     },
     {
       "feature": "library calls and contract-name members",
-      "first_rejection": 22,
+      "first_rejection": 0,
       "node_types": [
         "IndexAccess",
         "MemberAccess"
       ],
       "only_blocker": 0,
       "tests": 110
+    },
+    {
+      "feature": "struct values and copying",
+      "first_rejection": 0,
+      "node_types": [
+        "Identifier",
+        "IndexAccess",
+        "MemberAccess"
+      ],
+      "only_blocker": 2,
+      "tests": 108
     },
     {
       "feature": "contracts without functions",
@@ -209,7 +219,7 @@
     },
     {
       "feature": "abi.* functions",
-      "first_rejection": 37,
+      "first_rejection": 48,
       "node_types": [
         "Identifier",
         "MemberAccess"
@@ -219,7 +229,7 @@
     },
     {
       "feature": "function types",
-      "first_rejection": 50,
+      "first_rejection": 56,
       "node_types": [
         "FunctionTypeName"
       ],
@@ -247,7 +257,7 @@
     },
     {
       "feature": "contract creation (new C)",
-      "first_rejection": 8,
+      "first_rejection": 13,
       "node_types": [
         "NewExpression"
       ],
@@ -274,25 +284,13 @@
     },
     {
       "feature": "msg/block/tx globals",
-      "first_rejection": 32,
+      "first_rejection": 34,
       "node_types": [
         "Identifier",
         "MemberAccess"
       ],
       "only_blocker": 12,
       "tests": 71
-    },
-    {
-      "feature": "mappings",
-      "first_rejection": 0,
-      "node_types": [
-        "IndexAccess",
-        "MemberAccess",
-        "TupleExpression",
-        "VariableDeclaration"
-      ],
-      "only_blocker": 0,
-      "tests": 67
     },
     {
       "feature": "hash and signature built-ins",
@@ -305,7 +303,7 @@
     },
     {
       "feature": "events",
-      "first_rejection": 43,
+      "first_rejection": 46,
       "node_types": [
         "EmitStatement",
         "EventDefinition",
@@ -316,7 +314,7 @@
     },
     {
       "feature": "address members (balance, call, transfer, \u2026)",
-      "first_rejection": 3,
+      "first_rejection": 4,
       "node_types": [
         "MemberAccess"
       ],
@@ -345,7 +343,7 @@
     },
     {
       "feature": "imports",
-      "first_rejection": 11,
+      "first_rejection": 9,
       "node_types": [
         "ImportDirective",
         "MemberAccess",
@@ -365,7 +363,7 @@
     },
     {
       "feature": "modifiers",
-      "first_rejection": 32,
+      "first_rejection": 33,
       "node_types": [
         "FunctionDefinition",
         "ModifierDefinition",
@@ -418,7 +416,7 @@
     },
     {
       "feature": "inline arrays",
-      "first_rejection": 10,
+      "first_rejection": 13,
       "node_types": [
         "TupleExpression"
       ],
@@ -444,8 +442,20 @@
       "tests": 41
     },
     {
+      "feature": "mappings",
+      "first_rejection": 0,
+      "node_types": [
+        "IndexAccess",
+        "MemberAccess",
+        "TupleExpression",
+        "VariableDeclaration"
+      ],
+      "only_blocker": 0,
+      "tests": 41
+    },
+    {
       "feature": "conditional expressions",
-      "first_rejection": 21,
+      "first_rejection": 22,
       "node_types": [
         "Conditional"
       ],
@@ -454,15 +464,24 @@
     },
     {
       "feature": "custom errors",
-      "first_rejection": 19,
+      "first_rejection": 20,
       "node_types": [
         "ErrorDefinition",
         "MemberAccess",
         "RevertStatement",
         "TupleExpression"
       ],
-      "only_blocker": 2,
+      "only_blocker": 3,
       "tests": 38
+    },
+    {
+      "feature": "aggregate array mutation",
+      "first_rejection": 0,
+      "node_types": [
+        "MemberAccess"
+      ],
+      "only_blocker": 1,
+      "tests": 35
     },
     {
       "feature": "interfaces",
@@ -484,7 +503,7 @@
     },
     {
       "feature": "named arguments",
-      "first_rejection": 7,
+      "first_rejection": 9,
       "node_types": [
         "FunctionCall"
       ],
@@ -507,7 +526,7 @@
     },
     {
       "feature": "conversions to non-elementary types",
-      "first_rejection": 0,
+      "first_rejection": 1,
       "node_types": [
         "Identifier",
         "IndexAccess",
@@ -518,7 +537,7 @@
     },
     {
       "feature": "enums",
-      "first_rejection": 22,
+      "first_rejection": 23,
       "node_types": [
         "EnumDefinition",
         "EnumValue",
@@ -528,7 +547,7 @@
         "UserDefinedTypeName",
         "VariableDeclaration"
       ],
-      "only_blocker": 0,
+      "only_blocker": 1,
       "tests": 29
     },
     {
@@ -542,7 +561,7 @@
     },
     {
       "feature": "call options ({value: \u2026, gas: \u2026})",
-      "first_rejection": 3,
+      "first_rejection": 4,
       "node_types": [
         "FunctionCallOptions"
       ],
@@ -590,7 +609,7 @@
     },
     {
       "feature": "array slices",
-      "first_rejection": 10,
+      "first_rejection": 11,
       "node_types": [
         "IndexRangeAccess"
       ],
@@ -611,7 +630,8 @@
       "first_rejection": 0,
       "node_types": [
         "Identifier",
-        "IndexAccess"
+        "IndexAccess",
+        "MemberAccess"
       ],
       "only_blocker": 0,
       "tests": 17
@@ -652,6 +672,15 @@
       ],
       "only_blocker": 0,
       "tests": 7
+    },
+    {
+      "feature": "array type expressions",
+      "first_rejection": 1,
+      "node_types": [
+        "IndexAccess"
+      ],
+      "only_blocker": 0,
+      "tests": 6
     },
     {
       "feature": "tuples with empty components",
@@ -729,84 +758,84 @@
   "format": "solidity-hol-semantic-tests-coverage-v1",
   "greedy_order": [
     {
-      "admitted": 61,
+      "admitted": 62,
       "feature": "inline assembly"
     },
     {
-      "admitted": 94,
+      "admitted": 95,
       "feature": "bytes and string"
     },
     {
-      "admitted": 115,
+      "admitted": 116,
       "feature": "require/assert/revert"
     },
     {
-      "admitted": 133,
+      "admitted": 134,
       "feature": "msg/block/tx globals"
     },
     {
-      "admitted": 148,
+      "admitted": 149,
       "feature": "constant expressions over literals"
     },
     {
-      "admitted": 162,
+      "admitted": 163,
       "feature": "local reference bindings"
     },
     {
-      "admitted": 187,
-      "feature": "structs"
-    },
-    {
-      "admitted": 231,
+      "admitted": 183,
       "feature": "arrays"
     },
     {
-      "admitted": 289,
+      "admitted": 228,
       "feature": "array values"
     },
     {
-      "admitted": 318,
+      "admitted": 253,
+      "feature": "structs"
+    },
+    {
+      "admitted": 281,
       "feature": "memory arrays (new T[](n))"
     },
     {
-      "admitted": 342,
-      "feature": "operator delete"
+      "admitted": 305,
+      "feature": "struct values and copying"
     },
     {
-      "admitted": 363,
+      "admitted": 325,
       "feature": "events"
     },
     {
-      "admitted": 384,
+      "admitted": 345,
       "feature": "public state variables"
     },
     {
-      "admitted": 418,
+      "admitted": 383,
       "feature": "constructors"
     },
     {
-      "admitted": 446,
-      "feature": "mappings"
+      "admitted": 405,
+      "feature": "operator delete"
     },
     {
-      "admitted": 465,
+      "admitted": 431,
+      "feature": "aggregate array mutation"
+    },
+    {
+      "admitted": 450,
       "feature": "abi.* functions"
     },
     {
-      "admitted": 486,
+      "admitted": 471,
       "feature": "hash and signature built-ins"
     },
     {
-      "admitted": 504,
+      "admitted": 489,
       "feature": "modifiers"
     },
     {
-      "admitted": 522,
+      "admitted": 507,
       "feature": "declaration values"
-    },
-    {
-      "admitted": 543,
-      "feature": "inline arrays"
     }
   ],
   "profile": "solc-0.8.37-via-ir-osaka",
@@ -830,6 +859,7 @@
       "category": "import-rejected",
       "features": [
         "abi.* functions",
+        "array type expressions",
         "arrays",
         "bytes and string",
         "local reference bindings",
@@ -860,13 +890,12 @@
       "category": "import-rejected",
       "features": [
         "abi.* functions",
-        "arrays",
         "bytes and string",
         "local reference bindings",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 7: unsupported contract member",
+      "first": "abi.* functions",
+      "reason": "MemberAccess 16: unsupported built-in member",
       "scan_agrees": true,
       "test": "abicoder/abi_decode_from_calldata_struct_v2.sol"
     },
@@ -874,12 +903,14 @@
       "category": "import-rejected",
       "features": [
         "abi.* functions",
+        "array values",
         "arrays",
         "memory arrays (new T[](n))",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 7: unsupported contract member",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 28: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "abicoder/abi_decode_from_memory_struct_v2.sol"
     },
@@ -887,13 +918,15 @@
       "category": "import-rejected",
       "features": [
         "abi.* functions",
+        "array values",
         "arrays",
         "bytes and string",
         "memory arrays (new T[](n))",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 9: unsupported contract member",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 30: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "abicoder/abi_decode_from_storage_struct_v2.sol"
     },
@@ -925,6 +958,7 @@
       "category": "import-rejected",
       "features": [
         "abi.* functions",
+        "array type expressions",
         "arrays",
         "bytes and string",
         "inline assembly",
@@ -998,7 +1032,7 @@
         "require/assert/revert"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 6: only array length, push and pop members are supported",
+      "reason": "MemberAccess 6: unsupported built-in member",
       "scan_agrees": true,
       "test": "abicoder/abi_encode.sol"
     },
@@ -1118,6 +1152,7 @@
       "features": [
         "abi.* functions",
         "address members (balance, call, transfer, \u2026)",
+        "array values",
         "arrays",
         "bytes and string",
         "enums",
@@ -1126,6 +1161,7 @@
         "local reference bindings",
         "memory arrays (new T[](n))",
         "require/assert/revert",
+        "struct values and copying",
         "structs",
         "this",
         "tuples of literals",
@@ -1165,7 +1201,7 @@
         "type names as values"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 14: only array length, push and pop members are supported",
+      "reason": "MemberAccess 14: unsupported built-in member",
       "scan_agrees": true,
       "test": "abicoder/abi_encode_decode_simple.sol"
     },
@@ -1176,7 +1212,7 @@
         "bytes and string"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 8: only array length, push and pop members are supported",
+      "reason": "MemberAccess 8: unsupported built-in member",
       "scan_agrees": true,
       "test": "abicoder/abi_encode_empty_string_not_bytes0.sol"
     },
@@ -1198,7 +1234,7 @@
         "local reference bindings"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 12: only array length, push and pop members are supported",
+      "reason": "MemberAccess 12: unsupported built-in member",
       "scan_agrees": true,
       "test": "abicoder/abi_encode_memory_dynamic_array_and_calldata_bytes_v1.sol"
     },
@@ -1210,7 +1246,7 @@
         "constant expressions over literals"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 6: only array length, push and pop members are supported",
+      "reason": "MemberAccess 6: unsupported built-in member",
       "scan_agrees": true,
       "test": "abicoder/abi_encode_rational.sol"
     },
@@ -1224,7 +1260,7 @@
         "local reference bindings"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 21: only array length, push and pop members are supported",
+      "reason": "MemberAccess 21: unsupported built-in member",
       "scan_agrees": true,
       "test": "abicoder/abi_encode_storage_array_v2.sol"
     },
@@ -1232,13 +1268,12 @@
       "category": "import-rejected",
       "features": [
         "abi.* functions",
-        "arrays",
         "bytes and string",
         "require/assert/revert",
-        "structs"
+        "struct values and copying"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 7: unsupported contract member",
+      "first": "abi.* functions",
+      "reason": "MemberAccess 13: unsupported built-in member",
       "scan_agrees": true,
       "test": "abicoder/abi_encode_v2.sol"
     },
@@ -1255,7 +1290,7 @@
         "structs"
       ],
       "first": "external calls and contract members",
-      "reason": "UserDefinedTypeName 31: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 31: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "abicoder/abi_encode_v2_in_function_inherited_in_v1_contract.sol"
     },
@@ -1287,7 +1322,7 @@
         "type(\u2026)"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 7: only array length, push and pop members are supported",
+      "reason": "MemberAccess 7: unsupported built-in member",
       "scan_agrees": true,
       "test": "abicoder/abi_encode_with_selector_v1.sol"
     },
@@ -1297,12 +1332,13 @@
         "abi.* functions",
         "bytes and string",
         "literals of non-integer types",
+        "struct values and copying",
         "structs",
         "type names as values",
         "type(\u2026)"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 67: unsupported contract member",
+      "first": "abi.* functions",
+      "reason": "MemberAccess 7: unsupported built-in member",
       "scan_agrees": true,
       "test": "abicoder/abi_encode_with_selector_v2.sol"
     },
@@ -1318,7 +1354,7 @@
         "type(\u2026)"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 7: only array length, push and pop members are supported",
+      "reason": "MemberAccess 7: unsupported built-in member",
       "scan_agrees": true,
       "test": "abicoder/abi_encode_with_signature_v1.sol"
     },
@@ -1330,26 +1366,28 @@
         "arrays",
         "bytes and string",
         "memory arrays (new T[](n))",
+        "struct values and copying",
         "structs",
         "type names as values",
         "type(\u2026)"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 139: unsupported contract member",
+      "first": "abi.* functions",
+      "reason": "MemberAccess 7: unsupported built-in member",
       "scan_agrees": true,
       "test": "abicoder/abi_encode_with_signature_v2.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "array values",
         "arrays",
         "bytes and string",
         "local reference bindings",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "UserDefinedTypeName 12: unsupported type name UserDefinedTypeName",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for abicoder/bug_abi_encoder_v2_head_overflow_with_static_array_cleanup.sol",
       "scan_agrees": true,
       "test": "abicoder/bug_abi_encoder_v2_head_overflow_with_static_array_cleanup.sol"
     },
@@ -1373,8 +1411,8 @@
         "local reference bindings",
         "this"
       ],
-      "first": "external calls and contract members",
-      "reason": "MemberAccess 65: only array length, push and pop members are supported",
+      "first": "this",
+      "reason": "Identifier 64: built-in this is not supported",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_2d_dynamic_dynamic_v2.sol"
     },
@@ -1387,8 +1425,8 @@
         "local reference bindings",
         "this"
       ],
-      "first": "external calls and contract members",
-      "reason": "MemberAccess 69: only array length, push and pop members are supported",
+      "first": "this",
+      "reason": "Identifier 68: built-in this is not supported",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_2d_dynamic_static_v2.sol"
     },
@@ -1416,7 +1454,7 @@
         "this"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 10: only array length, push and pop members are supported",
+      "reason": "MemberAccess 10: unsupported built-in member",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_dynamic_of_uint_v2.sol"
     },
@@ -1432,7 +1470,7 @@
         "this"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 10: only array length, push and pop members are supported",
+      "reason": "MemberAccess 10: unsupported built-in member",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_dynamic_of_value_types_v2.sol"
     },
@@ -1449,7 +1487,7 @@
         "this"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 13: only array length, push and pop members are supported",
+      "reason": "MemberAccess 13: unsupported built-in member",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_dynamic_static_dynamic_v2.sol"
     },
@@ -1463,8 +1501,8 @@
         "local reference bindings",
         "source units without exactly one contract"
       ],
-      "first": "library calls and contract-name members",
-      "reason": "MemberAccess 41: only array length, push and pop members are supported",
+      "first": "libraries",
+      "reason": "ContractDefinition 23: unsupported contract kind library",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_dynamic_static_in_library_v2.sol"
     },
@@ -1489,8 +1527,8 @@
         "local reference bindings",
         "this"
       ],
-      "first": "external calls and contract members",
-      "reason": "MemberAccess 27: only array length, push and pop members are supported",
+      "first": "this",
+      "reason": "Identifier 26: built-in this is not supported",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_dynamic_static_short_reencode_v2.sol"
     },
@@ -1567,7 +1605,7 @@
         "this"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 10: only array length, push and pop members are supported",
+      "reason": "MemberAccess 10: unsupported built-in member",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_indexing_dynamic_v2.sol"
     },
@@ -1583,7 +1621,7 @@
         "this"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 11: only array length, push and pop members are supported",
+      "reason": "MemberAccess 11: unsupported built-in member",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_indexing_static_v2.sol"
     },
@@ -1610,7 +1648,7 @@
         "this"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 11: only array length, push and pop members are supported",
+      "reason": "MemberAccess 11: unsupported built-in member",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_multi_dynamic_v2.sol"
     },
@@ -1618,6 +1656,7 @@
       "category": "import-rejected",
       "features": [
         "array slices",
+        "array type expressions",
         "array values",
         "arrays",
         "conversions to non-elementary types",
@@ -1644,7 +1683,7 @@
         "this"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 14: only array length, push and pop members are supported",
+      "reason": "MemberAccess 14: unsupported built-in member",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_static_dynamic_static_v2.sol"
     },
@@ -1671,7 +1710,7 @@
         "this"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 11: only array length, push and pop members are supported",
+      "reason": "MemberAccess 11: unsupported built-in member",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_static_of_value_types_v2.sol"
     },
@@ -1684,23 +1723,22 @@
         "bytes and string",
         "external calls and contract members",
         "local reference bindings",
-        "structs",
         "this"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 5: unsupported contract member",
+      "first": "abi.* functions",
+      "reason": "MemberAccess 15: unsupported built-in member",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_struct_dynamic_v2.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "arrays",
         "local reference bindings",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 6: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/array/calldata_array_struct_static_v2.sol",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_struct_static_v2.sol"
     },
@@ -1716,7 +1754,7 @@
         "this"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 16: only array length, push and pop members are supported",
+      "reason": "MemberAccess 16: unsupported built-in member",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_two_dynamic_v2.sol"
     },
@@ -1732,7 +1770,7 @@
         "this"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 18: only array length, push and pop members are supported",
+      "reason": "MemberAccess 18: unsupported built-in member",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_array_two_static_v2.sol"
     },
@@ -1773,7 +1811,7 @@
         "local reference bindings"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 11: only array length, push and pop members are supported",
+      "reason": "MemberAccess 11: unsupported built-in member",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_nested_array_static_reencode_v2.sol"
     },
@@ -1787,7 +1825,7 @@
         "local reference bindings"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 43: only array length, push and pop members are supported",
+      "reason": "MemberAccess 43: unsupported built-in member",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_overlapping_dynamic_arrays_v2.sol"
     },
@@ -1801,7 +1839,7 @@
         "local reference bindings"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 32: only array length, push and pop members are supported",
+      "reason": "MemberAccess 32: unsupported built-in member",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_overlapping_nested_dynamic_arrays_v2.sol"
     },
@@ -1825,10 +1863,11 @@
         "arrays",
         "bytes and string",
         "local reference bindings",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 5: unsupported contract member",
+      "first": "abi.* functions",
+      "reason": "MemberAccess 17: unsupported built-in member",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/calldata_struct_array_reencode_v2.sol"
     },
@@ -1852,7 +1891,7 @@
         "local reference bindings"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 11: only array length, push and pop members are supported",
+      "reason": "MemberAccess 11: unsupported built-in member",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/memory_dynamic_array_and_calldata_bytes.sol"
     },
@@ -1866,7 +1905,7 @@
         "local reference bindings"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 13: only array length, push and pop members are supported",
+      "reason": "MemberAccess 13: unsupported built-in member",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/array/memory_dynamic_array_and_calldata_static_array.sol"
     },
@@ -1920,7 +1959,7 @@
         "this"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 7: only array length, push and pop members are supported",
+      "reason": "MemberAccess 7: unsupported built-in member",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/copy_from_calldata_removes_bytes_data.sol"
     },
@@ -1931,8 +1970,8 @@
         "external calls and contract members",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 8: unsupported contract member",
+      "first": "external calls and contract members",
+      "reason": "UserDefinedTypeName 3: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/struct/mediocre_dynamic_v2.sol"
     },
@@ -1943,32 +1982,32 @@
         "external calls and contract members",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 5: unsupported contract member",
+      "first": "external calls and contract members",
+      "reason": "UserDefinedTypeName 3: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/struct/mediocre_static_v2.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "arrays",
         "local reference bindings",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 5: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/struct/member_array_dynamic2_v2.sol",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/struct/member_array_dynamic2_v2.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "arrays",
         "local reference bindings",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 9: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/struct/member_array_dynamic_multiple_fields_v2.sol",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/struct/member_array_dynamic_multiple_fields_v2.sol"
     },
@@ -1976,27 +2015,27 @@
       "category": "import-rejected",
       "features": [
         "abi.* functions",
-        "arrays",
         "bytes and string",
         "external calls and contract members",
         "local reference bindings",
+        "struct values and copying",
         "structs",
         "this"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 5: unsupported contract member",
+      "first": "abi.* functions",
+      "reason": "MemberAccess 14: unsupported built-in member",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/struct/member_array_dynamic_v2.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "arrays",
         "local reference bindings",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 10: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/struct/member_array_static_mulitple_fields_v2.sol",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/struct/member_array_static_mulitple_fields_v2.sol"
     },
@@ -2009,8 +2048,8 @@
         "structs",
         "this"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 10: unsupported contract member",
+      "first": "function types",
+      "reason": "FunctionTypeName 6: unsupported type name FunctionTypeName",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/struct/member_external_function_v2.sol"
     },
@@ -2022,56 +2061,57 @@
         "external calls and contract members",
         "local reference bindings",
         "memory arrays (new T[](n))",
+        "struct values and copying",
         "structs",
         "this"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 7: unsupported contract member",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 39: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/struct/member_offset_v2.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "local reference bindings",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 6: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/struct/multiple_structs_v2.sol",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/struct/multiple_structs_v2.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "local reference bindings",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 6: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/struct/nested_static_3_fields_v2.sol",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/struct/nested_static_3_fields_v2.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "local reference bindings",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 6: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/struct/nested_static_4_fields_v2.sol",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/struct/nested_static_4_fields_v2.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "bytes and string",
         "local reference bindings",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 6: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/struct/nested_with_bytes_v2.sol",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/struct/nested_with_bytes_v2.sol"
     },
@@ -2081,53 +2121,55 @@
         "arrays",
         "local reference bindings",
         "require/assert/revert",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 11: unsupported contract member",
+      "first": "require/assert/revert",
+      "reason": "Identifier 60: built-in assert is not supported",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/struct/nested_with_dynamic_array_v2.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "arrays",
         "local reference bindings",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 4: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/struct/nested_with_dynamic_struct_array_v2.sol",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/struct/nested_with_dynamic_struct_array_v2.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 8: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/struct/short_v2.sol",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/struct/short_v2.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 10: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/struct/simple_multiple_fields_short_types_v2.sol",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/struct/simple_multiple_fields_short_types_v2.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "local reference bindings",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 6: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/struct/simple_multiple_fields_v2.sol",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/struct/simple_multiple_fields_v2.sol"
     },
@@ -2138,22 +2180,23 @@
         "bytes and string",
         "external calls and contract members",
         "local reference bindings",
+        "struct values and copying",
         "structs",
         "this"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 4: unsupported contract member",
+      "first": "abi.* functions",
+      "reason": "MemberAccess 13: unsupported built-in member",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/struct/simple_single_field_v2.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "local reference bindings",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 6: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for abicoder/calldataDecoding/struct/struct_and_ints_v2.sol",
       "scan_agrees": true,
       "test": "abicoder/calldataDecoding/struct/struct_and_ints_v2.sol"
     },
@@ -2241,7 +2284,7 @@
         "this"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 14: only array length, push and pop members are supported",
+      "reason": "MemberAccess 14: unsupported built-in member",
       "scan_agrees": true,
       "test": "abicoder/cleanup/dynamic_array_v2.sol"
     },
@@ -2272,11 +2315,12 @@
         "function types",
         "inline assembly",
         "local reference bindings",
+        "struct values and copying",
         "structs",
         "this"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 6: unsupported contract member",
+      "first": "function types",
+      "reason": "FunctionTypeName 4: unsupported type name FunctionTypeName",
       "scan_agrees": true,
       "test": "abicoder/cleanup/function_v2.sol"
     },
@@ -2321,7 +2365,7 @@
         "this"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 15: only array length, push and pop members are supported",
+      "reason": "MemberAccess 15: unsupported built-in member",
       "scan_agrees": true,
       "test": "abicoder/cleanup/static_array_v2.sol"
     },
@@ -2332,8 +2376,8 @@
         "local reference bindings",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 6: unsupported contract member",
+      "first": "inline assembly",
+      "reason": "InlineAssembly 26: unsupported statement InlineAssembly",
       "scan_agrees": true,
       "test": "abicoder/cleanup/struct2_v2.sol"
     },
@@ -2345,11 +2389,12 @@
         "inline assembly",
         "local reference bindings",
         "msg/block/tx globals",
+        "struct values and copying",
         "structs",
         "this"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 6: unsupported contract member",
+      "first": "msg/block/tx globals",
+      "reason": "MemberAccess 23: unsupported built-in member",
       "scan_agrees": true,
       "test": "abicoder/cleanup/struct_v2.sol"
     },
@@ -2369,6 +2414,7 @@
       "category": "import-rejected",
       "features": [
         "abi.* functions",
+        "array type expressions",
         "array values",
         "arrays",
         "bytes and string",
@@ -2379,7 +2425,7 @@
         "memory arrays (new T[](n))"
       ],
       "first": "external calls and contract members",
-      "reason": "UserDefinedTypeName 5: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 5: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "abicoder/contract_array.sol"
     },
@@ -2387,6 +2433,7 @@
       "category": "import-rejected",
       "features": [
         "abi.* functions",
+        "array type expressions",
         "array values",
         "arrays",
         "bytes and string",
@@ -2397,7 +2444,7 @@
         "memory arrays (new T[](n))"
       ],
       "first": "external calls and contract members",
-      "reason": "UserDefinedTypeName 6: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 6: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "abicoder/contract_array_v2.sol"
     },
@@ -2412,6 +2459,7 @@
         "local reference bindings",
         "memory arrays (new T[](n))",
         "source units without exactly one contract",
+        "struct values and copying",
         "structs"
       ],
       "first": "declaration values",
@@ -2432,7 +2480,7 @@
         "type(\u2026)"
       ],
       "first": "type(\u2026)",
-      "reason": "MemberAccess 21: only array length, push and pop members are supported",
+      "reason": "MemberAccess 21: unsupported built-in member",
       "scan_agrees": true,
       "test": "abicoder/return_dynamic_types_cross_call_advanced.sol"
     },
@@ -2464,8 +2512,8 @@
         "external calls and contract members",
         "this"
       ],
-      "first": "external calls and contract members",
-      "reason": "MemberAccess 14: only array length, push and pop members are supported",
+      "first": "this",
+      "reason": "Identifier 13: built-in this is not supported",
       "scan_agrees": true,
       "test": "abicoder/return_dynamic_types_cross_call_simple.sol"
     },
@@ -2606,7 +2654,7 @@
         "type(\u2026)"
       ],
       "first": "type(\u2026)",
-      "reason": "MemberAccess 11: only array length, push and pop members are supported",
+      "reason": "MemberAccess 11: unsupported built-in member",
       "scan_agrees": true,
       "test": "arithmetics/block_inside_unchecked.sol"
     },
@@ -2686,7 +2734,7 @@
         "type(\u2026)"
       ],
       "first": "type(\u2026)",
-      "reason": "MemberAccess 27: only array length, push and pop members are supported",
+      "reason": "MemberAccess 27: unsupported built-in member",
       "scan_agrees": true,
       "test": "arithmetics/signed_mod.sol"
     },
@@ -2995,7 +3043,7 @@
         "msg/block/tx globals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 7: only array length, push and pop members are supported",
+      "reason": "MemberAccess 7: unsupported built-in member",
       "scan_agrees": true,
       "test": "array/bytes_length_member.sol"
     },
@@ -3058,7 +3106,7 @@
         "type names as values"
       ],
       "first": "bytes and string",
-      "reason": "MemberAccess 11: only array length, push and pop members are supported",
+      "reason": "MemberAccess 11: unsupported built-in member",
       "scan_agrees": true,
       "test": "array/concat/bytes_concat_2_args.sol"
     },
@@ -3069,7 +3117,7 @@
         "type names as values"
       ],
       "first": "bytes and string",
-      "reason": "MemberAccess 13: only array length, push and pop members are supported",
+      "reason": "MemberAccess 13: unsupported built-in member",
       "scan_agrees": true,
       "test": "array/concat/bytes_concat_3_args.sol"
     },
@@ -3081,7 +3129,7 @@
         "type names as values"
       ],
       "first": "bytes and string",
-      "reason": "MemberAccess 12: only array length, push and pop members are supported",
+      "reason": "MemberAccess 12: unsupported built-in member",
       "scan_agrees": true,
       "test": "array/concat/bytes_concat_as_argument.sol"
     },
@@ -3100,7 +3148,7 @@
         "type names as values"
       ],
       "first": "bytes and string",
-      "reason": "MemberAccess 7: only array length, push and pop members are supported",
+      "reason": "MemberAccess 7: unsupported built-in member",
       "scan_agrees": true,
       "test": "array/concat/bytes_concat_empty_argument_list.sol"
     },
@@ -3111,7 +3159,7 @@
         "type names as values"
       ],
       "first": "bytes and string",
-      "reason": "MemberAccess 14: only array length, push and pop members are supported",
+      "reason": "MemberAccess 14: unsupported built-in member",
       "scan_agrees": true,
       "test": "array/concat/bytes_concat_empty_strings.sol"
     },
@@ -3122,7 +3170,7 @@
         "type names as values"
       ],
       "first": "bytes and string",
-      "reason": "MemberAccess 16: only array length, push and pop members are supported",
+      "reason": "MemberAccess 16: unsupported built-in member",
       "scan_agrees": true,
       "test": "array/concat/bytes_concat_nested.sol"
     },
@@ -3223,8 +3271,8 @@
     {
       "category": "elaboration-rejected",
       "features": [
+        "aggregate array mutation",
         "array values",
-        "arrays",
         "operator delete"
       ],
       "first": null,
@@ -3344,14 +3392,13 @@
       "test": "array/copying/array_copy_storage_storage_static_static.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
-        "array values",
-        "arrays",
-        "structs"
+        "aggregate array mutation",
+        "array values"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 5: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/copying/array_copy_storage_storage_struct.sol",
       "scan_agrees": true,
       "test": "array/copying/array_copy_storage_storage_struct.sol"
     },
@@ -3369,6 +3416,7 @@
     {
       "category": "elaboration-rejected",
       "features": [
+        "aggregate array mutation",
         "array values",
         "arrays"
       ],
@@ -3425,7 +3473,6 @@
         "arrays",
         "constructors",
         "local reference bindings",
-        "mappings",
         "memory arrays (new T[](n))"
       ],
       "first": "constructors",
@@ -3476,28 +3523,27 @@
       "test": "array/copying/array_of_function_external_storage_to_storage_dynamic_different_mutability.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "array values",
         "arrays",
         "local reference bindings",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 8: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/copying/array_of_struct_calldata_to_memory.sol",
       "scan_agrees": true,
       "test": "array/copying/array_of_struct_calldata_to_memory.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "array values",
         "arrays",
-        "local reference bindings",
-        "structs"
+        "local reference bindings"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 8: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/copying/array_of_struct_calldata_to_storage.sol",
       "scan_agrees": true,
       "test": "array/copying/array_of_struct_calldata_to_storage.sol"
     },
@@ -3509,8 +3555,8 @@
         "memory arrays (new T[](n))",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 7: unsupported contract member",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 32: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "array/copying/array_of_struct_memory_to_storage.sol"
     },
@@ -3523,8 +3569,8 @@
         "require/assert/revert",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 5: unsupported contract member",
+      "first": "require/assert/revert",
+      "reason": "Identifier 23: built-in assert is not supported",
       "scan_agrees": true,
       "test": "array/copying/array_of_structs_containing_arrays_calldata_to_memory.sol"
     },
@@ -3537,8 +3583,8 @@
         "require/assert/revert",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 5: unsupported contract member",
+      "first": "require/assert/revert",
+      "reason": "Identifier 24: built-in assert is not supported",
       "scan_agrees": true,
       "test": "array/copying/array_of_structs_containing_arrays_calldata_to_storage.sol"
     },
@@ -3550,10 +3596,11 @@
         "inline arrays",
         "memory arrays (new T[](n))",
         "require/assert/revert",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 11: unsupported contract member",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 34: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "array/copying/array_of_structs_containing_arrays_memory_to_storage.sol"
     },
@@ -3572,7 +3619,6 @@
         "arrays",
         "constructors",
         "local reference bindings",
-        "mappings",
         "memory arrays (new T[](n))"
       ],
       "first": "constructors",
@@ -3610,7 +3656,7 @@
         "msg/block/tx globals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 11: only array length, push and pop members are supported",
+      "reason": "MemberAccess 11: unsupported built-in member",
       "scan_agrees": true,
       "test": "array/copying/bytes_inside_mappings.sol"
     },
@@ -3705,15 +3751,15 @@
       "test": "array/copying/calldata_array_dynamic_to_storage.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "array values",
         "arrays",
         "local reference bindings",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 6: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/copying/calldata_array_of_struct_to_memory.sol",
       "scan_agrees": true,
       "test": "array/copying/calldata_array_of_struct_to_memory.sol"
     },
@@ -3734,8 +3780,7 @@
       "features": [
         "array values",
         "arrays",
-        "local reference bindings",
-        "mappings"
+        "local reference bindings"
       ],
       "first": null,
       "reason": "elaborate_unit returned NONE for array/copying/calldata_array_to_mapping.sol",
@@ -3798,7 +3843,7 @@
         "structs"
       ],
       "first": "structs",
-      "reason": "StructDefinition 7: unsupported contract member",
+      "reason": "FunctionCall 20: unsupported call kind structConstructorCall",
       "scan_agrees": true,
       "test": "array/copying/calldata_nested_array_copy_to_memory.sol"
     },
@@ -3829,13 +3874,14 @@
       "test": "array/copying/cleanup_during_multi_element_per_slot_copy.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "bytes and string",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "UserDefinedTypeName 14: unsupported type name UserDefinedTypeName",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/copying/copy_byte_array_in_struct_to_storage.sol",
       "scan_agrees": true,
       "test": "array/copying/copy_byte_array_in_struct_to_storage.sol"
     },
@@ -3886,7 +3932,7 @@
         "msg/block/tx globals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 7: only array length, push and pop members are supported",
+      "reason": "MemberAccess 7: unsupported built-in member",
       "scan_agrees": true,
       "test": "array/copying/copy_removes_bytes_data.sol"
     },
@@ -3905,7 +3951,7 @@
         "source units without exactly one contract"
       ],
       "first": "external calls and contract members",
-      "reason": "UserDefinedTypeName 93: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 93: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "array/copying/copying_bytes_multiassign.sol"
     },
@@ -3929,27 +3975,27 @@
       "test": "array/copying/dirty_memory_bytes_to_storage_copy_ir.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
+        "aggregate array mutation",
         "array values",
         "arrays",
-        "local reference bindings",
-        "structs"
+        "local reference bindings"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 9: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/copying/elements_of_nested_array_of_structs_calldata_to_storage.sol",
       "scan_agrees": true,
       "test": "array/copying/elements_of_nested_array_of_structs_calldata_to_storage.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
+        "aggregate array mutation",
         "array values",
-        "arrays",
-        "structs"
+        "arrays"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 9: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/copying/elements_of_nested_array_of_structs_memory_to_storage.sol",
       "scan_agrees": true,
       "test": "array/copying/elements_of_nested_array_of_structs_memory_to_storage.sol"
     },
@@ -3964,7 +4010,7 @@
         "type(\u2026)"
       ],
       "first": "type(\u2026)",
-      "reason": "MemberAccess 26: only array length, push and pop members are supported",
+      "reason": "MemberAccess 26: unsupported built-in member",
       "scan_agrees": true,
       "test": "array/copying/empty_bytes_copy.sol"
     },
@@ -4134,7 +4180,6 @@
       "category": "import-rejected",
       "features": [
         "array values",
-        "arrays",
         "constructors",
         "declaration values",
         "inline arrays",
@@ -4159,60 +4204,56 @@
       "test": "array/copying/nested_array_memory_to_storage.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "array values",
         "arrays",
-        "local reference bindings",
-        "structs"
+        "local reference bindings"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 6: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/copying/nested_array_of_structs_calldata_to_memory.sol",
       "scan_agrees": true,
       "test": "array/copying/nested_array_of_structs_calldata_to_memory.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "array values",
         "arrays",
-        "local reference bindings",
-        "structs"
+        "local reference bindings"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 9: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/copying/nested_array_of_structs_calldata_to_storage.sol",
       "scan_agrees": true,
       "test": "array/copying/nested_array_of_structs_calldata_to_storage.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "array values",
-        "arrays",
-        "structs"
+        "arrays"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 6: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/copying/nested_array_of_structs_memory_to_memory.sol",
       "scan_agrees": true,
       "test": "array/copying/nested_array_of_structs_memory_to_memory.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "array values",
-        "arrays",
-        "structs"
+        "arrays"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 9: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/copying/nested_array_of_structs_memory_to_storage.sol",
       "scan_agrees": true,
       "test": "array/copying/nested_array_of_structs_memory_to_storage.sol"
     },
     {
       "category": "import-rejected",
       "features": [
+        "aggregate array mutation",
         "array values",
-        "arrays",
         "constructors",
         "inline arrays",
         "memory arrays (new T[](n))",
@@ -4220,8 +4261,8 @@
         "require/assert/revert",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 6: unsupported contract member",
+      "first": "constructors",
+      "reason": "FunctionDefinition 124: unsupported function kind constructor",
       "scan_agrees": true,
       "test": "array/copying/nested_array_of_structs_storage_to_storage.sol"
     },
@@ -4234,16 +4275,18 @@
         "inline arrays",
         "memory arrays (new T[](n))",
         "named arguments",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 9: unsupported contract member",
+      "first": "constructors",
+      "reason": "FunctionDefinition 136: unsupported function kind constructor",
       "scan_agrees": true,
       "test": "array/copying/nested_array_of_structs_with_nested_array_from_storage_to_memory.sol"
     },
     {
       "category": "import-rejected",
       "features": [
+        "aggregate array mutation",
         "array values",
         "arrays",
         "constructors",
@@ -4272,6 +4315,7 @@
     {
       "category": "elaboration-rejected",
       "features": [
+        "aggregate array mutation",
         "array values",
         "arrays"
       ],
@@ -4295,6 +4339,7 @@
     {
       "category": "elaboration-rejected",
       "features": [
+        "aggregate array mutation",
         "array values",
         "arrays",
         "local reference bindings"
@@ -4305,14 +4350,15 @@
       "test": "array/copying/storage_memory_nested_from_pointer.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
+        "aggregate array mutation",
         "array values",
         "arrays",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 8: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/copying/storage_memory_nested_struct.sol",
       "scan_agrees": true,
       "test": "array/copying/storage_memory_nested_struct.sol"
     },
@@ -4368,8 +4414,8 @@
         "memory arrays (new T[](n))",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 7: unsupported contract member",
+      "first": "bytes and string",
+      "reason": "NewExpression 21: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "array/create_memory_array.sol"
     },
@@ -4449,17 +4495,17 @@
       "test": "array/delete/delete_memory_array.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
+        "aggregate array mutation",
         "array values",
-        "arrays",
         "constant expressions over literals",
         "local reference bindings",
         "operator delete",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 6: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/delete/delete_on_array_of_structs.sol",
       "scan_agrees": true,
       "test": "array/delete/delete_on_array_of_structs.sol"
     },
@@ -4541,8 +4587,8 @@
         "type(\u2026)",
         "unimplemented functions"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 9: unsupported contract member",
+      "first": "abi.* functions",
+      "reason": "MemberAccess 17: unsupported built-in member",
       "scan_agrees": true,
       "test": "array/delete/memory_bytes_delete_element_abi_encode_neighbor.sol"
     },
@@ -4557,8 +4603,8 @@
         "type names as values",
         "type(\u2026)"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 3: unsupported contract member",
+      "first": "bytes and string",
+      "reason": "MemberAccess 12: unsupported built-in member",
       "scan_agrees": true,
       "test": "array/delete/memory_bytes_delete_element_concat_neighbor.sol"
     },
@@ -4573,8 +4619,8 @@
         "type names as values",
         "type(\u2026)"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 3: unsupported contract member",
+      "first": "bytes and string",
+      "reason": "NewExpression 11: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "array/delete/memory_bytes_delete_element_neighbor.sol"
     },
@@ -4590,26 +4636,24 @@
       "test": "array/dynamic_array_cleanup.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
-        "arrays",
-        "structs"
+        "aggregate array mutation"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 5: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/dynamic_arrays_in_storage.sol",
       "scan_agrees": true,
       "test": "array/dynamic_arrays_in_storage.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
+        "aggregate array mutation",
         "array values",
-        "arrays",
-        "operator delete",
-        "structs"
+        "operator delete"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 5: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/dynamic_multi_array_cleanup.sol",
       "scan_agrees": true,
       "test": "array/dynamic_multi_array_cleanup.sol"
     },
@@ -4666,7 +4710,7 @@
         "source units without exactly one contract"
       ],
       "first": "external calls and contract members",
-      "reason": "UserDefinedTypeName 57: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 57: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "array/fixed_arrays_as_return_type.sol"
     },
@@ -4683,13 +4727,10 @@
       "test": "array/fixed_arrays_in_constructors.sol"
     },
     {
-      "category": "import-rejected",
-      "features": [
-        "arrays",
-        "structs"
-      ],
-      "first": "structs",
-      "reason": "StructDefinition 5: unsupported contract member",
+      "category": "admitted",
+      "features": [],
+      "first": null,
+      "reason": null,
       "scan_agrees": true,
       "test": "array/fixed_arrays_in_storage.sol"
     },
@@ -4837,6 +4878,7 @@
     {
       "category": "elaboration-rejected",
       "features": [
+        "aggregate array mutation",
         "array values",
         "arrays"
       ],
@@ -4943,8 +4985,8 @@
         "type names as values",
         "type(\u2026)"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 5: unsupported contract member",
+      "first": "inline assembly",
+      "reason": "InlineAssembly 11: unsupported statement InlineAssembly",
       "scan_agrees": true,
       "test": "array/long_byte_array_cleanup_after_delete.sol"
     },
@@ -4959,8 +5001,8 @@
         "type names as values",
         "type(\u2026)"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 5: unsupported contract member",
+      "first": "inline assembly",
+      "reason": "InlineAssembly 11: unsupported statement InlineAssembly",
       "scan_agrees": true,
       "test": "array/long_byte_array_cleanup_after_overwrite_with_long.sol"
     },
@@ -4972,8 +5014,8 @@
         "external calls and contract members",
         "this"
       ],
-      "first": "external calls and contract members",
-      "reason": "MemberAccess 37: only array length, push and pop members are supported",
+      "first": "this",
+      "reason": "Identifier 36: built-in this is not supported",
       "scan_agrees": true,
       "test": "array/memory.sol"
     },
@@ -5000,8 +5042,8 @@
     {
       "category": "import-rejected",
       "features": [
+        "aggregate array mutation",
         "array values",
-        "arrays",
         "declaration values",
         "inline arrays",
         "operator delete"
@@ -5158,7 +5200,7 @@
     {
       "category": "import-rejected",
       "features": [
-        "arrays",
+        "aggregate array mutation",
         "declaration values",
         "require/assert/revert"
       ],
@@ -5170,6 +5212,7 @@
     {
       "category": "import-rejected",
       "features": [
+        "aggregate array mutation",
         "array values",
         "arrays",
         "declaration values",
@@ -5184,6 +5227,7 @@
     {
       "category": "import-rejected",
       "features": [
+        "aggregate array mutation",
         "array values",
         "arrays",
         "declaration values",
@@ -5207,24 +5251,28 @@
     {
       "category": "import-rejected",
       "features": [
+        "aggregate array mutation",
+        "array values",
         "arrays",
         "memory arrays (new T[](n))",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 12: unsupported contract member",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 56: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "array/push/array_push_struct.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
-        "arrays",
+        "aggregate array mutation",
         "local reference bindings",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 13: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/push/array_push_struct_from_calldata.sol",
       "scan_agrees": true,
       "test": "array/push/array_push_struct_from_calldata.sol"
     },
@@ -5272,6 +5320,7 @@
     {
       "category": "elaboration-rejected",
       "features": [
+        "aggregate array mutation",
         "arrays",
         "local reference bindings"
       ],
@@ -5291,14 +5340,15 @@
       "test": "array/push/push_no_args_bytes.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
-        "arrays",
+        "aggregate array mutation",
         "local reference bindings",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 3: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for array/push/push_no_args_struct.sol",
       "scan_agrees": true,
       "test": "array/push/push_no_args_struct.sol"
     },
@@ -5314,8 +5364,8 @@
         "source units without exactly one contract",
         "this"
       ],
-      "first": "external calls and contract members",
-      "reason": "MemberAccess 49: only array length, push and pop members are supported",
+      "first": "this",
+      "reason": "Identifier 38: built-in this is not supported",
       "scan_agrees": true,
       "test": "array/reusing_memory.sol"
     },
@@ -5364,11 +5414,10 @@
         "array slices",
         "array values",
         "arrays",
-        "local reference bindings",
-        "structs"
+        "local reference bindings"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 10: unsupported contract member",
+      "first": "array slices",
+      "reason": "IndexRangeAccess 43: unsupported expression IndexRangeAccess",
       "scan_agrees": true,
       "test": "array/slices/array_slice_calldata_to_calldata.sol"
     },
@@ -5433,14 +5482,14 @@
     {
       "category": "import-rejected",
       "features": [
-        "arrays",
         "bytes and string",
         "constructors",
         "public state variables",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 9: unsupported contract member",
+      "first": "public state variables",
+      "reason": "VariableDeclaration 14: public state variables are not supported",
       "scan_agrees": true,
       "test": "array/string_allocation_bug.sol"
     },
@@ -5472,10 +5521,11 @@
         "bytes and string",
         "constructors",
         "public state variables",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 12: unsupported contract member",
+      "first": "public state variables",
+      "reason": "VariableDeclaration 3: public state variables are not supported",
       "scan_agrees": true,
       "test": "array/strings_in_struct.sol"
     },
@@ -5594,7 +5644,7 @@
         "type names as values"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 50: only array length, push and pop members are supported",
+      "reason": "MemberAccess 50: unsupported built-in member",
       "scan_agrees": true,
       "test": "builtinFunctions/erc7201_param_abi_encode.sol"
     },
@@ -5653,7 +5703,7 @@
         "type names as values"
       ],
       "first": "bytes and string",
-      "reason": "MemberAccess 53: only array length, push and pop members are supported",
+      "reason": "MemberAccess 53: unsupported built-in member",
       "scan_agrees": true,
       "test": "builtinFunctions/erc7201_param_string_concat.sol"
     },
@@ -5782,7 +5832,7 @@
         "hash and signature built-ins"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 9: only array length, push and pop members are supported",
+      "reason": "MemberAccess 9: unsupported built-in member",
       "scan_agrees": true,
       "test": "builtinFunctions/keccak256.sol"
     },
@@ -5804,7 +5854,7 @@
         "hash and signature built-ins"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 14: only array length, push and pop members are supported",
+      "reason": "MemberAccess 14: unsupported built-in member",
       "scan_agrees": true,
       "test": "builtinFunctions/keccak256_multiple_arguments.sol"
     },
@@ -5815,7 +5865,7 @@
         "hash and signature built-ins"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 12: only array length, push and pop members are supported",
+      "reason": "MemberAccess 12: unsupported built-in member",
       "scan_agrees": true,
       "test": "builtinFunctions/keccak256_multiple_arguments_with_numeric_literals.sol"
     },
@@ -5838,7 +5888,7 @@
         "hash and signature built-ins"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 27: only array length, push and pop members are supported",
+      "reason": "MemberAccess 27: unsupported built-in member",
       "scan_agrees": true,
       "test": "builtinFunctions/keccak256_packed.sol"
     },
@@ -5877,7 +5927,7 @@
         "msg/block/tx globals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 8: only array length, push and pop members are supported",
+      "reason": "MemberAccess 8: unsupported built-in member",
       "scan_agrees": true,
       "test": "builtinFunctions/msg_sig.sol"
     },
@@ -5887,7 +5937,7 @@
         "msg/block/tx globals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 6: only array length, push and pop members are supported",
+      "reason": "MemberAccess 6: unsupported built-in member",
       "scan_agrees": true,
       "test": "builtinFunctions/msg_sig_after_internal_call_is_same.sol"
     },
@@ -5898,7 +5948,7 @@
         "hash and signature built-ins"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 9: only array length, push and pop members are supported",
+      "reason": "MemberAccess 9: unsupported built-in member",
       "scan_agrees": true,
       "test": "builtinFunctions/ripemd160.sol"
     },
@@ -5920,7 +5970,7 @@
         "hash and signature built-ins"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 27: only array length, push and pop members are supported",
+      "reason": "MemberAccess 27: unsupported built-in member",
       "scan_agrees": true,
       "test": "builtinFunctions/ripemd160_packed.sol"
     },
@@ -5931,7 +5981,7 @@
         "hash and signature built-ins"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 9: only array length, push and pop members are supported",
+      "reason": "MemberAccess 9: unsupported built-in member",
       "scan_agrees": true,
       "test": "builtinFunctions/sha256.sol"
     },
@@ -5953,7 +6003,7 @@
         "hash and signature built-ins"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 27: only array length, push and pop members are supported",
+      "reason": "MemberAccess 27: unsupported built-in member",
       "scan_agrees": true,
       "test": "builtinFunctions/sha256_packed.sol"
     },
@@ -6261,8 +6311,8 @@
         "external calls and contract members",
         "this"
       ],
-      "first": "external calls and contract members",
-      "reason": "MemberAccess 31: only array length, push and pop members are supported",
+      "first": "this",
+      "reason": "Identifier 30: built-in this is not supported",
       "scan_agrees": true,
       "test": "constants/constant_read_via_external_call_from_unchecked.sol"
     },
@@ -6298,7 +6348,7 @@
         "enums"
       ],
       "first": "enums",
-      "reason": "UserDefinedTypeName 57: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 57: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "constants/constant_string_at_file_level.sol"
     },
@@ -6409,7 +6459,7 @@
         "source units without exactly one contract"
       ],
       "first": "external calls and contract members",
-      "reason": "UserDefinedTypeName 78: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 78: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "constructor/arrays_in_constructors.sol"
     },
@@ -6438,7 +6488,7 @@
         "source units without exactly one contract"
       ],
       "first": "external calls and contract members",
-      "reason": "UserDefinedTypeName 72: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 72: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "constructor/bytes_in_constructors_packer.sol"
     },
@@ -6491,7 +6541,7 @@
         "source units without exactly one contract"
       ],
       "first": "external calls and contract members",
-      "reason": "UserDefinedTypeName 39: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 39: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "constructor/constructor_arguments_internal.sol"
     },
@@ -6520,7 +6570,7 @@
         "this"
       ],
       "first": "external calls and contract members",
-      "reason": "UserDefinedTypeName 24: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 24: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "constructor/constructor_function_complex.sol"
     },
@@ -6751,7 +6801,7 @@
         "local reference bindings"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 8: only array length, push and pop members are supported",
+      "reason": "MemberAccess 8: unsupported built-in member",
       "scan_agrees": true,
       "test": "conversions/calldata_bytes_to_memory_reencode.sol"
     },
@@ -7013,7 +7063,7 @@
         "type(\u2026)"
       ],
       "first": "type(\u2026)",
-      "reason": "MemberAccess 12: only array length, push and pop members are supported",
+      "reason": "MemberAccess 12: unsupported built-in member",
       "scan_agrees": true,
       "test": "ecrecover/failing_ecrecover_invalid_input.sol"
     },
@@ -7037,7 +7087,7 @@
         "require/assert/revert"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 36: only array length, push and pop members are supported",
+      "reason": "MemberAccess 36: unsupported built-in member",
       "scan_agrees": true,
       "test": "ecrecover/failing_ecrecover_invalid_input_proper.sol"
     },
@@ -7099,7 +7149,7 @@
         "enums"
       ],
       "first": "enums",
-      "reason": "UserDefinedTypeName 261: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 261: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "enums/enum_with_256_members.sol"
     },
@@ -7432,8 +7482,8 @@
         "function types",
         "require/assert/revert"
       ],
-      "first": "external calls and contract members",
-      "reason": "MemberAccess 32: only array length, push and pop members are supported",
+      "first": "conversions to non-elementary types",
+      "reason": "Identifier 26: expected ElementaryTypeNameExpression",
       "scan_agrees": true,
       "test": "errors/require_error_function_pointer_parameter.sol"
     },
@@ -7663,8 +7713,8 @@
         "external calls and contract members",
         "source units without exactly one contract"
       ],
-      "first": "external calls and contract members",
-      "reason": "MemberAccess 41: only array length, push and pop members are supported",
+      "first": "contract creation (new C)",
+      "reason": "NewExpression 38: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "errors/small_error_optimization.sol"
     },
@@ -7674,10 +7724,11 @@
         "bytes and string",
         "custom errors",
         "named arguments",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "UserDefinedTypeName 17: unsupported type name UserDefinedTypeName",
+      "first": "custom errors",
+      "reason": "RevertStatement 41: unsupported statement RevertStatement",
       "scan_agrees": true,
       "test": "errors/using_structs.sol"
     },
@@ -7893,6 +7944,7 @@
     {
       "category": "import-rejected",
       "features": [
+        "aggregate array mutation",
         "array values",
         "arrays",
         "events",
@@ -7979,7 +8031,7 @@
         "source units without exactly one contract"
       ],
       "first": "external calls and contract members",
-      "reason": "UserDefinedTypeName 25: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 25: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "events/event_emit_from_other_contract.sol"
     },
@@ -7993,8 +8045,8 @@
         "library calls and contract-name members",
         "source units without exactly one contract"
       ],
-      "first": "library calls and contract-name members",
-      "reason": "MemberAccess 18: only array length, push and pop members are supported",
+      "first": "libraries",
+      "reason": "ContractDefinition 13: unsupported contract kind library",
       "scan_agrees": true,
       "test": "events/event_emit_interface_event_via_library.sol"
     },
@@ -8162,7 +8214,7 @@
         "source units without exactly one contract"
       ],
       "first": "events",
-      "reason": "MemberAccess 14: only array length, push and pop members are supported",
+      "reason": "MemberAccess 14: unsupported built-in member",
       "scan_agrees": true,
       "test": "events/event_selector_file_level.sol"
     },
@@ -8190,6 +8242,7 @@
         "libraries",
         "library calls and contract-name members",
         "source units without exactly one contract",
+        "struct values and copying",
         "structs"
       ],
       "first": "constructors",
@@ -8227,8 +8280,8 @@
         "events",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 4: unsupported contract member",
+      "first": "events",
+      "reason": "EventDefinition 9: unsupported contract member",
       "scan_agrees": true,
       "test": "events/event_struct_memory_v2.sol"
     },
@@ -8236,10 +8289,11 @@
       "category": "import-rejected",
       "features": [
         "events",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 4: unsupported contract member",
+      "first": "events",
+      "reason": "EventDefinition 9: unsupported contract member",
       "scan_agrees": true,
       "test": "events/event_struct_storage_v2.sol"
     },
@@ -8486,8 +8540,8 @@
         "contracts without functions",
         "imports"
       ],
-      "first": "imports",
-      "reason": "MemberAccess 19: only array length, push and pop members are supported",
+      "first": "conditional expressions",
+      "reason": "Conditional 17: unsupported expression Conditional",
       "scan_agrees": true,
       "test": "expressions/module_from_ternary_expression.sol"
     },
@@ -8530,7 +8584,6 @@
       "features": [
         "abstract contracts",
         "address members (balance, call, transfer, \u2026)",
-        "arrays",
         "bytes and string",
         "constants",
         "declaration values",
@@ -8547,12 +8600,13 @@
         "payable functions",
         "require/assert/revert",
         "source units without exactly one contract",
+        "struct values and copying",
         "structs",
         "unimplemented functions",
         "virtual functions"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 45: unsupported contract member",
+      "first": "modifiers",
+      "reason": "ModifierDefinition 59: unsupported contract member",
       "scan_agrees": true,
       "test": "externalContracts/FixedFeeRegistrar.sol"
     },
@@ -8684,6 +8738,7 @@
         "memory arrays (new T[](n))",
         "require/assert/revert",
         "source units without exactly one contract",
+        "struct values and copying",
         "structs",
         "type names as values",
         "using for"
@@ -8707,13 +8762,14 @@
         "libraries",
         "literals of non-integer types",
         "memory arrays (new T[](n))",
+        "struct values and copying",
         "structs",
         "type names as values",
         "type(\u2026)",
         "using for"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 6: unsupported contract member",
+      "first": "libraries",
+      "reason": "ContractDefinition 1793: unsupported contract kind library",
       "scan_agrees": true,
       "test": "externalContracts/strings.sol"
     },
@@ -8826,7 +8882,7 @@
         "imports"
       ],
       "first": "external calls and contract members",
-      "reason": "UserDefinedTypeName 8: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 8: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "externalSource/source_remapping.sol"
     },
@@ -8845,7 +8901,7 @@
         "source units without exactly one contract"
       ],
       "first": "external calls and contract members",
-      "reason": "UserDefinedTypeName 82: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 82: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "fallback/call_forward_bytes.sol"
     },
@@ -9037,6 +9093,7 @@
         "imports",
         "local reference bindings",
         "source units without exactly one contract",
+        "struct values and copying",
         "structs"
       ],
       "first": "free functions",
@@ -9125,7 +9182,7 @@
         "bytes and string"
       ],
       "first": "address members (balance, call, transfer, \u2026)",
-      "reason": "MemberAccess 11: only array length, push and pop members are supported",
+      "reason": "MemberAccess 11: unsupported built-in member",
       "scan_agrees": true,
       "test": "functionCall/bare_call_no_returndatacopy.sol"
     },
@@ -9263,8 +9320,8 @@
         "local reference bindings",
         "this"
       ],
-      "first": "external calls and contract members",
-      "reason": "MemberAccess 18: only array length, push and pop members are supported",
+      "first": "this",
+      "reason": "Identifier 17: built-in this is not supported",
       "scan_agrees": true,
       "test": "functionCall/calldata_argument_external_bytes.sol"
     },
@@ -9304,8 +9361,8 @@
         "source units without exactly one contract",
         "this"
       ],
-      "first": "library calls and contract-name members",
-      "reason": "MemberAccess 25: only array length, push and pop members are supported",
+      "first": "bytes and string",
+      "reason": "NewExpression 40: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "functionCall/calldata_argument_internal_library_bytes.sol"
     },
@@ -9317,10 +9374,11 @@
         "library calls and contract-name members",
         "local reference bindings",
         "source units without exactly one contract",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "UserDefinedTypeName 62: unsupported type name UserDefinedTypeName",
+      "first": "libraries",
+      "reason": "ContractDefinition 60: unsupported contract kind library",
       "scan_agrees": true,
       "test": "functionCall/calldata_argument_internal_library_dynamic_struct_v2.sol"
     },
@@ -9331,10 +9389,11 @@
         "library calls and contract-name members",
         "local reference bindings",
         "source units without exactly one contract",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "UserDefinedTypeName 28: unsupported type name UserDefinedTypeName",
+      "first": "libraries",
+      "reason": "ContractDefinition 24: unsupported contract kind library",
       "scan_agrees": true,
       "test": "functionCall/calldata_argument_internal_library_static_struct_v2.sol"
     },
@@ -9362,31 +9421,33 @@
         "local reference bindings",
         "this"
       ],
-      "first": "external calls and contract members",
-      "reason": "MemberAccess 93: only array length, push and pop members are supported",
+      "first": "this",
+      "reason": "Identifier 92: built-in this is not supported",
       "scan_agrees": true,
       "test": "functionCall/calldata_argument_internal_multi_static_array_v2.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "arrays",
         "local reference bindings",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 11: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for functionCall/calldata_argument_internal_struct_as_memory_v2.sol",
       "scan_agrees": true,
       "test": "functionCall/calldata_argument_internal_struct_as_memory_v2.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "local reference bindings",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "UserDefinedTypeName 8: unsupported type name UserDefinedTypeName",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for functionCall/calldata_argument_internal_struct_v2.sol",
       "scan_agrees": true,
       "test": "functionCall/calldata_argument_internal_struct_v2.sol"
     },
@@ -9473,8 +9534,8 @@
         "public state variables",
         "source units without exactly one contract"
       ],
-      "first": "external calls and contract members",
-      "reason": "MemberAccess 20: only array length, push and pop members are supported",
+      "first": "contract creation (new C)",
+      "reason": "NewExpression 18: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "functionCall/creation_function_call_no_args.sol"
     },
@@ -9488,7 +9549,7 @@
         "source units without exactly one contract"
       ],
       "first": "external calls and contract members",
-      "reason": "UserDefinedTypeName 15: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 15: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "functionCall/creation_function_call_with_args.sol"
     },
@@ -9504,7 +9565,7 @@
         "source units without exactly one contract"
       ],
       "first": "external calls and contract members",
-      "reason": "UserDefinedTypeName 15: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 15: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "functionCall/creation_function_call_with_salt.sol"
     },
@@ -9518,7 +9579,7 @@
         "this"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 33: only array length, push and pop members are supported",
+      "reason": "MemberAccess 33: unsupported built-in member",
       "scan_agrees": true,
       "test": "functionCall/delegatecall_return_value.sol"
     },
@@ -9546,8 +9607,8 @@
         "external calls and contract members",
         "this"
       ],
-      "first": "external calls and contract members",
-      "reason": "MemberAccess 21: only array length, push and pop members are supported",
+      "first": "this",
+      "reason": "Identifier 20: built-in this is not supported",
       "scan_agrees": true,
       "test": "functionCall/external_call.sol"
     },
@@ -9616,7 +9677,7 @@
         "this"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 11: only array length, push and pop members are supported",
+      "reason": "MemberAccess 11: unsupported built-in member",
       "scan_agrees": true,
       "test": "functionCall/external_call_value.sol"
     },
@@ -9685,7 +9746,7 @@
         "this"
       ],
       "first": "external calls and contract members",
-      "reason": "UserDefinedTypeName 33: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 33: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "functionCall/gas_and_value_basic.sol"
     },
@@ -9933,7 +9994,7 @@
         "unimplemented functions"
       ],
       "first": "external calls and contract members",
-      "reason": "UserDefinedTypeName 21: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 21: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "functionCall/return_size_bigger_than_expected.sol"
     },
@@ -9958,7 +10019,7 @@
         "unimplemented functions"
       ],
       "first": "external calls and contract members",
-      "reason": "UserDefinedTypeName 21: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 21: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "functionCall/return_size_shorter_than_expected_evm_version_after_homestead.sol"
     },
@@ -9995,7 +10056,7 @@
         "payable functions"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 6: only array length, push and pop members are supported",
+      "reason": "MemberAccess 6: unsupported built-in member",
       "scan_agrees": true,
       "test": "functionCall/value_test.sol"
     },
@@ -10008,7 +10069,7 @@
         "source units without exactly one contract"
       ],
       "first": "function members (selector, address, \u2026)",
-      "reason": "MemberAccess 39: only array length, push and pop members are supported",
+      "reason": "MemberAccess 39: unsupported built-in member",
       "scan_agrees": true,
       "test": "functionSelector/function_selector_via_contract_name.sol"
     },
@@ -10022,7 +10083,7 @@
         "inline arrays"
       ],
       "first": "function members (selector, address, \u2026)",
-      "reason": "MemberAccess 15: only array length, push and pop members are supported",
+      "reason": "MemberAccess 15: unsupported built-in member",
       "scan_agrees": true,
       "test": "functionTypes/address_member.sol"
     },
@@ -10072,8 +10133,8 @@
         "require/assert/revert",
         "this"
       ],
-      "first": "external calls and contract members",
-      "reason": "MemberAccess 23: only array length, push and pop members are supported",
+      "first": "this",
+      "reason": "Identifier 22: built-in this is not supported",
       "scan_agrees": true,
       "test": "functionTypes/comparison_operators_for_external_functions.sol"
     },
@@ -10156,8 +10217,8 @@
         "library calls and contract-name members",
         "source units without exactly one contract"
       ],
-      "first": "library calls and contract-name members",
-      "reason": "MemberAccess 72: only array length, push and pop members are supported",
+      "first": "libraries",
+      "reason": "ContractDefinition 60: unsupported contract kind library",
       "scan_agrees": true,
       "test": "functionTypes/function_type_library_internal.sol"
     },
@@ -10174,7 +10235,7 @@
         "this"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 7: only array length, push and pop members are supported",
+      "reason": "MemberAccess 7: unsupported built-in member",
       "scan_agrees": true,
       "test": "functionTypes/inline_array_with_value_call_option.sol"
     },
@@ -10218,8 +10279,8 @@
         "function types",
         "this"
       ],
-      "first": "external calls and contract members",
-      "reason": "MemberAccess 10: only array length, push and pop members are supported",
+      "first": "this",
+      "reason": "Identifier 9: built-in this is not supported",
       "scan_agrees": true,
       "test": "functionTypes/pass_function_types_externally.sol"
     },
@@ -10283,7 +10344,7 @@
         "source units without exactly one contract"
       ],
       "first": "function members (selector, address, \u2026)",
-      "reason": "MemberAccess 18: only array length, push and pop members are supported",
+      "reason": "MemberAccess 18: unsupported built-in member",
       "scan_agrees": true,
       "test": "functionTypes/selector_2.sol"
     },
@@ -10309,7 +10370,7 @@
         "this"
       ],
       "first": "function members (selector, address, \u2026)",
-      "reason": "MemberAccess 10: only array length, push and pop members are supported",
+      "reason": "MemberAccess 10: unsupported built-in member",
       "scan_agrees": true,
       "test": "functionTypes/selector_expression_side_effect.sol"
     },
@@ -10322,7 +10383,7 @@
         "this"
       ],
       "first": "function members (selector, address, \u2026)",
-      "reason": "MemberAccess 22: only array length, push and pop members are supported",
+      "reason": "MemberAccess 22: unsupported built-in member",
       "scan_agrees": true,
       "test": "functionTypes/selector_ternary.sol"
     },
@@ -10352,7 +10413,7 @@
         "this"
       ],
       "first": "function members (selector, address, \u2026)",
-      "reason": "MemberAccess 16: only array length, push and pop members are supported",
+      "reason": "MemberAccess 16: unsupported built-in member",
       "scan_agrees": true,
       "test": "functionTypes/stack_height_check_on_adding_gas_variable_to_function.sol"
     },
@@ -10375,31 +10436,27 @@
     {
       "category": "import-rejected",
       "features": [
-        "arrays",
         "constructors",
         "external calls and contract members",
         "function members (selector, address, \u2026)",
         "function types",
-        "structs",
         "this"
       ],
-      "first": "structs",
-      "reason": "UserDefinedTypeName 13: unsupported type name UserDefinedTypeName",
+      "first": "function types",
+      "reason": "FunctionTypeName 7: unsupported type name FunctionTypeName",
       "scan_agrees": true,
       "test": "functionTypes/struct_with_external_function.sol"
     },
     {
       "category": "import-rejected",
       "features": [
-        "arrays",
         "constructors",
         "function members (selector, address, \u2026)",
         "function types",
-        "functions as values",
-        "structs"
+        "functions as values"
       ],
-      "first": "structs",
-      "reason": "UserDefinedTypeName 13: unsupported type name UserDefinedTypeName",
+      "first": "function types",
+      "reason": "FunctionTypeName 7: unsupported type name FunctionTypeName",
       "scan_agrees": true,
       "test": "functionTypes/struct_with_functions.sol"
     },
@@ -10496,21 +10553,18 @@
     {
       "category": "import-rejected",
       "features": [
-        "arrays",
+        "aggregate array mutation",
         "constructors",
-        "mappings",
-        "public state variables",
-        "structs"
+        "public state variables"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 5: unsupported contract member",
+      "first": "public state variables",
+      "reason": "VariableDeclaration 11: public state variables are not supported",
       "scan_agrees": true,
       "test": "getters/array_mapping_struct.sol"
     },
     {
       "category": "import-rejected",
       "features": [
-        "arrays",
         "constructors",
         "public state variables"
       ],
@@ -10545,14 +10599,12 @@
     {
       "category": "import-rejected",
       "features": [
-        "arrays",
+        "aggregate array mutation",
         "constructors",
-        "mappings",
-        "public state variables",
-        "structs"
+        "public state variables"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 5: unsupported contract member",
+      "first": "public state variables",
+      "reason": "VariableDeclaration 11: public state variables are not supported",
       "scan_agrees": true,
       "test": "getters/mapping_array_struct.sol"
     },
@@ -10573,12 +10625,10 @@
       "category": "import-rejected",
       "features": [
         "constructors",
-        "mappings",
-        "public state variables",
-        "structs"
+        "public state variables"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 9: unsupported contract member",
+      "first": "public state variables",
+      "reason": "VariableDeclaration 16: public state variables are not supported",
       "scan_agrees": true,
       "test": "getters/mapping_to_struct.sol"
     },
@@ -10609,30 +10659,24 @@
     {
       "category": "import-rejected",
       "features": [
-        "arrays",
         "bytes and string",
         "constructors",
-        "mappings",
-        "public state variables",
-        "structs"
+        "public state variables"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 12: unsupported contract member",
+      "first": "public state variables",
+      "reason": "VariableDeclaration 17: public state variables are not supported",
       "scan_agrees": true,
       "test": "getters/struct_with_bytes.sol"
     },
     {
       "category": "import-rejected",
       "features": [
-        "arrays",
         "bytes and string",
         "constructors",
-        "mappings",
-        "public state variables",
-        "structs"
+        "public state variables"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 12: unsupported contract member",
+      "first": "public state variables",
+      "reason": "VariableDeclaration 17: public state variables are not supported",
       "scan_agrees": true,
       "test": "getters/struct_with_bytes_simple.sol"
     },
@@ -10943,8 +10987,8 @@
         "external calls and contract members",
         "source units without exactly one contract"
       ],
-      "first": "external calls and contract members",
-      "reason": "MemberAccess 31: only array length, push and pop members are supported",
+      "first": "call options ({value: \u2026, gas: \u2026})",
+      "reason": "FunctionCallOptions 28: unsupported expression FunctionCallOptions",
       "scan_agrees": true,
       "test": "inheritance/address_overload_resolution.sol"
     },
@@ -11166,7 +11210,7 @@
         "unimplemented functions"
       ],
       "first": "external calls and contract members",
-      "reason": "UserDefinedTypeName 43: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 43: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "inheritance/inherited_function_calldata_calldata_interface.sol"
     },
@@ -11206,7 +11250,7 @@
         "unimplemented functions"
       ],
       "first": "external calls and contract members",
-      "reason": "UserDefinedTypeName 43: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 43: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "inheritance/inherited_function_calldata_memory_interface.sol"
     },
@@ -11217,8 +11261,8 @@
         "library calls and contract-name members",
         "source units without exactly one contract"
       ],
-      "first": "library calls and contract-name members",
-      "reason": "MemberAccess 23: only array length, push and pop members are supported",
+      "first": "libraries",
+      "reason": "ContractDefinition 9: unsupported contract kind library",
       "scan_agrees": true,
       "test": "inheritance/inherited_function_from_a_library.sol"
     },
@@ -11484,7 +11528,7 @@
         "this"
       ],
       "first": "external calls and contract members",
-      "reason": "UserDefinedTypeName 39: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 39: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "inheritance/value_for_constructor.sol"
     },
@@ -11638,8 +11682,8 @@
         "local reference bindings",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 4: unsupported contract member",
+      "first": "inline assembly",
+      "reason": "InlineAssembly 22: unsupported statement InlineAssembly",
       "scan_agrees": true,
       "test": "inlineAssembly/calldata_struct_assign.sol"
     },
@@ -11653,8 +11697,8 @@
         "msg/block/tx globals",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 6: unsupported contract member",
+      "first": "inline assembly",
+      "reason": "InlineAssembly 12: unsupported statement InlineAssembly",
       "scan_agrees": true,
       "test": "inlineAssembly/calldata_struct_assign_and_return.sol"
     },
@@ -11988,10 +12032,11 @@
         "local reference bindings",
         "public state variables",
         "require/assert/revert",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 3: unsupported contract member",
+      "first": "public state variables",
+      "reason": "VariableDeclaration 5: public state variables are not supported",
       "scan_agrees": true,
       "test": "inlineAssembly/inline_assembly_storage_access_via_pointer.sol"
     },
@@ -12098,7 +12143,7 @@
         "type(\u2026)"
       ],
       "first": "type(\u2026)",
-      "reason": "MemberAccess 11: only array length, push and pop members are supported",
+      "reason": "MemberAccess 11: unsupported built-in member",
       "scan_agrees": true,
       "test": "inlineAssembly/keccak_yul_optimization.sol"
     },
@@ -12223,12 +12268,12 @@
         "hash and signature built-ins",
         "inline assembly",
         "local reference bindings",
-        "mappings",
         "public state variables",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 5: unsupported contract member",
+      "first": "public state variables",
+      "reason": "VariableDeclaration 10: public state variables are not supported",
       "scan_agrees": true,
       "test": "inlineAssembly/slot_access.sol"
     },
@@ -12404,7 +12449,7 @@
         "type(\u2026)"
       ],
       "first": "type(\u2026)",
-      "reason": "MemberAccess 11: only array length, push and pop members are supported",
+      "reason": "MemberAccess 11: unsupported built-in member",
       "scan_agrees": true,
       "test": "integer/basic.sol"
     },
@@ -12417,7 +12462,7 @@
         "type(\u2026)"
       ],
       "first": "type(\u2026)",
-      "reason": "MemberAccess 11: only array length, push and pop members are supported",
+      "reason": "MemberAccess 11: unsupported built-in member",
       "scan_agrees": true,
       "test": "integer/int.sol"
     },
@@ -12446,7 +12491,7 @@
         "type(\u2026)"
       ],
       "first": "type(\u2026)",
-      "reason": "MemberAccess 11: only array length, push and pop members are supported",
+      "reason": "MemberAccess 11: unsupported built-in member",
       "scan_agrees": true,
       "test": "integer/uint.sol"
     },
@@ -12567,7 +12612,7 @@
         "msg/block/tx globals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 7: only array length, push and pop members are supported",
+      "reason": "MemberAccess 7: unsupported built-in member",
       "scan_agrees": true,
       "test": "isoltestTesting/account.sol"
     },
@@ -12686,7 +12731,7 @@
         "require/assert/revert"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 19: only array length, push and pop members are supported",
+      "reason": "MemberAccess 19: unsupported built-in member",
       "scan_agrees": true,
       "test": "isoltestTesting/precompiles_ignoring_trailing_input.sol"
     },
@@ -12741,7 +12786,6 @@
     {
       "category": "import-rejected",
       "features": [
-        "array values",
         "arrays",
         "libraries",
         "local reference bindings",
@@ -12834,8 +12878,8 @@
         "source units without exactly one contract",
         "this"
       ],
-      "first": "external calls and contract members",
-      "reason": "MemberAccess 43: only array length, push and pop members are supported",
+      "first": "this",
+      "reason": "Identifier 42: built-in this is not supported",
       "scan_agrees": true,
       "test": "libraries/external_call_with_function_pointer_parameter.sol"
     },
@@ -12849,8 +12893,8 @@
         "local reference bindings",
         "source units without exactly one contract"
       ],
-      "first": "library calls and contract-name members",
-      "reason": "MemberAccess 41: only array length, push and pop members are supported",
+      "first": "libraries",
+      "reason": "ContractDefinition 19: unsupported contract kind library",
       "scan_agrees": true,
       "test": "libraries/external_call_with_storage_array_parameter.sol"
     },
@@ -12864,14 +12908,15 @@
         "mappings",
         "source units without exactly one contract"
       ],
-      "first": "library calls and contract-name members",
-      "reason": "MemberAccess 41: only array length, push and pop members are supported",
+      "first": "libraries",
+      "reason": "ContractDefinition 19: unsupported contract kind library",
       "scan_agrees": true,
       "test": "libraries/external_call_with_storage_mapping_parameter.sol"
     },
     {
       "category": "import-rejected",
       "features": [
+        "array values",
         "arrays",
         "function members (selector, address, \u2026)",
         "libraries",
@@ -12893,8 +12938,8 @@
         "library calls and contract-name members",
         "source units without exactly one contract"
       ],
-      "first": "library calls and contract-name members",
-      "reason": "MemberAccess 15: only array length, push and pop members are supported",
+      "first": "libraries",
+      "reason": "ContractDefinition 9: unsupported contract kind library",
       "scan_agrees": true,
       "test": "libraries/internal_call_unattached_with_parentheses.sol"
     },
@@ -12982,7 +13027,6 @@
     {
       "category": "import-rejected",
       "features": [
-        "array values",
         "arrays",
         "libraries",
         "memory arrays (new T[](n))",
@@ -13028,7 +13072,6 @@
     {
       "category": "import-rejected",
       "features": [
-        "array values",
         "arrays",
         "libraries",
         "source units without exactly one contract",
@@ -13131,7 +13174,6 @@
       "features": [
         "libraries",
         "local reference bindings",
-        "mapping values",
         "mappings",
         "source units without exactly one contract",
         "using for"
@@ -13171,6 +13213,7 @@
     {
       "category": "import-rejected",
       "features": [
+        "array values",
         "arrays",
         "libraries",
         "memory arrays (new T[](n))",
@@ -13216,6 +13259,7 @@
     {
       "category": "import-rejected",
       "features": [
+        "array values",
         "arrays",
         "libraries",
         "memory arrays (new T[](n))",
@@ -13242,8 +13286,8 @@
         "type names as values",
         "type(\u2026)"
       ],
-      "first": "library calls and contract-name members",
-      "reason": "MemberAccess 81: only array length, push and pop members are supported",
+      "first": "libraries",
+      "reason": "ContractDefinition 38: unsupported contract kind library",
       "scan_agrees": true,
       "test": "libraries/internal_types_in_library.sol"
     },
@@ -13260,8 +13304,8 @@
         "source units without exactly one contract",
         "type names as values"
       ],
-      "first": "library calls and contract-name members",
-      "reason": "MemberAccess 49: only array length, push and pop members are supported",
+      "first": "abi.* functions",
+      "reason": "MemberAccess 71: unsupported built-in member",
       "scan_agrees": true,
       "test": "libraries/library_address.sol"
     },
@@ -13276,7 +13320,7 @@
         "source units without exactly one contract"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 50: only array length, push and pop members are supported",
+      "reason": "MemberAccess 50: unsupported built-in member",
       "scan_agrees": true,
       "test": "libraries/library_address_homestead.sol"
     },
@@ -13294,8 +13338,8 @@
         "source units without exactly one contract",
         "type names as values"
       ],
-      "first": "imports",
-      "reason": "MemberAccess 34: only array length, push and pop members are supported",
+      "first": "abi.* functions",
+      "reason": "MemberAccess 75: unsupported built-in member",
       "scan_agrees": true,
       "test": "libraries/library_address_via_module.sol"
     },
@@ -13404,7 +13448,7 @@
         "type names as values"
       ],
       "first": "external calls and contract members",
-      "reason": "UserDefinedTypeName 27: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 27: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "libraries/library_delegatecall_guard_view_staticcall.sol"
     },
@@ -13417,8 +13461,8 @@
         "library calls and contract-name members",
         "source units without exactly one contract"
       ],
-      "first": "library calls and contract-name members",
-      "reason": "MemberAccess 11: only array length, push and pop members are supported",
+      "first": "enums",
+      "reason": "EnumDefinition 3: unsupported contract member",
       "scan_agrees": true,
       "test": "libraries/library_enum_as_an_expression.sol"
     },
@@ -13477,8 +13521,8 @@
         "structs",
         "type names as values"
       ],
-      "first": "structs",
-      "reason": "UserDefinedTypeName 31: unsupported type name UserDefinedTypeName",
+      "first": "constructors",
+      "reason": "FunctionDefinition 42: unsupported function kind constructor",
       "scan_agrees": true,
       "test": "libraries/library_function_selectors_struct.sol"
     },
@@ -13505,12 +13549,11 @@
         "libraries",
         "library calls and contract-name members",
         "local reference bindings",
-        "mappings",
         "source units without exactly one contract",
         "structs"
       ],
-      "first": "structs",
-      "reason": "UserDefinedTypeName 23: unsupported type name UserDefinedTypeName",
+      "first": "inline assembly",
+      "reason": "InlineAssembly 29: unsupported statement InlineAssembly",
       "scan_agrees": true,
       "test": "libraries/library_return_struct_with_mapping.sol"
     },
@@ -13523,8 +13566,8 @@
         "source units without exactly one contract",
         "this"
       ],
-      "first": "external calls and contract members",
-      "reason": "MemberAccess 21: only array length, push and pop members are supported",
+      "first": "this",
+      "reason": "Identifier 20: built-in this is not supported",
       "scan_agrees": true,
       "test": "libraries/library_staticcall_delegatecall.sol"
     },
@@ -13535,8 +13578,8 @@
         "library calls and contract-name members",
         "source units without exactly one contract"
       ],
-      "first": "library calls and contract-name members",
-      "reason": "MemberAccess 26: only array length, push and pop members are supported",
+      "first": "libraries",
+      "reason": "ContractDefinition 15: unsupported contract kind library",
       "scan_agrees": true,
       "test": "libraries/library_stray_values.sol"
     },
@@ -13546,11 +13589,10 @@
         "contracts without functions",
         "libraries",
         "library calls and contract-name members",
-        "source units without exactly one contract",
-        "structs"
+        "source units without exactly one contract"
       ],
-      "first": "library calls and contract-name members",
-      "reason": "MemberAccess 13: only array length, push and pop members are supported",
+      "first": "libraries",
+      "reason": "ContractDefinition 6: unsupported contract kind library",
       "scan_agrees": true,
       "test": "libraries/library_struct_as_an_expression.sol"
     },
@@ -13564,8 +13606,8 @@
         "mappings",
         "source units without exactly one contract"
       ],
-      "first": "library calls and contract-name members",
-      "reason": "MemberAccess 51: only array length, push and pop members are supported",
+      "first": "libraries",
+      "reason": "ContractDefinition 35: unsupported contract kind library",
       "scan_agrees": true,
       "test": "libraries/mapping_arguments_in_library.sol"
     },
@@ -13580,8 +13622,8 @@
         "mappings",
         "source units without exactly one contract"
       ],
-      "first": "library calls and contract-name members",
-      "reason": "MemberAccess 48: only array length, push and pop members are supported",
+      "first": "libraries",
+      "reason": "ContractDefinition 24: unsupported contract kind library",
       "scan_agrees": true,
       "test": "libraries/mapping_returns_in_library.sol"
     },
@@ -13595,8 +13637,8 @@
         "mappings",
         "source units without exactly one contract"
       ],
-      "first": "library calls and contract-name members",
-      "reason": "MemberAccess 62: only array length, push and pop members are supported",
+      "first": "libraries",
+      "reason": "ContractDefinition 37: unsupported contract kind library",
       "scan_agrees": true,
       "test": "libraries/mapping_returns_in_library_named.sol"
     },
@@ -13608,8 +13650,8 @@
         "payable functions",
         "source units without exactly one contract"
       ],
-      "first": "library calls and contract-name members",
-      "reason": "MemberAccess 15: only array length, push and pop members are supported",
+      "first": "libraries",
+      "reason": "ContractDefinition 9: unsupported contract kind library",
       "scan_agrees": true,
       "test": "libraries/payable_function_calls_library.sol"
     },
@@ -13620,8 +13662,8 @@
         "library calls and contract-name members",
         "source units without exactly one contract"
       ],
-      "first": "library calls and contract-name members",
-      "reason": "MemberAccess 21: only array length, push and pop members are supported",
+      "first": "libraries",
+      "reason": "ContractDefinition 13: unsupported contract kind library",
       "scan_agrees": true,
       "test": "libraries/stub.sol"
     },
@@ -13632,8 +13674,8 @@
         "library calls and contract-name members",
         "source units without exactly one contract"
       ],
-      "first": "library calls and contract-name members",
-      "reason": "MemberAccess 21: only array length, push and pop members are supported",
+      "first": "libraries",
+      "reason": "ContractDefinition 13: unsupported contract kind library",
       "scan_agrees": true,
       "test": "libraries/stub_internal.sol"
     },
@@ -13699,6 +13741,7 @@
         "libraries",
         "local reference bindings",
         "source units without exactly one contract",
+        "struct values and copying",
         "structs",
         "using for"
       ],
@@ -13717,8 +13760,8 @@
         "mappings",
         "source units without exactly one contract"
       ],
-      "first": "library calls and contract-name members",
-      "reason": "MemberAccess 44: only array length, push and pop members are supported",
+      "first": "libraries",
+      "reason": "ContractDefinition 19: unsupported contract kind library",
       "scan_agrees": true,
       "test": "libraries/using_library_mappings_public.sol"
     },
@@ -13732,25 +13775,25 @@
         "mappings",
         "source units without exactly one contract"
       ],
-      "first": "library calls and contract-name members",
-      "reason": "MemberAccess 44: only array length, push and pop members are supported",
+      "first": "libraries",
+      "reason": "ContractDefinition 21: unsupported contract kind library",
       "scan_agrees": true,
       "test": "libraries/using_library_mappings_return.sol"
     },
     {
       "category": "import-rejected",
       "features": [
-        "arrays",
         "bytes and string",
         "libraries",
         "library calls and contract-name members",
         "local reference bindings",
         "mappings",
         "source units without exactly one contract",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "UserDefinedTypeName 44: unsupported type name UserDefinedTypeName",
+      "first": "libraries",
+      "reason": "ContractDefinition 41: unsupported contract kind library",
       "scan_agrees": true,
       "test": "libraries/using_library_structs.sol"
     },
@@ -13782,7 +13825,7 @@
         "bytes and string"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 13: only array length, push and pop members are supported",
+      "reason": "MemberAccess 13: unsupported built-in member",
       "scan_agrees": true,
       "test": "literals/escape.sol"
     },
@@ -13926,10 +13969,11 @@
       "category": "import-rejected",
       "features": [
         "inline assembly",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 7: unsupported contract member",
+      "first": "inline assembly",
+      "reason": "InlineAssembly 12: unsupported statement InlineAssembly",
       "scan_agrees": true,
       "test": "memoryManagement/struct_allocation.sol"
     },
@@ -14080,6 +14124,7 @@
         "local reference bindings",
         "modifiers",
         "source units without exactly one contract",
+        "struct values and copying",
         "structs",
         "using for"
       ],
@@ -14097,6 +14142,7 @@
         "modifiers",
         "require/assert/revert",
         "source units without exactly one contract",
+        "struct values and copying",
         "structs",
         "using for"
       ],
@@ -14941,7 +14987,7 @@
         "using for"
       ],
       "first": "user-defined value types",
-      "reason": "MemberAccess 5304: only array length, push and pop members are supported",
+      "reason": "MemberAccess 5304: unsupported built-in member",
       "scan_agrees": true,
       "test": "operators/userDefined/all_possible_user_defined_value_types_with_operators.sol"
     },
@@ -14953,7 +14999,7 @@
         "using for"
       ],
       "first": "user-defined value types",
-      "reason": "UserDefinedTypeName 36: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 36: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "operators/userDefined/attaching_and_defining_operator_with_same_function.sol"
     },
@@ -14965,7 +15011,7 @@
         "using for"
       ],
       "first": "user-defined value types",
-      "reason": "UserDefinedTypeName 35: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 35: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "operators/userDefined/checked_operators.sol"
     },
@@ -14978,7 +15024,7 @@
         "using for"
       ],
       "first": "user-defined value types",
-      "reason": "UserDefinedTypeName 44: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 44: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "operators/userDefined/consecutive_operator_invocations.sol"
     },
@@ -14995,7 +15041,7 @@
         "using for"
       ],
       "first": "user-defined value types",
-      "reason": "UserDefinedTypeName 94: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 94: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "operators/userDefined/fixed_point_udvt_with_operators.sol"
     },
@@ -15007,7 +15053,7 @@
         "using for"
       ],
       "first": "user-defined value types",
-      "reason": "UserDefinedTypeName 70: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 70: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "operators/userDefined/multiple_operator_definitions_different_types_different_functions_separate_directives.sol"
     },
@@ -15019,7 +15065,7 @@
         "using for"
       ],
       "first": "user-defined value types",
-      "reason": "UserDefinedTypeName 36: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 36: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "operators/userDefined/multiple_operator_definitions_same_type_same_function_same_directive.sol"
     },
@@ -15031,7 +15077,7 @@
         "using for"
       ],
       "first": "user-defined value types",
-      "reason": "UserDefinedTypeName 35: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 35: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "operators/userDefined/operator_definition_shadowing_builtin_keccak256.sol"
     },
@@ -15066,7 +15112,7 @@
         "using for"
       ],
       "first": "user-defined value types",
-      "reason": "UserDefinedTypeName 134: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 134: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "operators/userDefined/operator_making_pure_external_call.sol"
     },
@@ -15088,7 +15134,7 @@
         "using for"
       ],
       "first": "user-defined value types",
-      "reason": "UserDefinedTypeName 156: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 156: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "operators/userDefined/operator_making_view_external_call.sol"
     },
@@ -15101,7 +15147,7 @@
         "using for"
       ],
       "first": "user-defined value types",
-      "reason": "UserDefinedTypeName 37: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 37: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "operators/userDefined/operator_parameter_and_return_cleanup_between_calls.sol"
     },
@@ -15114,7 +15160,7 @@
         "using for"
       ],
       "first": "user-defined value types",
-      "reason": "UserDefinedTypeName 35: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 35: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "operators/userDefined/operator_parameter_cleanup.sol"
     },
@@ -15143,7 +15189,7 @@
         "using for"
       ],
       "first": "user-defined value types",
-      "reason": "UserDefinedTypeName 40: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 40: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "operators/userDefined/operator_return_parameter_cleanup.sol"
     },
@@ -15155,7 +15201,7 @@
         "using for"
       ],
       "first": "user-defined value types",
-      "reason": "UserDefinedTypeName 120: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 120: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "operators/userDefined/recursive_operator.sol"
     },
@@ -15167,7 +15213,7 @@
         "using for"
       ],
       "first": "user-defined value types",
-      "reason": "UserDefinedTypeName 36: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 36: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "operators/userDefined/unchecked_operators.sol"
     },
@@ -15448,8 +15494,7 @@
     {
       "category": "import-rejected",
       "features": [
-        "custom errors",
-        "structs"
+        "custom errors"
       ],
       "first": "custom errors",
       "reason": "ErrorDefinition 5: unsupported contract member",
@@ -15583,7 +15628,7 @@
         "try/catch"
       ],
       "first": "external calls and contract members",
-      "reason": "UserDefinedTypeName 7: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 7: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "saltedCreate/salted_create.sol"
     },
@@ -15601,7 +15646,7 @@
         "this"
       ],
       "first": "external calls and contract members",
-      "reason": "UserDefinedTypeName 39: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 39: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "saltedCreate/salted_create_with_value.sol"
     },
@@ -15669,8 +15714,8 @@
         "structs",
         "tuples of literals"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 8: unsupported contract member",
+      "first": "inline arrays",
+      "reason": "TupleExpression 23: inline arrays are not supported",
       "scan_agrees": true,
       "test": "smoke/arrays.sol"
     },
@@ -15683,7 +15728,7 @@
         "tuples of literals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 11: only array length, push and pop members are supported",
+      "reason": "MemberAccess 11: unsupported built-in member",
       "scan_agrees": true,
       "test": "smoke/basic.sol"
     },
@@ -15761,7 +15806,7 @@
         "structs"
       ],
       "first": "structs",
-      "reason": "StructDefinition 6: unsupported contract member",
+      "reason": "FunctionCall 22: unsupported call kind structConstructorCall",
       "scan_agrees": true,
       "test": "smoke/structs.sol"
     },
@@ -15773,7 +15818,7 @@
         "require/assert/revert"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 13: only array length, push and pop members are supported",
+      "reason": "MemberAccess 13: unsupported built-in member",
       "scan_agrees": true,
       "test": "specialFunctions/abi_encode_with_signature_from_string.sol"
     },
@@ -15783,7 +15828,7 @@
         "abi.* functions"
       ],
       "first": "abi.* functions",
-      "reason": "MemberAccess 5: only array length, push and pop members are supported",
+      "reason": "MemberAccess 5: unsupported built-in member",
       "scan_agrees": true,
       "test": "specialFunctions/abi_functions_member_access.sol"
     },
@@ -15817,7 +15862,7 @@
         "msg/block/tx globals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 6: only array length, push and pop members are supported",
+      "reason": "MemberAccess 6: unsupported built-in member",
       "scan_agrees": true,
       "test": "state/block_basefee.sol"
     },
@@ -15828,7 +15873,7 @@
         "msg/block/tx globals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 6: only array length, push and pop members are supported",
+      "reason": "MemberAccess 6: unsupported built-in member",
       "scan_agrees": true,
       "test": "state/block_blobbasefee.sol"
     },
@@ -15838,7 +15883,7 @@
         "msg/block/tx globals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 6: only array length, push and pop members are supported",
+      "reason": "MemberAccess 6: unsupported built-in member",
       "scan_agrees": true,
       "test": "state/block_chainid.sol"
     },
@@ -15848,7 +15893,7 @@
         "msg/block/tx globals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 6: only array length, push and pop members are supported",
+      "reason": "MemberAccess 6: unsupported built-in member",
       "scan_agrees": true,
       "test": "state/block_coinbase.sol"
     },
@@ -15866,7 +15911,7 @@
         "msg/block/tx globals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 6: only array length, push and pop members are supported",
+      "reason": "MemberAccess 6: unsupported built-in member",
       "scan_agrees": true,
       "test": "state/block_difficulty_post_paris.sol"
     },
@@ -15876,7 +15921,7 @@
         "msg/block/tx globals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 6: only array length, push and pop members are supported",
+      "reason": "MemberAccess 6: unsupported built-in member",
       "scan_agrees": true,
       "test": "state/block_gaslimit.sol"
     },
@@ -15897,7 +15942,7 @@
         "msg/block/tx globals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 6: only array length, push and pop members are supported",
+      "reason": "MemberAccess 6: unsupported built-in member",
       "scan_agrees": true,
       "test": "state/block_prevrandao.sol"
     },
@@ -15960,7 +16005,7 @@
         "msg/block/tx globals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 6: only array length, push and pop members are supported",
+      "reason": "MemberAccess 6: unsupported built-in member",
       "scan_agrees": true,
       "test": "state/msg_data.sol"
     },
@@ -15970,7 +16015,7 @@
         "msg/block/tx globals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 6: only array length, push and pop members are supported",
+      "reason": "MemberAccess 6: unsupported built-in member",
       "scan_agrees": true,
       "test": "state/msg_sender.sol"
     },
@@ -15980,7 +16025,7 @@
         "msg/block/tx globals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 6: only array length, push and pop members are supported",
+      "reason": "MemberAccess 6: unsupported built-in member",
       "scan_agrees": true,
       "test": "state/msg_sig.sol"
     },
@@ -15991,7 +16036,7 @@
         "payable functions"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 6: only array length, push and pop members are supported",
+      "reason": "MemberAccess 6: unsupported built-in member",
       "scan_agrees": true,
       "test": "state/msg_value.sol"
     },
@@ -16001,7 +16046,7 @@
         "msg/block/tx globals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 6: only array length, push and pop members are supported",
+      "reason": "MemberAccess 6: unsupported built-in member",
       "scan_agrees": true,
       "test": "state/tx_gasprice.sol"
     },
@@ -16011,7 +16056,7 @@
         "msg/block/tx globals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 6: only array length, push and pop members are supported",
+      "reason": "MemberAccess 6: unsupported built-in member",
       "scan_agrees": true,
       "test": "state/tx_origin.sol"
     },
@@ -16034,7 +16079,7 @@
         "msg/block/tx globals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 8: only array length, push and pop members are supported",
+      "reason": "MemberAccess 8: unsupported built-in member",
       "scan_agrees": true,
       "test": "state/uncalled_blockhash.sol"
     },
@@ -16069,15 +16114,12 @@
       "category": "import-rejected",
       "features": [
         "array values",
-        "arrays",
         "constructors",
-        "mappings",
         "memory arrays (new T[](n))",
-        "public state variables",
-        "structs"
+        "public state variables"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 16: unsupported contract member",
+      "first": "public state variables",
+      "reason": "VariableDeclaration 4: public state variables are not supported",
       "scan_agrees": true,
       "test": "storage/array_accessor.sol"
     },
@@ -16185,11 +16227,12 @@
         "declaration values",
         "operator delete",
         "require/assert/revert",
+        "struct values and copying",
         "structs",
         "transient storage"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 5: unsupported contract member",
+      "first": "declaration values",
+      "reason": "VariableDeclaration 15: declaration values are not supported",
       "scan_agrees": true,
       "test": "storage/delete_overlapping_transient_after_storage_struct_delete_same_value_type.sol"
     },
@@ -16271,11 +16314,12 @@
         "declaration values",
         "operator delete",
         "require/assert/revert",
+        "struct values and copying",
         "structs",
         "transient storage"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 5: unsupported contract member",
+      "first": "declaration values",
+      "reason": "VariableDeclaration 15: declaration values are not supported",
       "scan_agrees": true,
       "test": "storage/delete_overlapping_transient_before_storage_struct_delete_same_value_type.sol"
     },
@@ -16312,6 +16356,7 @@
     {
       "category": "elaboration-rejected",
       "features": [
+        "aggregate array mutation",
         "array values",
         "arrays",
         "local reference bindings",
@@ -16325,8 +16370,8 @@
     {
       "category": "elaboration-rejected",
       "features": [
+        "aggregate array mutation",
         "array values",
-        "arrays",
         "operator delete"
       ],
       "first": null,
@@ -16371,22 +16416,20 @@
       "test": "storage/packed_storage_signed.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "bytes and string",
-        "literals of non-integer types",
-        "structs"
+        "literals of non-integer types"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 11: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for storage/packed_storage_structs_bytes.sol",
       "scan_agrees": true,
       "test": "storage/packed_storage_structs_bytes.sol"
     },
     {
       "category": "import-rejected",
       "features": [
-        "enums",
-        "structs"
+        "enums"
       ],
       "first": "enums",
       "reason": "EnumDefinition 5: unsupported contract member",
@@ -16394,12 +16437,10 @@
       "test": "storage/packed_storage_structs_enum.sol"
     },
     {
-      "category": "import-rejected",
-      "features": [
-        "structs"
-      ],
-      "first": "structs",
-      "reason": "StructDefinition 7: unsupported contract member",
+      "category": "admitted",
+      "features": [],
+      "first": null,
+      "reason": null,
       "scan_agrees": true,
       "test": "storage/packed_storage_structs_uint.sol"
     },
@@ -16431,12 +16472,13 @@
         "named arguments",
         "operator delete",
         "public state variables",
+        "struct values and copying",
         "structs",
         "type names as values",
         "type(\u2026)"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 9: unsupported contract member",
+      "first": "public state variables",
+      "reason": "VariableDeclaration 26: declaration values are not supported",
       "scan_agrees": true,
       "test": "storage/static_array_copy_cleanup.sol"
     },
@@ -16528,8 +16570,8 @@
         "type names as values",
         "type(\u2026)"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 3: unsupported contract member",
+      "first": "constructors",
+      "reason": "FunctionDefinition 23: unsupported function kind constructor",
       "scan_agrees": true,
       "test": "storage/storage_boundary_array_packing_not_overlapping_variable.sol"
     },
@@ -16591,12 +16633,13 @@
         "local reference bindings",
         "named arguments",
         "operator delete",
+        "struct values and copying",
         "structs",
         "type names as values",
         "type(\u2026)"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 12: unsupported contract member",
+      "first": "inline assembly",
+      "reason": "InlineAssembly 25: unsupported statement InlineAssembly",
       "scan_agrees": true,
       "test": "storage/storage_boundary_struct_array_mixed_types.sol"
     },
@@ -16610,12 +16653,13 @@
         "local reference bindings",
         "named arguments",
         "operator delete",
+        "struct values and copying",
         "structs",
         "type names as values",
         "type(\u2026)"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 8: unsupported contract member",
+      "first": "inline assembly",
+      "reason": "InlineAssembly 21: unsupported statement InlineAssembly",
       "scan_agrees": true,
       "test": "storage/storage_boundary_struct_array_multislot.sol"
     },
@@ -16629,12 +16673,13 @@
         "local reference bindings",
         "named arguments",
         "operator delete",
+        "struct values and copying",
         "structs",
         "type names as values",
         "type(\u2026)"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 10: unsupported contract member",
+      "first": "inline assembly",
+      "reason": "InlineAssembly 23: unsupported statement InlineAssembly",
       "scan_agrees": true,
       "test": "storage/storage_boundary_struct_array_packed.sol"
     },
@@ -16654,12 +16699,10 @@
       "category": "import-rejected",
       "features": [
         "constructors",
-        "mappings",
-        "public state variables",
-        "structs"
+        "public state variables"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 11: unsupported contract member",
+      "first": "public state variables",
+      "reason": "VariableDeclaration 16: public state variables are not supported",
       "scan_agrees": true,
       "test": "storage/struct_accessor.sol"
     },
@@ -16771,8 +16814,8 @@
         "public state variables",
         "source units without exactly one contract"
       ],
-      "first": "external calls and contract members",
-      "reason": "MemberAccess 67: only array length, push and pop members are supported",
+      "first": "contract creation (new C)",
+      "reason": "NewExpression 65: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "storageLayoutSpecifier/inheritance_constructor_order_setting_storage_var.sol"
     },
@@ -16869,7 +16912,7 @@
         "source units without exactly one contract"
       ],
       "first": "external calls and contract members",
-      "reason": "UserDefinedTypeName 40: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 40: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "storageLayoutSpecifier/inheritance_immutables.sol"
     },
@@ -16886,8 +16929,8 @@
         "require/assert/revert",
         "source units without exactly one contract"
       ],
-      "first": "external calls and contract members",
-      "reason": "MemberAccess 74: only array length, push and pop members are supported",
+      "first": "contract creation (new C)",
+      "reason": "NewExpression 72: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "storageLayoutSpecifier/inheritance_modifier_calling_revert.sol"
     },
@@ -16968,7 +17011,7 @@
         "source units without exactly one contract"
       ],
       "first": "external calls and contract members",
-      "reason": "UserDefinedTypeName 46: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 46: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "storageLayoutSpecifier/inheritance_storage_vars_initialization.sol"
     },
@@ -17084,7 +17127,7 @@
         "inline assembly"
       ],
       "first": "enums",
-      "reason": "UserDefinedTypeName 8: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 8: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "storageLayoutSpecifier/state_variable_enum.sol"
     },
@@ -17106,14 +17149,12 @@
     {
       "category": "import-rejected",
       "features": [
-        "arrays",
         "bytes and string",
         "contracts without functions",
         "inheritance",
         "inline assembly",
         "public state variables",
         "source units without exactly one contract",
-        "structs",
         "transient storage"
       ],
       "first": "inheritance",
@@ -17139,7 +17180,6 @@
         "inheritance",
         "public state variables",
         "source units without exactly one contract",
-        "structs",
         "transient storage"
       ],
       "first": "inheritance",
@@ -17182,6 +17222,7 @@
         "public state variables",
         "require/assert/revert",
         "source units without exactly one contract",
+        "struct values and copying",
         "structs"
       ],
       "first": "inheritance",
@@ -17200,6 +17241,7 @@
         "public state variables",
         "require/assert/revert",
         "source units without exactly one contract",
+        "struct values and copying",
         "structs"
       ],
       "first": "inheritance",
@@ -17264,7 +17306,7 @@
         "type names as values"
       ],
       "first": "bytes and string",
-      "reason": "MemberAccess 11: only array length, push and pop members are supported",
+      "reason": "MemberAccess 11: unsupported built-in member",
       "scan_agrees": true,
       "test": "strings/concat/string_concat_2_args.sol"
     },
@@ -17290,7 +17332,7 @@
         "type names as values"
       ],
       "first": "bytes and string",
-      "reason": "MemberAccess 7: only array length, push and pop members are supported",
+      "reason": "MemberAccess 7: unsupported built-in member",
       "scan_agrees": true,
       "test": "strings/concat/string_concat_empty_argument_list.sol"
     },
@@ -17301,7 +17343,7 @@
         "type names as values"
       ],
       "first": "bytes and string",
-      "reason": "MemberAccess 14: only array length, push and pop members are supported",
+      "reason": "MemberAccess 14: unsupported built-in member",
       "scan_agrees": true,
       "test": "strings/concat/string_concat_empty_strings.sol"
     },
@@ -17312,7 +17354,7 @@
         "type names as values"
       ],
       "first": "bytes and string",
-      "reason": "MemberAccess 16: only array length, push and pop members are supported",
+      "reason": "MemberAccess 16: unsupported built-in member",
       "scan_agrees": true,
       "test": "strings/concat/string_concat_nested.sol"
     },
@@ -17417,34 +17459,38 @@
         "require/assert/revert",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 5: unsupported contract member",
+      "first": "inline arrays",
+      "reason": "TupleExpression 22: inline arrays are not supported",
       "scan_agrees": true,
       "test": "structs/array_of_recursive_struct.sol"
     },
     {
       "category": "import-rejected",
       "features": [
+        "aggregate array mutation",
         "arrays",
         "constructors",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 5: unsupported contract member",
+      "first": "constructors",
+      "reason": "FunctionDefinition 74: unsupported function kind constructor",
       "scan_agrees": true,
       "test": "structs/conversion/recursive_storage_memory.sol"
     },
     {
       "category": "import-rejected",
       "features": [
+        "aggregate array mutation",
         "array values",
         "arrays",
         "constructors",
         "memory arrays (new T[](n))",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 7: unsupported contract member",
+      "first": "constructors",
+      "reason": "FunctionDefinition 152: unsupported function kind constructor",
       "scan_agrees": true,
       "test": "structs/conversion/recursive_storage_memory_complex.sol"
     },
@@ -17456,13 +17502,13 @@
         "bytes and string",
         "constructors",
         "local reference bindings",
-        "mappings",
         "memory arrays (new T[](n))",
         "named arguments",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 9: unsupported contract member",
+      "first": "constructors",
+      "reason": "FunctionDefinition 46: unsupported function kind constructor",
       "scan_agrees": true,
       "test": "structs/copy_from_mapping.sol"
     },
@@ -17473,16 +17519,17 @@
         "arrays",
         "constructors",
         "memory arrays (new T[](n))",
-        "structs"
+        "struct values and copying"
       ],
-      "first": "structs",
-      "reason": "UserDefinedTypeName 6: unsupported type name UserDefinedTypeName",
+      "first": "constructors",
+      "reason": "FunctionDefinition 17: unsupported function kind constructor",
       "scan_agrees": true,
       "test": "structs/copy_from_storage.sol"
     },
     {
       "category": "import-rejected",
       "features": [
+        "aggregate array mutation",
         "array values",
         "arrays",
         "constructors",
@@ -17490,69 +17537,70 @@
         "require/assert/revert",
         "structs"
       ],
-      "first": "structs",
-      "reason": "UserDefinedTypeName 6: unsupported type name UserDefinedTypeName",
+      "first": "constructors",
+      "reason": "FunctionDefinition 81: unsupported function kind constructor",
       "scan_agrees": true,
       "test": "structs/copy_struct_array_from_storage.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
-        "arrays",
         "local reference bindings",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 9: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for structs/copy_struct_with_nested_array_from_calldata_to_memory.sol",
       "scan_agrees": true,
       "test": "structs/copy_struct_with_nested_array_from_calldata_to_memory.sol"
     },
     {
       "category": "import-rejected",
       "features": [
-        "arrays",
         "local reference bindings",
         "require/assert/revert",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 9: unsupported contract member",
+      "first": "require/assert/revert",
+      "reason": "Identifier 22: built-in require is not supported",
       "scan_agrees": true,
       "test": "structs/copy_struct_with_nested_array_from_calldata_to_storage.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
-        "arrays",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 9: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for structs/copy_struct_with_nested_array_from_memory_to_memory.sol",
       "scan_agrees": true,
       "test": "structs/copy_struct_with_nested_array_from_memory_to_memory.sol"
     },
     {
       "category": "import-rejected",
       "features": [
-        "arrays",
+        "array values",
         "constructors",
         "inline arrays",
         "require/assert/revert",
-        "structs"
+        "struct values and copying"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 8: unsupported contract member",
+      "first": "constructors",
+      "reason": "FunctionDefinition 41: unsupported function kind constructor",
       "scan_agrees": true,
       "test": "structs/copy_struct_with_nested_array_from_storage_to_storage.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "local reference bindings",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 6: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for structs/copy_struct_with_nested_struct_from_calldata_to_memory.sol",
       "scan_agrees": true,
       "test": "structs/copy_struct_with_nested_struct_from_calldata_to_memory.sol"
     },
@@ -17564,13 +17612,13 @@
         "bytes and string",
         "constructors",
         "local reference bindings",
-        "mappings",
         "memory arrays (new T[](n))",
         "named arguments",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 9: unsupported contract member",
+      "first": "constructors",
+      "reason": "FunctionDefinition 46: unsupported function kind constructor",
       "scan_agrees": true,
       "test": "structs/copy_substructures_from_mapping.sol"
     },
@@ -17582,12 +17630,12 @@
         "bytes and string",
         "constructors",
         "local reference bindings",
-        "mappings",
         "memory arrays (new T[](n))",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 9: unsupported contract member",
+      "first": "constructors",
+      "reason": "FunctionDefinition 57: unsupported function kind constructor",
       "scan_agrees": true,
       "test": "structs/copy_substructures_to_mapping.sol"
     },
@@ -17599,12 +17647,12 @@
         "bytes and string",
         "constructors",
         "local reference bindings",
-        "mappings",
         "memory arrays (new T[](n))",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 9: unsupported contract member",
+      "first": "constructors",
+      "reason": "FunctionDefinition 57: unsupported function kind constructor",
       "scan_agrees": true,
       "test": "structs/copy_to_mapping.sol"
     },
@@ -17612,12 +17660,11 @@
       "category": "import-rejected",
       "features": [
         "constructors",
-        "mappings",
         "operator delete",
-        "structs"
+        "struct values and copying"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 10: unsupported contract member",
+      "first": "constructors",
+      "reason": "FunctionDefinition 86: unsupported function kind constructor",
       "scan_agrees": true,
       "test": "structs/delete_struct.sol"
     },
@@ -17630,8 +17677,8 @@
         "source units without exactly one contract",
         "structs"
       ],
-      "first": "library calls and contract-name members",
-      "reason": "MemberAccess 27: only array length, push and pop members are supported",
+      "first": "events",
+      "reason": "EventDefinition 9: unsupported contract member",
       "scan_agrees": true,
       "test": "structs/event.sol"
     },
@@ -17649,6 +17696,7 @@
         "memory arrays (new T[](n))",
         "require/assert/revert",
         "source units without exactly one contract",
+        "struct values and copying",
         "structs",
         "this"
       ],
@@ -17658,24 +17706,25 @@
       "test": "structs/function_type_copy.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "local reference bindings",
         "structs"
       ],
-      "first": "structs",
-      "reason": "UserDefinedTypeName 8: unsupported type name UserDefinedTypeName",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for structs/global.sol",
       "scan_agrees": true,
       "test": "structs/global.sol"
     },
     {
       "category": "import-rejected",
       "features": [
+        "array type expressions",
         "arrays",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 5: unsupported contract member",
+      "first": "array type expressions",
+      "reason": "IndexAccess 13: no definition for field \"indexExpression\" in object",
       "scan_agrees": true,
       "test": "structs/lone_struct_array_type.sol"
     },
@@ -17685,50 +17734,54 @@
         "named arguments",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 6: unsupported contract member",
+      "first": "named arguments",
+      "reason": "FunctionCall 15: named arguments are not supported",
       "scan_agrees": true,
       "test": "structs/memory_struct_named_constructor.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 7: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for structs/memory_structs_as_function_args.sol",
       "scan_agrees": true,
       "test": "structs/memory_structs_as_function_args.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 7: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for structs/memory_structs_nested.sol",
       "scan_agrees": true,
       "test": "structs/memory_structs_nested.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "arrays",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 7: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for structs/memory_structs_nested_load.sol",
       "scan_agrees": true,
       "test": "structs/memory_structs_nested_load.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "arrays",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 11: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for structs/memory_structs_read_write.sol",
       "scan_agrees": true,
       "test": "structs/memory_structs_read_write.sol"
     },
@@ -17739,11 +17792,12 @@
         "external calls and contract members",
         "function members (selector, address, \u2026)",
         "msg/block/tx globals",
+        "struct values and copying",
         "structs",
         "this"
       ],
-      "first": "structs",
-      "reason": "UserDefinedTypeName 7: unsupported type name UserDefinedTypeName",
+      "first": "msg/block/tx globals",
+      "reason": "MemberAccess 18: unsupported built-in member",
       "scan_agrees": true,
       "test": "structs/msg_data_to_struct_member_copy.sol"
     },
@@ -17756,8 +17810,8 @@
         "structs",
         "this"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 13: unsupported contract member",
+      "first": "function types",
+      "reason": "FunctionTypeName 11: unsupported type name FunctionTypeName",
       "scan_agrees": true,
       "test": "structs/multislot_struct_allocation.sol"
     },
@@ -17767,46 +17821,48 @@
         "structs"
       ],
       "first": "structs",
-      "reason": "StructDefinition 5: unsupported contract member",
+      "reason": "FunctionCall 21: unsupported call kind structConstructorCall",
       "scan_agrees": true,
       "test": "structs/nested_struct_allocation.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "operator delete",
-        "structs"
+        "struct values and copying"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 7: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for structs/packed_storage_structs_delete.sol",
       "scan_agrees": true,
       "test": "structs/packed_storage_structs_delete.sol"
     },
     {
       "category": "import-rejected",
       "features": [
-        "arrays",
+        "aggregate array mutation",
         "constructors",
         "inline assembly",
         "local reference bindings",
         "operator delete",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 7: unsupported contract member",
+      "first": "constructors",
+      "reason": "FunctionDefinition 72: unsupported function kind constructor",
       "scan_agrees": true,
       "test": "structs/recursive_struct_2.sol"
     },
     {
       "category": "import-rejected",
       "features": [
-        "arrays",
+        "array values",
         "memory arrays (new T[](n))",
         "operator delete",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 5: unsupported contract member",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 23: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "structs/recursive_structs.sol"
     },
@@ -17816,7 +17872,7 @@
         "structs"
       ],
       "first": "structs",
-      "reason": "StructDefinition 3: unsupported contract member",
+      "reason": "FunctionCall 13: unsupported call kind structConstructorCall",
       "scan_agrees": true,
       "test": "structs/simple_struct_allocation.sol"
     },
@@ -17825,10 +17881,11 @@
       "features": [
         "constructors",
         "local reference bindings",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 3: unsupported contract member",
+      "first": "constructors",
+      "reason": "FunctionDefinition 22: unsupported function kind constructor",
       "scan_agrees": true,
       "test": "structs/struct_assign_reference_to_struct.sol"
     },
@@ -17838,46 +17895,47 @@
         "array values",
         "arrays",
         "constructors",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 5: unsupported contract member",
+      "first": "constructors",
+      "reason": "FunctionDefinition 46: unsupported function kind constructor",
       "scan_agrees": true,
       "test": "structs/struct_constructor_nested.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "bytes and string",
         "local reference bindings",
         "operator delete",
-        "structs"
+        "struct values and copying"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 7: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for structs/struct_containing_bytes_copy_and_delete.sol",
       "scan_agrees": true,
       "test": "structs/struct_containing_bytes_copy_and_delete.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
-        "mappings",
-        "structs"
+        "struct values and copying"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 5: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for structs/struct_copy.sol",
       "scan_agrees": true,
       "test": "structs/struct_copy.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "bytes and string",
         "local reference bindings",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 8: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for structs/struct_copy_calldata_to_memory_nested_bytes_v2.sol",
       "scan_agrees": true,
       "test": "structs/struct_copy_calldata_to_memory_nested_bytes_v2.sol"
     },
@@ -17887,46 +17945,50 @@
         "arrays",
         "local reference bindings",
         "require/assert/revert",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 11: unsupported contract member",
+      "first": "require/assert/revert",
+      "reason": "Identifier 34: built-in assert is not supported",
       "scan_agrees": true,
       "test": "structs/struct_copy_calldata_to_memory_nested_dynamic_array_v2.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "arrays",
         "local reference bindings",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 10: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for structs/struct_copy_calldata_to_memory_nested_static_array_v2.sol",
       "scan_agrees": true,
       "test": "structs/struct_copy_calldata_to_memory_nested_static_array_v2.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "arrays",
         "local reference bindings",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 11: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for structs/struct_copy_calldata_to_memory_tuple.sol",
       "scan_agrees": true,
       "test": "structs/struct_copy_calldata_to_memory_tuple.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "fixed-size bytes members and indexing",
         "local reference bindings",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 8: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for structs/struct_copy_calldata_to_memory_v2.sol",
       "scan_agrees": true,
       "test": "structs/struct_copy_calldata_to_memory_v2.sol"
     },
@@ -17936,32 +17998,35 @@
         "arrays",
         "local reference bindings",
         "require/assert/revert",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 11: unsupported contract member",
+      "first": "require/assert/revert",
+      "reason": "Identifier 36: built-in assert is not supported",
       "scan_agrees": true,
       "test": "structs/struct_copy_calldata_to_storage_nested_dynamic_array_v2.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "fixed-size bytes members and indexing",
         "local reference bindings",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 8: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for structs/struct_copy_calldata_to_storage_v2.sol",
       "scan_agrees": true,
       "test": "structs/struct_copy_calldata_to_storage_v2.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 5: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for structs/struct_copy_via_local.sol",
       "scan_agrees": true,
       "test": "structs/struct_copy_via_local.sol"
     },
@@ -17971,10 +18036,11 @@
         "constructors",
         "local reference bindings",
         "operator delete",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 3: unsupported contract member",
+      "first": "constructors",
+      "reason": "FunctionDefinition 16: unsupported function kind constructor",
       "scan_agrees": true,
       "test": "structs/struct_delete_member.sol"
     },
@@ -17984,25 +18050,26 @@
         "declaration values",
         "operator delete",
         "require/assert/revert",
-        "structs"
+        "struct values and copying"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 7: unsupported contract member",
+      "first": "declaration values",
+      "reason": "VariableDeclaration 10: declaration values are not supported",
       "scan_agrees": true,
       "test": "structs/struct_delete_storage.sol"
     },
     {
       "category": "import-rejected",
       "features": [
-        "arrays",
+        "aggregate array mutation",
         "inline assembly",
         "local reference bindings",
         "operator delete",
         "require/assert/revert",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 7: unsupported contract member",
+      "first": "inline assembly",
+      "reason": "InlineAssembly 19: unsupported statement InlineAssembly",
       "scan_agrees": true,
       "test": "structs/struct_delete_storage_nested_small.sol"
     },
@@ -18012,40 +18079,40 @@
         "inline assembly",
         "operator delete",
         "require/assert/revert",
-        "structs"
+        "struct values and copying"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 5: unsupported contract member",
+      "first": "inline assembly",
+      "reason": "InlineAssembly 13: unsupported statement InlineAssembly",
       "scan_agrees": true,
       "test": "structs/struct_delete_storage_small.sol"
     },
     {
       "category": "import-rejected",
       "features": [
+        "array values",
         "arrays",
         "declaration values",
         "inline assembly",
         "local reference bindings",
         "operator delete",
         "require/assert/revert",
-        "structs"
+        "struct values and copying"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 9: unsupported contract member",
+      "first": "declaration values",
+      "reason": "VariableDeclaration 12: declaration values are not supported",
       "scan_agrees": true,
       "test": "structs/struct_delete_storage_with_array.sol"
     },
     {
       "category": "import-rejected",
       "features": [
-        "arrays",
         "inline assembly",
         "operator delete",
         "require/assert/revert",
-        "structs"
+        "struct values and copying"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 10: unsupported contract member",
+      "first": "inline assembly",
+      "reason": "InlineAssembly 18: unsupported statement InlineAssembly",
       "scan_agrees": true,
       "test": "structs/struct_delete_storage_with_arrays_small.sol"
     },
@@ -18053,22 +18120,22 @@
       "category": "import-rejected",
       "features": [
         "constructors",
-        "mappings",
         "operator delete",
-        "structs"
+        "struct values and copying"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 3: unsupported contract member",
+      "first": "constructors",
+      "reason": "FunctionDefinition 19: unsupported function kind constructor",
       "scan_agrees": true,
       "test": "structs/struct_delete_struct_in_mapping.sol"
     },
     {
       "category": "import-rejected",
       "features": [
+        "struct values and copying",
         "structs"
       ],
       "first": "structs",
-      "reason": "StructDefinition 8: unsupported contract member",
+      "reason": "FunctionCall 39: unsupported call kind structConstructorCall",
       "scan_agrees": true,
       "test": "structs/struct_memory_to_storage.sol"
     },
@@ -18078,10 +18145,11 @@
         "function members (selector, address, \u2026)",
         "function types",
         "functions as values",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 14: unsupported contract member",
+      "first": "function types",
+      "reason": "FunctionTypeName 12: unsupported type name FunctionTypeName",
       "scan_agrees": true,
       "test": "structs/struct_memory_to_storage_function_ptr.sol"
     },
@@ -18091,22 +18159,25 @@
         "constructors",
         "named arguments",
         "public state variables",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 5: unsupported contract member",
+      "first": "public state variables",
+      "reason": "VariableDeclaration 8: public state variables are not supported",
       "scan_agrees": true,
       "test": "structs/struct_named_constructor.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "local reference bindings",
+        "mapping values",
         "mappings",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 8: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for structs/struct_reference.sol",
       "scan_agrees": true,
       "test": "structs/struct_reference.sol"
     },
@@ -18119,6 +18190,7 @@
         "libraries",
         "library calls and contract-name members",
         "source units without exactly one contract",
+        "struct values and copying",
         "structs"
       ],
       "first": "inheritance",
@@ -18129,24 +18201,22 @@
     {
       "category": "import-rejected",
       "features": [
-        "arrays",
+        "aggregate array mutation",
         "declaration values",
-        "require/assert/revert",
-        "structs"
+        "require/assert/revert"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 14: unsupported contract member",
+      "first": "declaration values",
+      "reason": "VariableDeclaration 17: declaration values are not supported",
       "scan_agrees": true,
       "test": "structs/struct_storage_push_zero_value.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
-        "mappings",
-        "structs"
+        "struct values and copying"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 3: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for structs/struct_storage_to_mapping.sol",
       "scan_agrees": true,
       "test": "structs/struct_storage_to_mapping.sol"
     },
@@ -18154,10 +18224,11 @@
       "category": "import-rejected",
       "features": [
         "declaration values",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 8: unsupported contract member",
+      "first": "declaration values",
+      "reason": "VariableDeclaration 29: declaration values are not supported",
       "scan_agrees": true,
       "test": "structs/struct_storage_to_memory.sol"
     },
@@ -18168,21 +18239,19 @@
         "function members (selector, address, \u2026)",
         "function types",
         "functions as values",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 14: unsupported contract member",
+      "first": "declaration values",
+      "reason": "VariableDeclaration 36: declaration values are not supported",
       "scan_agrees": true,
       "test": "structs/struct_storage_to_memory_function_ptr.sol"
     },
     {
-      "category": "import-rejected",
-      "features": [
-        "mappings",
-        "structs"
-      ],
-      "first": "structs",
-      "reason": "StructDefinition 5: unsupported contract member",
+      "category": "admitted",
+      "features": [],
+      "first": null,
+      "reason": null,
       "scan_agrees": true,
       "test": "structs/structs.sol"
     },
@@ -18492,7 +18561,6 @@
         "constructors",
         "inheritance",
         "local reference bindings",
-        "mappings",
         "modifiers",
         "public state variables",
         "source units without exactly one contract"
@@ -18607,7 +18675,7 @@
         "this"
       ],
       "first": "function members (selector, address, \u2026)",
-      "reason": "MemberAccess 7: only array length, push and pop members are supported",
+      "reason": "MemberAccess 7: unsupported built-in member",
       "scan_agrees": true,
       "test": "types/external_function_to_address.sol"
     },
@@ -18618,29 +18686,30 @@
         "arrays",
         "constructors",
         "inline arrays",
-        "mappings",
         "memory arrays (new T[](n))",
         "named arguments",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 12: unsupported contract member",
+      "first": "constructors",
+      "reason": "FunctionDefinition 87: unsupported function kind constructor",
       "scan_agrees": true,
       "test": "types/mapping/copy_from_mapping_to_mapping.sol"
     },
     {
       "category": "import-rejected",
       "features": [
+        "aggregate array mutation",
         "array values",
         "arrays",
         "constructors",
         "local reference bindings",
-        "mappings",
         "named arguments",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 4: unsupported contract member",
+      "first": "constructors",
+      "reason": "FunctionDefinition 20: unsupported function kind constructor",
       "scan_agrees": true,
       "test": "types/mapping/copy_struct_to_array_stored_in_mapping.sol"
     },
@@ -18656,7 +18725,7 @@
         "user-defined value types"
       ],
       "first": "user-defined value types",
-      "reason": "UserDefinedTypeName 55: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 55: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "types/mapping/user_defined_types_mapping_storage.sol"
     },
@@ -18688,7 +18757,7 @@
         "source units without exactly one contract"
       ],
       "first": "external calls and contract members",
-      "reason": "UserDefinedTypeName 3: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 3: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "types/mapping_contract_key.sol"
     },
@@ -18722,7 +18791,7 @@
         "source units without exactly one contract"
       ],
       "first": "external calls and contract members",
-      "reason": "UserDefinedTypeName 42: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 42: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "types/mapping_contract_key_library.sol"
     },
@@ -18768,7 +18837,7 @@
         "source units without exactly one contract"
       ],
       "first": "enums",
-      "reason": "UserDefinedTypeName 46: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 46: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "types/mapping_enum_key_library_v2.sol"
     },
@@ -18787,7 +18856,7 @@
         "mappings"
       ],
       "first": "enums",
-      "reason": "UserDefinedTypeName 7: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 7: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "types/mapping_enum_key_v2.sol"
     },
@@ -18843,9 +18912,9 @@
         "constructors",
         "inheritance",
         "local reference bindings",
-        "mappings",
         "modifiers",
         "source units without exactly one contract",
+        "struct values and copying",
         "structs"
       ],
       "first": "inheritance",
@@ -18870,7 +18939,7 @@
         "type(\u2026)"
       ],
       "first": "type(\u2026)",
-      "reason": "MemberAccess 19: only array length, push and pop members are supported",
+      "reason": "MemberAccess 19: unsupported built-in member",
       "scan_agrees": true,
       "test": "types/type_conversion_cleanup.sol"
     },
@@ -19000,7 +19069,7 @@
         "user-defined value types"
       ],
       "first": "user-defined value types",
-      "reason": "UserDefinedTypeName 5: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 5: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "userDefinedValueType/assembly_access_bytes2_abicoder_v2.sol"
     },
@@ -19032,6 +19101,7 @@
         "arrays",
         "local reference bindings",
         "public state variables",
+        "struct values and copying",
         "structs",
         "user-defined value types"
       ],
@@ -19052,7 +19122,7 @@
         "user-defined value types"
       ],
       "first": "user-defined value types",
-      "reason": "UserDefinedTypeName 27: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 27: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "userDefinedValueType/cleanup.sol"
     },
@@ -19084,7 +19154,7 @@
         "user-defined value types"
       ],
       "first": "user-defined value types",
-      "reason": "UserDefinedTypeName 12: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 12: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "userDefinedValueType/conversion.sol"
     },
@@ -19155,7 +19225,7 @@
         "user-defined value types"
       ],
       "first": "user-defined value types",
-      "reason": "UserDefinedTypeName 95: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 95: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "userDefinedValueType/fixedpoint.sol"
     },
@@ -19183,7 +19253,7 @@
         "user-defined value types"
       ],
       "first": "user-defined value types",
-      "reason": "UserDefinedTypeName 5: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 5: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "userDefinedValueType/in_parenthesis.sol"
     },
@@ -19205,6 +19275,7 @@
         "array values",
         "arrays",
         "public state variables",
+        "struct values and copying",
         "structs",
         "user-defined value types"
       ],
@@ -19261,7 +19332,7 @@
         "user-defined value types"
       ],
       "first": "user-defined value types",
-      "reason": "UserDefinedTypeName 5: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 5: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "userDefinedValueType/parameter.sol"
     },
@@ -19271,7 +19342,7 @@
         "user-defined value types"
       ],
       "first": "user-defined value types",
-      "reason": "UserDefinedTypeName 5: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 5: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "userDefinedValueType/simple.sol"
     },
@@ -19282,7 +19353,7 @@
         "user-defined value types"
       ],
       "first": "user-defined value types",
-      "reason": "UserDefinedTypeName 8: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 8: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "userDefinedValueType/storage_layout.sol"
     },
@@ -19292,6 +19363,7 @@
         "constant expressions over literals",
         "inline assembly",
         "public state variables",
+        "struct values and copying",
         "structs",
         "user-defined value types"
       ],
@@ -19323,7 +19395,7 @@
         "user-defined value types"
       ],
       "first": "user-defined value types",
-      "reason": "MemberAccess 7: only array length, push and pop members are supported",
+      "reason": "MemberAccess 7: unsupported built-in member",
       "scan_agrees": true,
       "test": "userDefinedValueType/wrap_unwrap.sol"
     },
@@ -19336,7 +19408,7 @@
         "user-defined value types"
       ],
       "first": "user-defined value types",
-      "reason": "UserDefinedTypeName 5: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 5: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "userDefinedValueType/wrap_unwrap_via_contract_name.sol"
     },
@@ -19354,14 +19426,13 @@
         "user-defined value types"
       ],
       "first": "user-defined value types",
-      "reason": "UserDefinedTypeName 7: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 7: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "userDefinedValueType/zero_cost_abstraction_comparison_userdefined.sol"
     },
     {
       "category": "import-rejected",
       "features": [
-        "array values",
         "arrays",
         "free functions",
         "local reference bindings",
@@ -19657,7 +19728,6 @@
         "overrides",
         "public state variables",
         "source units without exactly one contract",
-        "structs",
         "virtual functions"
       ],
       "first": "inheritance",
@@ -19670,11 +19740,9 @@
       "features": [
         "bytes and string",
         "inheritance",
-        "mappings",
         "overrides",
         "public state variables",
         "source units without exactly one contract",
-        "structs",
         "virtual functions"
       ],
       "first": "inheritance",
@@ -19717,7 +19785,7 @@
         "transient storage"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 9: only array length, push and pop members are supported",
+      "reason": "MemberAccess 9: unsupported built-in member",
       "scan_agrees": true,
       "test": "variables/transient_state_address_variable_members.sol"
     },
@@ -19842,7 +19910,7 @@
         "source units without exactly one contract"
       ],
       "first": "address members (balance, call, transfer, \u2026)",
-      "reason": "MemberAccess 18: only array length, push and pop members are supported",
+      "reason": "MemberAccess 18: unsupported built-in member",
       "scan_agrees": true,
       "test": "various/address_code_complex.sol"
     },
@@ -19896,7 +19964,7 @@
         "type(\u2026)"
       ],
       "first": "external calls and contract members",
-      "reason": "UserDefinedTypeName 21: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 21: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "various/code_access_content.sol"
     },
@@ -19911,7 +19979,7 @@
         "type(\u2026)"
       ],
       "first": "type(\u2026)",
-      "reason": "MemberAccess 29: only array length, push and pop members are supported",
+      "reason": "MemberAccess 29: unsupported built-in member",
       "scan_agrees": true,
       "test": "various/code_access_create.sol"
     },
@@ -19924,7 +19992,7 @@
         "type(\u2026)"
       ],
       "first": "type(\u2026)",
-      "reason": "MemberAccess 19: only array length, push and pop members are supported",
+      "reason": "MemberAccess 19: unsupported built-in member",
       "scan_agrees": true,
       "test": "various/code_access_padding.sol"
     },
@@ -19941,7 +20009,7 @@
         "type(\u2026)"
       ],
       "first": "external calls and contract members",
-      "reason": "UserDefinedTypeName 25: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 25: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "various/code_access_runtime.sol"
     },
@@ -19966,11 +20034,10 @@
         "address members (balance, call, transfer, \u2026)",
         "bytes and string",
         "fixed-size bytes members and indexing",
-        "structs",
         "this"
       ],
-      "first": "structs",
-      "reason": "UserDefinedTypeName 7: unsupported type name UserDefinedTypeName",
+      "first": "address members (balance, call, transfer, \u2026)",
+      "reason": "MemberAccess 27: unsupported built-in member",
       "scan_agrees": true,
       "test": "various/code_length_contract_member.sol"
     },
@@ -19994,7 +20061,7 @@
         "this"
       ],
       "first": "address members (balance, call, transfer, \u2026)",
-      "reason": "MemberAccess 9: only array length, push and pop members are supported",
+      "reason": "MemberAccess 9: unsupported built-in member",
       "scan_agrees": true,
       "test": "various/codehash.sol"
     },
@@ -20071,8 +20138,8 @@
         "source units without exactly one contract",
         "structs"
       ],
-      "first": "structs",
-      "reason": "UserDefinedTypeName 14: unsupported type name UserDefinedTypeName",
+      "first": "named arguments",
+      "reason": "FunctionCall 20: named arguments are not supported",
       "scan_agrees": true,
       "test": "various/cross_contract_types.sol"
     },
@@ -20153,7 +20220,7 @@
         "this"
       ],
       "first": "external calls and contract members",
-      "reason": "UserDefinedTypeName 18: unsupported type name UserDefinedTypeName",
+      "reason": "UserDefinedTypeName 18: only struct user-defined types are supported",
       "scan_agrees": true,
       "test": "various/external_types_in_calls.sol"
     },
@@ -20465,24 +20532,23 @@
         "this",
         "tuples of literals"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 5: unsupported contract member",
+      "first": "inline arrays",
+      "reason": "TupleExpression 33: inline arrays are not supported",
       "scan_agrees": true,
       "test": "various/skip_dynamic_types_for_static_arrays_with_dynamic_elements.sol"
     },
     {
       "category": "import-rejected",
       "features": [
-        "arrays",
+        "array values",
         "bytes and string",
         "external calls and contract members",
         "inline arrays",
         "public state variables",
-        "structs",
         "this"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 10: unsupported contract member",
+      "first": "public state variables",
+      "reason": "VariableDeclaration 13: public state variables are not supported",
       "scan_agrees": true,
       "test": "various/skip_dynamic_types_for_structs.sol"
     },
@@ -20518,8 +20584,8 @@
         "source units without exactly one contract",
         "unimplemented functions"
       ],
-      "first": "external calls and contract members",
-      "reason": "MemberAccess 37: only array length, push and pop members are supported",
+      "first": "contract creation (new C)",
+      "reason": "NewExpression 34: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "various/staticcall_for_view_and_pure.sol"
     },
@@ -20549,7 +20615,7 @@
         "msg/block/tx globals"
       ],
       "first": "msg/block/tx globals",
-      "reason": "MemberAccess 11: only array length, push and pop members are supported",
+      "reason": "MemberAccess 11: unsupported built-in member",
       "scan_agrees": true,
       "test": "various/store_bytes.sol"
     },
@@ -20605,10 +20671,11 @@
       "category": "import-rejected",
       "features": [
         "public state variables",
+        "struct values and copying",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 5: unsupported contract member",
+      "first": "public state variables",
+      "reason": "VariableDeclaration 8: public state variables are not supported",
       "scan_agrees": true,
       "test": "various/swap_in_storage_overwrite.sol"
     },
@@ -20648,20 +20715,21 @@
         "tuples of literals",
         "tuples with empty components"
       ],
-      "first": "external calls and contract members",
-      "reason": "MemberAccess 55: only array length, push and pop members are supported",
+      "first": "this",
+      "reason": "Identifier 54: built-in this is not supported",
       "scan_agrees": true,
       "test": "various/tuples.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
         "local reference bindings",
+        "struct values and copying",
         "structs",
         "tuples of literals"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 3: unsupported contract member",
+      "first": null,
+      "reason": "elaborate_unit returned NONE for various/typed_multi_variable_declaration.sol",
       "scan_agrees": true,
       "test": "various/typed_multi_variable_declaration.sol"
     },
@@ -20889,17 +20957,18 @@
     {
       "category": "import-rejected",
       "features": [
-        "arrays",
+        "aggregate array mutation",
         "declaration values",
         "external calls and contract members",
         "function members (selector, address, \u2026)",
         "function types",
         "require/assert/revert",
+        "struct values and copying",
         "structs",
         "this"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 5: unsupported contract member",
+      "first": "declaration values",
+      "reason": "VariableDeclaration 12: declaration values are not supported",
       "scan_agrees": true,
       "test": "viaYul/copy_struct_invalid_ir_bug.sol"
     },
@@ -21006,8 +21075,8 @@
         "local reference bindings",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 5: unsupported contract member",
+      "first": "inline assembly",
+      "reason": "InlineAssembly 29: unsupported statement InlineAssembly",
       "scan_agrees": true,
       "test": "viaYul/dirty_calldata_struct.sol"
     },
@@ -21049,13 +21118,14 @@
     {
       "category": "import-rejected",
       "features": [
+        "array values",
         "arrays",
         "inline assembly",
         "memory arrays (new T[](n))",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 4: unsupported contract member",
+      "first": "memory arrays (new T[](n))",
+      "reason": "NewExpression 18: unsupported expression NewExpression",
       "scan_agrees": true,
       "test": "viaYul/dirty_memory_struct.sol"
     },
@@ -21150,7 +21220,7 @@
         "this"
       ],
       "first": "function members (selector, address, \u2026)",
-      "reason": "MemberAccess 12: only array length, push and pop members are supported",
+      "reason": "MemberAccess 12: unsupported built-in member",
       "scan_agrees": true,
       "test": "viaYul/function_address.sol"
     },
@@ -21185,7 +21255,7 @@
         "this"
       ],
       "first": "function members (selector, address, \u2026)",
-      "reason": "MemberAccess 7: only array length, push and pop members are supported",
+      "reason": "MemberAccess 7: unsupported built-in member",
       "scan_agrees": true,
       "test": "viaYul/function_selector.sol"
     },
@@ -21325,8 +21395,8 @@
         "inline assembly",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 5: unsupported contract member",
+      "first": "inline assembly",
+      "reason": "InlineAssembly 12: unsupported statement InlineAssembly",
       "scan_agrees": true,
       "test": "viaYul/memory_struct_allow.sol"
     },
@@ -21348,7 +21418,7 @@
         "type(\u2026)"
       ],
       "first": "type(\u2026)",
-      "reason": "MemberAccess 14: only array length, push and pop members are supported",
+      "reason": "MemberAccess 14: unsupported built-in member",
       "scan_agrees": true,
       "test": "viaYul/negation_bug.sol"
     },
@@ -21490,12 +21560,10 @@
     {
       "category": "import-rejected",
       "features": [
-        "arrays",
-        "inline assembly",
-        "structs"
+        "inline assembly"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 4: unsupported contract member",
+      "first": "inline assembly",
+      "reason": "InlineAssembly 19: unsupported statement InlineAssembly",
       "scan_agrees": true,
       "test": "viaYul/storage/dirty_storage_struct.sol"
     },
@@ -21509,7 +21577,7 @@
         "type(\u2026)"
       ],
       "first": "type(\u2026)",
-      "reason": "MemberAccess 50: only array length, push and pop members are supported",
+      "reason": "MemberAccess 50: unsupported built-in member",
       "scan_agrees": true,
       "test": "viaYul/storage/mappings.sol"
     },
@@ -21553,13 +21621,14 @@
     {
       "category": "import-rejected",
       "features": [
+        "array values",
         "arrays",
         "constructors",
         "local reference bindings",
         "structs"
       ],
-      "first": "structs",
-      "reason": "StructDefinition 9: unsupported contract member",
+      "first": "constructors",
+      "reason": "FunctionDefinition 52: unsupported function kind constructor",
       "scan_agrees": true,
       "test": "viaYul/struct_member_access.sol"
     },
