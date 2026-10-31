@@ -3,7 +3,6 @@
 from pathlib import Path
 import json
 import sys
-import json
 import tempfile
 import textwrap
 import unittest
@@ -108,6 +107,14 @@ class ReadTestTests(unittest.TestCase):
 
 
 class ClassifyTests(unittest.TestCase):
+    def test_preparation_failures_are_not_unsupported_features(self) -> None:
+        for status in (coverage.MALFORMED_INPUT, coverage.INVALID_CORE):
+            with self.subTest(status=status):
+                result = coverage.classify("t.sol", {}, {"status": status, "message": "bad input/core"})
+                self.assertEqual(result.category, status)
+                self.assertFalse(result.scan_agrees)
+                self.assertIsNone(result.first)
+
     def test_import_rejection_records_first_and_all_blockers(self) -> None:
         ast = unit([variable(3, state=True, visibility="public"), function(4, [ASSEMBLY])])
         result = coverage.classify(
@@ -246,17 +253,19 @@ class ClassifyTests(unittest.TestCase):
                 source = f"testdata/differential/{name}.sol"
                 self.assertEqual(coverage.scan({source: artifact["output"]["sources"][source]["ast"]}), {})
 
-    def test_compilation_retains_storage_layout_for_import(self) -> None:
+    def test_compilation_retains_artifact_contract_for_preparation(self) -> None:
         metadata = {"storageLayout": {"storage": [{"astId": 3, "slot": "0"}]},
                     "evm": {"deployedBytecode": {"object": "00"}}}
         output = {"sources": {"t.sol": {"ast": unit([])}},
                   "contracts": {"t.sol": {"C": metadata}}}
+        artifact = {"format": "solidity-hol-solc-artifact-v1", "compiler": {"pin": "pinned"},
+                    "profile": PROFILE, "input": {"settings": PROFILE["settings"]},
+                    "output": output}
         with patch.object(coverage.exporter, "build_artifact_from_sources",
-                          return_value={"output": output}):
+                          return_value=artifact):
             result = coverage.compile_test(Path("solc"), coverage.SemanticTest("t.sol", {}, {}),
                                            Path("profile"))
-        self.assertEqual(result, {"t.sol": {"ast": unit([]), "contracts": {
-            "C": {"storageLayout": metadata["storageLayout"]}}}})
+        self.assertEqual(result, artifact)
 
     def test_ranking_counts_only_blockers(self) -> None:
         def rejected(name: str, members: list) -> coverage.Classification:

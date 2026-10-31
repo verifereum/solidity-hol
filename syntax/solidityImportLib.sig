@@ -2,19 +2,23 @@ signature solidityImportLib =
 sig
   include Abbrev
 
-  (* Raised, with a message naming the offending node, for any JSON outside the
-   * admitted vocabulary: an unknown nodeType, a missing or ill-typed required
-   * field, or an unsupported feature. Nothing is dropped or defaulted.
+  (* An unknown nodeType or unsupported feature, naming the offending node.
+   * Missing or ill-typed required fields raise MalformedInput instead.
    *)
   exception ImportError of string
+  (* Missing or ill-typed required JSON fields. *)
+  exception MalformedInput of string
 
-  (* A SourceUnit AST node as a src_unit term, given the compiler's contracts
+  (* Raw, unchecked SourceUnit import. Validate valid_src_unit and the generated
+   * core before execution; use solidityPrepareLib for artifact consumers.
+   * A SourceUnit AST node as a src_unit term, given the compiler's contracts
    * output for that source, which holds the storage layouts.
    *)
   val import_source_unit : JSON.value -> JSON.value -> term
 
-  (* The named source unit of a solidity-hol-solc-artifact-v1 file written by
-   * tools/export_solc_artifacts.py.
+  (* Raw artifact import, checking only the artifact format. Callers own the
+   * compiler/profile/settings contract and source/core validation; normal
+   * artifact consumers use solidityPrepareLib.prepare_artifact.
    *)
   val import_artifact : string -> string -> term
 

@@ -53,8 +53,11 @@ COMPILE_FAILURE = "compile-failure"
 IMPORT_REJECTED = "import-rejected"
 ELABORATION_REJECTED = "elaboration-rejected"
 ADMITTED = "admitted"
+MALFORMED_INPUT = "malformed-input"
+INVALID_CORE = "invalid-core"
 GREEDY_STEPS = 20
-CATEGORIES = [ADMITTED, ELABORATION_REJECTED, IMPORT_REJECTED, COMPILE_FAILURE, SKIPPED]
+CATEGORIES = [ADMITTED, ELABORATION_REJECTED, IMPORT_REJECTED, COMPILE_FAILURE,
+              MALFORMED_INPUT, INVALID_CORE, SKIPPED]
 
 
 class TestFormatError(Exception):
@@ -154,18 +157,8 @@ def skip_reason(test: SemanticTest, profile: dict[str, Any]) -> str | None:
 
 
 def compile_test(solc: Path, test: SemanticTest, profile_path: Path) -> dict[str, Any]:
-    """ASTs and storage layouts by source; compiler diagnostics raise SystemExit."""
-    output = exporter.build_artifact_from_sources(solc, test.sources, profile_path)["output"]
-    return {
-        name: {
-            "ast": source["ast"],
-            "contracts": {
-                contract: {"storageLayout": metadata["storageLayout"]}
-                for contract, metadata in output.get("contracts", {}).get(name, {}).items()
-            },
-        }
-        for name, source in output["sources"].items()
-    }
+    """Full compiler artifact; shared HOL preparation checks its provenance."""
+    return exporter.build_artifact_from_sources(solc, test.sources, profile_path)
 
 
 # The scan
@@ -640,7 +633,7 @@ def run_hol(holbuild: str, work: Path, units: list[tuple[str, Path]]) -> dict[st
     manifest.write_text("".join(f"{name}\t{path}\n" for name, path in units), encoding="utf-8")
     log = work / "hol.log"
     # `holbuild run` loads built theories but does not build them.
-    build = [holbuild, "-j8", "build", "--skip-checkpoints", "--skip-proof-steps", "solidityImportLib",
+    build = [holbuild, "-j8", "build", "--skip-checkpoints", "--skip-proof-steps", "solidityPrepareLib",
              "solidityElaborateTheory"]
     print("+", " ".join(build), file=sys.stderr, flush=True)
     subprocess.run(build, cwd=ROOT, check=True)
@@ -655,7 +648,10 @@ def run_hol(holbuild: str, work: Path, units: list[tuple[str, Path]]) -> dict[st
     results = {}
     for line in log.read_text(encoding="utf-8", errors="replace").splitlines():
         if line.startswith(RESULT_PREFIX):
-            result = json.loads(line[len(RESULT_PREFIX):])
+            try:
+                result = json.loads(line[len(RESULT_PREFIX):])
+            except json.JSONDecodeError as error:
+                raise SystemExit(f"malformed HOL result: {line!r}: {error}") from error
             results[result["test"]] = result
     missing = [name for name, _ in units if name not in results]
     if status != 0 or missing:
@@ -696,6 +692,8 @@ def classify(test: str, scanned: dict[int, list[Blocker]], hol: dict[str, Any]) 
     if status == ELABORATION_REJECTED:
         return Classification(test, ELABORATION_REJECTED, message, blockers=blockers,
                               scan_agrees=stages == {"elaboration"})
+    if status in (MALFORMED_INPUT, INVALID_CORE):
+        return Classification(test, status, message, blockers=blockers, scan_agrees=False)
     if status != IMPORT_REJECTED:
         raise ValueError(f"{test}: unknown HOL status {status!r}")
     match = IMPORT_ERROR_NODE.match(message or "")
@@ -788,7 +786,7 @@ class Report:
             "",
             f"Every test under `{TESTS_DIR.as_posix()}` of argotorg/solidity at "
             f"`{self.pin}` was compiled with profile `{self.profile}`, imported by "
-            "`solidityImportLib` and elaborated by `elaborate_unit`. Call expectations "
+            "`solidityPrepareLib`, including source validation, elaboration and full core checking. Call expectations "
             "(the `// ----` sections) are not run, so an admitted test is one the "
             "semantics accepts, not one it is known to agree on.",
             "",
@@ -908,7 +906,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{len(tests)} tests, {len(units)} compiled", file=sys.stderr, flush=True)
         hol = run_hol(args.holbuild, work, units)
     for name, sources in compiled.items():
-        results[name] = classify(name, scan({source: data["ast"] for source, data in sources.items()}),
+        results[name] = classify(name, scan({source: data["ast"] for source, data in sources["output"]["sources"].items()}),
                                  hol[name])
 
     report = Report(pin, args.profile.stem, [results[t.name] for t in tests])
@@ -916,7 +914,7 @@ def main(argv: list[str] | None = None) -> int:
     args.output.with_suffix(".md").write_text(report.markdown(), encoding="utf-8")
     counts = report.counts()
     print(", ".join(f"{counts[c]} {c}" for c in CATEGORIES), file=sys.stderr)
-    return 0
+    return 1 if counts[MALFORMED_INPUT] or counts[INVALID_CORE] else 0
 
 
 if __name__ == "__main__":

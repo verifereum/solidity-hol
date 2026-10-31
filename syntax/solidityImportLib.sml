@@ -4,6 +4,7 @@ struct
 open HolKernel boolLib solidityImportTheory
 
 exception ImportError of string
+exception MalformedInput of string
 
 fun fail msg = raise ImportError msg
 
@@ -32,10 +33,10 @@ fun describe v =
 fun within v f =
   f v
   handle ImportError msg => raise ImportError msg
-       | e as JSONUtil.JSONError _ => fail (describe v ^ ": " ^ JSONUtil.exnMessage e)
-       | e as JSONUtil.FieldNotFound _ => fail (describe v ^ ": " ^ JSONUtil.exnMessage e)
-       | e as JSONUtil.NotObject => fail (describe v ^ ": " ^ JSONUtil.exnMessage e)
-       | e as JSONUtil.NotArray => fail (describe v ^ ": " ^ JSONUtil.exnMessage e)
+       | e as JSONUtil.JSONError _ => raise MalformedInput (describe v ^ ": " ^ JSONUtil.exnMessage e)
+       | e as JSONUtil.FieldNotFound _ => raise MalformedInput (describe v ^ ": " ^ JSONUtil.exnMessage e)
+       | e as JSONUtil.NotObject => raise MalformedInput (describe v ^ ": " ^ JSONUtil.exnMessage e)
+       | e as JSONUtil.NotArray => raise MalformedInput (describe v ^ ": " ^ JSONUtil.exnMessage e)
 
 fun require v cond msg = if cond then () else fail (describe v ^ ": " ^ msg)
 
@@ -195,9 +196,11 @@ fun expr v = within v (fn v =>
          expr (field v "leftHandSide"), expr (field v "rightHandSide"),
          type_id v]
   | "IndexAccess" =>
-      con "SrcIndexAccess"
-        [info v, expr (field v "baseExpression"),
-         expr (field v "indexExpression"), type_id v]
+      (require v (isSome (optional_field v "indexExpression"))
+         "array type expressions are not supported";
+       con "SrcIndexAccess"
+         [info v, expr (field v "baseExpression"),
+          expr (field v "indexExpression"), type_id v])
   | "TupleExpression" =>
       (require v (not (bool_field v "isInlineArray"))
          "inline arrays are not supported";
@@ -425,8 +428,6 @@ fun contract external_structs contracts v = within v (fn v =>
     val layout =
       JSONUtil.get (contracts,
         [JSONUtil.SEL name, JSONUtil.SEL "storageLayout"])
-      handle e => fail (describe v ^ ": no storage layout: " ^
-                        JSONUtil.exnMessage e)
   in
     expect v "ContractDefinition";
     require v (string_field v "contractKind" = "contract")
