@@ -28,7 +28,7 @@ val loops = [
 val proved = [
   ("pure_core",
    ["add", "argumentOrder", "badDivide", "compoundOrder", "count", "divmod",
-    "doubleUntil", "fact", "guardedDivide", "locals", "narrow", "negate",
+    "doubleUntil", "fact", "guardedDivide", "identity", "locals", "narrow", "negate",
     "panicOrder", "shortCircuit", "sum", "swap", "wrappingAdd"]),
   ("scalars",
    ["bitwise", "boolLogic", "divide", "implicitWidening", "increment",
@@ -42,7 +42,7 @@ val proved = [
   ("storage_arrays", ["combine"]),
   ("calls",
    ["ackermann", "argumentEffects", "decrementUnderflow", "fib", "holes",
-    "minMax", "narrowSum", "operandPanics", "pair", "prefixPostfix", "rotate",
+    "isEven", "isOdd", "minMax", "narrowSum", "operandPanics", "pair", "prefixPostfix", "rotate",
     "sameTarget", "swapThroughCall", "widenResult", "wrappingDecrement"])]
 
 fun json_string s =

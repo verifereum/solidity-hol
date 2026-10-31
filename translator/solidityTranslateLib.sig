@@ -16,7 +16,8 @@ sig
    *
    * termination and loops give, by function name, a tactic proving the
    * termination of the function's definition and of its loop helper when
-   * Define cannot; a loop helper always needs one. A function the translator
+   * Define cannot (for functions that call each other, under the first
+   * one's name); a loop helper always needs one. A function the translator
    * does not cover yet is Unsupported, and so are its callers; so are
    * overloaded functions. Any other failure is Failed, a translator bug. *)
   val translate_unit :

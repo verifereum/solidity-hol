@@ -398,6 +398,62 @@ Theorem uint_op_eval2 = Q.INST [‘xs’ |-> ‘[i; j]’] uint_op_eval |> SIMP_
 Theorem int_op_eval1 = Q.INST [‘xs’ |-> ‘[i]’] int_op_eval |> SIMP_RULE list_ss [];
 Theorem int_op_eval2 = Q.INST [‘xs’ |-> ‘[i; j]’] int_op_eval |> SIMP_RULE list_ss [];
 
+(* Addresses and fixed bytes *)
+
+Definition address_value_def:
+  address_value (a : address) = ScalarValue (AddressValue a)
+End
+
+Definition bytes_value_def:
+  bytes_value (bs : byte list) = ScalarValue (BytesValue bs)
+End
+
+Definition bytes_op_def:
+  bytes_op n op xs =
+    case eval_bytes_operation n op (MAP BytesValue xs) of
+      ScalarOk (BytesValue bs) => if LENGTH bs = n then Returns bs else Panics 0
+    | ScalarPanic c => Panics c
+    | _ => Panics 0
+End
+
+Theorem bytes_op_range:
+  ∀n op xs bs. bytes_op n op xs = Returns bs ⇒ LENGTH bs = n
+Proof
+  rw[bytes_op_def, AllCaseEqs()] >> simp[]
+QED
+
+Theorem bytes_op_eval:
+  int_operation_typed env (FixedBytesT n) op (MAP BytesValue xs) ∧
+  valid_fixed_bytes_width n ⇒
+  scalar_outcome_value
+    (eval_scalar_operation env (FixedBytesT n) mode op (MAP BytesValue xs)) =
+  result_outcome bytes_value (bytes_op n op xs)
+Proof
+  strip_tac >>
+  ‘eval_scalar_operation env (FixedBytesT n) mode op (MAP BytesValue xs) ≠
+   ScalarInvalid’
+    by (gvs[int_operation_typed_def] >> BasicProvers.EVERY_CASE_TAC >> gvs[] >>
+        irule eval_scalar_operation_progress >>
+        simp[core_scalar_type_def, is_value_type_def, is_function_type_def,
+             valid_type_shape_def, declared_type_ok_def] >> metis_tac[]) >>
+  gvs[int_operation_typed_def] >>
+  Cases_on ‘scalar_operator_signature op (FixedBytesT n)’ >> gvs[] >>
+  rename1 ‘SOME p’ >> PairCases_on ‘p’ >> gvs[] >>
+  ‘eval_scalar_operation env (FixedBytesT n) mode op (MAP BytesValue xs) =
+   eval_bytes_operation n op (MAP BytesValue xs)’
+    by (Cases_on ‘op’ >> gvs[scalar_operator_signature_def, AllCaseEqs()] >>
+        simp[eval_scalar_operation_def, scalar_operator_signature_def] >>
+        rpt (CASE_TAC >> gvs[])) >>
+  qpat_x_assum ‘eval_scalar_operation _ _ _ _ _ = _’ (fn th => fs[th]) >>
+  simp[bytes_op_def] >>
+  Cases_on ‘eval_bytes_operation n op (MAP BytesValue xs)’ >>
+  gvs[scalar_outcome_value_def, result_outcome_def] >>
+  drule_all eval_bytes_operation_canonical >> rw[] >> simp[bytes_value_def]
+QED
+
+Theorem bytes_op_eval1 = Q.INST [‘xs’ |-> ‘[a]’] bytes_op_eval |> SIMP_RULE list_ss [];
+Theorem bytes_op_eval2 = Q.INST [‘xs’ |-> ‘[a; b]’] bytes_op_eval |> SIMP_RULE list_ss [];
+
 Theorem int_less_op:
   valid_int_width n ∧ integer_in_range T n i ∧ integer_in_range T n j ⇒
   scalar_outcome_value

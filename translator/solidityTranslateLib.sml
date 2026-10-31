@@ -9,7 +9,8 @@
  * constant at the top of its prelude (the elaborator's first-iteration flag)
  * is not a parameter. One loop per procedure, not nested.
  *
- * Proof: induction on the shallow definition, a case split along it, the
+ * Proof: induction on the shallow definition (procedures that call each other
+ * are defined and proved together), a case split along it, the
  * theorems of callees, helpers and the induction hypotheses at the calls it
  * makes, then rewriting the evaluator on the concrete body.
  *)
@@ -47,13 +48,16 @@ fun ast_id tm = numSyntax.int_of_term (rand tm)
 
 fun dest_list tm = fst (listSyntax.dest_list tm)
 
-datatype ty = Uint of int | Sint of int | Bool | Tup of ty list
+datatype ty = Uint of int | Sint of int | Bool | Addr of bool | Bytes of int
+            | Tup of ty list
 
 fun dest_sol_type tm =
   case head_name tm of
     "UintT" => Uint (numSyntax.int_of_term (rand tm))
   | "IntT" => Sint (numSyntax.int_of_term (rand tm))
   | "BoolT" => Bool
+  | "AddressT" => Addr (head_name (rand tm) = "PayableAddress")
+  | "FixedBytesT" => Bytes (numSyntax.int_of_term (rand tm))
   | _ => unsupported ("type " ^ term_to_string tm)
 
 fun dest_value_type tm =
@@ -66,17 +70,23 @@ fun dest_value_type tm =
 fun hol_type (Uint _) = numSyntax.num
   | hol_type (Sint _) = intSyntax.int_ty
   | hol_type Bool = bool
+  | hol_type (Addr _) = “:address”
+  | hol_type (Bytes _) = “:byte list”
   | hol_type (Tup ts) = pairSyntax.list_mk_prod (map hol_type ts)
 
 fun sol_type_term (Uint n) = mk_comb (“UintT”, numSyntax.term_of_int n)
   | sol_type_term (Sint n) = mk_comb (“IntT”, numSyntax.term_of_int n)
   | sol_type_term Bool = “BoolT”
+  | sol_type_term (Addr payable) =
+      if payable then “AddressT PayableAddress” else “AddressT NonpayableAddress”
+  | sol_type_term (Bytes n) = mk_comb (“FixedBytesT”, numSyntax.term_of_int n)
   | sol_type_term (Tup _) = unsupported "tuple binding"
 
 fun power_of_two n = numSyntax.mk_exp (numSyntax.term_of_int 2, numSyntax.term_of_int n)
 
 fun range_facts (Uint n) v = [numSyntax.mk_less (v, power_of_two n)]
   | range_facts (Sint n) v = [“integer_in_range T ^(numSyntax.term_of_int n) ^v”]
+  | range_facts (Bytes n) v = [mk_eq (listSyntax.mk_length v, numSyntax.term_of_int n)]
   | range_facts (Tup ts) v = List.concat
       (ListPair.map (fn (t, x) => range_facts t x)
          (ts, pairSyntax.strip_pair v))
@@ -89,6 +99,8 @@ fun range_hyps decls vs =
 fun encode (Uint _) v = mk_comb (“uint_value”, v)
   | encode (Sint _) v = mk_comb (“int_value”, v)
   | encode Bool v = mk_comb (“bool_value”, v)
+  | encode (Addr _) v = mk_comb (“address_value”, v)
+  | encode (Bytes _) v = mk_comb (“bytes_value”, v)
   | encode (Tup _) _ = unsupported "tuple value"
 
 fun mk_returns v = mk_icomb (returns_tm, v)
@@ -249,6 +261,11 @@ fun scalar_op (Uint n) mode opt vs =
        ("BoolNotOp", [a]) => Pure (mk_neg a)
      | ("EqualOp", [a, b]) => Pure (mk_eq (a, b))
      | (oper, _) => unsupported oper)
+  | scalar_op (Bytes n) _ opt vs =
+    if mem (head_name opt) ["BitAndOp", "BitOrOp", "BitXorOp", "BitNotOp"]
+    then Op (list_mk_comb (“bytes_op”, [numSyntax.term_of_int n, opt,
+               listSyntax.mk_list (map fst vs, “:byte list”)]))
+    else unsupported (head_name opt)
   | scalar_op _ _ opt _ = unsupported (head_name opt)
 
 (* A conversion: extension keeps the value, anything else wraps. A constant
@@ -257,6 +274,8 @@ fun convert (v, vty) ty is_const =
   let fun width n = numSyntax.term_of_int n in
     case (vty, ty) of
       (Bool, Bool) => v
+    | (Addr _, Addr _) => v
+    | (Bytes m, Bytes n) => if m = n then v else unsupported "bytes resize"
     | (Uint m, Uint n) =>
         if m <= n orelse is_const then v else numSyntax.mk_mod (v, power_of_two n)
     | (Uint _, Sint n) =>
@@ -566,6 +585,8 @@ and exec_loop (ctx : context) (env : env) pc (pre, c, body) =
 fun default_value (Uint _) = numSyntax.zero_tm
   | default_value (Sint _) = intSyntax.zero_tm
   | default_value Bool = F
+  | default_value (Addr _) = “0w : address”
+  | default_value (Bytes n) = “REPLICATE ^(numSyntax.term_of_int n) (0w : byte)”
   | default_value _ = unsupported "tuple return"
 
 fun dest_decl p =
@@ -708,7 +729,8 @@ val eval_simps =
    uint_less_op, uint_equal_op, bool_equal_op, bool_not_op, uint_copy_conversion,
    uint_op_eval1, uint_op_eval2, int_op_eval1, int_op_eval2, int_less_op,
    int_equal_op, uint_conversion, int_conversion, uint_int_conversion,
-   int_uint_conversion, int_value_def, int_operation_typed_def,
+   int_uint_conversion, int_value_def, int_operation_typed_def, bytes_op_eval1, bytes_op_eval2,
+   address_value_def, bytes_value_def, valid_fixed_bytes_width_def,
    scalar_operator_signature_def, scalars_have_types_def, scalar_has_type_def,
    elementary_scalar_has_type_def, integer_in_range_def, is_integer_type_def,
    is_bitwise_type_def, wrap_integer_in_range, uint_wrap_range,
@@ -838,6 +860,7 @@ fun ranges_tac (g as (_, w)) =
   (if is_conj w then
      conj_tac >- (rpt strip_tac >> gvs [] >> res_tac >>
                   imp_res_tac uint_op_range >> imp_res_tac int_op_range >>
+                  imp_res_tac bytes_op_range >>
                   gvs [uint_div_range, uint_mod_range, uint_wrap_range,
                        wrap_integer_in_range] >>
                   gvs [integer_in_range_def] >> intLib.ARITH_TAC)
@@ -923,7 +946,7 @@ fun intro_tac (g as (_, w)) = (if is_imp w then strip_tac else ALL_TAC) g
 fun along_tac def ind heads facts =
   case ind of
     SOME ind =>
-      ho_match_mp_tac ind >> rpt gen_tac >> disch_then (fn ih =>
+      ho_match_mp_tac ind >> rpt conj_tac >> rpt gen_tac >> disch_then (fn ih =>
         intro_tac >> once_rewrite_tac [def] >> split_tac heads (CONJUNCTS ih) facts)
   | NONE => rpt gen_tac >> intro_tac >> once_rewrite_tac [def] >> split_tac heads [] facts
 
@@ -934,61 +957,92 @@ fun define name eqn termination =
     val def = case termination of
                 SOME tac => fst (TotalDefn.tDefine name [ANTIQUOTE eqn] tac)
               | NONE => TotalDefn.Define [ANTIQUOTE eqn]
-    val c = fst (strip_comb (lhs (snd (strip_forall (hd (strip_conj (concl def)))))))
+    val cs = map (fn th => fst (strip_comb (lhs (snd (strip_forall (concl th))))))
+                 (CONJUNCTS def)
     val ind = Lib.total (DB.fetch "-") (name ^ "_ind")
-  in (def, c, ind) end
+  in (def, cs, ind) end
+
+(* th proves n conjuncts, the last of which may be a conjunction itself *)
+fun split_conj 1 th = [th]
+  | split_conj n th = CONJUNCT1 th :: split_conj (n - 1) (CONJUNCT2 th)
 
 (* The translator *)
 
 type translated = {callee : callee, thm : thm}
 val translated = ref ([] : (int * translated) list)
 
-fun translate {env, lookup, name, id, names, termination, loop} =
+(* A group of procedures that call each other, defined and proved together.
+   A loop is translated only in a group of one. *)
+fun translate env lookup group termination =
   let
     val () = used := reserved
-    val lookup_th = lookup “lookup_procedure ^env (AstId ^(numSyntax.term_of_int id))”
-    val proc = rand (rhs (concl lookup_th))
-    val (ps, rs, body) = dest_procedure proc
-    val fvar = mk_var (name, foldr (op -->)
-                                   (sol_result_ty (tuple_type (map (hol_type o snd) rs)))
-                                   (if null ps then [oneSyntax.one_ty]
-                                    else map (hol_type o snd) ps))
-    val ctx = {name = name, names = names,
-               callees = (id, {shallow = fvar, returns = map snd rs}) ::
-                         map (fn (i, t) => (i, #callee t)) (!translated),
-               helper = ref NONE} : context
-    val (pvars, eqn) = procedure_equation ctx fvar (ps, rs, body)
-    val simps = lookup_th :: eval_simps
+    fun prepare {name, id, names, loop} =
+      let
+        val lookup_th = lookup “lookup_procedure ^env (AstId ^(numSyntax.term_of_int id))”
+        val (ps, rs, body) = dest_procedure (rand (rhs (concl lookup_th)))
+        val fvar = mk_var (name, foldr (op -->)
+                                       (sol_result_ty (tuple_type (map (hol_type o snd) rs)))
+                                       (if null ps then [oneSyntax.one_ty]
+                                        else map (hol_type o snd) ps))
+      in
+        {name = name, id = id, names = names, loop = loop, lookup_th = lookup_th,
+         ps = ps, rs = rs, body = body, fvar = fvar}
+      end
+    val procs = map prepare group
+    val callees = map (fn p => (#id p, {shallow = #fvar p, returns = map snd (#rs p)})) procs @
+                  map (fn (i, t) => (i, #callee t)) (!translated)
+    fun equation p =
+      let
+        val ctx = {name = #name p, names = #names p, callees = callees,
+                   helper = ref NONE} : context
+        val (pvars, eqn) = procedure_equation ctx (#fvar p) (#ps p, #rs p, #body p)
+      in (ctx, pvars, eqn) end
+    val eqns = map equation procs
+    val simps = map #lookup_th procs @ eval_simps
     (* the ranges of generic operations' results are used like a callee's *)
     val callee_heads = map (#shallow o #callee o snd) (!translated) @
-                       [“uint_op”, “int_op”]
-    val callee_thms = map (#thm o snd) (!translated) @ [uint_op_range, int_op_range]
+                       [“uint_op”, “int_op”, “bytes_op”]
+    val callee_thms = map (#thm o snd) (!translated) @
+                      [uint_op_range, int_op_range, bytes_op_range]
     val helpers =
-      case (!(#helper ctx), loop) of
-        (NONE, _) => []
-      | (SOME (hvar, heqn, info), SOME tac) =>
-          let
-            val (def, c, ind) = define (fst (dest_var hvar)) heqn (SOME tac)
-            val hpvars = snd (strip_comb (lhs heqn))
-            val goal = loop_goal ctx env c hpvars info
-            val th = prove (goal, along_tac def ind (c :: callee_heads) callee_thms >>
-                                  loop_case_tac simps)
-            val _ = save_thm (fst (dest_var hvar) ^ "_correct", th)
-          in [(hvar, c, th)] end
-      (* not Define: under holbuild a failed termination proof ends the
-         theory build even when handled *)
-      | (SOME _, NONE) => unsupported "loop without a termination tactic"
+      case (procs, eqns) of
+        ([p], [(ctx, _, _)]) =>
+          (case (!(#helper ctx), #loop p) of
+             (NONE, _) => []
+           | (SOME (hvar, heqn, info), SOME tac) =>
+               let
+                 val (def, cs, ind) = define (fst (dest_var hvar)) heqn (SOME tac)
+                 val c = hd cs
+                 val hpvars = snd (strip_comb (lhs heqn))
+                 val goal = loop_goal ctx env c hpvars info
+                 val th = prove (goal, along_tac def ind (c :: callee_heads) callee_thms >>
+                                       loop_case_tac simps)
+                 val _ = save_thm (fst (dest_var hvar) ^ "_correct", th)
+               in [(hvar, c, th)] end
+           (* not Define: under holbuild a failed termination proof ends the
+              theory build even when handled *)
+           | (SOME _, NONE) => unsupported "loop without a termination tactic")
+      | _ => if List.exists (fn (ctx, _, _) => isSome (!(#helper ctx))) eqns
+             then unsupported "loop in mutual recursion" else []
     val s = map (fn (v, c, _) => v |-> c) helpers
-    val (def, c, ind) = define name (Term.subst s eqn) termination
-    val goal = procedure_goal ctx env id c pvars ps rs
-    val heads = c :: map #2 helpers @ callee_heads
+    val (def, defined, ind) =
+      define (#name (hd procs)) (list_mk_conj (map (Term.subst s o #3) eqns)) termination
+    val cs = map (fn p => Lib.first (fn c => fst (dest_const c) = #name p) defined) procs
+    val goals = map (fn (p, ((ctx, pvars, _), c)) =>
+                       procedure_goal ctx env (#id p) c pvars (#ps p) (#rs p))
+                    (ListPair.zip (procs, ListPair.zip (eqns, cs)))
+    val heads = cs @ map #2 helpers @ callee_heads
     val facts = map #3 helpers @ callee_thms
-    val th = prove (goal, along_tac def ind heads facts >> procedure_case_tac simps)
-    val th = save_thm (name ^ "_correct", th)
+    val th = prove (list_mk_conj goals,
+                    along_tac def ind heads facts >> procedure_case_tac simps)
+    val ths = map (fn (p, th) => save_thm (#name p ^ "_correct", th))
+                  (ListPair.zip (procs, split_conj (length procs) th))
   in
-    translated := (id, {callee = {shallow = c, returns = map snd rs},
-                        thm = th}) :: !translated;
-    th
+    translated := rev (map (fn (p, (c, th)) =>
+                              (#id p, {callee = {shallow = c, returns = map snd (#rs p)},
+                                       thm = th}))
+                           (ListPair.zip (procs, ListPair.zip (cs, ths)))) @ !translated;
+    ths
   end
 
 (* Units *)
@@ -1001,9 +1055,10 @@ fun callees proc =
       (find_terms (fn t => head_name t = "InternalCallOperation" andalso
                            length (args_of t) = 2) proc)
 
-(* Callees before callers; a cycle other than a self-call is left in program
-   order, and its first call of an untranslated procedure is unsupported *)
-fun call_order ids calls =
+(* Groups of procedures that call each other, callees before callers. In a
+   depth-first post-order every procedure a group reaches is done by the time
+   the group's last member is. *)
+fun call_groups ids calls =
   let
     fun visit (x, (seen, out)) =
       if mem x seen then (seen, out)
@@ -1012,7 +1067,23 @@ fun call_order ids calls =
               foldl visit (x :: seen, out)
                     (List.filter (fn y => y <> x andalso mem y ids) (calls x))
         in (seen, x :: out) end
-  in rev (snd (foldl visit ([], []) ids)) end
+    val order = rev (snd (foldl visit ([], []) ids))
+    fun reach x =
+      let
+        fun go (y, seen) =
+          if mem y seen then seen
+          else foldl go (y :: seen) (List.filter (fn z => mem z ids) (calls y))
+      in go (x, []) end
+    val reaches = map (fn x => (x, reach x)) ids
+    fun group x = List.filter (fn y => mem y (Lib.assoc x reaches) andalso
+                                       mem x (Lib.assoc y reaches)) ids
+    fun pos x = Lib.index (fn z => z = x) order
+  in
+    List.mapPartial
+      (fn x => let val g = group x in
+                 if List.all (fn y => pos y <= pos x) g then SOME g else NONE
+               end) order
+  end
 
 fun unsupported_message (HOL_ERR e) =
       let val m = message_of e in
@@ -1055,28 +1126,34 @@ fun translate_unit {prefix, unit_def, program_def, termination, loops} =
       length (List.filter (fn (_, i) => #name i = name) infos) > 1
     fun calls id =
       callees (rhs (concl (lookup “lookup_procedure ^env (AstId ^(numSyntax.term_of_int id))”)))
-    fun run id =
+    (* a group's termination tactic is its first member's *)
+    fun run group =
       let
-        val {name, names} = Lib.assoc id infos
+        val members = map (fn id => (id, Lib.assoc id infos)) group
+        val first = #name (snd (hd members))
         val timer = Timer.startRealTimer ()
-        val outcome =
-          if overloaded name then
-            Unsupported "unsupported: overloaded function"
+        val outcomes =
+          if List.exists (overloaded o #name o snd) members then
+            map (K (Unsupported "unsupported: overloaded function")) members
           else
-            Proved (translate {env = env, lookup = lookup, name = prefix ^ name,
-                               id = id, names = names,
-                               termination = Option.map snd (Lib.assoc1 name termination),
-                               loop = Option.map snd (Lib.assoc1 name loops)})
+            map Proved
+              (translate env lookup
+                 (map (fn (id, {name, names}) =>
+                         {name = prefix ^ name, id = id, names = names,
+                          loop = Option.map snd (Lib.assoc1 name loops)}) members)
+                 (Option.map snd (Lib.assoc1 first termination)))
             handle Interrupt => raise Interrupt
-                 | e => case unsupported_message e of
-                          SOME m => Unsupported m
-                        | NONE => Failed (General.exnMessage e)
+                 | e => map (K (case unsupported_message e of
+                                  SOME m => Unsupported m
+                                | NONE => Failed (General.exnMessage e))) members
+        val seconds = Time.toReal (Timer.checkRealTimer timer)
       in
-        {name = name, outcome = outcome,
-         seconds = Time.toReal (Timer.checkRealTimer timer)}
+        ListPair.map (fn ((_, {name, ...}), outcome) =>
+                        {name = name, outcome = outcome, seconds = seconds})
+                     (members, outcomes)
       end
   in
-    map run (call_order ids calls)
+    List.concat (map run (call_groups ids calls))
   end
 
 end
