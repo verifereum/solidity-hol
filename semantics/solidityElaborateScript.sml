@@ -1086,7 +1086,7 @@ val () = cv_auto_trans elab_struct_layouts_def;
 val () = cv_auto_trans_rec solidityCoreWfTheory.inline_storage_shape_def (
   WF_REL_TAC ‘inv_image ($< LEX $<) (λx. case x of
     INL (env, n, ty) => (cv$c2n n, cv_size ty)
-  | INR (env, n, fields) => (cv$c2n n, cv_size fields))’ >> cv_termination_tac
+  | INR (env, n, tys) => (cv$c2n n, cv_size tys))’ >> cv_termination_tac
 );
 val () = cv_auto_trans elaborate_unit_def;
 val () = cv_auto_trans solidityCoreWfTheory.core_program_environment_def;

@@ -682,16 +682,16 @@ Definition inline_storage_shape_def:
   (inline_storage_shape env n (StructT id) ⇔
     if n = 0 then F else
     case lookup_struct_layout env id of
-      SOME s => inline_storage_fields env (n - 1) s.struct_fields
+      SOME s => inline_storage_types env (n - 1) (MAP (λv. v.state_type) s.struct_fields)
     | NONE => F) ∧
   (inline_storage_shape env n _ ⇔ T) ∧
-  (inline_storage_fields env n [] ⇔ T) ∧
-  (inline_storage_fields env n (v :: vs) ⇔
-    inline_storage_shape env n v.state_type ∧ inline_storage_fields env n vs)
+  (inline_storage_types env n [] ⇔ T) ∧
+  (inline_storage_types env n (ty :: tys) ⇔
+    inline_storage_shape env n ty ∧ inline_storage_types env n tys)
 Termination
   WF_REL_TAC ‘inv_image ($< LEX $<) (λx. case x of
     INL (env, n, ty) => (n, sol_type_size ty)
-  | INR (env, n, fields) => (n, list_size (λv. sol_type_size v.state_type) fields))’ >>
+  | INR (env, n, tys) => (n, list_size sol_type_size tys))’ >>
   rw[list_size_def]
 End
 

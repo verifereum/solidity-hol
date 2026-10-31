@@ -213,11 +213,13 @@ QED
 
 Definition missing_struct_layout_unit_def:
   missing_struct_layout_unit =
-    let c = HD struct_unit.unit_contracts in
-    let s = HD c.contract_structs in
-    struct_unit with unit_contracts :=
-      [c with contract_structs :=
-        (s with struct_layout := NONE) :: TL c.contract_structs]
+    case struct_unit.unit_contracts of
+      c :: cs =>
+        (case c.contract_structs of
+           s :: ss => struct_unit with unit_contracts :=
+             (c with contract_structs := (s with struct_layout := NONE) :: ss) :: cs
+         | [] => struct_unit)
+    | [] => struct_unit
 End
 val () = cv_auto_trans missing_struct_layout_unit_def;
 
