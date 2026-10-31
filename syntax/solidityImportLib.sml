@@ -150,7 +150,10 @@ fun expr v = within v (fn v =>
              [info v, expr (field v "expression"),
               mk_num (JSONUtil.asIntInf declaration), type_id v]
        | NONE =>
-           (case string_field v "memberName" of
+           (if String.isPrefix "t_struct$_"
+                 (string_field (field (field v "expression") "typeDescriptions") "typeIdentifier")
+            then raise MalformedInput (describe v ^ ": missing struct field declaration")
+            else case string_field v "memberName" of
               "length" => con "SrcArrayLength"
                 [info v, expr (field v "expression"), type_id v]
             | member =>
