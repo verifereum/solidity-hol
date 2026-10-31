@@ -1,6 +1,7 @@
 # Interpreter architecture: EVM boundary review
 
-Status: proposal for review, not an implementation commitment.
+Status: historical EVM-boundary proposal. The current implementation and open
+extension points are described in [implementation-blueprint.md](implementation-blueprint.md).
 
 This note refines the external-interaction questions in [design.md](design.md).
 It records inspected implementation evidence and identifies decisions to make

@@ -99,44 +99,40 @@ Definition assign_local_def:
     [CaptureBindingStmt (AstId t) (AstId x); WriteScalarStmt (AstId t) ty a]
 End
 
-(* Variables: a local, or a state variable, which is read from storage into
- * a fresh binding when it is evaluated.
+(* A destination is a local binding or an already evaluated concrete reference.
+ * Its prelude captures the location; reads and writes share this representation.
  *)
 Datatype:
-  elab_place = LocalPlace sol_type | StatePlace sol_type
+  destination = LocalDestination num sol_type | ReferenceDestination core_atom sol_type
 End
 
-Definition variable_place_def:
-  variable_place ctx x =
+Definition destination_type_def:
+  (destination_type (LocalDestination _ ty) = ty) ∧
+  (destination_type (ReferenceDestination _ ty) = ty)
+End
+
+Definition variable_destination_def:
+  variable_destination ctx (n : num) x =
     case ALOOKUP ctx.variables x of
-      SOME ty => SOME (LocalPlace ty)
+      SOME ty => SOME (([], LocalDestination x ty), n)
     | NONE =>
         (case ALOOKUP ctx.state x of
-           SOME ty => SOME (StatePlace ty)
+           SOME ty => SOME (([DefineStmt (AstId n) (ReferenceType ty)
+                                (StateReferenceOperation (AstId x))],
+                             ReferenceDestination (BoundAtom (AstId n)) ty), n + 1)
          | NONE => NONE)
 End
 
-Definition place_type_def:
-  (place_type (LocalPlace ty) = ty) ∧
-  (place_type (StatePlace ty) = ty)
+Definition read_destination_def:
+  (read_destination n (LocalDestination x ty) = (([], BoundAtom (AstId x)), n)) ∧
+  (read_destination n (ReferenceDestination ref ty) =
+    (bind_value n ty (ReadOperation ty ref), n + 1))
 End
 
-Definition read_place_def:
-  (read_place n x (LocalPlace ty) = (([], BoundAtom (AstId x)), n)) ∧
-  (read_place n x (StatePlace ty) =
-    (bind_value n ty (ReadStateOperation (AstId x)), n + 1))
-End
-
-Definition write_place_def:
-  (write_place t x (LocalPlace ty) a = assign_local t x ty a) ∧
-  (write_place (t : num) x (StatePlace ty) a =
-    [CaptureStateStmt (AstId t) (AstId x); WriteScalarStmt (AstId t) ty a])
-End
-
-(* Capturing a computed scalar leaf preserves the evaluated index path. *)
-Definition write_reference_def:
-  write_reference (t : num) ty ref a =
-    [CaptureValueStmt (AstId t) ref; WriteScalarStmt (AstId t) ty a]
+Definition write_destination_def:
+  (write_destination t (LocalDestination x ty) a = assign_local t x ty a) ∧
+  (write_destination (t : num) (ReferenceDestination ref ty) a =
+    [CaptureValueStmt (AstId t) ref; WriteScalarStmt (AstId t) ty a])
 End
 
 (* Operators *)
@@ -264,13 +260,16 @@ Definition tuple_writes_def:
   (tuple_writes ctx n [] [] = SOME ([], n)) ∧
   (tuple_writes ctx n (NONE :: cs) (_ :: vs) = tuple_writes ctx n cs vs) ∧
   (tuple_writes ctx n (SOME (SrcIdentifier _ _ x _) :: cs) ((a, vt) :: vs) =
-    case (variable_place ctx x, tuple_writes ctx n cs vs) of
-      (SOME place, SOME (ws, n')) =>
-        (case coerce n' (place_type place) a vt of
-           SOME ((ss, a'), n'') =>
-             SOME (ws ++ ss ++ write_place n'' x place a', n'' + 1)
+    case tuple_writes ctx n cs vs of
+      SOME (ws, n1) =>
+        (case variable_destination ctx n1 x of
+           SOME ((ls, target), n2) =>
+             (case coerce n2 (destination_type target) a vt of
+                SOME ((ss, a'), n3) =>
+                  SOME (ws ++ ls ++ ss ++ write_destination n3 target a', n3 + 1)
+              | NONE => NONE)
          | NONE => NONE)
-    | _ => NONE) ∧
+    | NONE => NONE) ∧
   (tuple_writes ctx n _ _ = NONE)
 End
 
@@ -311,12 +310,13 @@ Definition elab_expr_def:
   (elab_expr ctx n expression =
     case expression of
       SrcIdentifier _ _ x _ =>
-        (case variable_place ctx x of
-           SOME place =>
-             if ¬is_elementary_type (place_type place) then NONE else
-             let (read, n1) = read_place n x place in
+        (case variable_destination ctx n x of
+           SOME ((ls, target), n1) =>
+             let ty = destination_type target in
+             if ¬is_elementary_type ty then NONE else
+             let (read, n2) = read_destination n1 target in
              let (ss, a) = read in
-             SOME ((ss, a, ElabType (place_type place)), n1)
+             SOME ((ls ++ ss, a, ElabType ty), n2)
          | NONE => NONE)
     | SrcArrayLength _ root_expr _ =>
         (case elab_location ctx n root_expr of
@@ -352,36 +352,22 @@ Definition elab_expr_def:
          | NONE => NONE)
     | SrcUnaryOperation _ op prefix e tid =>
         (if op = "++" ∨ op = "--" then
-           case e of
-             SrcIdentifier _ _ x _ =>
-               (case variable_place ctx x of
-                  SOME place =>
-                    let ty = place_type place in
-                    let (read, n1) = read_place n x place in
-                    let (rs, cur) = read in
-                    let (old, old_atom) =
-                      bind_value n1 ty (ConvertOperation ty cur) in
-                    let (step, new_atom) =
-                      bind_value (n1 + 1) ty
-                        (ScalarOperation ty ctx.mode
-                           (if op = "++" then AddOp else SubtractOp)
-                           [cur; ConstantAtom (IntegerValue 1)]) in
-                    SOME ((rs ++ (if prefix then [] else old) ++ step ++
-                           write_place (n1 + 2) x place new_atom,
-                           (if prefix then new_atom else old_atom), ElabType ty),
-                          n1 + 3)
-                | NONE => NONE)
-           | _ =>
-               (case elab_location ctx n e of
-                  SOME ((ss, ref, ty), n1) =>
-                    let (rs, cur) = bind_value n1 ty (ReadOperation ty ref) in
-                    let (step, v) = bind_value (n1 + 1) ty
-                      (ScalarOperation ty ctx.mode
-                         (if op = "++" then AddOp else SubtractOp)
-                         [cur; ConstantAtom (IntegerValue 1)]) in
-                    SOME ((ss ++ rs ++ step ++ write_reference (n1 + 2) ty ref v,
-                           (if prefix then v else cur), ElabType ty), n1 + 3)
-                | NONE => NONE)
+           case elab_destination ctx n e of
+             SOME ((ls, target), n1) =>
+               let ty = destination_type target in
+               let (read, n2) = read_destination n1 target in
+               let (rs, cur) = read in
+               let (old, n3) = if prefix then (([], cur), n2)
+                               else snapshot n2 cur (ElabType ty) in
+               let (ss, old_atom) = old in
+               let (step, new_atom) = bind_value n3 ty
+                 (ScalarOperation ty ctx.mode
+                   (if op = "++" then AddOp else SubtractOp)
+                   [cur; ConstantAtom (IntegerValue 1)]) in
+               SOME ((ls ++ rs ++ ss ++ step ++
+                        write_destination (n3 + 1) target new_atom,
+                      (if prefix then new_atom else old_atom), ElabType ty), n3 + 2)
+           | NONE => NONE
          else
            case (unary_operator op, identifier_type tid, elab_expr ctx n e) of
              (SOME uop, SOME ty, SOME ((ss, a, vt), n')) =>
@@ -449,33 +435,7 @@ Definition elab_expr_def:
          | _ => NONE)
     | SrcAssignment _ op lhs rhs tid =>
         (case lhs of
-           SrcIdentifier _ _ x _ =>
-             (case (variable_place ctx x, elab_expr ctx n rhs) of
-                (SOME place, SOME ((sr, ar, vr), n1)) =>
-                  let ty = place_type place in
-                  if op = "=" then
-                    (case coerce n1 ty ar vr of
-                       SOME ((cr, ar'), n2) =>
-                         SOME ((sr ++ cr ++ write_place n2 x place ar', ar',
-                                ElabType ty), n2 + 1)
-                     | NONE => NONE)
-                  else
-                    (case compound_operator op of
-                       SOME aop =>
-                         (case coerce n1 (right_operand_type aop ty) ar vr of
-                            SOME ((cr, ar'), n2) =>
-                              let (read, n3) = read_place n2 x place in
-                              let (rs, cur) = read in
-                              let (ss, v) = bind_value n3 ty
-                                              (ScalarOperation ty ctx.mode aop
-                                                 [cur; ar']) in
-                              SOME ((sr ++ cr ++ rs ++ ss ++
-                                     write_place (n3 + 1) x place v,
-                                     v, ElabType ty), n3 + 2)
-                          | NONE => NONE)
-                     | NONE => NONE)
-              | _ => NONE)
-         | SrcTupleExpression _ cs _ =>
+           SrcTupleExpression _ cs _ =>
              (if op = "=" then
                 case elab_values ctx n rhs of
                   SOME ((sr, vs), n1) =>
@@ -490,27 +450,32 @@ Definition elab_expr_def:
          | _ =>
              (case elab_expr ctx n rhs of
                 SOME ((sr, ar, vr), n1) =>
-                  let (copied, n2) = snapshot n1 ar vr in
+                  let (copied, n2) = case lhs of
+                      SrcIdentifier _ _ _ _ => (([], ar), n1)
+                    | _ => snapshot n1 ar vr in
                   let (sc, ar') = copied in
-                  (case elab_location ctx n2 lhs of
-                     SOME ((sl, ref, ty), n3) =>
+                  (case elab_destination ctx n2 lhs of
+                     SOME ((ls, target), n3) =>
+                       let ty = destination_type target in
                        if op = "=" then
                          (case coerce n3 ty ar' vr of
                             SOME ((cr, a), n4) =>
-                              SOME ((sr ++ sc ++ sl ++ cr ++
-                                     write_reference n4 ty ref a, a, ElabType ty), n4 + 1)
+                              SOME ((sr ++ sc ++ ls ++ cr ++
+                                       write_destination n4 target a,
+                                     a, ElabType ty), n4 + 1)
                           | NONE => NONE)
                        else
                          (case compound_operator op of
                             SOME aop =>
                               (case coerce n3 (right_operand_type aop ty) ar' vr of
                                  SOME ((cr, a), n4) =>
-                                   let (rs, cur) = bind_value n4 ty (ReadOperation ty ref) in
-                                   let (step, v) = bind_value (n4 + 1) ty
+                                   let (read, n5) = read_destination n4 target in
+                                   let (rs, cur) = read in
+                                   let (step, v) = bind_value n5 ty
                                      (ScalarOperation ty ctx.mode aop [cur; a]) in
-                                   SOME ((sr ++ sc ++ sl ++ cr ++ rs ++ step ++
-                                          write_reference (n4 + 2) ty ref v,
-                                          v, ElabType ty), n4 + 3)
+                                   SOME ((sr ++ sc ++ ls ++ cr ++ rs ++ step ++
+                                            write_destination (n5 + 1) target v,
+                                          v, ElabType ty), n5 + 2)
                                | NONE => NONE)
                           | NONE => NONE)
                    | NONE => NONE)
@@ -692,7 +657,15 @@ Definition elab_expr_def:
                              (ArrayPushOperation ref NONE)],
                     BoundAtom (AstId n1), element), n1 + 1)
          | _ => NONE)
-    | _ => NONE)
+    | _ => NONE) ∧
+  (elab_destination ctx n e =
+    case e of
+      SrcIdentifier _ _ x _ => variable_destination ctx n x
+    | _ =>
+        case elab_location ctx n e of
+          SOME ((ss, ref, ty), n1) =>
+            SOME ((ss, ReferenceDestination ref ty), n1)
+        | NONE => NONE)
 Termination
   WF_REL_TAC ‘measure (λx. case x of
      INL (ctx, n, e) => 3 * src_expr_size e + 2
@@ -700,7 +673,8 @@ Termination
    | INR (INR (INL (ctx, n, e))) => 3 * src_expr_size e + 3
    | INR (INR (INR (INL (ctx, n, cs)))) =>
        3 * list_size (option_size src_expr_size) cs
-   | INR (INR (INR (INR (ctx, n, e)))) => 3 * src_expr_size e + 1)’ >>
+   | INR (INR (INR (INR (INL (ctx, n, e))))) => 3 * src_expr_size e + 1
+   | INR (INR (INR (INR (INR (ctx, n, e))))) => 3 * src_expr_size e + 2)’ >>
   rw[solidityImportTheory.src_expr_size_def, listTheory.list_size_def,
      basicSizeTheory.option_size_def]
 End
@@ -1019,11 +993,10 @@ val () = cv_auto_trans bind_value_def;
 val () = cv_auto_trans coerce_def;
 val () = cv_auto_trans snapshot_def;
 val () = cv_auto_trans assign_local_def;
-val () = cv_auto_trans variable_place_def;
-val () = cv_auto_trans place_type_def;
-val () = cv_auto_trans read_place_def;
-val () = cv_auto_trans write_place_def;
-val () = cv_auto_trans write_reference_def;
+val () = cv_auto_trans variable_destination_def;
+val () = cv_auto_trans destination_type_def;
+val () = cv_auto_trans read_destination_def;
+val () = cv_auto_trans write_destination_def;
 val () = cv_auto_trans arithmetic_operator_def;
 val () = cv_auto_trans right_operand_type_def;
 val () = cv_auto_trans compound_operator_def;
@@ -1056,14 +1029,15 @@ val () = cv_auto_trans error_string_data_def;
 val () = cv_auto_trans builtin_failure_def;
 
 val elab_expr_pre_def = cv_auto_trans_pre_rec
-  "elab_expr_pre elab_args_pre elab_values_pre elab_components_pre elab_location_pre"
+  "elab_expr_pre elab_args_pre elab_values_pre elab_components_pre elab_location_pre elab_destination_pre"
   elab_expr_def (
   WF_REL_TAC ‘measure (λx. case x of
      INL (ctx, n, e) => 3 * cv_size e + 2
    | INR (INL (ctx, n, tys, es)) => 3 * cv_size es
    | INR (INR (INL (ctx, n, e))) => 3 * cv_size e + 3
    | INR (INR (INR (INL (ctx, n, cs)))) => 3 * cv_size cs
-   | INR (INR (INR (INR (ctx, n, e)))) => 3 * cv_size e + 1)’ >>
+   | INR (INR (INR (INR (INL (ctx, n, e))))) => 3 * cv_size e + 1
+   | INR (INR (INR (INR (INR (ctx, n, e))))) => 3 * cv_size e + 2)’ >>
   cv_termination_tac
 );
 
@@ -1072,7 +1046,8 @@ Theorem elab_expr_pre[cv_pre,local]:
   (∀ctx n tys es. elab_args_pre ctx n tys es) ∧
   (∀ctx n e. elab_values_pre ctx n e) ∧
   (∀ctx n cs. elab_components_pre ctx n cs) ∧
-  (∀ctx n e. elab_location_pre ctx n e)
+  (∀ctx n e. elab_location_pre ctx n e) ∧
+  (∀ctx n e. elab_destination_pre ctx n e)
 Proof
   ho_match_mp_tac elab_expr_ind >> rpt strip_tac
   >~ [‘elab_expr_pre ctx n expression’] >-

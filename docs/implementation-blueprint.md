@@ -1,209 +1,94 @@
-# Milestones 1–2: first implementation checkpoint
+# Semantics architecture
 
-This is a **build-checked architectural blueprint and concrete EVM experiment**,
-not a supported Solidity subset. The decisions in [interpreter-design.md](interpreter-design.md)
-remain authoritative. No importer or source evaluator has been implemented.
+The executable semantics has one definition: import an analyzed compiler source
+unit, elaborate it into an ordered core, then evaluate that core. Keeping one
+checked preparation boundary and one storage path makes additions use the same
+validation and execution rules as existing consumers.
 
-## Buildable artifacts
+## Preparation and declarations
 
-| Theory | Purpose |
-| --- | --- |
-| `syntax/solidityCoreScript.sml` | Candidate ordered core, scalar/reference values, captured targets, procedures and control outcomes |
-| `syntax/solidityCoreWfScript.sml` | Static environment and well-formedness checker for the pure fragment: typed atoms, operations, scoped statements, procedures and programs |
-| `tests/solidityCoreWfTestScript.sml` | Positive and negative well-formedness witnesses |
-| `semantics/solidityScalarScript.sml` | Scalar operator and conversion semantics over canonical values, cv-translated, with canonicality theorems |
-| `tests/solidityScalarTestScript.sml` | Scalar operator, panic and conversion witnesses, proved by `EVAL_TAC` and `cv_eval` |
-| `semantics/solidityStateScript.sml` | Candidate source state, separate gas evidence, observable EVM projection and frame completion |
-| `semantics/solidityEVMCallScript.sml` | Concrete CALL/CREATE boundary experiment reusing pinned Verifereum |
-| `semantics/solidityEVMBoundaryPropsScript.sml` | General well-formedness/transaction preservation and conditional storage preservation |
-| `tests/solidityEVMCallTestScript.sml` | CALL, STATICCALL, DELEGATECALL, precompile and failure witnesses |
-| `tests/solidityEVMCreateTestScript.sml` | CREATE/CREATE2 installation, revert and collision witnesses |
-| `tests/solidityEVMFrameTestScript.sml` | Nested rollback and sequential transient-storage witnesses |
-| `tests/solidityEVMReentryTestScript.sml` | Coherent deployed-bytecode reentry and resumed world observation |
-| `tests/solidityEVMBookkeepingTestScript.sml` | Nonempty bookkeeping, original/current storage and caller-tail witnesses |
+`solidityPrepareLib.prepare_artifact` checks the pinned compiler, artifact format,
+profile and Standard JSON settings, imports and validates the normalized source,
+elaborates it, and cv-evaluates the full `wf_core_program`. Differential tests
+and the semanticTests acceptance scanner share this API. Metadata validation is
+an SML check; source validation, elaboration and core checking return HOL
+certificates. Metadata is not proof that the recorded compiler output is genuine.
 
-All are ancestors of the project roll-up:
+Malformed artifacts, unsupported import/lowering, source rejection and invalid
+generated core are separate failures. Invalid generated core is an implementation
+error. Lower-level importer/elaborator functions remain available; their callers
+must establish provenance, source validity and full core well-formedness.
 
-```sh
-holbuild build solidityHolTheory
-```
+A `core_program` owns procedures, state variables, semantic declarations and keyed
+storage layouts. `core_program_environment` derives both checker and runtime
+environments from it. `StructDeclaration` records field identities and types even
+without storage metadata. Layouts give relative slots, offsets and extents and
+must agree with those declarations. Enum and user-defined value declarations
+have the same semantic home; their import coverage remains deferred.
 
-Definitions and proofs contain no cheats or new axioms. Concrete boundary
-witnesses are proved by `cv_eval`, not merely evaluated outside HOL.
+## Destinations and storage
 
-## Candidate core contracts
+Elaboration represents an assignment destination as a local binding or an
+already evaluated reference. `elab_destination`, `read_destination` and
+`write_destination` are shared by assignment, compound assignment and increment.
+Tuple writes use the same helpers, retaining identifier-only target coverage and
+right-to-left writes. The pinned profile evaluates the assignment RHS before
+capturing a computed LHS. Snapshots keep earlier values stable while later
+operands run. Postfix increment preserves its old value; compound assignment
+reads and writes the captured location once.
 
-Effects are named by `DefineStmt`; its operands are pure constants or bindings.
-Type annotations distinguish ordinary Solidity types from product types for
-intermediate tuples/multiple return values. Tuple construction/projection is
-explicit. `solidityCoreWfScript.sml` checks these annotations for the pure
-fragment; reference operations and external calls are rejected until their
-validation rules exist. The checker fixes conventions that the evaluator and
-elaborator inherit: bindings hold elementary, enum and user-defined value types
-only, with function and contract values deferred; a `ConvertOperation` on a
-constant is the literal/default-initialisation form and checks membership only;
-return bindings are in scope from procedure entry, so the evaluator
-default-initialises them and fall-through returns their current values;
-`RevertStmt` carries a constant `BytesValue` of any length as raw revert data;
-`PanicStmt` carries a panic code, including assertion failure `0x01`; a
-loop prelude is not a loop body, so `break`/`continue` there are rejected;
-targets are lexically scoped like bindings, so a runtime target map is saved and
-restored per scope or capture overwrites; and a `ScalarOperation`'s type is its
-left operand's type, with `scalar_operator_signature` giving every operand's
-type: shift amounts and exponents are `uint256`, so elaboration widens a
-narrower unsigned right operand. Type declarations accompany a `core_program`
-rather than living in it.
+Scalar state variables use `StateReferenceOperation`, `ReadOperation` and
+`CaptureValueStmt`, like navigated storage. There is no second scalar-state
+read/capture operation. `WriteScalarStmt`, `RebindReferenceStmt` and
+`CopyContentsStmt` remain distinct: changing an alias is not copying an aggregate.
+The latter operations are extension points, not aggregate execution coverage.
 
-The scalar layer in `semantics/solidityScalarScript.sml` adds three more.
-`eval_scalar_operation` and `eval_conversion` return a `scalar_outcome`
-(`ScalarOk`, `ScalarPanic` with the panic code, or `ScalarInvalid`), which the
-evaluator maps onto `PanicCompletion` and `InvalidCompletion`. Values are
-canonical (an `IntegerValue` is the mathematical integer and fixed bytes hold
-exactly their width), so "typed cleanup" is wrapping into the target's range,
-proved as the canonicality theorems, and cleanup of raw EVM words belongs to
-the ABI/storage boundary. `eval_conversion` takes the source type as well as
-the target: the evaluator reads it from the binding for a `BoundAtom` and sets
-it to the target type for a `ConstantAtom`.
+`solidityStorage` owns concrete storage encoding, packed scalar access, mapping
+hashing, array navigation, state references and struct-field navigation. These
+helpers take evaluated values/references and accounts; they do not evaluate core
+atoms or change scopes. `solidityEvaluator` owns atom evaluation, bindings,
+captured targets, frame checks and control flow. Its static-frame write rejection
+is deliberate and remains `InvalidCompletion`.
 
-Capture statements produce entries in a separate target map. The core then
-explicitly writes a scalar, binds a reference (including memory reference
-fields), or copies typed contents between references. A storage reference
-captures backend, account, slot and byte offset, together with type/layout
-identity. No stored index path is reevaluated.
+## Evaluator interfaces and validation
 
-Value-type state variables are the exception: no reference to one is bound.
-`ReadStateOperation` reads one into a binding and `CaptureStateStmt` captures a
-`ValueTarget` holding its storage reference for `WriteScalarStmt`. Both read
-the slot and offset from the program's `state_variables`, and the evaluator
-reads and writes the bytes of the executing account's word in place, keeping
-the rest of a packed slot. A write in a static frame is invalid, where the EVM
-would halt exceptionally.
+The evaluator exposes unconditional block, loop and call equations in
+`solidityEvaluatorProps`: `eval_block_cons`, `eval_block_append`,
+`eval_loop_unfold` and `invoke_source_unfold`. Intermediate-result wrappers
+prevent rewriting from duplicating unevaluated operations. Existing fuel
+stability results keep their statements. Fuel bounds recursive depth, not EVM
+gas; sibling statements reuse a bound.
 
+These equations hold for arbitrary environments and runtime frames. They do not
+claim type safety or progress. `wf_core_program` and typed arguments alone do
+not imply execution avoids `InvalidCompletion`; runtime bindings, concrete
+references, accounts and static-frame permissions matter. Preservation results
+must state the exact premises of the operation they justify. No stronger
+execution restriction is hidden in preparation to make a theorem hold.
 
-Mapping navigation uses `ReferenceType ty` bindings, including scalar leaves.
-`StateReferenceOperation` obtains the root location from `state_variables`;
-`NavigateOperation` hashes the encoded key and the current slot. Each nested
-index yields a concrete reference before the next index is evaluated.
-`ReadOperation` reads a scalar leaf and `CaptureValueStmt` captures it for the
-existing `WriteScalarStmt`. Assignment evaluates and saves its RHS before
-navigating the target; compound assignment and increment/decrement read and
-write the same captured location. Integer keys are extended to 256 bits,
-addresses and booleans are zero padded, and fixed bytes are right padded.
-Fixed-size storage arrays use the same captured references. Scalar elements
-occupy `32 DIV storage_bytes` positions per slot, without straddling slots;
-`fixed_storage_slots` rounds each nested row up to whole slots.
-`fixed_array_element` checks bounds before computing its slot and byte offset,
-returning panic `0x32` on failure. `.length` evaluates the reference prefix and
-then returns the fixed dimension. Storage writes and panic rollback reuse the
-scalar operations and source-frame boundary.
+Differential verdicts compare the complete committed contract storage, using
+Verifereum's canonical zero-omitting cv encoding of its total storage map.
+Explicit slot lists remain diagnostics. Revert/panic observations use the rolled
+back world. A checked mutant that writes an otherwise unlisted mapping slot
+proves why the former slot projection was incomplete. See
+[differential-testing.md](differential-testing.md) for execution checks and
+[semantic-tests-coverage.md](semantic-tests-coverage.md) for the separate
+acceptance census.
 
-Dynamic scalar storage arrays reuse this navigation with the current length
-from the root slot and a Keccak-derived data base. `ArrayLengthOperation` reads
-the length. `ArrayPushOperation` returns a captured appended element and
-`ArrayPopOperation` clears the last scalar before shrinking the length. Both
-mutations run in `simple_stmt`, so they introduce no source fuel decrement.
-The pinned profile rejects push at length >= `2^64` with panic `0x41`; indexing
-and length reads keep the full 256-bit range. Zero-argument push preserves dirty
-bytes, while pop clears only the removed scalar's packed bytes.
+## Extension points
 
-Storage structs carry declaration-ID field tables and relative slot/offset
-metadata in `core_program.struct_layouts` and `core_environment.struct_layouts`.
-`FieldNavigation` resolves a field within its struct and adds its relative slot
-to the captured base. Fixed and dynamic arrays of structs use the imported
-whole-slot stride. Struct fields may themselves be structs, mappings or arrays;
-only scalar leaves are read or assigned. The core checker validates field
-ownership, supported types, alignment, field extents and finite inline nesting.
-Elaboration checks the resulting runtime layout metadata before returning it.
+Add a source form through normalized import/validation, ordered elaboration,
+core checking and execution, then test it against the pinned compiler. Extend
+the existing destination and storage interfaces when needed. Keep unsupported
+source and invalid generated core distinguishable. The acceptance census tracks
+which upstream tests prepare; executing upstream semanticTests expectations is
+separate work.
 
-Dynamic keys, mutation of aggregate array elements, memory/calldata references,
-aggregate copying and local storage-reference bindings remain coverage work.
-
-Memory references use object identity and an abstract cell offset; this is not
-an EVM byte address. The sparse heap separates metadata from cells, avoiding a
-mandatory dense array representation. Calldata references capture an offset
-and extent into frame calldata; nested ABI validation/navigation remains to be
-defined. These are candidate representations, not established refinement laws.
-
-`core_procedure` gives ordinary functions and elaborated modifier wrappers the
-same invocation interface. Return bindings are explicit. Fresh invocation scopes
-and explicit argument/return wiring must preserve via-IR repeated-placeholder
-behavior; a body return is caught locally, not at the outer source frame.
-
-`WhileStmt` contains an ordered condition prelude, condition atom and body, so
-effectful conditions rerun every iteration. Break and continue are scoped
-outcomes; future for/do-while normalization must preserve their distinct edges.
-The operator vocabulary is intentionally incomplete. Unsupported source cannot
-be admitted until its lowering and validation rules exist.
-
-### Proposed evaluator signatures (not constants or axioms)
-
-```text
-eval_block     : num -> core_environment -> core_stmt list
-                    -> source_state -> gas_observation list -> source_result
-invoke_source  : num -> core_environment -> ast_id -> runtime_value list
-                    -> source_state -> gas_observation list -> source_result
-navigate       : core_environment -> reference -> navigation_value
-                    -> source_state -> navigation_result
-copy_contents  : core_environment -> sol_type -> sol_type
-                    -> reference -> reference -> source_state -> copy_result
-```
-
-`core_environment` supplies validated declarations and resolved procedures;
-binding types travel in the checking context and on runtime bindings, and
-layout descriptors belong to the stage-3 reference/layout environment.
-Navigation/copy result types must preserve
-state and report panic or invalid input distinctly. They are deliberately not
-invented as total-success operations in this checkpoint.
-
-Finite block traversal should use list recursion without decrementing fuel.
-Potentially unbounded while iteration and recursive procedure invocation use the
-smallest sufficient recursive-depth decrement. Siblings reuse the depth bound;
-copy/navigation helpers use independent termination measures. No step-budget
-counter is threaded through state. Fuel stability is a future proof, not yet a
-claim about an evaluator that does not exist.
-
-The bytecode boundary's concrete context supply is still unresolved. It must be
-added to the evaluator interface in alignment with the intended/final Vyper-HOL
-#98 solution. The schematic signatures above do **not** claim source state alone
-can reconstruct an arbitrary EVM invocation state. They do not introduce a
-replaceable handler or artificial EVM registers into source state.
-
-### State, evidence and frame completion
-
-Source state uses Verifereum account/transient-storage/event types, with source
-scopes, captured targets, addressable heap and meaningful message fields.
-`project_evm_world` projects only accounts, transient storage and current-frame
-logs, failing on an empty context stack. Equality of this projection is a
-necessary observable check, **not** a complete simulation relation.
-
-Gas evidence is separate from world state. The tags reserve distinct gasleft,
-call and creation observations; their exact meanings and oracle-consumption
-rules await the aligned upstream design. Explicit requested gas is retained in
-`bytecode_request`, not replaced by evidence.
-
-`finish_source_frame` demonstrates commit versus restoring the entire initial
-source world on revert/panic. Invalid/fuel outcomes expose no committed world.
-It does not perform ABI encoding, transaction fees, deletion processing or gas
-refund accounting. Its rollback theorem is about this wrapper, not interpreter
-or EVM correspondence.
-
-### Difficult-case walkthroughs
-
-- **Captured storage then pop:** navigation captures an element slot once;
-  bind the local to that reference; subsequent pop changes storage; reading the
-  bound reference does not recheck the old prefix. Dangling cases are
-  profile behavior/undefined-behavior witnesses, not portable guarantees.
-- **Memory alias:** bind two locals to the same heap reference; member writes
-  update the shared cells. Storage-to-memory copying allocates a separate object
-  and uses the copy helper rather than rebinding.
-- **Effectful assignment:** ordered definitions evaluate RHS and capture LHS in
-  the chosen profile schedule; classified writes/copies follow afterward.
-- **Modifier return:** placeholder calls an inner procedure; that invocation
-  catches return and restores its binding scope; wrapper postlude continues.
-  Revert/panic/resources propagate without postlude execution.
-- **Bytecode reentry:** successful nested EVM effects update the shared account
-  storage before later source reads. Concrete EVM-context supply and the source
-  correspondence needed to justify this transition remain a separate obligation.
+Memory/calldata execution, a memory model compatible with inline assembly, and
+aggregate aliasing/copying remain unresolved. Concrete CALL/CREATE experiments
+below do not settle the source external-call context, transaction bookkeeping or
+gas contract. Deployment and exact gas/refund correspondence also remain open.
+Full type safety and whole-language coverage are later obligations.
 
 ## Concrete EVM boundary experiment
 
@@ -277,21 +162,3 @@ witnesses/proofs. The reentry and bookkeeping witnesses are concrete finite
 checks, not universal checkpoint/tail preservation or source simulation theorems. Creation fixtures execute real initcode but do not
 constitute Solidity constructor/deployment semantics.
 
-## Next gates and escalation points
-
-1. Review the candidate representations before extending the core vocabulary.
-2. Resolve concrete context supply and gas evidence against Vyper-HOL #98; do
-   not silently choose a synthetic source-frame EVM context or fixed gas policy.
-3. Define the reference/layout environments and extend core well-formedness
-   to them; establish copy termination without fuel, including recursive-type
-   restrictions.
-4. Implement the minimal evaluator across loops/internal calls/modifier wrappers
-   and prove fuel stability. Only then broaden source feature coverage.
-5. Extend value-transfer/domain-abort coverage and prove the remaining
-   checkpoint/tail/access laws under exact upstream hypotheses. Reentry and
-   seeded-bookkeeping witnesses now exist; source correspondence is still open.
-
-Milestone 1 is a compiled blueprint with schematic evaluator contracts, not a
-complete interpreter interface. Milestone 2 has a working concrete boundary
-experiment, not the final source adapter. Both intentionally stop short of
-settling upstream-dependent architecture on the user's behalf.

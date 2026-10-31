@@ -26,7 +26,7 @@
  *)
 Theory solidityEvaluator
 Ancestors
-  solidityState solidityScalar vfmCompute keccak
+  solidityStorage
 Libs
   cv_transLib wordsLib intLib
 
@@ -130,10 +130,6 @@ Definition conversion_source_type_def:
     | NONE => NONE)
 End
 
-Datatype:
-  value_outcome = ValueOk runtime_value | ValueAbrupt source_completion
-End
-
 Definition scalar_outcome_value_def:
   scalar_outcome_value (ScalarOk s) = ValueOk (ScalarValue s) ∧
   scalar_outcome_value (ScalarPanic code) = ValueAbrupt (PanicCompletion code) ∧
@@ -141,7 +137,7 @@ Definition scalar_outcome_value_def:
     ValueAbrupt (InvalidCompletion "ill-typed scalar operands")
 End
 
-(* Every operation except a state read and an internal call. *)
+(* Operations over scalar values and tuples, without storage access. *)
 Definition eval_pure_operation_def:
   eval_pure_operation env scopes op =
     case op of
@@ -173,198 +169,25 @@ Definition eval_pure_operation_def:
     | _ => ValueAbrupt (InvalidCompletion "unsupported operation")
 End
 
-(* Storage *)
-
-(* A value as the number held in its b storage bytes: integers in two's
- * complement, fixed bytes big-endian.
- *)
-Definition stored_number_def:
-  stored_number b s =
-    case s of
-      BoolValue v => SOME (if v then 1 else 0)
-    | IntegerValue i => SOME (Num (wrap_integer F (8 * b) i))
-    | AddressValue a => SOME (w2n a)
-    | BytesValue bs => SOME (num_of_be_bytes bs)
-    | _ => NONE
-End
-
-(* The value of type ty held as the number n < 256 ** storage_bytes ty. *)
-Definition stored_value_def:
-  stored_value ty (n : num) =
-    case ty of
-      BoolT => SOME (BoolValue (n ≠ 0))
-    | UintT _ => SOME (IntegerValue (&n))
-    | IntT w => SOME (IntegerValue (wrap_integer T w (&n)))
-    | AddressT _ => SOME (AddressValue (n2w n))
-    | FixedBytesT k => SOME (BytesValue (num_to_bytes k n))
-    | _ => NONE
-End
-
-(* The bytes of a value of type ty at a byte offset from the low-order end of
- * a slot of an account. Reading keeps only those bytes, as the compiler's
- * storage cleanup does; writing replaces only them.
- *)
-Definition read_storage_def:
-  read_storage accounts addr slot offset ty =
-    case storage_bytes ty of
-      SOME b =>
-        stored_value ty
-          ((w2n (lookup_storage slot (lookup_account addr accounts).storage)
-            DIV 2 ** (8 * offset)) MOD 2 ** (8 * b))
-    | NONE => NONE
-End
-
-Definition write_storage_def:
-  write_storage accounts addr slot offset ty s =
-    case storage_bytes ty of
-      NONE => NONE
-    | SOME b =>
-        case stored_number b s of
-          NONE => NONE
-        | SOME v =>
-            let account = lookup_account addr accounts in
-            let w = w2n (lookup_storage slot account.storage) in
-            let lo = 2 ** (8 * offset) in
-            let hi = 2 ** (8 * (offset + b)) in
-            let w' = w DIV hi * hi + v MOD 2 ** (8 * b) * lo + w MOD lo in
-            SOME (update_account addr
-                    (account with storage :=
-                       update_storage slot (n2w w') account.storage)
-                    accounts)
-End
-
-Definition read_state_variable_def:
-  read_state_variable env (st : source_state) x =
-    case lookup_state_variable env x of
-      SOME v =>
-        read_storage st.world.accounts st.frame.self_address v.state_slot
-          v.state_offset v.state_type
-    | NONE => NONE
-End
-
-(* A state variable's location in the executing account. A value type needs
- * no layout for navigation; its layout id names the declaration.
- *)
-Definition state_target_def:
-  state_target env (st : source_state) x =
-    case lookup_state_variable env x of
-      SOME v =>
-        SOME (ValueTarget
-                (StorageReference PersistentStorage st.frame.self_address
-                   v.state_slot v.state_offset v.state_type
-                   (LayoutId (ast_key x))))
-    | NONE => NONE
-End
-
-(* Solidity mapping keys occupy one 32-byte word: integers are extended to
- * 256 bits, addresses and booleans are zero padded, bytesN are right padded.
- *)
-Definition mapping_key_bytes_def:
-  mapping_key_bytes key s =
-    if ¬elementary_storage_type_ok key ∨ ¬elementary_scalar_has_type key s then NONE
-    else case s of
-      BytesValue bs => SOME (bs ++ REPLICATE (32 - LENGTH bs) 0w)
-    | _ => OPTION_MAP (num_to_bytes 32) (stored_number 32 s)
-End
-
-Definition mapping_slot_def:
-  mapping_slot key_bytes (slot : bytes32) : bytes32 =
-    word_of_bytes_be (Keccak_256_w64 (key_bytes ++ num_to_bytes 32 (w2n slot)))
-End
-
-(* One new index from a captured fixed-array reference. The caller has already
- * evaluated the index; slot arithmetic wraps at the EVM word width. *)
-Definition fixed_array_element_def:
-  fixed_array_element env addr slot element length layout (i : int) =
-    if i < 0 ∨ &length ≤ i then ValueAbrupt (PanicCompletion 50) else
-    case storage_bytes element of
-      SOME b =>
-        if b = 0 ∨ 32 < b then
-          ValueAbrupt (InvalidCompletion "bad array element width")
-        else
-          let per_slot = 32 DIV b in
-          ValueOk (ReferenceValue
-            (StorageReference PersistentStorage addr
-              (n2w (w2n slot + Num i DIV per_slot))
-              (b * (Num i MOD per_slot)) element layout))
-    | NONE =>
-        case fixed_storage_slots env element of
-          SOME slots =>
-            ValueOk (ReferenceValue
-              (StorageReference PersistentStorage addr
-                (n2w (w2n slot + Num i * slots)) 0 element layout))
-        | NONE => ValueAbrupt (InvalidCompletion "bad array element type")
-End
-
-(* Navigation consumes already evaluated atoms and returns a concrete location.
- * A nested mapping starts at the preceding mapping's hashed slot.
- *)
-Definition navigate_storage_def:
-  navigate_storage env accounts r s =
-    case r of
-      StorageReference PersistentStorage addr slot 0 (MappingT key value) layout =>
-        (case mapping_key_bytes key s of
-           SOME bs =>
-             ValueOk (ReferenceValue
-               (StorageReference PersistentStorage addr (mapping_slot bs slot)
-                  0 value layout))
-         | NONE => ValueAbrupt (InvalidCompletion "bad mapping key"))
-    | StorageReference PersistentStorage addr slot 0
-        (ArrayT element (SOME length)) layout =>
-        (case s of
-           IntegerValue i => fixed_array_element env addr slot element length layout i
-         | _ => ValueAbrupt (InvalidCompletion "bad array index"))
-    | StorageReference PersistentStorage addr slot 0 (ArrayT element NONE) layout =>
-        (case s of
-           IntegerValue i =>
-             fixed_array_element env addr (mapping_slot [] slot) element
-               (w2n (lookup_storage slot (lookup_account addr accounts).storage)) layout i
-         | _ => ValueAbrupt (InvalidCompletion "bad array index"))
-    | _ => ValueAbrupt (InvalidCompletion "unsupported storage navigation")
-End
-
 (* Pure operations; calls and array mutations are handled by statements. *)
 Definition eval_operation_def:
   eval_operation env (st : source_state) op =
     case op of
-      ReadStateOperation x =>
-        (case read_state_variable env st x of
-           SOME s => ValueOk (ScalarValue s)
-         | NONE => ValueAbrupt (InvalidCompletion "bad state read"))
-    | StateReferenceOperation x =>
-        (case state_target env st x of
-           SOME (ValueTarget r) => ValueOk (ReferenceValue r)
+      StateReferenceOperation x =>
+        (case state_reference env st.frame.self_address x of
+           SOME r => ValueOk (ReferenceValue r)
          | _ => ValueAbrupt (InvalidCompletion "bad state reference"))
     | ReadOperation ty a =>
         (case eval_atom st.scopes a of
-           SOME (ReferenceValue
-             (StorageReference PersistentStorage addr slot offset rty _)) =>
-               if rty ≠ ty then ValueAbrupt (InvalidCompletion "bad read type")
-               else (case read_storage st.world.accounts addr slot offset ty of
-                       SOME s => ValueOk (ScalarValue s)
-                     | NONE => ValueAbrupt (InvalidCompletion "bad storage read"))
+           SOME (ReferenceValue r) => read_storage_reference st.world.accounts ty r
          | _ => ValueAbrupt (InvalidCompletion "bad storage reference"))
     | ArrayLengthOperation a =>
         (case eval_atom st.scopes a of
-           SOME (ReferenceValue
-             (StorageReference PersistentStorage addr slot 0 (ArrayT _ NONE) _)) =>
-               ValueOk (ScalarValue (IntegerValue
-                 (&(w2n (lookup_storage slot
-                    (lookup_account addr st.world.accounts).storage)))))
+           SOME (ReferenceValue r) => storage_array_length st.world.accounts r
          | _ => ValueAbrupt (InvalidCompletion "bad dynamic array reference"))
     | NavigateOperation ty root_expr (FieldNavigation member_id) =>
         (case eval_atom st.scopes root_expr of
-           SOME (ReferenceValue
-             (StorageReference PersistentStorage addr slot 0 (StructT id) layout)) =>
-               (case lookup_struct_layout env id of
-                  SOME s =>
-                    (case ALOOKUP (MAP (λv. (v.state_id, v)) s.struct_fields) member_id of
-                       SOME v =>
-                         ValueOk (ReferenceValue
-                           (StorageReference PersistentStorage addr
-                             (slot + v.state_slot) v.state_offset v.state_type layout))
-                     | NONE => ValueAbrupt (InvalidCompletion "unknown struct field"))
-                | NONE => ValueAbrupt (InvalidCompletion "missing struct layout"))
+           SOME (ReferenceValue r) => navigate_storage_field env r member_id
          | _ => ValueAbrupt (InvalidCompletion "bad struct reference"))
     | NavigateOperation ty root_expr (IndexNavigation index) =>
         (case (eval_atom st.scopes root_expr, eval_atom st.scopes index) of
@@ -563,13 +386,6 @@ Definition simple_stmt_def:
              normal_result
                (st with targets := set_target t (ValueTarget r) st.targets) gas
          | _ => abrupt_result (InvalidCompletion "bad captured reference") st gas)
-    | CaptureStateStmt t x =>
-        (case state_target env st x of
-           SOME target =>
-             normal_result
-               (st with targets := set_target t target st.targets) gas
-         | NONE =>
-             abrupt_result (InvalidCompletion "unknown state variable") st gas)
     | WriteScalarStmt t ty a =>
         (case write_target t a st of
            SOME st' => normal_result st' gas
