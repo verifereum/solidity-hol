@@ -650,7 +650,7 @@ val op_defs = [uint_add_def, uint_sub_def, uint_mul_def, uint_div_def, uint_mod_
 val eval_simps =
   [ast_key_def, entry_scope_def, bind_parameters_def, bind_defaults_def,
    default_scalar_def, default_elementary_def, single_binding_def,
-   enter_procedure_def, eval_pure_operation_def, eval_atom_def, eval_atoms_def,
+   enter_procedure_def, eval_operation_def, eval_pure_operation_def, eval_atom_def, eval_atoms_def,
    lookup_binding_def, finite_mapTheory.FLOOKUP_UPDATE,
    finite_mapTheory.FLOOKUP_FUNION, scalar_values_def,
    conversion_source_type_def, scalar_outcome_value_def, loop_after_body_def,
