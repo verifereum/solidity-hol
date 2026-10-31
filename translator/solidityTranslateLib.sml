@@ -1,4 +1,4 @@
-(* PROTOTYPE core-to-HOL translator; see solidityTranslateLib.sig.
+(* Core-to-HOL translator; see solidityTranslateLib.sig.
  *
  * Generation: symbolic execution of a procedure body over a map from ids to
  * shallow values. Temporaries, capture targets and copies only rename terms;
@@ -655,7 +655,7 @@ val eval_simps =
    finite_mapTheory.FLOOKUP_FUNION, scalar_values_def,
    conversion_source_type_def, scalar_outcome_value_def, loop_after_body_def,
    uint_add_op, uint_sub_op, uint_mul_op, uint_div_op, uint_mod_op,
-   uint_less_op, uint_equal_op, bool_not_op, uint_copy_conversion,
+   uint_less_op, uint_equal_op, bool_equal_op, bool_not_op, uint_copy_conversion,
    bool_copy_conversion, define_binding_def, bind_local_def, write_target_def,
    set_target_def, update_binding_set_binding, set_binding_def,
    lookup_set_binding, set_bindings_def, branch_of_def, push_scope_def,
@@ -663,7 +663,7 @@ val eval_simps =
    procedure_completion_def, read_returns_def, restore_caller_def,
    result_completion_def, result_outcome_def, loop_completion_def,
    uint_value_def, bool_value_def, valid_int_width_def, simple_stmt_def,
-   source_state_component_equality, eval_block_cons, result_literal_eqs,
+   source_state_component_equality, eval_block_cons, result_literal_eqs, listTheory.oEL_def,
    uint_div_range, uint_mod_range, uint_mod_divisor_range] @
   List.filter (fn th => let val (h, args) = strip_comb (lhs (concl (SPEC_ALL th))) in
                           same_const h eval_stmt_tm orelse
@@ -676,10 +676,27 @@ fun is_call heads t =
     length args = length (fst (strip_fun (type_of h)))
   end handle HOL_ERR _ => false
 
-(* Instances of facts ∀xs. ... f xs ... at the calls of f in the goal *)
+(* Instances of facts ∀xs. ... f xs ... at the calls of f in the goal. A
+   variable the call does not fix, such as an earlier call's result in an
+   induction hypothesis, is fixed by matching the antecedents against the
+   assumptions. *)
 fun fact_instances heads facts (asl, w) =
   let
     val calls = op_mk_set aconv (List.concat (map (find_terms (is_call heads)) (w :: asl)))
+    fun fixed s v = exists (fn {redex, ...} => aconv redex v) s
+    fun fill rest (c, s) =
+      let
+        val c' = subst s c
+        fun matches a =
+          let val (s', _) = match_term c' a in
+            if List.all (fn {redex, ...} => exists (aconv redex) rest) s'
+            then SOME s' else NONE
+          end handle HOL_ERR _ => NONE
+      in
+        if exists (fn v => free_in v c') rest
+        then case List.mapPartial matches asl of s' :: _ => s @ s' | [] => s
+        else s
+      end
     fun inst th =
       let
         val (vs, body) = strip_forall (concl th)
@@ -687,24 +704,42 @@ fun fact_instances heads facts (asl, w) =
         fun at c =
           let val (s, _) = match_term pat c in
             if List.all (fn {redex, ...} => exists (aconv redex) vs) s
-            then SOME (INST s (SPEC_ALL th)) else NONE
+            then
+              let
+                val th1 = INST s (SPEC_ALL th)
+                val rest = List.filter (not o fixed s) vs
+                val ants = List.concat (map strip_conj (fst (strip_imp (concl th1))))
+              in SOME (INST (foldl (fill rest) [] ants) th1) end
+            else NONE
           end handle HOL_ERR _ => NONE
       in List.mapPartial at calls end
       handle HOL_ERR _ => []
   in List.concat (map inst facts) end
 
-(* Use the facts at their instances whose antecedents hold here *)
-fun use_facts_tac heads facts (g as (asl, _)) =
+(* Use the facts at their instances whose antecedents hold here, until no
+   new instance holds: a call's arguments can be in range only by the facts
+   about an earlier call *)
+fun use_facts_tac heads facts =
   let
-    fun discharge th =
+    fun discharge asl th =
       let val th1 = REWRITE_RULE [AND_IMP_INTRO] th
           val (a, _) = dest_imp (concl th1)
-          val pf = TAC_PROOF ((asl, a), asm_simp_tac (srw_ss() ++ numSimps.ARITH_ss)
-                                          (sol_bind_def :: op_defs))
-      in SOME (MP th1 pf) end
+          (* gvs, not asm_simp_tac: the assumptions' 2 ** n must be
+             evaluated like the goal's for arithmetic to relate them *)
+          val pf = TAC_PROOF ((asl, a), gvs (sol_bind_def :: op_defs))
+      in SOME (th, MP th1 pf) end
       handle HOL_ERR _ => NONE
-    val ths = List.mapPartial discharge (fact_instances heads facts g)
-  in MAP_EVERY strip_assume_tac ths g end
+    fun use used (g as (asl, _)) =
+      let
+        val new = List.filter (fn th => not (exists (aconv (concl th)) used))
+                              (fact_instances heads facts g)
+        val ths = List.mapPartial (discharge asl) new
+      in
+        if null ths then ALL_TAC g
+        else (MAP_EVERY (strip_assume_tac o snd) ths >>
+              use (map (concl o fst) ths @ used)) g
+      end
+  in use [] end
 
 fun uncurry_tac (g as (_, w)) =
   let val t = find_term (fn t => is_comb t andalso pairSyntax.is_uncurry (rator t)
@@ -712,16 +747,36 @@ fun uncurry_tac (g as (_, w)) =
   in (FULL_STRUCT_CASES_TAC (ISPEC (rand t) pairTheory.pair_CASES) >>
       simp_tac (srw_ss()) []) g end
 
-(* A case split along the shallow definition's control flow *)
-fun split_tac heads facts =
+(* gvs turns f c = Returns v, for a call f c with constant arguments, into
+   Returns v = f c, which no longer rewrites the call; turn such facts back
+   and rewrite with them *)
+fun flipped a =
+  is_eq a andalso null (free_vars (rhs a)) andalso not (null (free_vars (lhs a)))
+  andalso mem (head_name (lhs a)) ["Returns", "Reverts", "Panics"]
+
+fun unflip_tac simps (g as (asl, _)) =
+  (if exists flipped asl
+   then rpt (first_x_assum (fn th =>
+               if flipped (concl th) then assume_tac (GSYM th) else NO_TAC)) >>
+        asm_simp_tac (srw_ss()) simps
+   else ALL_TAC) g
+
+fun gvs_tac simps = gvs simps >> unflip_tac simps
+
+(* A case split along the shallow definition's control flow. The induction
+   hypotheses are about the function's own parameters, so they are also
+   used before gvs eliminates a parameter together with the branch
+   condition that discharges them. *)
+fun split_tac heads ihs facts =
   simp_tac (srw_ss()) [sol_bind_def] >>
   rpt (BasicProvers.TOP_CASE_TAC ORELSE IF_CASES_TAC ORELSE uncurry_tac) >>
-  gvs (AllCaseEqs() :: op_defs) >>
-  use_facts_tac heads facts
+  use_facts_tac heads ihs >>
+  gvs_tac (AllCaseEqs() :: op_defs) >>
+  use_facts_tac heads (ihs @ facts)
 
 fun ranges_tac (g as (_, w)) =
   (if is_conj w then
-     conj_tac >- (rpt strip_tac >> res_tac >> gvs [uint_div_range, uint_mod_range])
+     conj_tac >- (rpt strip_tac >> gvs [] >> res_tac >> gvs [uint_div_range, uint_mod_range])
    else ALL_TAC) g
 
 (* Fuel: the sum of the fuel bounds of the facts in use, and some to spare *)
@@ -781,19 +836,22 @@ fun ext_tac (g as (_, w)) =
 
 fun loop_case_tac simps =
   ranges_tac >> fuel_tac >> rpt strip_tac >> once_rewrite_tac [eval_loop_unfold] >>
-  gvs simps >> loop_step simps >>
+  gvs_tac simps >> loop_step simps >>
   simp[source_state_component_equality] >> rpt strip_tac >>
   rpt (first_x_assum drule >> disch_then SUBST1_TAC) >> ext_tac
 
 fun peel_tac simps (g as (_, w)) =
   (if can (find_term is_eval_loop) w
-   then once_rewrite_tac [eval_loop_unfold] >> gvs simps >> loop_step simps
+   then once_rewrite_tac [eval_loop_unfold] >> gvs_tac simps >> loop_step simps
    else ALL_TAC) g
 
 fun procedure_case_tac simps =
   ranges_tac >> fuel_tac >> rpt strip_tac >> once_rewrite_tac [invoke_source_unfold] >>
-  gvs simps >> peel_tac simps >> rpt (first_x_assum drule >> strip_tac) >> gvs simps >>
-  rpt IF_CASES_TAC >> gvs simps
+  gvs_tac simps >> peel_tac simps >> rpt (first_x_assum drule >> strip_tac) >>
+  gvs_tac simps >>
+  (* what is left: branches, and the result of a call in tail position *)
+  rpt ((IF_CASES_TAC >> gvs_tac simps) ORELSE
+       (BasicProvers.TOP_CASE_TAC >> gvs_tac (AllCaseEqs() :: simps)))
 
 fun intro_tac (g as (_, w)) = (if is_imp w then strip_tac else ALL_TAC) g
 
@@ -802,8 +860,8 @@ fun along_tac def ind heads facts =
   case ind of
     SOME ind =>
       ho_match_mp_tac ind >> rpt gen_tac >> disch_then (fn ih =>
-        intro_tac >> once_rewrite_tac [def] >> split_tac heads (CONJUNCTS ih @ facts))
-  | NONE => rpt gen_tac >> intro_tac >> once_rewrite_tac [def] >> split_tac heads facts
+        intro_tac >> once_rewrite_tac [def] >> split_tac heads (CONJUNCTS ih) facts)
+  | NONE => rpt gen_tac >> intro_tac >> once_rewrite_tac [def] >> split_tac heads [] facts
 
 (* Definitions *)
 
@@ -851,7 +909,7 @@ fun translate {env, lookup, name, id, names, termination, loop} =
                                   loop_case_tac simps)
             val _ = save_thm (fst (dest_var hvar) ^ "_correct", th)
           in [(hvar, c, th)] end
-      | (SOME _, NONE) => raise ERR "translate" "the loop needs a termination tactic"
+      | (SOME _, NONE) => unsupported "loop without a termination tactic"
     val s = map (fn (v, c, _) => v |-> c) helpers
     val (def, c, ind) = define name (Term.subst s eqn) termination
     val goal = procedure_goal ctx env id c pvars ps rs
@@ -863,6 +921,87 @@ fun translate {env, lookup, name, id, names, termination, loop} =
     translated := (id, {callee = {shallow = c, returns = map snd rs},
                         thm = th}) :: !translated;
     th
+  end
+
+(* Units *)
+
+datatype outcome = Proved of thm | Unsupported of string | Failed of string
+type result = {name : string, outcome : outcome, seconds : real}
+
+fun callees proc =
+  map (ast_id o hd o args_of)
+      (find_terms (fn t => head_name t = "InternalCallOperation" andalso
+                           length (args_of t) = 2) proc)
+
+(* Callees before callers; a cycle other than a self-call is left in program
+   order, and its first call of an untranslated procedure is unsupported *)
+fun call_order ids calls =
+  let
+    fun visit (x, (seen, out)) =
+      if mem x seen then (seen, out)
+      else
+        let val (seen, out) =
+              foldl visit (x :: seen, out)
+                    (List.filter (fn y => y <> x andalso mem y ids) (calls x))
+        in (seen, x :: out) end
+  in rev (snd (foldl visit ([], []) ids)) end
+
+fun unsupported_message (HOL_ERR e) =
+      let val m = message_of e in
+        if String.isPrefix "unsupported: " m then SOME m else NONE
+      end
+  | unsupported_message _ = NONE
+
+fun translate_unit {prefix, unit_def, program_def, termination, loops} =
+  let
+    val () = translated := []
+    val env_var = mk_var (prefix ^ "env", type_of “core_program_environment [] p”)
+    val env_def = new_definition (prefix ^ "env_def",
+      mk_eq (env_var, “core_program_environment [] ^(lhs (concl program_def))”))
+    val env = lhs (concl env_def)
+    val lookup = REWRITE_CONV [lookup_procedure_def, env_def,
+                               core_program_environment_def, program_def]
+                 THENC EVAL
+    val unit = lhs (concl unit_def)
+    fun eval tm = rhs (concl ((REWRITE_CONV [unit_def] THENC EVAL) tm))
+    val fns = dest_list (eval “FLAT (MAP (λc. c.contract_functions)
+                                         ^unit.unit_contracts)”)
+    fun info f =
+      let
+        val id = numSyntax.int_of_term (eval “(^f).fn_info.node_id”)
+        val name = stringSyntax.fromHOLstring (eval “(^f).fn_name”)
+        val vars = HOLset.listItems (HOLset.addList (empty_tmset,
+                     find_terms (fn t => type_of t = “:src_variable”) f))
+        fun named v =
+          SOME (numSyntax.int_of_term (eval “(^v).var_info.node_id”),
+                stringSyntax.fromHOLstring (eval “(^v).var_name”))
+          handle HOL_ERR _ => NONE
+      in
+        (id, {name = name,
+              names = List.filter (fn (_, s) => s <> "") (List.mapPartial named vars)})
+      end
+    val infos = map info fns
+    val ids = map fst infos
+    fun calls id =
+      callees (rhs (concl (lookup “lookup_procedure ^env (AstId ^(numSyntax.term_of_int id))”)))
+    fun run id =
+      let
+        val {name, names} = Lib.assoc id infos
+        val timer = Timer.startRealTimer ()
+        val outcome =
+          Proved (translate {env = env, lookup = lookup, name = prefix ^ name, id = id,
+                             names = names,
+                             termination = Option.map snd (Lib.assoc1 name termination),
+                             loop = Option.map snd (Lib.assoc1 name loops)})
+          handle e => case unsupported_message e of
+                         SOME m => Unsupported m
+                       | NONE => Failed (General.exnMessage e)
+      in
+        {name = name, outcome = outcome,
+         seconds = Time.toReal (Timer.checkRealTimer timer)}
+      end
+  in
+    map run (call_order ids calls)
   end
 
 end

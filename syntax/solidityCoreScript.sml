@@ -17,8 +17,9 @@ Datatype:
   storage_backend = PersistentStorage | TransientStorage
 End
 
-(* Captured locations, never source paths to reevaluate. Layout IDs resolve in
- * an imported layout environment; validity is a future environment predicate.
+(* Captured locations, never source paths to reevaluate. The type identifies
+ * the struct layout used by subsequent field navigation; layout_id preserves
+ * the root declaration's identity through navigation.
  *)
 Datatype:
   reference
@@ -104,6 +105,9 @@ Datatype:
   | ReadStateOperation ast_id
   | StateReferenceOperation ast_id
   | NavigateOperation sol_type core_atom navigation
+  | ArrayLengthOperation core_atom
+  | ArrayPushOperation core_atom (core_atom option)
+  | ArrayPopOperation core_atom
   | InternalCallOperation ast_id (core_atom list)
   | ExternalCallOperation external_kind (core_atom list)
 End
@@ -130,6 +134,7 @@ Datatype:
   | BreakStmt
   | ContinueStmt
   | RevertStmt core_atom
+  | PanicStmt num
 End
 
 Datatype:
@@ -153,10 +158,20 @@ Datatype:
   |>
 End
 
+(* A struct's fields use declaration IDs and relative storage slots. *)
+Datatype:
+  core_struct_layout = <|
+    struct_id : ast_id;
+    struct_fields : core_state_variable list;
+    struct_slots : num
+  |>
+End
+
 Datatype:
   core_program = <|
     procedures : core_procedure list;
     state_variables : core_state_variable list;
+    struct_layouts : core_struct_layout list;
     entry_procedure : ast_id
   |>
 End

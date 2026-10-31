@@ -5,20 +5,20 @@
  * closed: an unknown nodeType, a missing required field, or a feature outside
  * the subset (public, constant, immutable or initialised state variables,
  * modifiers, inheritance, named or try calls, literal subdenominations,
- * inline arrays, type names other than elementary types and mappings, ...)
- * raises ImportError. Every node keeps its compiler id and source range;
+ * inline arrays, type names other than elementary types, arrays and mappings, ...)
+ * raises ImportError. Semantic nodes keep their compiler id and source range;
  * declarations are referred to by id, and names are diagnostic only. Type
  * annotations are kept as the compiler's encoded typeIdentifier and decoded
  * here, never from the display typeString.
  *
- * Types are normalized from elementary and mapping type-name nodes; value
+ * Types are normalized from elementary, array and mapping type-name nodes; value
  * types are decoded from typeIdentifiers. Both yield only valid shapes (normalize_type_name_valid,
  * decode_type_identifier_valid). Literals keep their exact rational type.
  *
  * valid_src_unit then establishes, for an imported unit:
  *  - all node ids are distinct;
  *  - every parameter, return, local and state variable has a normalized
- *    elementary or admitted mapping type, the default data location, and a
+ *    elementary, array or mapping type, the default data location, and a
  *    type identifier agreeing with that type, and the enclosing function, block, for statement or
  *    contract as its scope;
  *  - the contract's storage layout lists its state variables in declaration
@@ -63,7 +63,10 @@ End
 (* ElementaryTypeName: name and, for addresses, stateMutability. *)
 Datatype:
   src_type_name = SrcElementaryTypeName node_info string (string option)
-                | SrcMappingTypeName node_info src_type_name src_type_name
+                | SrcArrayTypeName node_info src_type_name num
+                | SrcDynamicArrayTypeName node_info src_type_name
+  | SrcMappingTypeName node_info src_type_name src_type_name
+  | SrcStructTypeName node_info num string
 End
 
 Datatype:
@@ -88,8 +91,15 @@ End
  * FunctionCall (kind typeConversion): target type name, argument.
  *)
 Datatype:
+  src_builtin = RequireBuiltin | AssertBuiltin | RevertBuiltin
+End
+
+Datatype:
   src_expr
   = SrcIdentifier node_info string num string
+  | SrcArrayLength node_info src_expr string
+  | SrcMemberAccess node_info src_expr num string
+  | SrcArrayMember node_info string src_expr string
   | SrcLiteral node_info string string string
   | SrcUnaryOperation node_info string bool src_expr string
   | SrcBinaryOperation node_info string src_expr src_expr string string
@@ -97,6 +107,8 @@ Datatype:
   | SrcIndexAccess node_info src_expr src_expr string
   | SrcTupleExpression node_info (src_expr option list) string
   | SrcFunctionCall node_info src_expr (src_expr list) string
+  | SrcBuiltinCall node_info node_info src_builtin (src_expr option)
+      (src_expr option) string
   | SrcTypeConversion node_info src_type_name src_expr string
 End
 
@@ -151,12 +163,22 @@ Datatype:
 End
 
 Datatype:
+  src_struct = <|
+    struct_info : node_info;
+    struct_scope : num;
+    struct_members : src_variable list;
+    struct_layout : (num # src_storage_entry list) option
+  |>
+End
+
+Datatype:
   src_contract = <|
     contract_info : node_info;
     contract_name : string;
     contract_scope : num;
     contract_state_variables : src_variable list;
     contract_storage : src_storage_entry list;
+    contract_structs : src_struct list;
     contract_functions : src_function list
   |>
 End
@@ -203,6 +225,17 @@ Definition normalize_type_name_def:
         else NONE
     | SOME ty => if mutability = NONE then SOME ty else NONE
     | NONE => NONE) ∧
+  (normalize_type_name (SrcArrayTypeName _ element n) =
+    case normalize_type_name element of
+      SOME ty => if 0 < n ∧ n < 2 ** 256 then SOME (ArrayT ty (SOME n))
+                 else NONE
+    | NONE => NONE) ∧
+  (normalize_type_name (SrcStructTypeName _ id tid) =
+    if isPREFIX "t_struct$_" tid ∧
+       isPREFIX (REVERSE ("_$" ++ toString id ++ "_storage_ptr")) (REVERSE tid)
+    then SOME (StructT (AstId id)) else NONE) ∧
+  (normalize_type_name (SrcDynamicArrayTypeName _ element) =
+    OPTION_MAP (λty. ArrayT ty NONE) (normalize_type_name element)) ∧
   (normalize_type_name (SrcMappingTypeName _ key value) =
     case (normalize_type_name key, normalize_type_name value) of
       (SOME k, SOME v) =>
@@ -324,7 +357,7 @@ Proof
   Induct_on ‘tn’ >> rw[normalize_type_name_def, AllCaseEqs()] >>
   imp_res_tac elementary_type_valid >>
   imp_res_tac elementary_type_outer_free >>
-  gvs[valid_type_shape_def, outer_location_free_def] >>
+  gvs[valid_type_shape_def, outer_location_free_def, valid_array_length_def] >>
   metis_tac[elementary_mapping_key]
 QED
 
@@ -383,6 +416,13 @@ Definition storage_type_identifier_def:
   (storage_type_identifier (AddressT NonpayableAddress) = "t_address") ∧
   (storage_type_identifier (AddressT PayableAddress) = "t_address_payable") ∧
   (storage_type_identifier (FixedBytesT n) = "t_bytes" ++ toString n) ∧
+  (storage_type_identifier (ArrayT element (SOME n)) =
+    "t_array$_" ++ storage_type_identifier element ++ "_$" ++ toString n ++
+    "_storage") ∧
+  (storage_type_identifier (StructT (AstId id)) =
+    "t_struct$__$" ++ toString id ++ "_storage") ∧
+  (storage_type_identifier (ArrayT element NONE) =
+    "t_array$_" ++ storage_type_identifier element ++ "_$dyn_storage") ∧
   (storage_type_identifier (MappingT key value) =
     "t_mapping$_" ++ storage_type_identifier key ++ "_$_" ++
     storage_type_identifier value ++ "_$") ∧
@@ -391,14 +431,42 @@ End
 
 (* storageLayout uses parentheses and commas where AST identifiers use $_. *)
 Definition storage_layout_identifier_def:
+  (storage_layout_identifier (ArrayT element (SOME n)) =
+    "t_array(" ++ storage_layout_identifier element ++ ")" ++ toString n ++
+    "_storage") ∧
+  (storage_layout_identifier (ArrayT element NONE) =
+    "t_array(" ++ storage_layout_identifier element ++ ")dyn_storage") ∧
   (storage_layout_identifier (MappingT key value) =
     "t_mapping(" ++ storage_layout_identifier key ++ "," ++
     storage_layout_identifier value ++ ")") ∧
+  (storage_layout_identifier (StructT (AstId id)) =
+    "t_struct()" ++ toString id ++ "_storage") ∧
   (storage_layout_identifier ty = storage_type_identifier ty)
 End
 
+(* Struct names are display metadata; declaration IDs determine identity.
+ * Keep every other character, including location/pointer suffixes. *)
+Definition canonical_storage_identifier_def:
+  (canonical_storage_identifier (mode : num) (skip : num) [] = []) ∧
+  (canonical_storage_identifier mode skip (c :: cs) =
+    if skip ≠ 0 then canonical_storage_identifier mode (skip - 1) cs
+    else if mode = 1 then
+      if c = #"_" ∧ isPREFIX "$" cs ∧ ¬isPREFIX "$$" cs then
+        "_$" ++ canonical_storage_identifier 0 1 cs
+      else canonical_storage_identifier 1 0 cs
+    else if mode = 2 then
+      if c = #")" then ")" ++ canonical_storage_identifier 0 0 cs
+      else canonical_storage_identifier 2 0 cs
+    else if isPREFIX "t_struct$_" (c :: cs) then
+      "t_struct$_" ++ canonical_storage_identifier 1 9 cs
+    else if isPREFIX "t_struct(" (c :: cs) then
+      "t_struct(" ++ canonical_storage_identifier 2 8 cs
+    else c :: canonical_storage_identifier 0 0 cs)
+End
+
 Definition source_type_matches_def:
-  source_type_matches ty tid ⇔ tid = storage_type_identifier ty
+  source_type_matches ty tid ⇔
+    canonical_storage_identifier 0 0 tid = storage_type_identifier ty
 End
 
 (* A parameter, return or local variable: an elementary value type in the
@@ -414,6 +482,20 @@ Definition variable_type_def:
     | NONE => NONE
 End
 
+(* Struct fields use storage pointer identifiers for arrays and structs,
+ * unlike state declarations. Mappings retain their ordinary identifier. *)
+Definition field_variable_type_def:
+  field_variable_type (v : src_variable) =
+    case normalize_type_name v.var_type_name of
+      SOME ty =>
+        let suffix = case ty of ArrayT _ _ => "_ptr" | StructT _ => "_ptr" | _ => "" in
+        if v.var_location = "default" ∧
+           canonical_storage_identifier 0 0 v.var_type_id =
+             storage_type_identifier ty ++ suffix
+        then SOME ty else NONE
+    | NONE => NONE
+End
+
 (* The type of a call to a function with these return types. *)
 Definition call_value_type_def:
   (call_value_type [ty] = SrcType ty) ∧
@@ -424,6 +506,11 @@ End
 
 Definition type_name_ids_def:
   (type_name_ids (SrcElementaryTypeName info _ _) = [info.node_id]) ∧
+  (type_name_ids (SrcArrayTypeName info element _) =
+    info.node_id :: type_name_ids element) ∧
+  (type_name_ids (SrcStructTypeName info _ _) = [info.node_id]) ∧
+  (type_name_ids (SrcDynamicArrayTypeName info element) =
+    info.node_id :: type_name_ids element) ∧
   (type_name_ids (SrcMappingTypeName info key value) =
     info.node_id :: type_name_ids key ++ type_name_ids value)
 End
@@ -435,6 +522,12 @@ End
 
 Definition expr_ids_def:
   (expr_ids (SrcIdentifier info _ _ _) = [info.node_id]) ∧
+  (expr_ids (SrcMemberAccess info root_expr _ _) =
+    info.node_id :: expr_ids root_expr) ∧
+  (expr_ids (SrcArrayMember info _ root_expr _) =
+    info.node_id :: expr_ids root_expr) ∧
+  (expr_ids (SrcArrayLength info root_expr _) =
+    info.node_id :: expr_ids root_expr) ∧
   (expr_ids (SrcLiteral info _ _ _) = [info.node_id]) ∧
   (expr_ids (SrcUnaryOperation info _ _ e _) = info.node_id :: expr_ids e) ∧
   (expr_ids (SrcBinaryOperation info _ l r _ _) =
@@ -447,6 +540,10 @@ Definition expr_ids_def:
     info.node_id :: component_ids cs) ∧
   (expr_ids (SrcFunctionCall info f args _) =
     info.node_id :: expr_ids f ++ exprs_ids args) ∧
+  (expr_ids (SrcBuiltinCall info callee _ condition message _) =
+    [info.node_id; callee.node_id] ++
+    (case condition of NONE => [] | SOME c => expr_ids c) ++
+    (case message of NONE => [] | SOME m => expr_ids m)) ∧
   (expr_ids (SrcTypeConversion info tn e _) =
     info.node_id :: type_name_ids tn ++ expr_ids e) ∧
   (component_ids [] = []) ∧
@@ -501,6 +598,8 @@ End
 Definition contract_ids_def:
   contract_ids (c : src_contract) =
     c.contract_info.node_id ::
+    FLAT (MAP (λs. s.struct_info.node_id ::
+      FLAT (MAP variable_ids s.struct_members)) c.contract_structs) ++
     FLAT (MAP variable_ids c.contract_state_variables) ++
     FLAT (MAP function_ids c.contract_functions)
 End
@@ -538,12 +637,44 @@ End
 Datatype:
   import_env = <|
     functions : (num # src_function) list;
+    structs : src_struct list;
     variables : (num # sol_type) list;
     state : (num # sol_type) list;
     scope : num;
     returns_id : num;
     in_loop : bool
   |>
+End
+
+Definition source_struct_field_def:
+  source_struct_field structs id field =
+    case ALOOKUP (MAP (λs. (s.struct_info.node_id, s.struct_members)) structs) id of
+      SOME fields =>
+        (case ALOOKUP (MAP (λv. (v.var_info.node_id, v)) fields) field of
+           SOME v => field_variable_type v
+         | NONE => NONE)
+    | NONE => NONE
+End
+
+(* Literal bytes are imported from solc's hexValue, including UTF-8 and NULs.
+ * Dynamic strings are a later runtime increment. *)
+Definition literal_message_def:
+  (literal_message (SrcLiteral _ kind value tid) =
+    if (kind = "string" ∨ kind = "unicodeString" ∨ kind = "hexString") ∧
+       isPREFIX "t_stringliteral_" tid
+    then SOME value else NONE) ∧
+  (literal_message _ = NONE)
+End
+
+Definition builtin_shape_def:
+  (builtin_shape AssertBuiltin condition message ⇔
+    IS_SOME condition ∧ message = NONE) ∧
+  (builtin_shape RequireBuiltin condition message ⇔
+    IS_SOME condition ∧
+    (case message of NONE => T | SOME m => IS_SOME (literal_message m))) ∧
+  (builtin_shape RevertBuiltin condition message ⇔
+    condition = NONE ∧
+    (case message of NONE => T | SOME m => IS_SOME (literal_message m)))
 End
 
 (* The decoded type of a checked expression. *)
@@ -554,11 +685,31 @@ Definition check_expr_def:
         if source_type_matches ty tid then SOME (SrcType ty)
         else NONE
     | NONE => NONE) ∧
+  (check_expr env (SrcMemberAccess _ root_expr field tid) =
+    case check_expr env root_expr of
+      SOME (SrcType (StructT (AstId id))) =>
+        (case source_struct_field env.structs id field of
+           SOME ty => if source_type_matches ty tid then SOME (SrcType ty) else NONE
+         | NONE => NONE)
+    | _ => NONE) ∧
   (check_expr env (SrcIndexAccess _ root_expr index tid) =
     case (check_expr env root_expr, check_expr env index) of
       (SOME (SrcType (MappingT key value)), SOME _) =>
         if source_type_matches value tid then SOME (SrcType value) else NONE
+    | (SOME (SrcType (ArrayT element _)), SOME index_type) =>
+        if source_type_matches element tid ∧
+           (case index_type of
+              SrcType (UintT _) => T
+            | SrcRational i d => 0 ≤ i ∧ d = 1
+            | _ => F)
+        then SOME (SrcType element) else NONE
     | _ => NONE) ∧
+  (check_expr env (SrcArrayLength _ root_expr tid) =
+    case check_expr env root_expr of
+      SOME (SrcType (ArrayT _ _)) =>
+        if tid = "t_uint256" then SOME (SrcType (UintT 256)) else NONE
+    | _ => NONE) ∧
+  (check_expr env (SrcArrayMember _ _ _ _) = NONE) ∧
   (check_expr env (SrcLiteral _ kind value tid) =
     if kind = "number" then
       case decode_type_identifier tid of
@@ -589,6 +740,17 @@ Definition check_expr_def:
     else NONE) ∧
   (check_expr env (SrcTupleExpression _ cs tid) =
     if check_components env cs then decode_type_identifier tid else NONE) ∧
+  (check_expr env (SrcFunctionCall _ (SrcArrayMember _ member root_expr _) args tid) =
+    case check_expr env root_expr of
+      SOME (SrcType (ArrayT element NONE)) =>
+        if ¬elementary_storage_type_ok element then NONE else
+        if member = "push" ∧ args = [] ∧ source_type_matches element tid then
+          SOME (SrcType element)
+        else if tid = "t_tuple$__$" ∧ check_exprs env args ∧
+                ((member = "push" ∧ LENGTH args = 1) ∨
+                 (member = "pop" ∧ args = []))
+        then SOME (SrcTupleType []) else NONE
+    | _ => NONE) ∧
   (check_expr env (SrcFunctionCall _ (SrcIdentifier _ _ f _) args tid) =
     case ALOOKUP env.functions f of
       SOME callee =>
@@ -602,6 +764,11 @@ Definition check_expr_def:
          | _ => NONE)
     | NONE => NONE) ∧
   (check_expr env (SrcFunctionCall _ _ _ _) = NONE) ∧
+  (check_expr env (SrcBuiltinCall _ _ builtin condition message tid) =
+    if builtin_shape builtin condition message ∧ tid = "t_tuple$__$" ∧
+       (case condition of NONE => T
+        | SOME c => check_expr env c = SOME (SrcType BoolT))
+    then SOME (SrcTupleType []) else NONE) ∧
   (check_expr env (SrcTypeConversion _ tn e tid) =
     case normalize_type_name tn of
       SOME ty =>
@@ -738,7 +905,7 @@ End
  * one is the compiler's check.
  *)
 Definition check_function_def:
-  check_function functions state contract_id (f : src_function) ⇔
+  check_function structs functions state contract_id (f : src_function) ⇔
     f.fn_scope = contract_id ∧
     (f.fn_mutability = "pure" ∨ f.fn_mutability = "view" ∨
      f.fn_mutability = "nonpayable") ∧
@@ -746,7 +913,7 @@ Definition check_function_def:
                      (f.fn_parameters ++ f.fn_returns)), f.fn_body) of
       (SOME variables, SrcBlock info ss) =>
         IS_SOME (check_stmts
-          <| functions := functions; variables := variables;
+          <| functions := functions; structs := structs; variables := variables;
              state := if f.fn_mutability = "pure" then [] else state;
              scope := info.node_id; returns_id := f.fn_returns_id;
              in_loop := F |> ss)
@@ -755,24 +922,38 @@ End
 
 (* The layout has an entry for each state variable, in order. *)
 Definition storage_layout_ok_def:
-  (storage_layout_ok [] [] ⇔ T) ∧
-  (storage_layout_ok ((v : src_variable) :: vs) (e :: es) ⇔
+  (storage_layout_ok fields [] [] ⇔ T) ∧
+  (storage_layout_ok fields ((v : src_variable) :: vs) (e :: es) ⇔
      e.storage_id = v.var_info.node_id ∧
-     (case variable_type v of
-        SOME ty => e.storage_type_id = storage_layout_identifier ty
+     (case (if fields then field_variable_type v else variable_type v) of
+        SOME ty => canonical_storage_identifier 0 0 e.storage_type_id = storage_layout_identifier ty
       | NONE => F) ∧
-     e.storage_slot < 2 ** 256 ∧ storage_layout_ok vs es) ∧
-  (storage_layout_ok _ _ ⇔ F)
+     e.storage_slot < 2 ** 256 ∧ storage_layout_ok fields vs es) ∧
+  (storage_layout_ok _ _ _ ⇔ F)
+End
+
+Definition check_struct_def:
+  check_struct unit_id contract_id (s : src_struct) ⇔
+    (s.struct_scope = contract_id ∨ s.struct_scope = unit_id) ∧
+    s.struct_members ≠ [] ∧
+    EVERY (λv. v.var_scope = s.struct_info.node_id ∧ IS_SOME (field_variable_type v))
+      s.struct_members ∧
+    case s.struct_layout of
+      NONE => T
+    | SOME (bytes, fields) =>
+        0 < bytes ∧ bytes MOD 32 = 0 ∧ bytes DIV 32 < 2 ** 256 ∧
+        storage_layout_ok T s.struct_members fields
 End
 
 Definition check_contract_def:
   check_contract unit_id (c : src_contract) ⇔
     c.contract_scope = unit_id ∧
-    storage_layout_ok c.contract_state_variables c.contract_storage ∧
+    EVERY (check_struct unit_id c.contract_info.node_id) c.contract_structs ∧
+    storage_layout_ok F c.contract_state_variables c.contract_storage ∧
     case all_some (MAP (scoped_variable c.contract_info.node_id)
                      c.contract_state_variables) of
       SOME state =>
-        EVERY (check_function
+        EVERY (check_function c.contract_structs
                  (MAP (λf. (f.fn_info.node_id, f)) c.contract_functions)
                  state c.contract_info.node_id)
           c.contract_functions
@@ -789,7 +970,6 @@ End
  * mutually recursive checkers terminate on the cv size of their syntax.
  *)
 
-val () = cv_auto_trans normalize_type_name_def;
 val () = cv_auto_trans decode_type_identifier_def;
 val () = cv_auto_trans identifier_type_def;
 val () = cv_auto_trans identifier_integer_def;
@@ -803,10 +983,13 @@ Proof
   rw[total_hex_pre_def] >> decide_tac
 QED
 
+val () = cv_auto_trans normalize_type_name_def;
 val () = cv_auto_trans storage_type_identifier_def;
+val () = cv_auto_trans canonical_storage_identifier_def;
 val () = cv_auto_trans source_type_matches_def;
 val () = cv_auto_trans storage_layout_identifier_def;
 val () = cv_auto_trans variable_type_def;
+val () = cv_auto_trans field_variable_type_def;
 val () = cv_auto_trans call_value_type_def;
 val () = cv_auto_trans_rec expr_ids_def (
   WF_REL_TAC ‘measure (λx. case x of
@@ -833,6 +1016,10 @@ Proof
 QED
 
 val () = cv_auto_trans unit_ids_def;
+
+val () = cv_auto_trans source_struct_field_def;
+val () = cv_auto_trans literal_message_def;
+val () = cv_auto_trans builtin_shape_def;
 
 val check_expr_pre_def = cv_auto_trans_pre_rec
   "check_expr_pre check_components_pre check_exprs_pre" check_expr_def (
@@ -880,5 +1067,6 @@ QED
 val () = cv_auto_trans scoped_variable_def;
 val () = cv_auto_trans storage_layout_ok_def;
 val () = cv_auto_trans check_function_def;
+val () = cv_auto_trans check_struct_def;
 val () = cv_auto_trans check_contract_def;
 val () = cv_auto_trans valid_src_unit_def;

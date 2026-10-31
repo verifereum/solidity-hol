@@ -13,7 +13,11 @@ fun holbuild_extra_deps (_ : string list) = ()
 val () = holbuild_extra_deps [
   "../testdata/frontend/expected/pure_core.json",
   "../testdata/differential/expected/storage.json",
-  "../testdata/differential/expected/mappings.json"
+  "../testdata/differential/expected/mappings.json",
+  "../testdata/differential/expected/storage_arrays.json",
+  "../testdata/differential/expected/dynamic_storage_arrays.json",
+  "../testdata/differential/expected/builtins.json",
+  "../testdata/differential/expected/storage_structs.json"
 ]
 
 val fixture = "../testdata/frontend/expected/pure_core.json"
@@ -175,8 +179,8 @@ val () = import_error "inheritance"
   (edit_first "ContractDefinition"
      (set_field "linearizedBaseContracts" (JSON.ARRAY [])) ast)
 
-(* solc refers to built-ins such as require by negative declaration ids; the
- * rejection names the identifier's node.
+(* Builtin references outside call position remain unsupported; the rejection
+ * names the identifier's node.
  *)
 val () =
   (import_source_unit
@@ -434,3 +438,159 @@ Theorem mapping_leaf_metadata_rejected:
 Proof
   CONV_TAC cv_eval
 QED
+
+(* The compiler uses different array encodings in AST types and storageLayout;
+ * changing only the resolved dimension or the indexed leaf must be rejected. *)
+val array_fixture = "../testdata/differential/expected/storage_arrays.json"
+val array_source = "testdata/differential/storage_arrays.sol"
+val array_ast = artifact_part array_fixture ["sources", array_source, "ast"]
+val array_contracts = artifact_part array_fixture ["contracts", array_source]
+
+Definition array_unit_def:
+  array_unit = ^(import_artifact array_fixture array_source)
+End
+val () = cv_auto_trans array_unit_def;
+
+Theorem array_unit_valid:
+  valid_src_unit array_unit
+Proof
+  CONV_TAC cv_eval
+QED
+
+val () = edited_unit_with array_contracts "array_dynamic_dimension_mismatch"
+  (edit_first "ArrayTypeName" (set_field "length" JSON.NULL) array_ast)
+
+Theorem array_dynamic_dimension_metadata_rejected:
+  ¬valid_src_unit array_dynamic_dimension_mismatch
+Proof
+  CONV_TAC cv_eval
+QED
+
+val () = import_error_with array_contracts "malformed resolved array dimension"
+  (edit_first "ArrayTypeName"
+     (fn v => set_field "length"
+       (type_identifier "t_rational_35x_by_1" (JSONUtil.lookupField v "length")) v)
+     array_ast)
+
+val () = edited_unit_with array_contracts "array_dimension_mismatch"
+  (edit_first "ArrayTypeName"
+     (fn v => set_field "length"
+       (type_identifier "t_rational_34_by_1" (JSONUtil.lookupField v "length")) v)
+     array_ast)
+
+Theorem array_dimension_metadata_rejected:
+  ¬valid_src_unit array_dimension_mismatch
+Proof
+  CONV_TAC cv_eval
+QED
+
+val () = edited_unit_with array_contracts "array_leaf_mismatch"
+  (edit_first "IndexAccess" (type_identifier "t_uint16") array_ast)
+
+Theorem array_leaf_metadata_rejected:
+  ¬valid_src_unit array_leaf_mismatch
+Proof
+  CONV_TAC cv_eval
+QED
+
+Definition dynamic_array_unit_def:
+  dynamic_array_unit =
+    ^(import_artifact "../testdata/differential/expected/dynamic_storage_arrays.json"
+                      "testdata/differential/dynamic_storage_arrays.sol")
+End
+val () = cv_auto_trans dynamic_array_unit_def;
+
+Theorem dynamic_array_unit_valid:
+  valid_src_unit dynamic_array_unit
+Proof
+  CONV_TAC cv_eval
+QED
+
+(* Builtin identity is solc's declaration reference; spelling is diagnostic. *)
+val builtins_fixture = "../testdata/differential/expected/builtins.json"
+val builtins_source = "testdata/differential/builtins.sol"
+val builtins_ast = artifact_part builtins_fixture ["sources", builtins_source, "ast"]
+val builtins_contracts = artifact_part builtins_fixture ["contracts", builtins_source]
+
+Definition builtins_unit_def:
+  builtins_unit = ^(import_artifact builtins_fixture builtins_source)
+End
+
+val () = cv_auto_trans builtins_unit_def;
+
+Theorem builtins_unit_valid:
+  valid_src_unit builtins_unit
+Proof
+  CONV_TAC cv_eval
+QED
+
+fun edit_callee f = edit_first "FunctionCall" (fn call =>
+  set_field "expression" (f (JSONUtil.lookupField call "expression")) call)
+
+val () = edited_unit_with builtins_contracts "renamed_builtin"
+  (edit_callee (set_field "name" (JSON.STRING "assert")) builtins_ast)
+
+Theorem renamed_builtin_valid:
+  valid_src_unit renamed_builtin
+Proof
+  CONV_TAC cv_eval
+QED
+
+val () = import_error_with builtins_contracts "unknown builtin declaration"
+  (edit_callee (set_field "referencedDeclaration" (JSON.INT ~999)) builtins_ast)
+
+(* A nonliteral message must not be silently ignored on success. *)
+val () = edited_unit_with builtins_contracts "nonliteral_builtin_message"
+  (edit_first "FunctionCall" (fn call =>
+     set_field "arguments" (JSON.ARRAY
+       [hd (JSONUtil.arrayMap I (JSONUtil.lookupField call "arguments")),
+        set_field "id" (JSON.INT 999999)
+          (hd (JSONUtil.arrayMap I (JSONUtil.lookupField call "arguments")))]) call)
+     builtins_ast)
+
+Theorem nonliteral_builtin_message_rejected:
+  ¬valid_src_unit nonliteral_builtin_message
+Proof
+  CONV_TAC cv_eval
+QED
+
+val struct_fixture = "../testdata/differential/expected/storage_structs.json"
+val struct_source = "testdata/differential/storage_structs.sol"
+val struct_ast = artifact_part struct_fixture ["sources", struct_source, "ast"]
+val struct_contracts = artifact_part struct_fixture ["contracts", struct_source]
+
+Definition struct_unit_def:
+  struct_unit = ^(import_artifact struct_fixture struct_source)
+End
+val () = cv_auto_trans struct_unit_def;
+
+Theorem struct_unit_valid:
+  valid_src_unit struct_unit
+Proof
+  CONV_TAC cv_eval
+QED
+
+val () = edited_unit_with struct_contracts "struct_type_identity_mismatch"
+  (edit_first "UserDefinedTypeName"
+    (set_field "referencedDeclaration" (JSON.INT 999999)) struct_ast)
+
+val () = edited_unit_with struct_contracts "struct_field_identity_mismatch"
+  (edit_first "MemberAccess"
+    (set_field "referencedDeclaration" (JSON.INT 999999)) struct_ast)
+
+val () = edited_unit_with struct_contracts "struct_field_type_mismatch"
+  (edit_first "MemberAccess" (type_identifier "t_uint16") struct_ast)
+
+Theorem struct_identities_checked:
+  ¬valid_src_unit struct_type_identity_mismatch ∧
+  ¬valid_src_unit struct_field_identity_mismatch ∧
+  ¬valid_src_unit struct_field_type_mismatch
+Proof
+  CONV_TAC cv_eval
+QED
+
+val () = import_error_with struct_contracts "missing field identity"
+  (edit_first "MemberAccess" (drop_field "referencedDeclaration") struct_ast)
+
+val () = import_error_with struct_contracts "missing struct type identity"
+  (edit_first "UserDefinedTypeName" (drop_field "referencedDeclaration") struct_ast)

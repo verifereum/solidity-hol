@@ -7,17 +7,16 @@
  * user-defined value types, which are integers and addresses at runtime.
  * Function values are deferred together with indirect calls; contract types
  * are deferred until contract metadata (payability, bases) is in the
- * environment. Typed storage references support mapping navigation and scalar
- * leaf reads/captures. Other navigation, copies and external calls remain
- * rejected until their validation rules exist.
+ * environment. Typed storage references support struct fields, mappings and
+ * arrays, with scalar leaf reads/captures. Aggregate copies and external calls
+ * remain rejected until their validation rules exist.
  *)
 Theory solidityCoreWf
 Ancestors
   solidityCore alist list option
 
-(* Type declarations accompany a core_program rather than living inside it;
- * the elaborator must emit both. Struct fields are recorded for stage 3;
- * recursive-struct restrictions and layout descriptors are not checked yet.
+(* Scalar type declarations accompany the program. Its struct layouts supply
+ * both field declarations and runtime layout metadata to the environment.
  *)
 Datatype:
   core_type_declaration
@@ -30,6 +29,7 @@ Datatype:
   core_environment = <|
     procedures : (ast_id # core_procedure) list;
     state_variables : (ast_id # core_state_variable) list;
+    struct_layouts : (ast_id # core_struct_layout) list;
     type_declarations : (ast_id # core_type_declaration) list
   |>
 End
@@ -38,7 +38,10 @@ Definition core_program_environment_def:
   core_program_environment decls (prog : core_program) = <|
     procedures := MAP (λp. (p.procedure_id, p)) prog.procedures;
     state_variables := MAP (λv. (v.state_id, v)) prog.state_variables;
-    type_declarations := decls
+    struct_layouts := MAP (λs. (s.struct_id, s)) prog.struct_layouts;
+    type_declarations := decls ++ MAP
+      (λs. (s.struct_id, StructDeclaration
+        (MAP (λv. (v.state_id, v.state_type)) s.struct_fields))) prog.struct_layouts
   |>
 End
 
@@ -48,6 +51,10 @@ End
 
 Definition lookup_state_variable_def:
   lookup_state_variable env x = ALOOKUP env.state_variables x
+End
+
+Definition lookup_struct_layout_def:
+  lookup_struct_layout env id = ALOOKUP env.struct_layouts id
 End
 
 Definition lookup_enum_def:
@@ -151,8 +158,8 @@ Definition storage_bytes_def:
     | _ => NONE
 End
 
-(* Stored elementary values and mappings to them, including nested mappings.
- * ReferenceType represents a captured storage location, even at a scalar leaf.
+(* ReferenceType represents a captured storage location, even at a scalar
+ * leaf. Struct declarations resolve through the environment's layout table.
  *)
 Definition elementary_storage_type_ok_def:
   (elementary_storage_type_ok BoolT ⇔ T) ∧
@@ -163,16 +170,43 @@ Definition elementary_storage_type_ok_def:
   (elementary_storage_type_ok _ ⇔ F)
 End
 
+(* Fixed arrays start on a slot boundary, including each nested row. Scalar
+ * elements share slots without straddling a boundary. *)
+Definition fixed_storage_slots_def:
+  fixed_storage_slots env ty =
+    case ty of
+      ArrayT element (SOME n) =>
+        if n = 0 then NONE else
+        (case storage_bytes element of
+           SOME b =>
+             if b = 0 ∨ 32 < b then NONE else
+             let per_slot = 32 DIV b in
+             SOME ((n + per_slot - 1) DIV per_slot)
+         | NONE => OPTION_MAP (λslots. n * slots)
+                     (fixed_storage_slots env element))
+    | ArrayT _ NONE => SOME 1
+    | MappingT _ _ => SOME 1
+    | StructT id => OPTION_MAP (λs. s.struct_slots) (lookup_struct_layout env id)
+    | _ => OPTION_MAP (K 1) (storage_bytes ty)
+Termination
+  WF_REL_TAC ‘measure (sol_type_size o SND)’
+End
+
 Definition storage_type_ok_def:
-  (storage_type_ok (MappingT key value) ⇔
-    elementary_storage_type_ok key ∧ storage_type_ok value) ∧
-  (storage_type_ok ty ⇔ elementary_storage_type_ok ty)
+  (storage_type_ok env (ArrayT element (SOME n)) ⇔
+    0 < n ∧ n < 2 ** 256 ∧ storage_type_ok env element ∧
+    IS_SOME (fixed_storage_slots env (ArrayT element (SOME n)))) ∧
+  (storage_type_ok env (MappingT key value) ⇔
+    elementary_storage_type_ok key ∧ storage_type_ok env value) ∧
+  (storage_type_ok env (ArrayT element NONE) ⇔ storage_type_ok env element) ∧
+  (storage_type_ok env (StructT id) ⇔ IS_SOME (lookup_struct_layout env id)) ∧
+  (storage_type_ok env ty ⇔ elementary_storage_type_ok ty)
 End
 
 (* ProductType is reserved for tuples and multiple returns: never singleton. *)
 Definition wf_core_value_type_def:
   (wf_core_value_type env (SingleType ty) ⇔ core_scalar_type env ty) ∧
-  (wf_core_value_type env (ReferenceType ty) ⇔ storage_type_ok ty) ∧
+  (wf_core_value_type env (ReferenceType ty) ⇔ storage_type_ok env ty) ∧
   (wf_core_value_type env (ProductType tys) ⇔
     LENGTH tys ≠ 1 ∧ EVERY (wf_core_value_type env) tys)
 Termination
@@ -234,7 +268,7 @@ Definition value_has_type_def:
     scalar_has_type env ty s) ∧
   (value_has_type env (ReferenceType ty)
      (ReferenceValue (StorageReference PersistentStorage _ _ offset rty _)) ⇔
-    ty = rty ∧ storage_type_ok ty ∧
+    ty = rty ∧ storage_type_ok env ty ∧
     (case storage_bytes ty of SOME b => offset + b ≤ 32 | NONE => offset = 0)) ∧
   (value_has_type env (ProductType tys) (TupleValue vs) ⇔
     values_have_types env tys vs) ∧
@@ -450,6 +484,18 @@ Definition wf_core_operation_def:
     annotation = SingleType ty ∧ core_scalar_type env ty ∧
     IS_SOME (storage_bytes ty) ∧ wf_core_atom env ctx (ReferenceType ty) a) ∧
   (wf_core_operation env ctx annotation
+     (NavigateOperation ty base (FieldNavigation field)) ⇔
+    annotation = ReferenceType ty ∧
+    case base of
+      BoundAtom x =>
+        (case ALOOKUP ctx.bindings x of
+           SOME (ReferenceType (StructT id)) =>
+             (case lookup_struct env id of
+                SOME fields => ALOOKUP fields field = SOME ty
+              | NONE => F)
+         | _ => F)
+    | _ => F) ∧
+  (wf_core_operation env ctx annotation
      (NavigateOperation ty base (IndexNavigation index)) ⇔
     annotation = ReferenceType ty ∧
     case base of
@@ -457,6 +503,36 @@ Definition wf_core_operation_def:
         (case ALOOKUP ctx.bindings x of
            SOME (ReferenceType (MappingT key value)) =>
              value = ty ∧ wf_core_atom env ctx (SingleType key) index
+         | SOME (ReferenceType (ArrayT element _)) =>
+             element = ty ∧ wf_core_atom env ctx (SingleType (UintT 256)) index
+         | _ => F)
+    | _ => F) ∧
+  (wf_core_operation env ctx annotation (ArrayLengthOperation a) ⇔
+    annotation = SingleType (UintT 256) ∧
+    case a of
+      BoundAtom x =>
+        (case ALOOKUP ctx.bindings x of
+           SOME (ReferenceType (ArrayT _ NONE)) => T
+         | _ => F)
+    | _ => F) ∧
+  (wf_core_operation env ctx annotation (ArrayPushOperation a value) ⇔
+    case a of
+      BoundAtom x =>
+        (case ALOOKUP ctx.bindings x of
+           SOME (ReferenceType (ArrayT element NONE)) =>
+             elementary_storage_type_ok element ∧
+             annotation = ReferenceType element ∧
+             case value of
+               NONE => T
+             | SOME v => wf_core_atom env ctx (SingleType element) v
+         | _ => F)
+    | _ => F) ∧
+  (wf_core_operation env ctx annotation (ArrayPopOperation a) ⇔
+    annotation = ProductType [] ∧
+    case a of
+      BoundAtom x =>
+        (case ALOOKUP ctx.bindings x of
+           SOME (ReferenceType (ArrayT element NONE)) => elementary_storage_type_ok element
          | _ => F)
     | _ => F) ∧
   (wf_core_operation env ctx annotation (InternalCallOperation f args) ⇔
@@ -545,6 +621,8 @@ Definition check_core_stmts_def:
     if ctx.in_loop then check_core_stmts env ctx ss else NONE) ∧
   (check_core_stmts env ctx (ContinueStmt :: ss) =
     if ctx.in_loop then check_core_stmts env ctx ss else NONE) ∧
+  (check_core_stmts env ctx (PanicStmt code :: ss) =
+    check_core_stmts env ctx ss) ∧
   (check_core_stmts env ctx (RevertStmt a :: ss) =
     if provisional_revert_payload a then check_core_stmts env ctx ss
     else NONE) ∧
@@ -592,10 +670,44 @@ End
  *)
 Definition wf_core_state_variable_def:
   wf_core_state_variable env (v : core_state_variable) ⇔
-    storage_type_ok v.state_type ∧
+    storage_type_ok env v.state_type ∧
     case storage_bytes v.state_type of
       SOME b => v.state_offset + b ≤ 32
     | NONE => v.state_offset = 0
+End
+
+(* Inline containment must be finite. Mappings and dynamic arrays terminate
+ * layout traversal; recursive structs behind those containers are allowed. *)
+Definition inline_storage_shape_def:
+  (inline_storage_shape env (n : num) (ArrayT element (SOME _)) ⇔
+    inline_storage_shape env n element) ∧
+  (inline_storage_shape env n (StructT id) ⇔
+    if n = 0 then F else
+    case lookup_struct_layout env id of
+      SOME s => inline_storage_types env (n - 1) (MAP (λv. v.state_type) s.struct_fields)
+    | NONE => F) ∧
+  (inline_storage_shape env n _ ⇔ T) ∧
+  (inline_storage_types env n [] ⇔ T) ∧
+  (inline_storage_types env n (ty :: tys) ⇔
+    inline_storage_shape env n ty ∧ inline_storage_types env n tys)
+Termination
+  WF_REL_TAC ‘inv_image ($< LEX $<) (λx. case x of
+    INL (env, n, ty) => (n, sol_type_size ty)
+  | INR (env, n, tys) => (n, list_size sol_type_size tys))’ >>
+  rw[list_size_def]
+End
+
+Definition wf_core_struct_layout_def:
+  wf_core_struct_layout env (s : core_struct_layout) ⇔
+    0 < s.struct_slots ∧ s.struct_slots < 2 ** 256 ∧
+    s.struct_fields ≠ [] ∧ ALL_DISTINCT (MAP (λv. v.state_id) s.struct_fields) ∧
+    lookup_struct env s.struct_id =
+      SOME (MAP (λv. (v.state_id, v.state_type)) s.struct_fields) ∧
+    inline_storage_shape env (LENGTH env.struct_layouts) (StructT s.struct_id) ∧
+    EVERY (λv. wf_core_state_variable env v ∧
+      case fixed_storage_slots env v.state_type of
+        SOME slots => w2n v.state_slot + slots ≤ s.struct_slots
+      | NONE => F) s.struct_fields
 End
 
 Definition wf_core_environment_def:
@@ -606,6 +718,9 @@ Definition wf_core_environment_def:
     ALL_DISTINCT (MAP FST env.state_variables) ∧
     EVERY (λ(x, v). v.state_id = x ∧ wf_core_state_variable env v)
       env.state_variables ∧
+    ALL_DISTINCT (MAP FST env.struct_layouts) ∧
+    EVERY (λ(id, s). s.struct_id = id ∧ wf_core_struct_layout env s)
+      env.struct_layouts ∧
     ALL_DISTINCT (MAP FST env.type_declarations) ∧
     EVERY (λ(_, decl). wf_type_declaration env decl) env.type_declarations
 End
@@ -614,6 +729,7 @@ Definition wf_core_program_def:
   wf_core_program env (prog : core_program) ⇔
     env.procedures = MAP (λp. (p.procedure_id, p)) prog.procedures ∧
     env.state_variables = MAP (λv. (v.state_id, v)) prog.state_variables ∧
+    env.struct_layouts = MAP (λs. (s.struct_id, s)) prog.struct_layouts ∧
     wf_core_environment env ∧
     IS_SOME (lookup_procedure env prog.entry_procedure)
 End

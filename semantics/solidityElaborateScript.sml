@@ -2,15 +2,16 @@
  * core, for the pinned profile solc-0.8.37-via-ir-osaka.
  *
  * Admitted: one contract of functions over elementary value types, with
- * value-type state variables and scalar-key nested mappings at their layout
- * entries, indexed scalar reads/updates, locals
+ * value-type state variables, storage structs, scalar-key mappings and
+ * fixed/dynamic storage arrays, member/indexed scalar reads and updates,
+ * array lengths, scalar push/pop and locals
  * (including tuple declarations with holes), internal calls with single or
  * multiple returns, explicit elementary conversions, literals, unary, binary,
  * comparison and short-circuit operators, simple and compound assignment to
  * locals and state variables, tuple assignment, ++ and --, if, while,
- * do-while, for, break, continue, return and unchecked blocks. Anything else,
- * and any literal that is not an integer, is rejected (NONE) rather than
- * partially elaborated.
+ * do-while, for, break, continue, return and unchecked blocks. Built-in
+ * require/assert/revert admit boolean conditions and literal string messages.
+ * Other string runtime operations and unsupported forms are rejected (NONE).
  *
  * Schedules, read from the compiler's IR for this profile (the ir output in
  * testdata/frontend/expected/pure_core.json) and checked against the compiled
@@ -47,6 +48,7 @@ Libs
 Datatype:
   elab_ctx = <|
     functions : (num # src_function) list;
+    structs : src_struct list;
     variables : (num # sol_type) list;
     state : (num # sol_type) list;
     returns : (num # sol_type) list;
@@ -213,8 +215,15 @@ Definition expr_assigns_def:
   (expr_assigns (SrcBinaryOperation _ _ l r _ _) ⇔
     expr_assigns l ∨ expr_assigns r) ∧
   (expr_assigns (SrcTupleExpression _ cs _) ⇔ components_assign cs) ∧
-  (expr_assigns (SrcFunctionCall _ _ args _) ⇔ exprs_assign args) ∧
+  (expr_assigns (SrcFunctionCall _ callee args _) ⇔
+    expr_assigns callee ∨ exprs_assign args) ∧
+  (expr_assigns (SrcArrayMember _ _ root_expr _) ⇔ expr_assigns root_expr) ∧
+  (expr_assigns (SrcBuiltinCall _ _ _ condition message _) ⇔
+    (case condition of NONE => F | SOME c => expr_assigns c) ∨
+    (case message of NONE => F | SOME m => expr_assigns m)) ∧
   (expr_assigns (SrcIndexAccess _ b i _) ⇔ expr_assigns b ∨ expr_assigns i) ∧
+  (expr_assigns (SrcMemberAccess _ root_expr _ _) ⇔ expr_assigns root_expr) ∧
+  (expr_assigns (SrcArrayLength _ root_expr _) ⇔ expr_assigns root_expr) ∧
   (expr_assigns (SrcTypeConversion _ _ e _) ⇔ expr_assigns e) ∧
   (expr_assigns _ ⇔ F) ∧
   (components_assign [] ⇔ F) ∧
@@ -275,6 +284,25 @@ Definition snapshot_values_def:
           (ss', vs', n'') => (ss ++ ss', (a', vt) :: vs', n''))
 End
 
+(* Error(string): one dynamic ABI argument, encoded from literal bytes only. *)
+Definition error_string_data_def:
+  error_string_data value =
+    let bytes = MAP (λc. n2w (ORD c) : byte) value in
+    [0x08w; 0xc3w; 0x79w; 0xa0w] ++ num_to_bytes 32 32 ++
+    num_to_bytes 32 (LENGTH bytes) ++ bytes ++
+    REPLICATE ((32 - LENGTH bytes MOD 32) MOD 32) 0w
+End
+
+Definition builtin_failure_def:
+  builtin_failure builtin message =
+    if builtin = AssertBuiltin then PanicStmt 1 else
+    RevertStmt (ConstantAtom (BytesValue
+      (case message of NONE => []
+       | SOME m => case literal_message m of
+           SOME value => error_string_data value
+         | NONE => [])))
+End
+
 (* Expressions: statements computing a value, the value as an atom, and its
  * decoded type. Multiple values (tuples and calls with several returns) are
  * elaborated by elab_values.
@@ -290,6 +318,15 @@ Definition elab_expr_def:
              let (ss, a) = read in
              SOME ((ss, a, ElabType (place_type place)), n1)
          | NONE => NONE)
+    | SrcArrayLength _ root_expr _ =>
+        (case elab_location ctx n root_expr of
+           SOME ((ss, _, ArrayT _ (SOME length)), n1) =>
+             SOME ((ss, ConstantAtom (IntegerValue (&length)),
+                    ElabType (UintT 256)), n1)
+         | SOME ((ss, ref, ArrayT _ NONE), n1) =>
+             let (rs, a) = bind_value n1 (UintT 256) (ArrayLengthOperation ref) in
+             SOME ((ss ++ rs, a, ElabType (UintT 256)), n1 + 1)
+         | _ => NONE)
     | SrcLiteral _ kind value tid =>
         (if kind = "bool" then
            SOME (([], ConstantAtom (BoolValue (value = "true")), ElabType BoolT), n)
@@ -297,6 +334,14 @@ Definition elab_expr_def:
            case identifier_integer tid of
              SOME i => SOME (([], ConstantAtom (IntegerValue i), ElabLiteral), n)
            | NONE => NONE)
+    | SrcMemberAccess _ _ _ _ =>
+        (case elab_location ctx n expression of
+           SOME ((ss, ref, ty), n1) =>
+             if is_elementary_type ty then
+               let (rs, a) = bind_value n1 ty (ReadOperation ty ref) in
+               SOME ((ss ++ rs, a, ElabType ty), n1 + 1)
+             else NONE
+         | NONE => NONE)
     | SrcIndexAccess info root_expr index tid =>
         (case elab_location ctx n expression of
            SOME ((ss, ref, ty), n1) =>
@@ -474,9 +519,40 @@ Definition elab_expr_def:
         (elab_expr ctx n e)
     | SrcTupleExpression _ _ _ =>
         (NONE)
+    | SrcArrayMember _ _ _ _ => NONE
     | SrcFunctionCall _ callee args _ =>
         (case callee of
-           SrcIdentifier _ _ f _ =>
+           SrcArrayMember _ member root_expr _ =>
+             (case elab_location ctx n root_expr of
+                SOME ((ss, ref, ArrayT element NONE), n1) =>
+                  if member = "push" then
+                    (case args of
+                       [] =>
+                         let target = BoundAtom (AstId n1) in
+                         let (rs, a) = bind_value (n1 + 1) element
+                                         (ReadOperation element target) in
+                         SOME ((ss ++ [DefineStmt (AstId n1) (ReferenceType element)
+                                         (ArrayPushOperation ref NONE)] ++ rs,
+                                a, ElabType element), n1 + 2)
+                     | [arg] =>
+                         (case elab_expr ctx n1 arg of
+                            SOME ((sa, a, vt), n2) =>
+                              (case coerce n2 element a vt of
+                                 SOME ((cs, a'), n3) =>
+                                   SOME ((ss ++ sa ++ cs ++
+                                            [DefineStmt (AstId n3) (ReferenceType element)
+                                               (ArrayPushOperation ref (SOME a'))],
+                                          ConstantAtom (BoolValue F), ElabTuple []), n3 + 1)
+                               | NONE => NONE)
+                          | NONE => NONE)
+                     | _ => NONE)
+                  else if member = "pop" ∧ args = [] then
+                    SOME ((ss ++ [DefineStmt (AstId n1) (ProductType [])
+                                    (ArrayPopOperation ref)],
+                           ConstantAtom (BoolValue F), ElabTuple []), n1 + 1)
+                  else NONE
+              | _ => NONE)
+         | SrcIdentifier _ _ f _ =>
              (case ALOOKUP ctx.functions f of
                 SOME callee =>
                   (case callee_types callee of
@@ -490,6 +566,23 @@ Definition elab_expr_def:
                    | NONE => NONE)
               | NONE => NONE)
          | _ => NONE)
+    | SrcBuiltinCall _ _ builtin condition message _ =>
+        (if ¬builtin_shape builtin condition message then NONE else
+         let failure = builtin_failure builtin message in
+         case condition of
+           NONE => SOME (([failure;
+             DefineStmt (AstId n) (ProductType []) (TupleOperation [])],
+             BoundAtom (AstId n), ElabTuple []), n + 1)
+         | SOME c =>
+             (case elab_expr ctx n c of
+                SOME ((ss, a, vt), n1) =>
+                  (case coerce n1 BoolT a vt of
+                     SOME ((cs, v), n2) =>
+                       SOME ((ss ++ cs ++ [IfStmt v [] [failure];
+                         DefineStmt (AstId n2) (ProductType []) (TupleOperation [])],
+                         BoundAtom (AstId n2), ElabTuple []), n2 + 1)
+                   | NONE => NONE)
+              | NONE => NONE))
     | SrcTypeConversion _ tn e _ =>
         (case (normalize_type_name tn, elab_expr ctx n e) of
            (SOME ty, SOME ((ss, a, vt), n1)) =>
@@ -555,6 +648,17 @@ Definition elab_expr_def:
                        (StateReferenceOperation (AstId x))],
                     BoundAtom (AstId n), ty), n + 1)
          | NONE => NONE)
+    | SrcMemberAccess _ root_expr member_id _ =>
+        (case elab_location ctx n root_expr of
+           SOME ((ss, ref, StructT (AstId id)), n1) =>
+             (case source_struct_field ctx.structs id member_id of
+                SOME ty =>
+                  SOME ((ss ++
+                    [DefineStmt (AstId n1) (ReferenceType ty)
+                      (NavigateOperation ty ref (FieldNavigation (AstId member_id)))],
+                    BoundAtom (AstId n1), ty), n1 + 1)
+              | NONE => NONE)
+         | _ => NONE)
     | SrcIndexAccess _ root_expr index _ =>
         (case elab_location ctx n root_expr of
            SOME ((ss, ref, MappingT key value), n1) =>
@@ -568,6 +672,25 @@ Definition elab_expr_def:
                               BoundAtom (AstId n3), value), n3 + 1)
                    | NONE => NONE)
               | NONE => NONE)
+         | SOME ((ss, ref, ArrayT element _), n1) =>
+             (case elab_expr ctx n1 index of
+                SOME ((si, a, vt), n2) =>
+                  (case coerce n2 (UintT 256) a vt of
+                     SOME ((cs, a'), n3) =>
+                       SOME ((ss ++ si ++ cs ++
+                              [DefineStmt (AstId n3) (ReferenceType element)
+                                (NavigateOperation element ref (IndexNavigation a'))],
+                              BoundAtom (AstId n3), element), n3 + 1)
+                   | NONE => NONE)
+              | NONE => NONE)
+         | _ => NONE)
+    | SrcFunctionCall _ (SrcArrayMember _ member root_expr _) [] _ =>
+        (if member ≠ "push" then NONE else
+         case elab_location ctx n root_expr of
+           SOME ((ss, ref, ArrayT element NONE), n1) =>
+             SOME ((ss ++ [DefineStmt (AstId n1) (ReferenceType element)
+                             (ArrayPushOperation ref NONE)],
+                    BoundAtom (AstId n1), element), n1 + 1)
          | _ => NONE)
     | _ => NONE)
 Termination
@@ -790,11 +913,11 @@ End
  * their declaration ids.
  *)
 Definition elab_function_def:
-  elab_function functions state n (f : src_function) =
+  elab_function structs functions state n (f : src_function) =
     case (all_some (MAP variable_binding f.fn_parameters),
           all_some (MAP variable_binding f.fn_returns), f.fn_body) of
       (SOME ps, SOME rs, SrcBlock _ ss) =>
-        (case elab_stmts <| functions := functions; variables := ps ++ rs;
+        (case elab_stmts <| functions := functions; structs := structs; variables := ps ++ rs;
                             state := state; returns := rs;
                             mode := CheckedArithmetic |> n ss of
            SOME ((code, _), n1) =>
@@ -807,11 +930,11 @@ Definition elab_function_def:
 End
 
 Definition elab_functions_def:
-  (elab_functions functions state n [] = SOME ([], n)) ∧
-  (elab_functions functions state n (f :: fs) =
-    case elab_function functions state n f of
+  (elab_functions structs functions state n [] = SOME ([], n)) ∧
+  (elab_functions structs functions state n (f :: fs) =
+    case elab_function structs functions state n f of
       SOME (p, n1) =>
-        (case elab_functions functions state n1 fs of
+        (case elab_functions structs functions state n1 fs of
            SOME (ps, n2) => SOME (p :: ps, n2)
          | NONE => NONE)
     | NONE => NONE)
@@ -832,6 +955,27 @@ Definition core_state_variables_def:
   (core_state_variables _ _ = NONE)
 End
 
+Definition elab_struct_layouts_def:
+  (elab_struct_layouts [] = SOME []) ∧
+  (elab_struct_layouts (s :: ss) =
+    case elab_struct_layouts ss of
+      NONE => NONE
+    | SOME layouts =>
+        case s.struct_layout of
+          NONE => SOME layouts
+        | SOME (bytes, fields) =>
+            case all_some (MAP (λv. OPTION_MAP (λty. (v.var_info.node_id, ty))
+                               (field_variable_type v)) s.struct_members) of
+              NONE => NONE
+            | SOME types =>
+                case core_state_variables types fields of
+                  NONE => NONE
+                | SOME cvs =>
+                    SOME (<| struct_id := AstId s.struct_info.node_id;
+                             struct_fields := cvs; struct_slots := bytes DIV 32 |>
+                          :: layouts))
+End
+
 (* A valid unit of one contract, elaborated with fresh ids above its node ids;
  * the first function is the entry procedure.
  *)
@@ -843,13 +987,19 @@ Definition elaborate_unit_def:
         (case all_some (MAP variable_binding c.contract_state_variables) of
            NONE => NONE
          | SOME state =>
-             case (core_state_variables state c.contract_storage,
-                   elab_functions
+             case (elab_struct_layouts c.contract_structs,
+                   core_state_variables state c.contract_storage,
+                   elab_functions c.contract_structs
                      (MAP (λf. (f.fn_info.node_id, f)) c.contract_functions)
                      state (MAX_LIST (unit_ids u) + 1) c.contract_functions) of
-               (SOME cvs, SOME (p :: ps, _)) =>
-                 SOME <| procedures := p :: ps; state_variables := cvs;
-                         entry_procedure := p.procedure_id |>
+               (SOME layouts, SOME cvs, SOME (p :: ps, _)) =>
+                 let prog = <| procedures := p :: ps; state_variables := cvs;
+                               struct_layouts := layouts;
+                               entry_procedure := p.procedure_id |> in
+                 let env = core_program_environment [] prog in
+                 if EVERY (wf_core_struct_layout env) layouts ∧
+                    EVERY (wf_core_state_variable env) cvs
+                 then SOME prog else NONE
              | _ => NONE)
     | _ => NONE
 End
@@ -894,6 +1044,9 @@ val () = cv_auto_trans_rec expr_assigns_def (
                | INR (INR es) => cv_size es)’ >>
   cv_termination_tac
 );
+
+val () = cv_auto_trans error_string_data_def;
+val () = cv_auto_trans builtin_failure_def;
 
 val elab_expr_pre_def = cv_auto_trans_pre_rec
   "elab_expr_pre elab_args_pre elab_values_pre elab_components_pre elab_location_pre"
@@ -971,5 +1124,11 @@ val () = cv_auto_trans core_bindings_def;
 val () = cv_auto_trans elab_function_def;
 val () = cv_auto_trans elab_functions_def;
 val () = cv_auto_trans core_state_variables_def;
+val () = cv_auto_trans elab_struct_layouts_def;
+val () = cv_auto_trans_rec solidityCoreWfTheory.inline_storage_shape_def (
+  WF_REL_TAC ‘inv_image ($< LEX $<) (λx. case x of
+    INL (env, n, ty) => (cv$c2n n, cv_size ty)
+  | INR (env, n, tys) => (cv$c2n n, cv_size tys))’ >> cv_termination_tac
+);
 val () = cv_auto_trans elaborate_unit_def;
 val () = cv_auto_trans solidityCoreWfTheory.core_program_environment_def;

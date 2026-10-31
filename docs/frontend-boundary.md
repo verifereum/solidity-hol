@@ -126,8 +126,10 @@ compiler initially supplies layout calculation; Solidity-HOL interprets the
 layout when reading, writing, and capturing references. The declaration IDs in
 layout entries must resolve to compatible state-variable declarations.
 
-For value-type state variables and scalar-key mappings to scalar values
-(including nested mappings), this is implemented. The importer takes each
+Storage declarations now include elementary scalars, structs, scalar-key
+mappings, and fixed/dynamic arrays, including their storage combinations.
+Scalar leaves can be read and updated through member/index paths.
+The importer takes each
 contract's `storageLayout.storage` entries in declaration order, with their
 slot, byte offset and type identifier; `valid_src_unit` requires one entry per
 state variable, naming its declaration and type, and leaves the layout
@@ -137,8 +139,37 @@ compiler. Elaboration copies slot and offset into the core program's
 are import errors. Mapping key/value types come from recursive type-name
 normalization. AST and layout type identifiers use different encodings; both
 are checked against the normalized type. The scalar leaf width determines
-its storage read/write, and mapping root slots come from the layout. Other
-reference-type declarations remain coverage work.
+its storage read/write, and aggregate root slots come from the layout. Fixed
+array dimensions come from the compiler's resolved integer type of the length
+expression. Scalar elements pack without straddling slots; each nested row
+starts on a fresh slot. Array indexing checks bounds with panic `0x32`, and
+`.length` still evaluates its indexed prefix. Dynamic-array length is read from
+its root slot and packed elements start at Keccak-256 of that slot. `push(value)`,
+`push()` (also as a scalar lvalue), and `pop()` use the captured location. Empty
+pop panics with `0x31`; both push forms follow the pinned compiler's resource
+panic `0x41` at length >= `2^64`. Length reads and indexing retain the full
+256-bit range. `pop()` clears only the removed scalar bytes; `push()` preserves
+existing bytes at the appended position, as the pinned compiler does. Dynamic
+array mutation of aggregates, memory/calldata references, local reference
+bindings and aggregate copies remain coverage work.
+
+Struct declarations may be file-level or contract members. User-defined type
+names and field accesses retain declaration IDs; field ownership and expression
+types are checked against the declared struct. Struct fields use solc's storage
+pointer identifiers where state variables use storage reference identifiers.
+The importer preserves that distinction and ignores only the display name
+inside a struct type identifier, retaining its declaration ID and location.
+`storageLayout.types` supplies each used struct's ordered members, relative
+slots/offsets and size. Member IDs/types must match the declaration; sizes must
+be positive multiples of a slot. Core layout checks reject fields outside the
+struct's stride, scalar fields crossing a slot boundary, unaligned aggregates,
+and cyclic inline containment. Layout calculation and byte disjointness remain
+trusted compiler work. Unused declarations need no runtime layout.
+
+The core program carries these struct layouts into its environment. Member
+navigation extends an already captured base, and array strides use each struct's
+whole-slot size. Elaboration rejects missing or inconsistent runtime layouts; the core checker
+independently checks the elaborated program.
 
 The selected compiler also emits `transientStorageLayout`. It is empty for the
 initial corpus, so transient layout remains unvalidated.
@@ -161,6 +192,27 @@ checks the elaborated fixture with `wf_core_program` and runs it in the
 evaluator. The differential corpus runs the same inputs, and a wider corpus of
 sources, through the deployed bytecode in Verifereum and requires equal
 ABI-encoded outcomes; see [differential-testing.md](differential-testing.md).
+
+## Built-in failures
+
+The pinned compiler represents `require`, `assert` and built-in `revert` as
+ordinary calls with declaration references `-18`, `-3` and `-19`. Import maps
+those references to `SrcBuiltinCall`; identifier spelling does not select a
+built-in, so user declarations with those names remain internal calls.
+Normalized checking admits `require(bool)`, `require(bool, literal)`,
+`assert(bool)`, `revert()` and `revert(literal)`. Messages are string, Unicode
+string or string-compatible hex literals, read from `hexValue` to preserve
+exact bytes, including UTF-8 and NULs.
+
+Elaboration evaluates the condition before selecting the success/failure
+branch. A failed assertion emits `PanicCompletion 1`; bare require/revert emit
+empty revert bytes. Literal messages use ABI `Error(string)` with selector
+`08c379a0`, offset 32, byte length and zero padding to a multiple of 32 bytes.
+Existing internal-call propagation preserves the failure and the source-frame
+boundary rolls back all earlier writes. Literal messages have no evaluation
+effects. Dynamic message expressions remain rejected, including on a successful
+require; future string support must evaluate them on both paths according to
+the compiler profile's argument schedule. Custom errors are a later increment.
 
 ## Required validation
 
@@ -186,7 +238,7 @@ import error, not a partial semantic result.
 
 Before fixing a complete core AST, extend the corpus to cover control flow,
 tuple holes, modifiers, inheritance and `super`, external calls, creation,
-try/catch, errors, fallback/receive, fixed arrays, bytes/string, function
+try/catch, errors, fallback/receive, dynamic and memory/calldata arrays, bytes/string, function
 pointers, transient storage, and custom storage layout bases. The first HOL type
 theory can begin from the normalized types already observed, provided unsupported
 forms continue to fail closed.

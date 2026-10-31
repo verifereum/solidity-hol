@@ -15,5 +15,5 @@ Ancestors
   solidityCoreProgramsTest solidityImport solidityImportTest
   solidityElaborate solidityElaborateTest solidityDifferential
   solidityDifferentialCorpus solidityDifferentialTest
-  solidityShallow solidityShallowExamples
+  solidityShallow solidityTranslatorCorpus
   verifereum

@@ -1,4 +1,4 @@
-(* PROTOTYPE. The target of the core-to-HOL translator (solidityTranslateLib):
+(* The target of the core-to-HOL translator (solidityTranslateLib):
  * shallow functions over native HOL values, their result type, and the lemmas
  * its correspondence proofs use.
  *
@@ -221,6 +221,17 @@ Theorem uint_equal_op:
 Proof
   simp[eval_scalar_operation_def, scalar_operator_signature_def,
        scalars_have_types_def, uint_typed, scalar_outcome_value_def,
+       bool_value_def, is_equality_type_def]
+QED
+
+Theorem bool_equal_op:
+  scalar_outcome_value
+    (eval_scalar_operation env BoolT mode EqualOp [BoolValue a; BoolValue b]) =
+  ValueOk (bool_value (a = b))
+Proof
+  simp[eval_scalar_operation_def, scalar_operator_signature_def,
+       scalars_have_types_def, scalar_has_type_def,
+       elementary_scalar_has_type_def, scalar_outcome_value_def,
        bool_value_def, is_equality_type_def]
 QED
 

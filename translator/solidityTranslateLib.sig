@@ -1,19 +1,25 @@
-(* PROTOTYPE core-to-HOL translator *)
+(* Core-to-HOL translator; docs/translator.md describes it *)
 signature solidityTranslateLib =
 sig
   include Abbrev
 
-  (* translate {env, lookup, name, id, names, termination, loop} defines
-   * name, the shallow function of procedure id of the program environment env,
-   * and proves and saves name_correct: the evaluator computes it. A loop
-   * gets a helper name_loop with its own theorem name_loop_correct.
+  datatype outcome = Proved of thm | Unsupported of string | Failed of string
+  type result = {name : string, outcome : outcome, seconds : real}
+
+  (* translate_unit {prefix, unit_def, program_def, termination, loops}
+   * translates every function of an imported unit, given unit_def, the
+   * definition of a constant for the unit, and program_def, that of its
+   * elaborated program. It defines prefix ^ "env", the program's environment,
+   * and for each function f, callees first, the shallow function prefix ^ f
+   * and the theorem prefix ^ f ^ "_correct" that the evaluator computes it;
+   * a loop gets a helper prefix ^ f ^ "_loop" with its own theorem.
    *
-   * lookup evaluates lookup_procedure env (AstId id); names gives the
-   * variables' names by declaration id; termination proves the definition's
-   * termination when Define cannot; loop proves the loop helper's.
-   * Callees must be translated first. *)
-  val translate :
-    {env : term, lookup : conv, name : string, id : int,
-     names : (int * string) list, termination : tactic option,
-     loop : tactic option} -> thm
+   * termination and loops give, by function name, a tactic proving the
+   * termination of the function's definition when Define cannot, and of its
+   * loop helper. A function the translator does not cover yet is Unsupported,
+   * and so are its callers; any other failure is Failed, a translator bug. *)
+  val translate_unit :
+    {prefix : string, unit_def : thm, program_def : thm,
+     termination : (string * tactic) list, loops : (string * tactic) list} ->
+    result list
 end

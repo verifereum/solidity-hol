@@ -58,6 +58,7 @@ val stmt_ty = import_type "src_stmt"
 val variable_ty = import_type "src_variable"
 val function_ty = import_type "src_function"
 val contract_ty = import_type "src_contract"
+val struct_ty = import_type "src_struct"
 val storage_entry_ty = import_type "src_storage_entry"
 
 fun con name args =
@@ -87,7 +88,16 @@ fun type_id v = mk_str (string_field (field v "typeDescriptions") "typeIdentifie
 
 fun type_name v = within v (fn v =>
   case node_type v of
-    "Mapping" => con "SrcMappingTypeName"
+    "UserDefinedTypeName" =>
+      let
+        val declaration = int_field v "referencedDeclaration"
+        val tid = string_field (field v "typeDescriptions") "typeIdentifier"
+      in
+        require v (declaration >= 0 andalso String.isPrefix "t_struct$_" tid)
+          "only struct user-defined types are supported";
+        con "SrcStructTypeName" [info v, mk_num declaration, mk_str tid]
+      end
+  | "Mapping" => con "SrcMappingTypeName"
       [info v, type_name (field v "keyType"), type_name (field v "valueType")]
   | "ElementaryTypeName" =>
       let
@@ -101,6 +111,23 @@ fun type_name v = within v (fn v =>
         con "SrcElementaryTypeName"
           [info v, mk_str name, mk_opt stringSyntax.string_ty (Option.map mk_str mutability)]
       end
+  | "ArrayTypeName" =>
+      (case optional_field v "length" of
+         NONE => con "SrcDynamicArrayTypeName" [info v, type_name (field v "baseType")]
+       | SOME length => let
+        val dimension =
+          case String.fields (fn c => c = #"_")
+                 (string_field (field length "typeDescriptions") "typeIdentifier") of
+            ["t", "rational", n, "by", "1"] =>
+              if size n > 0 andalso CharVector.all Char.isDigit n
+              then IntInf.fromString n else NONE
+          | _ => NONE
+        val n = case dimension of
+                  SOME n => if n > 0 then n else fail "nonpositive array length"
+                | NONE => fail (describe v ^ ": array length is not a positive integer constant")
+      in
+        con "SrcArrayTypeName" [info v, type_name (field v "baseType"), mk_num n]
+      end)
   | other => fail (describe v ^ ": unsupported type name " ^ other))
 
 (* Expressions *)
@@ -115,12 +142,42 @@ fun expr v = within v (fn v =>
           [info v, mk_str (string_field v "name"), mk_num declaration,
            type_id v]
       end
+  | "MemberAccess" =>
+      (case optional_field v "referencedDeclaration" of
+         SOME declaration =>
+           con "SrcMemberAccess"
+             [info v, expr (field v "expression"),
+              mk_num (JSONUtil.asIntInf declaration), type_id v]
+       | NONE =>
+           (case string_field v "memberName" of
+              "length" => con "SrcArrayLength"
+                [info v, expr (field v "expression"), type_id v]
+            | member =>
+                (require v (member = "push" orelse member = "pop")
+                   "unsupported built-in member";
+                 con "SrcArrayMember"
+                   [info v, mk_str member, expr (field v "expression"), type_id v])))
   | "Literal" =>
       (require v (not (isSome (optional_field v "subdenomination")))
          "literal subdenominations are not supported";
        con "SrcLiteral"
          [info v, mk_str (string_field v "kind"),
-          mk_str (string_field v "value"), type_id v])
+          mk_str (if List.exists (fn k => k = string_field v "kind")
+                       ["string", "unicodeString", "hexString"] then
+                    let
+                      val hex = string_field v "hexValue"
+                      fun digit c =
+                        if c >= #"0" andalso c <= #"9" then Char.ord c - 48
+                        else if c >= #"a" andalso c <= #"f" then Char.ord c - 87
+                        else if c >= #"A" andalso c <= #"F" then Char.ord c - 55
+                        else (fail (describe v ^ ": invalid hexValue"))
+                      val () = require v (size hex mod 2 = 0) "odd hexValue length"
+                    in
+                      String.implode (List.tabulate (size hex div 2, fn i =>
+                        Char.chr (16 * digit (String.sub (hex, 2*i)) +
+                                  digit (String.sub (hex, 2*i+1)))))
+                    end
+                  else string_field v "value"), type_id v])
   | "UnaryOperation" =>
       con "SrcUnaryOperation"
         [info v, mk_str (string_field v "operator"),
@@ -163,9 +220,29 @@ fun expr v = within v (fn v =>
         require v (not (bool_field v "tryCall")) "try calls are not supported";
         case string_field v "kind" of
           "functionCall" =>
-            con "SrcFunctionCall"
-              [info v, expr callee, listSyntax.mk_list (args, expr_ty),
-               type_id v]
+            if node_type callee = "Identifier" andalso
+               int_field callee "referencedDeclaration" < 0 then
+              let
+                val id = int_field callee "referencedDeclaration"
+                val builtin = if id = ~18 then "RequireBuiltin"
+                              else if id = ~3 then "AssertBuiltin"
+                              else if id = ~19 then "RevertBuiltin"
+                              else fail (describe callee ^ ": unsupported built-in declaration " ^
+                                         IntInf.toString id)
+                val (condition, message) =
+                  case (builtin, args) of
+                    ("AssertBuiltin", [c]) => (SOME c, NONE)
+                  | ("RequireBuiltin", [c]) => (SOME c, NONE)
+                  | ("RequireBuiltin", [c, m]) => (SOME c, SOME m)
+                  | ("RevertBuiltin", []) => (NONE, NONE)
+                  | ("RevertBuiltin", [m]) => (NONE, SOME m)
+                  | _ => fail (describe v ^ ": unsupported built-in arguments")
+              in
+                con "SrcBuiltinCall" [info v, info callee, con builtin [],
+                  mk_opt expr_ty condition, mk_opt expr_ty message, type_id v]
+              end
+            else con "SrcFunctionCall"
+              [info v, expr callee, listSyntax.mk_list (args, expr_ty), type_id v]
         | "typeConversion" =>
             (require v (length args = 1) "a conversion takes one argument";
              within callee (fn c => expect c "ElementaryTypeNameExpression");
@@ -300,10 +377,39 @@ fun storage_entry v = within v (fn v =>
      ("storage_offset", mk_num (int_field v "offset")),
      ("storage_type_id", mk_str (string_field v "type"))])
 
-(* Contract members are functions and state variables; the layout is that
- * contract's entry of the compiler's contracts output for the source.
+fun struct_declaration types v = within v (fn v =>
+  let
+    val () = expect v "StructDefinition"
+    val key = "t_struct(" ^ string_field v "name" ^ ")" ^
+              IntInf.toString (int_field v "id") ^ "_storage"
+    val layout =
+      case (case types of JSON.NULL => NONE | _ => JSONUtil.findField types key) of
+        NONE => NONE
+      | SOME desc =>
+          (require v (string_field desc "encoding" = "inplace")
+             "struct layout encoding must be inplace";
+           SOME (pairSyntax.mk_pair
+             (case IntInf.fromString (string_field desc "numberOfBytes") of
+                SOME bytes => mk_num bytes
+              | NONE => fail "malformed struct layout size",
+              listSyntax.mk_list
+                (JSONUtil.arrayMap storage_entry (field desc "members"),
+                 storage_entry_ty))))
+  in
+    record "src_struct"
+      [("struct_info", info v),
+       ("struct_scope", mk_num (int_field v "scope")),
+       ("struct_members", listSyntax.mk_list
+         (JSONUtil.arrayMap (declaration false) (field v "members"), variable_ty)),
+       ("struct_layout", mk_opt
+         (pairSyntax.mk_prod (numSyntax.num, listSyntax.mk_list_type storage_entry_ty))
+         layout)]
+  end)
+
+(* The selected contract's layout also describes file-level struct types
+ * referenced by its state variables.
  *)
-fun contract contracts v = within v (fn v =>
+fun contract external_structs contracts v = within v (fn v =>
   let
     val id = int_field v "id"
     val name = string_field v "name"
@@ -312,13 +418,13 @@ fun contract contracts v = within v (fn v =>
     val () =
       List.app (fn m => within m (fn m =>
                   require m (node_type m = "FunctionDefinition" orelse
-                             node_type m = "VariableDeclaration")
+                             node_type m = "VariableDeclaration" orelse
+                             node_type m = "StructDefinition")
                     "unsupported contract member"))
         members
     val layout =
       JSONUtil.get (contracts,
-        [JSONUtil.SEL name, JSONUtil.SEL "storageLayout",
-         JSONUtil.SEL "storage"])
+        [JSONUtil.SEL name, JSONUtil.SEL "storageLayout"])
       handle e => fail (describe v ^ ": no storage layout: " ^
                         JSONUtil.exnMessage e)
   in
@@ -341,25 +447,31 @@ fun contract contracts v = within v (fn v =>
            variable_ty)),
        ("contract_storage",
         listSyntax.mk_list
-          (JSONUtil.arrayMap storage_entry layout, storage_entry_ty)),
+          (JSONUtil.arrayMap storage_entry (field layout "storage"), storage_entry_ty)),
+       ("contract_structs", listSyntax.mk_list
+          (map (struct_declaration (field layout "types"))
+             (external_structs @ members_of "StructDefinition"), struct_ty)),
        ("contract_functions",
         listSyntax.mk_list
           (map function (members_of "FunctionDefinition"), function_ty))]
   end)
 
-(* Pragmas carry no semantics for the pinned profile; any other source-unit
- * member is rejected.
+(* File-level structs accompany each contract that can refer to them;
+ * pragmas carry no semantics for the pinned profile.
  *)
 fun import_source_unit v contracts = within v (fn v =>
   let
+    val members = JSONUtil.arrayMap I (field v "nodes")
+    val structs = List.filter (fn m => node_type m = "StructDefinition") members
     fun member m acc =
       case node_type m of
         "PragmaDirective" => acc
-      | "ContractDefinition" => contract contracts m :: acc
+      | "StructDefinition" => acc
+      | "ContractDefinition" => contract structs contracts m :: acc
       | other => fail (describe m ^ ": unsupported source unit member " ^ other)
     val contracts =
       List.foldr (fn (m, acc) => within m (fn m => member m acc)) []
-        (JSONUtil.arrayMap I (field v "nodes"))
+        members
   in
     expect v "SourceUnit";
     record "src_unit"
