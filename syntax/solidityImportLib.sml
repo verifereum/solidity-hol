@@ -58,6 +58,7 @@ val stmt_ty = import_type "src_stmt"
 val variable_ty = import_type "src_variable"
 val function_ty = import_type "src_function"
 val contract_ty = import_type "src_contract"
+val struct_ty = import_type "src_struct"
 val storage_entry_ty = import_type "src_storage_entry"
 
 fun con name args =
@@ -87,7 +88,16 @@ fun type_id v = mk_str (string_field (field v "typeDescriptions") "typeIdentifie
 
 fun type_name v = within v (fn v =>
   case node_type v of
-    "Mapping" => con "SrcMappingTypeName"
+    "UserDefinedTypeName" =>
+      let
+        val declaration = int_field v "referencedDeclaration"
+        val tid = string_field (field v "typeDescriptions") "typeIdentifier"
+      in
+        require v (declaration >= 0 andalso String.isPrefix "t_struct$_" tid)
+          "only struct user-defined types are supported";
+        con "SrcStructTypeName" [info v, mk_num declaration, mk_str tid]
+      end
+  | "Mapping" => con "SrcMappingTypeName"
       [info v, type_name (field v "keyType"), type_name (field v "valueType")]
   | "ElementaryTypeName" =>
       let
@@ -134,9 +144,15 @@ fun expr v = within v (fn v =>
            type_id v]
       end
   | "MemberAccess" =>
-      (require v (string_field v "memberName" = "length")
-         "only fixed-array length members are supported";
-       con "SrcArrayLength" [info v, expr (field v "expression"), type_id v])
+      (case optional_field v "referencedDeclaration" of
+         SOME declaration =>
+           con "SrcMemberAccess"
+             [info v, expr (field v "expression"),
+              mk_num (JSONUtil.asIntInf declaration), type_id v]
+       | NONE =>
+           (require v (string_field v "memberName" = "length")
+              "unsupported built-in member";
+            con "SrcArrayLength" [info v, expr (field v "expression"), type_id v]))
   | "Literal" =>
       (require v (not (isSome (optional_field v "subdenomination")))
          "literal subdenominations are not supported";
@@ -322,10 +338,39 @@ fun storage_entry v = within v (fn v =>
      ("storage_offset", mk_num (int_field v "offset")),
      ("storage_type_id", mk_str (string_field v "type"))])
 
+fun struct_declaration types v = within v (fn v =>
+  let
+    val () = expect v "StructDefinition"
+    val key = "t_struct(" ^ string_field v "name" ^ ")" ^
+              IntInf.toString (int_field v "id") ^ "_storage"
+    val layout =
+      case JSONUtil.findField types key of
+        NONE => NONE
+      | SOME desc =>
+          (require v (string_field desc "encoding" = "inplace")
+             "struct layout encoding must be inplace";
+           SOME (pairSyntax.mk_pair
+             (case IntInf.fromString (string_field desc "numberOfBytes") of
+                SOME bytes => mk_num bytes
+              | NONE => fail "malformed struct layout size",
+              listSyntax.mk_list
+                (JSONUtil.arrayMap storage_entry (field desc "members"),
+                 storage_entry_ty))))
+  in
+    record "src_struct"
+      [("struct_info", info v),
+       ("struct_scope", mk_num (int_field v "scope")),
+       ("struct_members", listSyntax.mk_list
+         (JSONUtil.arrayMap (declaration false) (field v "members"), variable_ty)),
+       ("struct_layout", mk_opt
+         (pairSyntax.mk_prod (numSyntax.num, listSyntax.mk_list_type storage_entry_ty))
+         layout)]
+  end)
+
 (* Contract members are functions and state variables; the layout is that
  * contract's entry of the compiler's contracts output for the source.
  *)
-fun contract contracts v = within v (fn v =>
+fun contract external_structs contracts v = within v (fn v =>
   let
     val id = int_field v "id"
     val name = string_field v "name"
@@ -334,13 +379,13 @@ fun contract contracts v = within v (fn v =>
     val () =
       List.app (fn m => within m (fn m =>
                   require m (node_type m = "FunctionDefinition" orelse
-                             node_type m = "VariableDeclaration")
+                             node_type m = "VariableDeclaration" orelse
+                             node_type m = "StructDefinition")
                     "unsupported contract member"))
         members
     val layout =
       JSONUtil.get (contracts,
-        [JSONUtil.SEL name, JSONUtil.SEL "storageLayout",
-         JSONUtil.SEL "storage"])
+        [JSONUtil.SEL name, JSONUtil.SEL "storageLayout"])
       handle e => fail (describe v ^ ": no storage layout: " ^
                         JSONUtil.exnMessage e)
   in
@@ -363,7 +408,10 @@ fun contract contracts v = within v (fn v =>
            variable_ty)),
        ("contract_storage",
         listSyntax.mk_list
-          (JSONUtil.arrayMap storage_entry layout, storage_entry_ty)),
+          (JSONUtil.arrayMap storage_entry (field layout "storage"), storage_entry_ty)),
+       ("contract_structs", listSyntax.mk_list
+          (map (struct_declaration (field layout "types"))
+             (external_structs @ members_of "StructDefinition"), struct_ty)),
        ("contract_functions",
         listSyntax.mk_list
           (map function (members_of "FunctionDefinition"), function_ty))]
@@ -374,14 +422,17 @@ fun contract contracts v = within v (fn v =>
  *)
 fun import_source_unit v contracts = within v (fn v =>
   let
+    val members = JSONUtil.arrayMap I (field v "nodes")
+    val structs = List.filter (fn m => node_type m = "StructDefinition") members
     fun member m acc =
       case node_type m of
         "PragmaDirective" => acc
-      | "ContractDefinition" => contract contracts m :: acc
+      | "StructDefinition" => acc
+      | "ContractDefinition" => contract structs contracts m :: acc
       | other => fail (describe m ^ ": unsupported source unit member " ^ other)
     val contracts =
       List.foldr (fn (m, acc) => within m (fn m => member m acc)) []
-        (JSONUtil.arrayMap I (field v "nodes"))
+        members
   in
     expect v "SourceUnit";
     record "src_unit"

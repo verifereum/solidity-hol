@@ -271,6 +271,7 @@ Definition programs_def:
       binop_proc 5 u256 UncheckedArithmetic DivideOp;
       count_proc; nested_proc; fact_proc; fib_proc; divmod_proc; swap_proc;
       spin_proc; deep_proc; inner_proc; middle_proc; outer_proc];
+    struct_layouts := [];
     state_variables := [];
     entry_procedure := AstId 16
   |>

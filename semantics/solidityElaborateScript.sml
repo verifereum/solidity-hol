@@ -47,6 +47,7 @@ Libs
 Datatype:
   elab_ctx = <|
     functions : (num # src_function) list;
+    structs : src_struct list;
     variables : (num # sol_type) list;
     state : (num # sol_type) list;
     returns : (num # sol_type) list;
@@ -215,6 +216,7 @@ Definition expr_assigns_def:
   (expr_assigns (SrcTupleExpression _ cs _) ⇔ components_assign cs) ∧
   (expr_assigns (SrcFunctionCall _ _ args _) ⇔ exprs_assign args) ∧
   (expr_assigns (SrcIndexAccess _ b i _) ⇔ expr_assigns b ∨ expr_assigns i) ∧
+  (expr_assigns (SrcMemberAccess _ root_expr _ _) ⇔ expr_assigns root_expr) ∧
   (expr_assigns (SrcArrayLength _ root_expr _) ⇔ expr_assigns root_expr) ∧
   (expr_assigns (SrcTypeConversion _ _ e _) ⇔ expr_assigns e) ∧
   (expr_assigns _ ⇔ F) ∧
@@ -304,6 +306,14 @@ Definition elab_expr_def:
            case identifier_integer tid of
              SOME i => SOME (([], ConstantAtom (IntegerValue i), ElabLiteral), n)
            | NONE => NONE)
+    | SrcMemberAccess _ _ _ _ =>
+        (case elab_location ctx n expression of
+           SOME ((ss, ref, ty), n1) =>
+             if is_elementary_type ty then
+               let (rs, a) = bind_value n1 ty (ReadOperation ty ref) in
+               SOME ((ss ++ rs, a, ElabType ty), n1 + 1)
+             else NONE
+         | NONE => NONE)
     | SrcIndexAccess info root_expr index tid =>
         (case elab_location ctx n expression of
            SOME ((ss, ref, ty), n1) =>
@@ -562,6 +572,17 @@ Definition elab_expr_def:
                        (StateReferenceOperation (AstId x))],
                     BoundAtom (AstId n), ty), n + 1)
          | NONE => NONE)
+    | SrcMemberAccess _ root_expr field _ =>
+        (case elab_location ctx n root_expr of
+           SOME ((ss, ref, StructT (AstId id)), n1) =>
+             (case source_struct_field ctx.structs id field of
+                SOME ty =>
+                  SOME ((ss ++
+                    [DefineStmt (AstId n1) (ReferenceType ty)
+                      (NavigateOperation ty ref (FieldNavigation (AstId field)))],
+                    BoundAtom (AstId n1), ty), n1 + 1)
+              | NONE => NONE)
+         | _ => NONE)
     | SrcIndexAccess _ root_expr index _ =>
         (case elab_location ctx n root_expr of
            SOME ((ss, ref, MappingT key value), n1) =>
@@ -808,11 +829,11 @@ End
  * their declaration ids.
  *)
 Definition elab_function_def:
-  elab_function functions state n (f : src_function) =
+  elab_function structs functions state n (f : src_function) =
     case (all_some (MAP variable_binding f.fn_parameters),
           all_some (MAP variable_binding f.fn_returns), f.fn_body) of
       (SOME ps, SOME rs, SrcBlock _ ss) =>
-        (case elab_stmts <| functions := functions; variables := ps ++ rs;
+        (case elab_stmts <| functions := functions; structs := structs; variables := ps ++ rs;
                             state := state; returns := rs;
                             mode := CheckedArithmetic |> n ss of
            SOME ((code, _), n1) =>
@@ -825,11 +846,11 @@ Definition elab_function_def:
 End
 
 Definition elab_functions_def:
-  (elab_functions functions state n [] = SOME ([], n)) ∧
-  (elab_functions functions state n (f :: fs) =
-    case elab_function functions state n f of
+  (elab_functions structs functions state n [] = SOME ([], n)) ∧
+  (elab_functions structs functions state n (f :: fs) =
+    case elab_function structs functions state n f of
       SOME (p, n1) =>
-        (case elab_functions functions state n1 fs of
+        (case elab_functions structs functions state n1 fs of
            SOME (ps, n2) => SOME (p :: ps, n2)
          | NONE => NONE)
     | NONE => NONE)
@@ -850,6 +871,26 @@ Definition core_state_variables_def:
   (core_state_variables _ _ = NONE)
 End
 
+Definition elab_struct_layouts_def:
+  (elab_struct_layouts [] = SOME []) ∧
+  (elab_struct_layouts (s :: ss) =
+    case elab_struct_layouts ss of
+      NONE => NONE
+    | SOME layouts =>
+        case s.struct_layout of
+          NONE => SOME layouts
+        | SOME (bytes, fields) =>
+            case all_some (MAP variable_binding s.struct_members) of
+              NONE => NONE
+            | SOME types =>
+                case core_state_variables types fields of
+                  NONE => NONE
+                | SOME cvs =>
+                    SOME (<| struct_id := AstId s.struct_info.node_id;
+                             struct_fields := cvs; struct_slots := bytes DIV 32 |>
+                          :: layouts))
+End
+
 (* A valid unit of one contract, elaborated with fresh ids above its node ids;
  * the first function is the entry procedure.
  *)
@@ -861,13 +902,17 @@ Definition elaborate_unit_def:
         (case all_some (MAP variable_binding c.contract_state_variables) of
            NONE => NONE
          | SOME state =>
-             case (core_state_variables state c.contract_storage,
-                   elab_functions
+             case (elab_struct_layouts c.contract_structs,
+                   core_state_variables state c.contract_storage,
+                   elab_functions c.contract_structs
                      (MAP (λf. (f.fn_info.node_id, f)) c.contract_functions)
                      state (MAX_LIST (unit_ids u) + 1) c.contract_functions) of
-               (SOME cvs, SOME (p :: ps, _)) =>
-                 SOME <| procedures := p :: ps; state_variables := cvs;
-                         entry_procedure := p.procedure_id |>
+               (SOME layouts, SOME cvs, SOME (p :: ps, _)) =>
+                 let prog = <| procedures := p :: ps; state_variables := cvs;
+                               struct_layouts := layouts;
+                               entry_procedure := p.procedure_id |> in
+                 if wf_core_program (core_program_environment [] prog) prog
+                 then SOME prog else NONE
              | _ => NONE)
     | _ => NONE
 End
@@ -989,5 +1034,6 @@ val () = cv_auto_trans core_bindings_def;
 val () = cv_auto_trans elab_function_def;
 val () = cv_auto_trans elab_functions_def;
 val () = cv_auto_trans core_state_variables_def;
+val () = cv_auto_trans elab_struct_layouts_def;
 val () = cv_auto_trans elaborate_unit_def;
 val () = cv_auto_trans solidityCoreWfTheory.core_program_environment_def;

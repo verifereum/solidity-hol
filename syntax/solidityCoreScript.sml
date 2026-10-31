@@ -153,10 +153,20 @@ Datatype:
   |>
 End
 
+(* A struct's fields use declaration IDs and relative storage slots. *)
+Datatype:
+  core_struct_layout = <|
+    struct_id : ast_id;
+    struct_fields : core_state_variable list;
+    struct_slots : num
+  |>
+End
+
 Datatype:
   core_program = <|
     procedures : core_procedure list;
     state_variables : core_state_variable list;
+    struct_layouts : core_struct_layout list;
     entry_procedure : ast_id
   |>
 End

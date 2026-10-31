@@ -7,6 +7,7 @@ contract StorageStructs {
         int16 signedValue;
         bytes3 tag;
         bool flag;
+        uint8 length;
     }
     struct Nested {
         uint8 head;
@@ -49,6 +50,11 @@ contract StorageStructs {
     function smallPut(uint8 x) public returns (uint8) {
         item.small = x;
         return item.small;
+    }
+
+    function fieldNamedLength(uint8 x) public returns (uint8) {
+        item.length = x;
+        return item.length;
     }
 
     function nestedPut(uint8 x) public returns (uint8, uint8, uint8) {
