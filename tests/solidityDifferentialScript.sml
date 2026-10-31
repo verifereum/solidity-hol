@@ -460,7 +460,7 @@ Theorem differential_agrees_storage:
     SOME (seed_storage (final ++ storage))
 Proof
   rw[differential_agrees_def, differential_verdict_def] >>
-  every_case_tac >> gvs[is_agreement_def]
+  BasicProvers.every_case_tac >> gvs[is_agreement_def]
 QED
 
 val () = cv_auto_trans argument_scalar_def;
