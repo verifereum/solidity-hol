@@ -16,6 +16,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 import yul_reconnaissance as recon  # noqa: E402
 
 ARTIFACT = ROOT / "testdata" / "yul" / "reconnaissance.json"
+REPORT = ROOT / "testdata" / "yul" / "reconnaissance.md"
 
 
 class ParserTests(unittest.TestCase):
@@ -186,19 +187,31 @@ class GeneratedArtifactTests(unittest.TestCase):
 
     def test_format_and_roles(self) -> None:
         artifact = json.loads(ARTIFACT.read_text(encoding="utf-8"))
-        self.assertEqual(artifact["format"], "solidity-hol-yul-reconnaissance-v1")
-        self.assertEqual(artifact["summary"]["unknownBuiltins"], {})
-        roles = {
-            obj["role"]
-            for fixture in artifact["fixtures"]
-            for contract in fixture["contracts"]
-            for obj in contract["objects"]
-        }
-        self.assertEqual(roles, {"creation", "runtime"})
-        for entry in artifact["summary"]["builtins"].values():
-            self.assertTrue(entry["fixtures"])
-        for entry in artifact["summary"]["nodeKinds"].values():
-            self.assertTrue(entry["fixtures"])
+        self.assertEqual(artifact["format"], "solidity-hol-yul-reconnaissance-v2")
+        self.assertEqual(
+            [stage["id"] for stage in artifact["stages"]],
+            [stage.id for stage in recon.STAGES],
+        )
+        for stage in artifact["stages"]:
+            summary = artifact["summary"][stage["id"]]
+            self.assertEqual(summary["unknownBuiltins"], {})
+            roles = {
+                obj["role"]
+                for fixture in artifact["fixtures"]
+                for contract in fixture["contracts"]
+                for obj in contract["objects"]
+                if obj["stage"] == stage["id"]
+            }
+            self.assertEqual(roles, {"creation", "runtime"})
+            for entry in summary["builtins"].values():
+                self.assertTrue(entry["fixtures"])
+            for entry in summary["nodeKinds"].values():
+                self.assertTrue(entry["fixtures"])
+
+    def test_the_report_is_the_markdown_the_artifact_renders_to(self) -> None:
+        artifact = json.loads(ARTIFACT.read_text(encoding="utf-8"))
+        self.assertEqual(recon.render_markdown(artifact),
+                         REPORT.read_text(encoding="utf-8"))
 
     def test_records_the_pin_profile_and_selection_it_was_made_with(self) -> None:
         artifact = json.loads(ARTIFACT.read_text(encoding="utf-8"))
@@ -212,6 +225,19 @@ class GeneratedArtifactTests(unittest.TestCase):
                       artifact["compiler"]["reportedVersion"])
         self.assertEqual(artifact["profile"], profile)
         self.assertEqual(artifact["outputSelection"], recon.OUTPUT_SELECTION)
+
+    def test_stages_are_the_two_artifacts_and_both_optimizer_settings(self) -> None:
+        artifact = json.loads(ARTIFACT.read_text(encoding="utf-8"))
+        runs = artifact["profile"]["settings"]["optimizer"]["runs"]
+        self.assertEqual(
+            [
+                (stage["artifact"], stage["optimizer"]["enabled"])
+                for stage in artifact["stages"]
+            ],
+            [("ir", False), ("irOptimized", False), ("irOptimized", True)],
+        )
+        enabled = artifact["stages"][-1]["optimizer"]
+        self.assertEqual(enabled["runs"], runs)
 
     def test_every_fixture_is_the_source_it_was_made_from(self) -> None:
         artifact = json.loads(ARTIFACT.read_text(encoding="utf-8"))
@@ -265,22 +291,29 @@ class GeneratedArtifactTests(unittest.TestCase):
 
     def test_dialect_covers_every_builtin_the_pinned_solc_emits(self) -> None:
         artifact = json.loads(ARTIFACT.read_text(encoding="utf-8"))
-        emitted = set(artifact["summary"]["builtins"])
+        emitted = {
+            name
+            for summary in artifact["summary"].values()
+            for name in summary["builtins"]
+        }
         self.assertGreater(len(emitted), 0)
         self.assertLessEqual(emitted, self.dialect_builtin_names())
 
     def test_builtins_are_in_the_evm_dialect(self) -> None:
         artifact = json.loads(ARTIFACT.read_text(encoding="utf-8"))
-        for name in artifact["summary"]["builtins"]:
-            self.assertTrue(
-                name in recon.EVM_DIALECT_BUILTINS
-                or recon.VERBATIM_RE.fullmatch(name) is not None,
-                f"{name} is not an EVM dialect builtin",
-            )
+        for summary in artifact["summary"].values():
+            for name in summary["builtins"]:
+                self.assertTrue(
+                    name in recon.EVM_DIALECT_BUILTINS
+                    or recon.VERBATIM_RE.fullmatch(name) is not None,
+                    f"{name} is not an EVM dialect builtin",
+                )
 
 
 class DriverTests(unittest.TestCase):
     def fake_solc(self, directory: Path, ir: str) -> Path:
+        """A solc that answers with `ir`, and with `irOptimized` that differs
+        from it only when the request turns the optimizer on."""
         path = directory / "solc"
         version = "Version: 0.8.37+commit.f401782d.Linux.g++"
         path.write_text(
@@ -294,7 +327,12 @@ class DriverTests(unittest.TestCase):
                 else:
                     request = json.load(sys.stdin)
                     name = next(iter(request["sources"]))
-                    json.dump({{"contracts": {{name: {{"A": {{"ir": {ir!r}}}}}}}}}, sys.stdout)
+                    ir = {ir!r}
+                    optimized = ir
+                    if request["settings"]["optimizer"]["enabled"]:
+                        optimized = ir.replace("stop()", "pop(0)")
+                    json.dump({{"contracts": {{name: {{"A": {{"ir": ir,
+                                                          "irOptimized": optimized}}}}}}}}, sys.stdout)
                 """
             ),
             encoding="utf-8",
@@ -313,11 +351,20 @@ class DriverTests(unittest.TestCase):
             finally:
                 recon.fixture_sources = original
         self.assertEqual(artifact["compiler"]["pin"], (ROOT / "SOLIDITY_PIN").read_text().strip())
-        self.assertEqual(artifact["summary"]["builtins"]["mstore"]["runtime"], 0)
-        self.assertEqual(artifact["summary"]["builtins"]["mstore"]["creation"], 1)
-        self.assertEqual(artifact["summary"]["builtins"]["stop"]["runtime"], 1)
+        for stage in ("ir", "ir-optimized-off"):
+            summary = artifact["summary"][stage]
+            self.assertEqual(summary["builtins"]["mstore"]["runtime"], 0)
+            self.assertEqual(summary["builtins"]["mstore"]["creation"], 1)
+            self.assertEqual(summary["builtins"]["stop"]["runtime"], 1)
+            self.assertEqual(sorted(summary["builtins"]), ["mstore", "stop"])
+        # only the optimizer-on stage sees what the optimizer introduced: the
+        # `stop()` of the unoptimized runtime object becomes a `pop(0)`
+        self.assertEqual(sorted(artifact["summary"]["ir-optimized-on"]["builtins"]),
+                         ["mstore", "pop"])
         report = recon.render_markdown(artifact)
         self.assertIn("| `mstore` | 1 | 0 | 0 | 1 |", report)
+        self.assertIn("`ir-optimized-on`: the `irOptimized` artifact, optimizer on, `runs: 200`",
+                      report)
 
 
 class CliTests(unittest.TestCase):

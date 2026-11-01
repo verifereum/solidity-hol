@@ -40,13 +40,18 @@ Definition builtin_name_def:
   builtin_name YKeccak256 = "keccak256" ∧
   builtin_name YMLoad = "mload" ∧
   builtin_name YMStore = "mstore" ∧
+  builtin_name YMCopy = "mcopy" ∧
   builtin_name YSLoad = "sload" ∧
   builtin_name YSStore = "sstore" ∧
   builtin_name YCallDataLoad = "calldataload" ∧
   builtin_name YCallDataSize = "calldatasize" ∧
   builtin_name YCallValue = "callvalue" ∧
   builtin_name YMemoryGuard = "memoryguard" ∧
+  builtin_name YCaller = "caller" ∧
+  builtin_name YLoadImmutable = "loadimmutable" ∧
   builtin_name YLog1 = "log1" ∧
+  builtin_name YLog3 = "log3" ∧
+  builtin_name YPop = "pop" ∧
   builtin_name YReturn = "return" ∧
   builtin_name YRevert = "revert" ∧
   builtin_name YCodeCopy = "codecopy" ∧
@@ -81,13 +86,18 @@ Definition builtin_of_name_def:
     else if name = "keccak256" then SOME YKeccak256
     else if name = "mload" then SOME YMLoad
     else if name = "mstore" then SOME YMStore
+    else if name = "mcopy" then SOME YMCopy
     else if name = "sload" then SOME YSLoad
     else if name = "sstore" then SOME YSStore
     else if name = "calldataload" then SOME YCallDataLoad
     else if name = "calldatasize" then SOME YCallDataSize
     else if name = "callvalue" then SOME YCallValue
     else if name = "memoryguard" then SOME YMemoryGuard
+    else if name = "caller" then SOME YCaller
+    else if name = "loadimmutable" then SOME YLoadImmutable
     else if name = "log1" then SOME YLog1
+    else if name = "log3" then SOME YLog3
+    else if name = "pop" then SOME YPop
     else if name = "return" then SOME YReturn
     else if name = "revert" then SOME YRevert
     else if name = "codecopy" then SOME YCodeCopy
@@ -99,11 +109,14 @@ End
 Datatype:
   yul_builtin_effect
   = EffectPure      (* only its arguments: the arithmetic, comparison and
-                       bitwise operations, and memoryguard, which is the
-                       identity in the unoptimized IR *)
+                       bitwise operations, memoryguard, which is the identity
+                       in the unoptimized IR, and pop, which discards its
+                       argument *)
   | EffectMemory    (* reads or writes the frame's memory *)
   | EffectStorage   (* reads or writes the executing account's storage *)
-  | EffectFrame     (* reads the frame: its call data or call value *)
+  | EffectFrame     (* reads the frame: its call data, its call value, the
+                       account it runs for, or an immutable the constructor
+                       patched into its code *)
   | EffectLog       (* appends a log entry, whose payload it reads from
                        memory: a touch like any other, so it can raise the
                        frame's memory size *)
@@ -138,13 +151,18 @@ Definition builtin_effect_def:
   builtin_effect YKeccak256 = EffectMemory ∧
   builtin_effect YMLoad = EffectMemory ∧
   builtin_effect YMStore = EffectMemory ∧
+  builtin_effect YMCopy = EffectMemory ∧
   builtin_effect YSLoad = EffectStorage ∧
   builtin_effect YSStore = EffectStorage ∧
   builtin_effect YCallDataLoad = EffectFrame ∧
   builtin_effect YCallDataSize = EffectFrame ∧
   builtin_effect YCallValue = EffectFrame ∧
   builtin_effect YMemoryGuard = EffectPure ∧
+  builtin_effect YCaller = EffectFrame ∧
+  builtin_effect YLoadImmutable = EffectFrame ∧
   builtin_effect YLog1 = EffectLog ∧
+  builtin_effect YLog3 = EffectLog ∧
+  builtin_effect YPop = EffectPure ∧
   builtin_effect YReturn = EffectHalt ∧
   builtin_effect YRevert = EffectHalt ∧
   builtin_effect YCodeCopy = EffectObject ∧
