@@ -41,6 +41,8 @@ val () = holbuild_extra_deps [
   "../testdata/differential/expected/fallback.json",
   "../testdata/differential/expected/receive.json",
   "../testdata/differential/expected/external.json",
+  "../testdata/differential/expected/inheritance.json",
+  "../testdata/differential/expected/inheritance_diamond.json",
   "../testdata/yul/generated/pure_core.ir.json",
   "../testdata/yul/generated/pure_core.optimized.json",
   "../testdata/yul/generated/scalars.ir.json",
@@ -75,6 +77,10 @@ val () = holbuild_extra_deps [
   "../testdata/yul/generated/receive.optimized.json",
   "../testdata/yul/generated/external.ir.json",
   "../testdata/yul/generated/external.optimized.json",
+  "../testdata/yul/generated/inheritance.ir.json",
+  "../testdata/yul/generated/inheritance.optimized.json",
+  "../testdata/yul/generated/inheritance_diamond.ir.json",
+  "../testdata/yul/generated/inheritance_diamond.optimized.json",
 ]
 
 val () = solidityDifferentialLib.run_three_way

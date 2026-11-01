@@ -409,6 +409,23 @@ fun suite_failure suite status message =
          ("status", json_string status), ("message", json_string message)];
    false)
 
+(* The importer keeps the one contract no other inherits; the bytecode
+ * compared must be that contract's, on both sides of the comparison.
+ *)
+fun record_field name tm = Lib.assoc name (snd (TypeBase.dest_record tm))
+
+fun check_unit_contracts prepared contract =
+  let
+    val names =
+      map (stringSyntax.fromHOLstring o record_field "contract_name")
+        (fst (listSyntax.dest_list
+                (record_field "unit_contracts" (#unit prepared))))
+  in
+    if names = [contract] then ()
+    else fail ("the unit's contracts are [" ^ String.concatWith ", " names ^
+               "], not " ^ contract)
+  end
+
 fun run_suite root fuel s =
   let
     val suite = name_field s "name"
@@ -421,17 +438,7 @@ fun run_suite root fuel s =
     let
       val checked = solidityPrepareLib.prepare_artifact
         {root = root, path = artifact, source = source}
-      (* The importer keeps the one contract no other inherits; the bytecode
-       * compared must be that contract's. *)
-      fun record_field name tm = Lib.assoc name (snd (TypeBase.dest_record tm))
-      val names =
-        map (stringSyntax.fromHOLstring o record_field "contract_name")
-          (fst (listSyntax.dest_list
-                  (record_field "unit_contracts" (#unit (#prepared checked)))))
-      val () =
-        if names = [contract] then ()
-        else fail ("the unit's contracts are [" ^ String.concatWith ", " names ^
-                   "], not " ^ contract)
+      val () = check_unit_contracts (#prepared checked) contract
       val (unit, program) = prepared_constants prefix (#prepared checked)
       val code = code_constant prefix (#artifact checked) source contract
       val peer = peer_code root prefix s
@@ -677,6 +684,7 @@ fun run_suite_three_way root yul_root s =
     val cases = array_field s "cases"
     val checked = solidityPrepareLib.prepare_artifact
       {root = root, path = artifact, source = source}
+    val () = check_unit_contracts (#prepared checked) contract
     val (unit, program) = prepared_constants prefix (#prepared checked)
     val code = code_constant prefix (#artifact checked) source contract
     val peer = peer_code root prefix s
