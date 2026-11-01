@@ -349,4 +349,252 @@ fun run_corpus {root, corpus} =
   end
   handle CorpusError msg => raise ERR "run_corpus" msg
 
+(* The three-way run: the compiler's own Yul, at the three stages the design
+ * separates, held to the same expectation the corpus theory holds the
+ * elaborated core and the deployed bytecode to (yulDifferentialTheory says
+ * what the comparison is). This reads the corpus, imports each suite's Yul,
+ * runs every case at every stage, and reports each result as a line
+ * "yul-differential-result: " followed by JSON.
+ *)
+
+fun emit_yul fields =
+  print ("yul-differential-result: " ^ json_object fields ^ "\n")
+
+(* A stage as the name its theorem carries, the name the report uses, the
+ * artifact it is imported from, and which of the two ASTs in that artifact to
+ * read. The optimizer-off artifact holds both stages the compiler defines:
+ * irAst, the code generator's own output, and irOptimizedAst, what its
+ * transformations leave. The optimizer-on artifact is the production build's
+ * irOptimizedAst.
+ *)
+fun yul_stages yul_root suite =
+  [("ir", "ir", yul_root ^ "/" ^ suite ^ ".ir.json", yulImportLib.Ir),
+   ("ir_optimized", "ir-optimized", yul_root ^ "/" ^ suite ^ ".ir.json",
+    yulImportLib.IrOptimized),
+   ("optimized", "optimized", yul_root ^ "/" ^ suite ^ ".optimized.json",
+    yulImportLib.IrOptimized)]
+
+(* One fuel for every case, and a generous one: a frame that runs out is a
+ * diagnostic rather than an agreement, and fuel costs nothing unless it runs
+ * out.
+ *)
+val yul_fuel = 1000000;
+
+fun yul_code_constant name path source contract stage =
+  let
+    val def = define name
+                (yulImportLib.import_runtime_artifact path source contract stage)
+    val () = cv_auto_trans def
+  in
+    lhs (concl def)
+  end
+
+(* Importing is where a stage is admitted, so admission is reported on its own
+ * line: an unknown node kind, builtin or object form leaves the stage not
+ * admitted, and its cases are not run at that stage. The report counts these
+ * separately from agreements.
+ *)
+fun yul_stage_code prefix suite source contract (tag, json_tag, path, stage) =
+  SOME (tag, json_tag,
+        yul_code_constant (prefix ^ "_" ^ tag ^ "_code") path source contract
+          stage)
+  handle yulImportLib.ImportError msg =>
+           (emit_yul [("kind", json_string "stage"), ("suite", json_string suite),
+                      ("stage", json_string json_tag),
+                      ("status", json_string "import-rejected"),
+                      ("message", json_string msg)];
+            NONE)
+       | yulImportLib.MalformedInput msg =>
+           (emit_yul [("kind", json_string "stage"), ("suite", json_string suite),
+                      ("stage", json_string json_tag),
+                      ("status", json_string "import-malformed"),
+                      ("message", json_string msg)];
+            NONE)
+       | e =>
+           (emit_yul [("kind", json_string "stage"), ("suite", json_string suite),
+                      ("stage", json_string json_tag),
+                      ("status", json_string "error"),
+                      ("message", json_string (General.exnMessage e))];
+            NONE)
+
+fun yul_verdict_term {code, unit, program, function, args, initial, expect,
+                      final, ycode} =
+  list_mk_comb
+    (prim_mk_const {Thy = "yulDifferential", Name = "yul_case_verdict"},
+     [code, unit, program, stringSyntax.fromMLstring function, args, initial,
+      expect, final, num_term (IntInf.fromInt yul_fuel), ycode])
+
+fun yul_expected_outcome unit function expect =
+  rhs (concl (cv_eval
+    (list_mk_comb (prim_mk_const {Thy = "solidityDifferential",
+                                  Name = "expected_outcome"},
+                   [unit, stringSyntax.fromMLstring function, expect]))))
+
+(* One case at one stage: a single cv_eval of the verdict, which runs the
+ * bytecode and the Yul. An agreement saves the case's yul_agrees theorem.
+ *)
+fun run_yul_stage env (stage_tag, json_tag, ycode) =
+  let
+    val suite = #suite env
+    val case_name = #case_name env
+    val theorem = "yul_" ^ suite ^ "_" ^ case_name ^ "_" ^ stage_tag
+    val base = [("kind", json_string "case"), ("suite", json_string suite),
+                ("case", json_string case_name),
+                ("stage", json_string json_tag)]
+    fun emit_status status extra =
+      emit_yul (base @ [("status", json_string status)] @ extra)
+    val tm = yul_verdict_term
+      {code = #code env, unit = #unit env, program = #program env,
+       function = #function env, args = #args env, initial = #initial env,
+       expect = #expect env, final = #final env, ycode = ycode}
+    val th = cv_eval tm
+    val (verdict, logs) = pairSyntax.dest_pair (rhs (concl th))
+    val log_count = length (fst (listSyntax.dest_list logs))
+    fun both_sides () =
+      case snd (strip_comb verdict) of
+        [a, b] => [("bytecode", outcome_json a), ("yul", outcome_json b)]
+      | _ => []
+  in
+    if is_con "Agree" verdict then
+      if log_count <> 0 then
+        (emit_status "logged"
+           [("theorem", json_string theorem),
+            ("message", json_string
+               "the Yul run wrote a log; the core and bytecode runs record none")];
+         false)
+      else
+        let
+          val agrees_tm =
+            list_mk_comb
+              (prim_mk_const {Thy = "yulDifferential", Name = "yul_agrees"},
+               snd (strip_comb tm))
+          val proved = EQT_ELIM
+            ((PURE_REWRITE_CONV [yulDifferentialTheory.yul_agrees_def, th,
+                                 pairTheory.FST, pairTheory.SND]
+                THENC REWRITE_CONV [is_agreement_def, pairTheory.FST, pairTheory.SND])
+               agrees_tm)
+          val _ = save_thm (theorem, proved)
+        in
+          emit_status "agree"
+            [("theorem", json_string theorem),
+             ("outcome", outcome_json (rand verdict)), ("logs", "0")];
+          true
+        end
+    else if is_con "StorageMismatch" verdict orelse
+            is_con "StorageUnexpected" verdict then
+      let
+        val mismatch = is_con "StorageMismatch" verdict
+        val (bytecode_st, other_st) =
+          case snd (strip_comb verdict) of
+            [b, x] => (b, x)
+          | _ => raise ERR "run_yul_stage" "unexpected verdict"
+      in
+        emit_status
+          (if mismatch then "storage-mismatch" else "storage-unexpected")
+          [("message", json_string
+             "Complete storage is compared; displayed values cover the listed slots."),
+           ("logs", Int.toString log_count),
+           ("bytecode_storage", storage_json bytecode_st),
+           (if mismatch then "yul_storage" else "expected_storage",
+            storage_json other_st)];
+        false
+      end
+    else
+      (emit_status
+         (String.map Char.toLower (fst (dest_const (fst (strip_comb verdict)))))
+         ([("logs", Int.toString log_count),
+           ("expected",
+            outcome_json (yul_expected_outcome (#unit env) (#function env)
+                            (#expect env)))]
+          @ both_sides ());
+       false)
+  end
+  handle e =>
+    (emit_yul [("kind", json_string "case"), ("suite", json_string (#suite env)),
+               ("case", json_string (#case_name env)),
+               ("stage", json_string json_tag),
+               ("status", json_string "error"),
+               ("message", json_string (General.exnMessage e))];
+     false)
+
+fun run_case_three_way suite_name env c =
+  let
+    val case_env =
+      {suite = suite_name, case_name = name_field c "name",
+       function = string_field c "function",
+       args = arguments (array_field c "args"),
+       initial = storage (JSONUtil.findField c "storage"),
+       expect = expectation (field c "expect"),
+       final = storage (JSONUtil.findField c "final_storage"),
+       unit = #unit env, code = #code env, program = #program env}
+  in
+    List.foldl (fn (stage, ok) => run_yul_stage case_env stage andalso ok)
+      true (#stages env)
+  end
+  handle e =>
+    (emit_yul [("kind", json_string "case"), ("suite", json_string suite_name),
+               ("case", json_string (string_field c "name" handle _ => "?")),
+               ("status", json_string "error"),
+               ("message", json_string (General.exnMessage e))];
+     false)
+
+fun run_suite_three_way root yul_root s =
+  let
+    val suite = name_field s "name"
+    val prefix = "corpus_" ^ suite
+    val artifact = root ^ "/" ^ string_field s "artifact"
+    val source = string_field s "source"
+    val contract = string_field s "contract"
+    val cases = array_field s "cases"
+    val checked = solidityPrepareLib.prepare_artifact
+      {root = root, path = artifact, source = source}
+    val (unit, program) = prepared_constants prefix (#prepared checked)
+    val code = code_constant prefix (#artifact checked) source contract
+    val stages = List.mapPartial (yul_stage_code prefix suite source contract)
+                   (yul_stages yul_root suite)
+    val env = {unit = unit, code = code, program = program, stages = stages}
+  in
+    emit_yul [("kind", json_string "suite"), ("suite", json_string suite),
+              ("status", json_string "ok"),
+              ("stages",
+               json_array (map (fn (tag, _, _) => json_string tag) stages))];
+    List.foldl (fn (c, ok) => run_case_three_way suite env c andalso ok)
+      true cases
+  end
+  handle solidityPrepareLib.PreparationError (kind, message) =>
+           (emit_yul [("kind", json_string "suite"),
+                      ("suite", json_string (string_field s "name" handle _ => "?")),
+                      ("status", json_string
+                         (solidityPrepareLib.failure_name kind)),
+                      ("message", json_string message)];
+            false)
+       | CorpusError msg =>
+           (emit_yul [("kind", json_string "suite"),
+                      ("suite", json_string (string_field s "name" handle _ => "?")),
+                      ("status", json_string "error"),
+                      ("message", json_string msg)];
+            false)
+       | e as HOL_ERR _ =>
+           (emit_yul [("kind", json_string "suite"),
+                      ("suite", json_string (string_field s "name" handle _ => "?")),
+                      ("status", json_string "error"),
+                      ("message", json_string (General.exnMessage e))];
+            false)
+
+fun run_three_way {root, corpus, yul_root} =
+  let
+    val path = root ^ "/" ^ corpus
+    val v = JSONParser.parseFile path
+    val () = if string_field v "format" = "solidity-hol-differential-corpus-v1"
+             then () else raise ERR "run_three_way" (path ^ ": unsupported format")
+    val ok = List.foldl (fn (s, ok) =>
+                           run_suite_three_way root yul_root s andalso ok)
+               true (array_field v "suites")
+  in
+    if ok then ()
+    else raise ERR "run_three_way" "the Yul corpus failed; see the \
+                                   \yul-differential-result lines"
+  end
+  handle CorpusError msg => raise ERR "run_three_way" msg
+
 end
