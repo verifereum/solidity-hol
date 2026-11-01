@@ -88,9 +88,12 @@ fun hex_digit c =
   else if #"A" <= c andalso c <= #"F" then ord c - ord #"A" + 10
   else fail ("not a hex digit: " ^ String.str c)
 
+(* The digits of a hex string, with the 0x the compiler's numbers carry and
+ * without it where it leaves it off: a string literal's `hexValue` is the same
+ * hex, unprefixed.
+ *)
 fun hex_digits s =
-  if String.isPrefix "0x" s then String.extract (s, 2, NONE)
-  else fail ("not 0x-prefixed hex: " ^ s)
+  if String.isPrefix "0x" s then String.extract (s, 2, NONE) else s
 
 fun hex_number s =
   let val digits = hex_digits s in
@@ -160,7 +163,12 @@ fun builtin_of name =
 fun import_literal v = within v (fn v =>
   case string_field v "kind" of
     "number" => yul "LitNumber" [word_term (string_field v "value")]
-  | "string" => yul "LitBytes" [bytes_term (hex_bytes (string_field v "hexValue"))]
+  | "string" =>
+      (* Both the decoded text (`value`) and the bytes (`hexValue`) are there;
+       * the bytes are what the literal holds, and a literal written in hex has
+       * no text to read.
+       *)
+      yul "LitBytes" [bytes_term (hex_bytes (string_field v "hexValue"))]
   | kind => fail (describe v ^ ": unsupported literal kind " ^ kind))
 
 fun import_name v = within v (fn v =>

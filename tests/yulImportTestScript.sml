@@ -120,6 +120,31 @@ fun expect_malformed what v =
 (* The base is admitted, so a refusal below is the change, not a typo here. *)
 val () = ignore (import (minimal_output ()));
 
+(* A string literal, as the compiler emits one: the decoded text in `value` and
+ * the bytes in `hexValue`, which is hex without the 0x the numbers carry. What
+ * the importer must read is the bytes -- a literal written in hex has no text
+ * of its own -- so this pins the byte list in the imported tree.
+ *)
+val () =
+  let
+    val literal = obj [("nodeType", str "YulLiteral"), ("kind", str "string"),
+                       ("value", str "abc"), ("hexValue", str "616263"),
+                       ("type", str "")]
+    val imported =
+      import (output_with
+                [runtime_object [expression_statement
+                                   (call "mstore" [number "0", literal])]]
+                creation_code)
+    val expected = listSyntax.mk_list
+      (map (fn i => wordsSyntax.mk_wordii (i, 8)) [0x61, 0x62, 0x63],
+       wordsSyntax.mk_int_word_type 8)
+  in
+    if List.exists (fn t => aconv t expected) (find_terms (fn _ => true) imported)
+    then ()
+    else raise ERR "yulImportTest"
+           "a string literal did not import as its bytes"
+  end
+
 val () = expect_unknown "unknown node kind"
   (output_with [runtime_object [obj [("nodeType", str "YulNonsense")]]]
      creation_code)
