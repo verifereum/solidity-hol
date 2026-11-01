@@ -10,4 +10,4 @@ roots = ["solidityHolScript.sml"]
 
 [dependencies.verifereum]
 git = "https://github.com/verifereum/verifereum.git"
-rev = "1b6508cefacfd54f78437fb72d7962503ddbe96c"
+rev = "47a9174eb5214df0837b3cf3ca42f12c68b39abb"

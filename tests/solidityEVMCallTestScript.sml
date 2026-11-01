@@ -43,9 +43,10 @@ Definition call_fixture_def:
     |> in
     let caller = initial_context 0x1001w caller_code F
       empty_return_destination fixture_tx
-      with <| stack := operands; memory := input |> in
+      with <| stack := operands; memory := buffer_of_list input |> in
     <| contexts := [(caller, checkpoint)];
        txParams := fixture_tx_params; rollback := checkpoint;
+       originalAccounts := accounts;
        msdomain := Collect empty_domain |>
 End
 
@@ -83,7 +84,8 @@ Definition finite_call_summary_def:
         (case final.contexts of
           [] => NONE
         | (ctxt, checkpoint)::rest => SOME
-          (word, data, ctxt.memory, ctxt.pc, LENGTH final.contexts,
+          (word, data, buffer_to_list ctxt.memory,
+           ctxt.pc, LENGTH final.contexts,
            w2n (lookup_storage 0w (lookup_account 0x200w final.rollback.accounts).storage),
            w2n (lookup_storage 0w (lookup_account 0x1001w final.rollback.accounts).storage),
            final.txParams = es.txParams))

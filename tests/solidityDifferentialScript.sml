@@ -279,7 +279,7 @@ Definition differential_block_def:
     number := 1; timeStamp := 1; coinBase := 0w; gasLimit := 30000000;
     prevRandao := 0w; hash := 0w; parentBeaconBlockRoot := 0w;
     stateRoot := 0w; transactions := []; withdrawals := [];
-    requestsHash := 0w; withdrawalsRoot := 0w
+    requestsHash := 0w; withdrawalsRoot := 0w; rlpSize := 0
   |>
 End
 

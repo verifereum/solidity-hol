@@ -49,6 +49,7 @@ Definition reentry_initial_def:
     <| contexts := [(initial_context 0x1001w reentry_a_code F
           empty_return_destination fixture_tx, checkpoint)];
        txParams := fixture_tx_params; rollback := checkpoint;
+       originalAccounts := accounts;
        msdomain := Collect empty_domain |>
 End
 

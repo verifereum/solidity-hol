@@ -122,8 +122,9 @@ stack sizes; the nested outer-rollback fixture is separately proved well formed.
 Do not infer preservation hypotheses for arbitrary caller checkpoints from
 termination alone. `solidityEVMBoundaryPropsTheory` now derives boundary
 well-formedness preservation and unconditional transaction-parameter preservation.
-It also exposes entered-subtree untouched-storage preservation with the exact
-upstream checkpoint/access premises. See
+For entered subtrees, an unaccessed slot keeps its value or becomes zero in an
+account with nonce zero and empty code at subtree entry, with the exact upstream
+checkpoint/access premises. CREATE can clear pre-existing storage there. See
 [source-evm-adapter-contract.md](source-evm-adapter-contract.md) for the source
 adapter's required inputs and entry/exit correspondence obligations.
 
