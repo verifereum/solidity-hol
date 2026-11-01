@@ -12,3 +12,20 @@ contract Mutant {
         }
     }
 }
+
+// Token.mint (testdata/differential/token.sol) with the Transfer event's
+// indexed arguments swapped: the same outcome and storage, different logs.
+contract LogMutant {
+    event Transfer(address indexed from, address indexed to, uint256 value);
+
+    mapping(address => uint256) private balances;
+    mapping(address => mapping(address => uint256)) private allowances;
+    uint256 private supply;
+
+    function mint(address to, uint256 value) external {
+        require(to != address(0), "mint to zero");
+        supply += value;
+        balances[to] += value;
+        emit Transfer(to, address(0), value);
+    }
+}

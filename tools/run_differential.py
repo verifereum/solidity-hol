@@ -50,6 +50,10 @@ class CorpusError(Exception):
 # The corpus
 
 
+# contract_address in tests/solidityDifferentialScript.sml
+CONTRACT_ADDRESS = 0x1000
+
+
 def check_identifier(value: Any, what: str) -> str:
     if not isinstance(value, str) or IDENTIFIER.fullmatch(value) is None:
         raise CorpusError(f"{what} must be an identifier: {value!r}")
@@ -112,6 +116,44 @@ def check_storage(value: Any, what: str) -> None:
             raise CorpusError(f"{what}[{slot}] is not a 256-bit word: {contents!r}")
 
 
+def check_word(value: Any, bits: int, what: str) -> None:
+    number = word(value)
+    if number is None or number >= 2**bits:
+        raise CorpusError(f"{what} must be a {bits}-bit word: {value!r}")
+
+
+def check_logs(value: Any, what: str) -> None:
+    """Logs are a list of {"topics": [word, ...], "data": "0x..."}."""
+    if not isinstance(value, list):
+        raise CorpusError(f"{what} must be a list")
+    for index, log in enumerate(value):
+        if not isinstance(log, dict) or set(log) != {"topics", "data"}:
+            raise CorpusError(f"{what}[{index}] must have exactly topics and data")
+        if not isinstance(log["topics"], list) or len(log["topics"]) > 4:
+            raise CorpusError(f"{what}[{index}].topics must be a list of at most 4 words")
+        for topic, topic_word in enumerate(log["topics"]):
+            check_word(topic_word, 256, f"{what}[{index}].topics[{topic}]")
+        if not isinstance(log["data"], str) or HEX.fullmatch(log["data"]) is None:
+            raise CorpusError(f"{what}[{index}].data must be 0x-prefixed hex")
+
+
+def check_call(case: dict[str, Any], what: str) -> None:
+    """A case calls either raw calldata or a named function with arguments."""
+    if "calldata" in case:
+        if "function" in case or "args" in case:
+            raise CorpusError(f"{what}: calldata excludes function and args")
+        if not isinstance(case["calldata"], str) or HEX.fullmatch(case["calldata"]) is None:
+            raise CorpusError(f"{what}: calldata must be 0x-prefixed hex")
+        return
+    if not isinstance(case.get("function"), str) or not case["function"]:
+        raise CorpusError(f"{what}: function must be a string")
+    args = case.get("args")
+    if not isinstance(args, list):
+        raise CorpusError(f"{what}: args must be a list")
+    for index, arg in enumerate(args):
+        check_argument(arg, f"{what}.args[{index}]")
+
+
 def check_fuel(value: Any, what: str) -> None:
     if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
         raise CorpusError(f"{what} must be a positive integer")
@@ -156,21 +198,25 @@ def load_corpus(path: Path) -> dict[str, Any]:
             if theorem in theorems:
                 raise CorpusError(f"case {what} repeats theorem name {theorem}")
             theorems.add(theorem)
-            if not isinstance(case.get("function"), str) or not case["function"]:
-                raise CorpusError(f"{what}: function must be a string")
-            args = case.get("args")
-            if not isinstance(args, list):
-                raise CorpusError(f"{what}: args must be a list")
-            for index, arg in enumerate(args):
-                check_argument(arg, f"{what}.args[{index}]")
+            check_call(case, what)
+            if "sender" in case:
+                check_word(case["sender"], 160, f"{what}.sender")
+                if word(case["sender"]) == CONTRACT_ADDRESS:
+                    raise CorpusError(f"{what}.sender must not be the contract address")
+            if "value" in case:
+                # the harness funds the sender with 2^128 wei, gas included
+                check_word(case["value"], 127, f"{what}.value")
+            if "logs" in case:
+                check_logs(case["logs"], f"{what}.logs")
             check_expectation(case.get("expect"), f"{what}.expect")
             if "fuel" in case:
                 check_fuel(case["fuel"], f"{what}.fuel")
             for key in ("storage", "final_storage"):
                 if key in case:
                     check_storage(case[key], f"{what}.{key}")
-            unknown = set(case) - {"name", "function", "args", "storage", "expect",
-                                   "final_storage", "fuel"}
+            unknown = set(case) - {"name", "function", "args", "calldata", "sender",
+                                   "value", "storage", "expect", "final_storage",
+                                   "logs", "fuel"}
             if unknown:
                 raise CorpusError(f"{what}: unknown fields {sorted(unknown)}")
     return corpus
@@ -381,10 +427,15 @@ def write_reproduction(root: Path, directory: Path, suite: dict[str, Any],
     inputs = {"suite": suite["name"]}
     inputs.update({key: suite[key] for key in ("source", "contract", "artifact")})
     if case is not None:
-        inputs.update({"case": case["name"], "function": case["function"],
-                       "args": case["args"], "storage": case.get("storage", {}),
+        inputs.update({"case": case["name"],
+                       **{key: case[key] for key in ("function", "args", "calldata")
+                          if key in case},
+                       "sender": case.get("sender", "0x2000"),
+                       "value": case.get("value", 0),
+                       "storage": case.get("storage", {}),
                        "expect": case["expect"],
                        "final_storage": case.get("final_storage", {}),
+                       "logs": case.get("logs", []),
                        "fuel": case.get("fuel", fuel)})
     exporter.write_json_atomic(directory / "inputs.json", inputs)
     exporter.write_json_atomic(directory / "outcomes.json", result)

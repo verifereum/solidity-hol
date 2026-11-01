@@ -464,6 +464,16 @@ Definition call_result_type_def[simp]:
   (call_result_type tys = ProductType (MAP SingleType tys))
 End
 
+Definition environment_type_def:
+  environment_type f =
+    case f of
+      MsgSender => AddressT NonpayableAddress
+    | SelfAddress => AddressT NonpayableAddress
+    | TxOrigin => AddressT NonpayableAddress
+    | BlockCoinbase => AddressT PayableAddress
+    | _ => UintT 256
+End
+
 Definition wf_core_operation_def:
   (wf_core_operation env ctx annotation
      (ScalarOperation ty mode op args) ⇔
@@ -558,6 +568,8 @@ Definition wf_core_operation_def:
         wf_core_atoms env ctx (MAP (λ(_, ty). SingleType ty) p.parameters) args ∧
         annotation = call_result_type (MAP SND p.return_bindings)
     | NONE => F) ∧
+  (wf_core_operation env ctx annotation (EnvironmentOperation f) ⇔
+    annotation = SingleType (environment_type f)) ∧
   (wf_core_operation env ctx annotation _ ⇔ F)
 End
 
@@ -567,6 +579,20 @@ End
 Definition provisional_revert_payload_def:
   (provisional_revert_payload (ConstantAtom (BytesValue _)) ⇔ T) ∧
   (provisional_revert_payload _ ⇔ F)
+End
+
+(* Event arguments are elementary; the count of indexed ones, which with
+ * topic0 must fit the four topics of a log.
+ *)
+Definition emit_indexed_count_def:
+  (emit_indexed_count env ctx [] = SOME (0 : num)) ∧
+  (emit_indexed_count env ctx ((ty, indexed, a) :: args) =
+    if is_elementary_type ty ∧ valid_type_shape ty ∧
+       wf_core_atom env ctx (SingleType ty) a then
+      case emit_indexed_count env ctx args of
+        SOME n => SOME (if indexed then n + 1 else n)
+      | NONE => NONE
+    else NONE)
 End
 
 (* Statements: lexical scopes. A block's definitions and captures extend the
@@ -634,6 +660,12 @@ Definition check_core_stmts_def:
   (check_core_stmts env ctx (RevertStmt a :: ss) =
     if provisional_revert_payload a then check_core_stmts env ctx ss
     else NONE) ∧
+  (check_core_stmts env ctx (EmitStmt topic args :: ss) =
+    case emit_indexed_count env ctx args of
+      SOME n =>
+        if n + (if IS_SOME topic then 1 else 0) ≤ 4
+        then check_core_stmts env ctx ss else NONE
+    | NONE => NONE) ∧
   (check_core_stmts env ctx (_ :: _) = NONE)
 Termination
   WF_REL_TAC ‘measure (λ(env, ctx, ss). list_size core_stmt_size ss)’ >>
@@ -733,13 +765,47 @@ Definition wf_core_environment_def:
     EVERY (λ(_, decl). wf_type_declaration env decl) env.type_declarations
 End
 
+(* Calldata reaches procedures whose parameters and returns are elementary,
+ * the types the entry ABI-decodes and encodes; receive and the fallback take
+ * and return nothing.
+ *)
+Definition abi_procedure_def:
+  abi_procedure env f ⇔
+    case lookup_procedure env f of
+      SOME p =>
+        EVERY (λ(_, ty). is_elementary_type ty)
+          (p.parameters ++ p.return_bindings)
+    | NONE => F
+End
+
+Definition plain_procedure_def:
+  plain_procedure env f ⇔
+    case lookup_procedure env f of
+      SOME p => p.parameters = [] ∧ p.return_bindings = []
+    | NONE => F
+End
+
+Definition wf_core_dispatch_def:
+  wf_core_dispatch env (prog : core_program) ⇔
+    ALL_DISTINCT (MAP (λe. e.selector) prog.external_functions) ∧
+    EVERY (λe. LENGTH e.selector = 4 ∧ abi_procedure env e.external_procedure)
+      prog.external_functions ∧
+    (case prog.receive_procedure of
+       SOME f => plain_procedure env f
+     | NONE => T) ∧
+    (case prog.fallback_procedure of
+       SOME (f, _) => plain_procedure env f
+     | NONE => T)
+End
+
 Definition wf_core_program_def:
   wf_core_program env (prog : core_program) ⇔
     env.procedures = MAP (λp. (p.procedure_id, p)) prog.procedures ∧
     env.state_variables = MAP (λv. (v.state_id, v)) prog.state_variables ∧
     env.struct_layouts = MAP (λs. (s.struct_id, s)) prog.struct_layouts ∧
     wf_core_environment env ∧
-    IS_SOME (lookup_procedure env prog.entry_procedure)
+    IS_SOME (lookup_procedure env prog.entry_procedure) ∧
+    wf_core_dispatch env prog
 End
 
 (* Facts the evaluator can use under wf_core_program. *)
@@ -809,7 +875,9 @@ val () = cv_auto_trans_rec inline_storage_shape_def (
     INL (env, n, ty) => (cv$c2n n, cv_size ty)
   | INR (env, n, tys) => (cv$c2n n, cv_size tys))’ >> cv_termination_tac
 );
+val () = cv_auto_trans environment_type_def;
 val () = cv_auto_trans (SPEC_ALL wf_core_operation_def);
+val () = cv_auto_trans emit_indexed_count_def;
 val () = cv_auto_trans fresh_core_id_def;
 val () = cv_auto_trans bind_core_id_def;
 val () = cv_auto_trans capture_core_target_def;
@@ -832,4 +900,7 @@ Proof
   rw[] >> fs[]
 QED
 
+val () = cv_auto_trans abi_procedure_def;
+val () = cv_auto_trans plain_procedure_def;
+val () = cv_auto_trans wf_core_dispatch_def;
 val () = cv_auto_trans wf_core_program_def;

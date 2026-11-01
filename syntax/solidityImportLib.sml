@@ -61,11 +61,64 @@ val function_ty = import_type "src_function"
 val contract_ty = import_type "src_contract"
 val struct_ty = import_type "src_struct"
 val storage_entry_ty = import_type "src_storage_entry"
+val event_ty = import_type "src_event"
 
 fun con name args =
   list_mk_comb (prim_mk_const {Thy = "solidityImport", Name = name}, args)
 
 fun record name fields = TypeBase.mk_record (import_type name, fields)
+
+fun mk_bool b = if b then T else F
+
+(* The bytes of a hex string without prefix. *)
+fun hex_bytes v hex =
+  let
+    fun digit c =
+      if c >= #"0" andalso c <= #"9" then Char.ord c - 48
+      else if c >= #"a" andalso c <= #"f" then Char.ord c - 87
+      else if c >= #"A" andalso c <= #"F" then Char.ord c - 55
+      else fail (describe v ^ ": invalid hex string " ^ hex)
+    val () = require v (size hex mod 2 = 0) ("odd hex string length " ^ hex)
+  in
+    List.tabulate (size hex div 2, fn i =>
+      16 * digit (String.sub (hex, 2*i)) + digit (String.sub (hex, 2*i+1)))
+  end
+
+fun mk_bytes v hex =
+  listSyntax.mk_list
+    (map (fn b => wordsSyntax.mk_wordii (b, 8)) (hex_bytes v hex),
+     wordsSyntax.mk_int_word_type 8)
+
+(* The members of msg, tx and block, by the built-in declaration ids of the
+ * pinned compiler. *)
+fun environment_field v base member =
+  let
+    val name =
+      case (IntInf.toInt base, member) of
+        (~15, "sender") => "MsgSender"
+      | (~15, "value") => "MsgValue"
+      | (~26, "origin") => "TxOrigin"
+      | (~26, "gasprice") => "TxGasPrice"
+      | (~4, "number") => "BlockNumber"
+      | (~4, "timestamp") => "BlockTimestamp"
+      | (~4, "chainid") => "BlockChainId"
+      | (~4, "coinbase") => "BlockCoinbase"
+      | (~4, "basefee") => "BlockBaseFee"
+      | (~4, "gaslimit") => "BlockGasLimit"
+      | _ => fail (describe v ^ ": unsupported built-in member " ^ member)
+  in
+    prim_mk_const {Thy = "solidityCore", Name = name}
+  end
+
+fun builtin_identifier v id =
+  node_type v = "Identifier" andalso int_field v "referencedDeclaration" = id
+
+(* address(this) *)
+fun self_address v args =
+  string_field v "kind" = "typeConversion" andalso
+  node_type (field v "expression") = "ElementaryTypeNameExpression" andalso
+  string_field (field (field v "expression") "typeName") "name" = "address" andalso
+  (case args of [a] => builtin_identifier a ~28 | _ => false)
 
 (* "start:length:source" *)
 fun location v =
@@ -150,7 +203,15 @@ fun expr v = within v (fn v =>
              [info v, expr (field v "expression"),
               mk_num (JSONUtil.asIntInf declaration), type_id v]
        | NONE =>
-           (if String.isPrefix "t_struct$_"
+           let val base = field v "expression" in
+           if node_type base = "Identifier" andalso
+              int_field base "referencedDeclaration" < 0 then
+             con "SrcEnvironment"
+               [info v,
+                environment_field v (int_field base "referencedDeclaration")
+                  (string_field v "memberName"),
+                type_id v]
+           else if String.isPrefix "t_struct$_"
                  (string_field (field (field v "expression") "typeDescriptions") "typeIdentifier")
             then raise MalformedInput (describe v ^ ": missing struct field declaration")
             else case string_field v "memberName" of
@@ -160,7 +221,8 @@ fun expr v = within v (fn v =>
                 (require v (member = "push" orelse member = "pop")
                    "unsupported built-in member";
                  con "SrcArrayMember"
-                   [info v, mk_str member, expr (field v "expression"), type_id v])))
+                   [info v, mk_str member, expr (field v "expression"), type_id v])
+           end)
   | "Literal" =>
       (require v (not (isSome (optional_field v "subdenomination")))
          "literal subdenominations are not supported";
@@ -168,19 +230,8 @@ fun expr v = within v (fn v =>
          [info v, mk_str (string_field v "kind"),
           mk_str (if List.exists (fn k => k = string_field v "kind")
                        ["string", "unicodeString", "hexString"] then
-                    let
-                      val hex = string_field v "hexValue"
-                      fun digit c =
-                        if c >= #"0" andalso c <= #"9" then Char.ord c - 48
-                        else if c >= #"a" andalso c <= #"f" then Char.ord c - 87
-                        else if c >= #"A" andalso c <= #"F" then Char.ord c - 55
-                        else (fail (describe v ^ ": invalid hexValue"))
-                      val () = require v (size hex mod 2 = 0) "odd hexValue length"
-                    in
-                      String.implode (List.tabulate (size hex div 2, fn i =>
-                        Char.chr (16 * digit (String.sub (hex, 2*i)) +
-                                  digit (String.sub (hex, 2*i+1)))))
-                    end
+                    String.implode
+                      (map Char.chr (hex_bytes v (string_field v "hexValue")))
                   else string_field v "value"), type_id v])
   | "UnaryOperation" =>
       con "SrcUnaryOperation"
@@ -217,6 +268,11 @@ fun expr v = within v (fn v =>
              optionSyntax.mk_option expr_ty),
           type_id v])
   | "FunctionCall" =>
+      if self_address v (JSONUtil.arrayMap I (field v "arguments")) then
+        con "SrcEnvironment"
+          [info v, prim_mk_const {Thy = "solidityCore", Name = "SelfAddress"},
+           type_id v]
+      else
       let
         val args = JSONUtil.arrayMap expr (field v "arguments")
         val callee = field v "expression"
@@ -332,6 +388,18 @@ fun stmt v = within v (fn v =>
       con "SrcReturn"
         [info v, mk_num (int_field v "functionReturnParameters"),
          optional_expr v "expression"]
+  | "EmitStatement" =>
+      let val call = field v "eventCall" in
+        within call (fn call =>
+          (require call (null (JSONUtil.arrayMap I (field call "names")))
+             "named arguments are not supported";
+           within (field call "expression") (fn e => expect e "Identifier");
+           con "SrcEmit"
+             [info v,
+              mk_num (int_field (field call "expression") "referencedDeclaration"),
+              listSyntax.mk_list
+                (JSONUtil.arrayMap expr (field call "arguments"), expr_ty)]))
+      end
   | other => fail (describe v ^ ": unsupported statement " ^ other))
 and stmts v = listSyntax.mk_list (JSONUtil.arrayMap stmt v, stmt_ty)
 and optional_stmt v k = mk_opt stmt_ty (Option.map stmt (optional_field v k))
@@ -350,7 +418,8 @@ fun function v = within v (fn v =>
     val (returns_id, returns) = parameter_list (field v "returnParameters")
   in
     expect v "FunctionDefinition";
-    require v (string_field v "kind" = "function")
+    require v (List.exists (fn k => k = string_field v "kind")
+                 ["function", "receive", "fallback"])
       ("unsupported function kind " ^ string_field v "kind");
     require v (bool_field v "implemented") "unimplemented functions";
     require v (null (JSONUtil.arrayMap I (field v "modifiers")))
@@ -361,16 +430,29 @@ fun function v = within v (fn v =>
     record "src_function"
       [("fn_info", info v), ("fn_name", mk_str (string_field v "name")),
        ("fn_scope", mk_num (int_field v "scope")),
+       ("fn_kind", mk_str (string_field v "kind")),
        ("fn_visibility", mk_str (string_field v "visibility")),
        ("fn_mutability", mk_str (string_field v "stateMutability")),
        ("fn_selector",
-        mk_opt stringSyntax.string_ty
-          (Option.map (mk_str o JSONUtil.asString)
+        mk_opt (listSyntax.mk_list_type (wordsSyntax.mk_int_word_type 8))
+          (Option.map (mk_bytes v o JSONUtil.asString)
              (optional_field v "functionSelector"))),
        ("fn_parameters_id", params_id), ("fn_parameters", params),
        ("fn_returns_id", returns_id), ("fn_returns", returns),
        ("fn_body", stmt (field v "body"))]
   end)
+
+fun event v = within v (fn v =>
+  (expect v "EventDefinition";
+   record "src_event"
+     [("event_info", info v),
+      ("event_anonymous", mk_bool (bool_field v "anonymous")),
+      ("event_selector", mk_bytes v (string_field v "eventSelector")),
+      ("event_parameters", listSyntax.mk_list
+         (JSONUtil.arrayMap
+            (fn p => pairSyntax.mk_pair (variable p, mk_bool (bool_field p "indexed")))
+            (field (field v "parameters") "parameters"),
+          pairSyntax.mk_prod (variable_ty, bool)))]))
 
 (* An entry of a contract's storageLayout. *)
 fun storage_entry v = within v (fn v =>
@@ -425,7 +507,8 @@ fun contract external_structs contracts v = within v (fn v =>
       List.app (fn m => within m (fn m =>
                   require m (node_type m = "FunctionDefinition" orelse
                              node_type m = "VariableDeclaration" orelse
-                             node_type m = "StructDefinition")
+                             node_type m = "StructDefinition" orelse
+                             node_type m = "EventDefinition")
                     "unsupported contract member"))
         members
     val layout =
@@ -455,6 +538,8 @@ fun contract external_structs contracts v = within v (fn v =>
        ("contract_structs", listSyntax.mk_list
           (map (struct_declaration (field layout "types"))
              (external_structs @ members_of "StructDefinition"), struct_ty)),
+       ("contract_events", listSyntax.mk_list
+          (map event (members_of "EventDefinition"), event_ty)),
        ("contract_functions",
         listSyntax.mk_list
           (map function (members_of "FunctionDefinition"), function_ty))]
