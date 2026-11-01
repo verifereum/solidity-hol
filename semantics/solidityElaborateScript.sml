@@ -3,8 +3,8 @@
  *
  * Admitted: one contract, flattened along its bases, of functions over
  * elementary value types, with value-type state variables, storage structs,
- * scalar-key mappings and fixed/dynamic storage arrays, member/indexed scalar reads and updates,
- * array lengths, scalar push/pop and locals
+ * scalar-key mappings and fixed/dynamic storage arrays, member/indexed scalar
+ * reads and updates, array lengths, scalar push/pop and locals
  * (including tuple declarations with holes), internal calls with single or
  * multiple returns, explicit elementary conversions, literals, unary, binary,
  * comparison and short-circuit operators, simple and compound assignment to
@@ -1059,9 +1059,9 @@ Definition special_function_def:
 End
 
 (* Raw lowering of a valid unit of one contract, with fresh ids above its
- * node ids; the first function is the entry procedure. A SOME result is not
- * yet a checked program: consumers must establish wf_core_program through
- * solidityPrepareLib before execution.
+ * node ids; the first live function is the entry procedure. A SOME result is
+ * not yet a checked program: consumers must establish wf_core_program
+ * through solidityPrepareLib before execution.
  *)
 Definition elaborate_unit_def:
   elaborate_unit (u : src_unit) =

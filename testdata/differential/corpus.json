@@ -495,6 +495,18 @@
         {"name": "base_update_overflow_panics", "function": "bump", "args": [1], "storage": {"0": "115792089237316195423570985008687907853269984665640564039457584007913129639935"}, "expect": {"panic": "0x11"}},
         {"name": "dispatch_reaches_override", "function": "peek", "args": [8193], "storage": {"2": 7, "103313835155301363846162118174845647368154603271475845237394604746666688557604": 5}, "expect": {"return": [12]}}
       ]
+    },
+    {
+      "name": "inheritance_diamond",
+      "source": "testdata/differential/inheritance_diamond.sol",
+      "contract": "D",
+      "artifact": "testdata/differential/expected/inheritance_diamond.json",
+      "cases": [
+        {"name": "base_call_reaches_diamond_override", "function": "run", "args": [], "expect": {"return": [4]}, "final_storage": {"0": 4}},
+        {"name": "diamond_override_reads_state", "function": "run", "args": [], "storage": {"0": 5}, "expect": {"return": [9]}, "final_storage": {"0": 9}},
+        {"name": "fallback_override_runs", "calldata": "0xdeadbeef", "expect": {"return": []}, "final_storage": {"0": 200}},
+        {"name": "call_reaches_implementation_through_redeclaration", "function": "viaH", "args": [], "expect": {"return": [7]}}
+      ]
     }
   ]
 }
