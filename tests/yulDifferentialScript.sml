@@ -99,7 +99,7 @@ End
  * with the Yul run standing where the core run stands.
  *)
 Definition yul_case_verdict_def:
-  yul_case_verdict code u prog fuel c yfuel ycode =
+  yul_case_verdict code u prog c yfuel ycode =
     let slots = observed_slots prog c.case_storage c.case_final in
     let evm_run = evm_execution code u c in
     let yul_run = yul_case_execution ycode u c yfuel in
@@ -124,8 +124,8 @@ Definition yul_case_verdict_def:
 End
 
 Definition yul_agrees_def:
-  yul_agrees code u prog fuel c yfuel ycode ⇔
-    is_agreement (yul_case_verdict code u prog fuel c yfuel ycode)
+  yul_agrees code u prog c yfuel ycode ⇔
+    is_agreement (yul_case_verdict code u prog c yfuel ycode)
 End
 
 (* The complete-storage and complete-log checks of yul_case_verdict cannot
@@ -153,7 +153,7 @@ QED
  * solidityDifferential's differential_agrees_outcomes.
  *)
 Theorem yul_agrees_outcomes:
-  yul_agrees code u prog fuel c yfuel ycode ∧
+  yul_agrees code u prog c yfuel ycode ∧
   slots = observed_slots prog c.case_storage c.case_final ⇒
   ¬is_diagnostic (expected_outcome u c.case_input c.case_expect) ∧
   yul_observation ycode u c yfuel slots =
@@ -169,7 +169,7 @@ QED
  * lists: the whole committed storage, as the bytecode run's agreement is.
  *)
 Theorem yul_agrees_storage:
-  yul_agrees code u prog fuel c yfuel ycode ⇒
+  yul_agrees code u prog c yfuel ycode ⇒
   FST (SND (yul_case_execution ycode u c yfuel)) =
     SOME (seed_storage (c.case_final ++ c.case_storage))
 Proof
@@ -179,7 +179,7 @@ QED
 
 (* And the log it wrote is the one the case expects. *)
 Theorem yul_agrees_logs:
-  yul_agrees code u prog fuel c yfuel ycode ⇒
+  yul_agrees code u prog c yfuel ycode ⇒
   SND (SND (yul_case_execution ycode u c yfuel)) = expected_logs c.case_logs
 Proof
   rw[yul_agrees_def, yul_case_verdict_def] >>

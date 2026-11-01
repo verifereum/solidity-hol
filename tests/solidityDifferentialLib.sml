@@ -253,8 +253,7 @@ fun is_con name tm =
   end
 
 (* A corpus case as solidityDifferential's differential_case record, which is
- * what both the bytecode run and the Yul run are given, and the fuel it runs
- * with. *)
+ * what both the bytecode run and the Yul run are given. *)
 fun case_term c =
   TypeBase.mk_record
     (mk_thy_type {Thy = "solidityDifferential", Tyop = "differential_case",
@@ -273,6 +272,10 @@ fun case_term c =
       ("case_final", storage (JSONUtil.findField c "final_storage")),
       ("case_logs", logs (JSONUtil.findField c "logs"))])
 
+(* The fuel the core run of a case is given: the case's own, or the corpus's
+ * for one that declares none. The Yul run has its own (yul_fuel below) and
+ * does not read this.
+ *)
 fun case_fuel c fuel =
   case JSONUtil.findField c "fuel" of SOME v => integer v | NONE => fuel
 
@@ -494,10 +497,13 @@ fun yul_stage_code prefix suite source contract (tag, json_tag, path, stage) =
                       ("message", json_string (General.exnMessage e))];
             NONE)
 
-fun yul_verdict_term {code, unit, program, fuel, case_tm, ycode} =
+(* The Yul run has its own fuel (yul_fuel below): the corpus's fuel is the
+ * core evaluator's, which this verdict does not call.
+ *)
+fun yul_verdict_term {code, unit, program, case_tm, ycode} =
   list_mk_comb
     (prim_mk_const {Thy = "yulDifferential", Name = "yul_case_verdict"},
-     [code, unit, program, num_term fuel, case_tm,
+     [code, unit, program, case_tm,
       num_term (IntInf.fromInt yul_fuel), ycode])
 
 fun yul_expected_outcome unit input expect =
@@ -521,7 +527,7 @@ fun run_yul_stage env (stage_tag, json_tag, ycode) =
       emit_yul (base @ [("status", json_string status)] @ extra)
     val tm = yul_verdict_term
       {code = #code env, unit = #unit env, program = #program env,
-       fuel = #fuel env, case_tm = #case_tm env, ycode = ycode}
+       case_tm = #case_tm env, ycode = ycode}
     val th = cv_eval tm
     val verdict = rhs (concl th)
     fun both_sides () =
@@ -607,7 +613,7 @@ fun run_case_three_way suite_name env c =
     val case_env =
       {suite = suite_name, case_name = name_field c "name",
        case_tm = case_term c, input = call_input c,
-       expect = expectation (field c "expect"), fuel = case_fuel c (#fuel env),
+       expect = expectation (field c "expect"),
        unit = #unit env, code = #code env, program = #program env}
   in
     List.foldl (fn (stage, ok) => run_yul_stage case_env stage andalso ok)
@@ -620,7 +626,7 @@ fun run_case_three_way suite_name env c =
                ("message", json_string (General.exnMessage e))];
      false)
 
-fun run_suite_three_way root yul_root fuel s =
+fun run_suite_three_way root yul_root s =
   let
     val suite = name_field s "name"
     val prefix = "corpus_" ^ suite
@@ -634,8 +640,7 @@ fun run_suite_three_way root yul_root fuel s =
     val code = code_constant prefix (#artifact checked) source contract
     val stages = List.mapPartial (yul_stage_code prefix suite source contract)
                    (yul_stages yul_root suite)
-    val env = {unit = unit, code = code, program = program, stages = stages,
-               fuel = fuel}
+    val env = {unit = unit, code = code, program = program, stages = stages}
   in
     emit_yul [("kind", json_string "suite"), ("suite", json_string suite),
               ("status", json_string "ok"),
@@ -671,9 +676,8 @@ fun run_three_way {root, corpus, yul_root} =
     val v = JSONParser.parseFile path
     val () = if string_field v "format" = "solidity-hol-differential-corpus-v1"
              then () else raise ERR "run_three_way" (path ^ ": unsupported format")
-    val fuel = integer (field v "fuel")
     val ok = List.foldl (fn (s, ok) =>
-                           run_suite_three_way root yul_root fuel s andalso ok)
+                           run_suite_three_way root yul_root s andalso ok)
                true (array_field v "suites")
   in
     if ok then ()
