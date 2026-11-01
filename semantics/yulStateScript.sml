@@ -29,8 +29,8 @@
  * name it does not carry is an invalid outcome.
  *
  * The transaction and block the frame runs in are Verifereum's transaction
- * parameters, read by origin(), chainid(), number(), timestamp() and
- * coinbase().
+ * parameters, read by origin(), gasprice(), chainid(), number(),
+ * timestamp(), coinbase(), basefee() and gaslimit().
  *
  * Gas is not modelled: nothing in the pinned subset reads it.
  *)

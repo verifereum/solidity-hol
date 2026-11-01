@@ -324,7 +324,13 @@ Definition eval_yul_builtin_def:
     | (YAddress, []) => EvalValues [n2w (w2n m.self_address)] m
     | (YOrigin, []) =>
         EvalValues [n2w (w2n m.transaction_parameters.origin)] m
+    | (YGasPrice, []) =>
+        EvalValues [n2w m.transaction_parameters.gasPrice] m
     | (YChainId, []) => EvalValues [n2w m.transaction_parameters.chainId] m
+    | (YBaseFee, []) =>
+        EvalValues [n2w m.transaction_parameters.baseFeePerGas] m
+    | (YGasLimit, []) =>
+        EvalValues [n2w m.transaction_parameters.blockGasLimit] m
     | (YNumber, []) =>
         EvalValues [n2w m.transaction_parameters.blockNumber] m
     | (YTimestamp, []) =>
@@ -353,6 +359,12 @@ Definition eval_yul_builtin_def:
           EvalValues []
             (m' with logs := m'.logs ++
               [<| logger := m'.self_address; topics := [t1; t2; t3];
+                  data := bs |>])
+    | (YLog4, [p; s; t1; t2; t3; t4]) =>
+        let (m', bs) = yul_memory_region m (w2n p) (w2n s) in
+          EvalValues []
+            (m' with logs := m'.logs ++
+              [<| logger := m'.self_address; topics := [t1; t2; t3; t4];
                   data := bs |>])
     | (YPop, [_]) => EvalValues [] m
     | (YStop, []) => EvalAbrupt (YulReturn []) m

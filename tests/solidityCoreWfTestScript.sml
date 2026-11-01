@@ -462,6 +462,27 @@ Proof
   EVAL_TAC
 QED
 
+(* Calldata decodes and return data encodes only elementary types. *)
+Theorem non_elementary_external_parameter_rejected:
+  ¬wf_core_dispatch
+     (test_env with procedures :=
+        [(AstId 1, add_proc with parameters :=
+                     [(AstId 10, UserValueT (AstId 901)); (AstId 11, u256)])])
+     (test_program with external_functions := [external [1w; 2w; 3w; 4w] 1])
+Proof
+  EVAL_TAC
+QED
+
+Theorem non_elementary_external_return_rejected:
+  ¬wf_core_dispatch
+     (test_env with procedures :=
+        [(AstId 1, add_proc with return_bindings :=
+                     [(AstId 12, UserValueT (AstId 901))])])
+     (test_program with external_functions := [external [1w; 2w; 3w; 4w] 1])
+Proof
+  EVAL_TAC
+QED
+
 Theorem receive_with_parameters_rejected:
   ¬wf_core_dispatch test_env (test_program with receive_procedure := SOME (AstId 1))
 Proof

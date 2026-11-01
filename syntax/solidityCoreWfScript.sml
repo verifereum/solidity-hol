@@ -587,7 +587,8 @@ End
 Definition emit_indexed_count_def:
   (emit_indexed_count env ctx [] = SOME (0 : num)) ∧
   (emit_indexed_count env ctx ((ty, indexed, a) :: args) =
-    if is_elementary_type ty ∧ wf_core_atom env ctx (SingleType ty) a then
+    if is_elementary_type ty ∧ valid_type_shape ty ∧
+       wf_core_atom env ctx (SingleType ty) a then
       case emit_indexed_count env ctx args of
         SOME n => SOME (if indexed then n + 1 else n)
       | NONE => NONE

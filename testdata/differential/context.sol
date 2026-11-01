@@ -6,6 +6,9 @@ contract Context {
     event Received(address indexed sender, uint256 value);
     event Fallback(uint256 value) anonymous;
     event Noted(uint8 indexed tag, bool flag, bytes32 data);
+    event Plain(uint256 value);
+    event Typed(int8 indexed a, bytes4 indexed b, bool indexed c);
+    event Four(uint256 indexed a, uint256 indexed b, uint256 indexed c, uint256 indexed d) anonymous;
 
     uint256 private deposits;
     address private last;
@@ -39,6 +42,23 @@ contract Context {
 
     function blockInfo() external view returns (uint256, uint256, uint256, address) {
         return (block.number, block.timestamp, block.chainid, block.coinbase);
+    }
+
+    function feeInfo() external view returns (uint256, uint256, uint256) {
+        return (tx.gasprice, block.basefee, block.gaslimit);
+    }
+
+    function typed(int8 a, bytes4 b, bool c) external {
+        emit Typed(a, b, c);
+    }
+
+    function four() external {
+        emit Four(1, 2, 3, 4);
+    }
+
+    function emitThenCheck(uint256 x) external {
+        emit Plain(x);
+        require(x == 0, "nonzero");
     }
 
     function note(uint8 tag, bool flag, bytes32 data) external {

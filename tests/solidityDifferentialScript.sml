@@ -227,10 +227,18 @@ End
 
 (* The transaction *)
 
+(* Distinct values for each field a contract can read, so that reading the
+ * wrong one shows up as a mismatch.
+ *)
+Definition differential_chain_id_def:
+  differential_chain_id = 5n
+End
+
 Definition differential_block_def:
   differential_block = <|
-    baseFeePerGas := 0; excessBlobGas := 0; gasUsed := 0; blobGasUsed := 0;
-    number := 1; timeStamp := 1; coinBase := 0w; gasLimit := 30000000;
+    baseFeePerGas := 7; excessBlobGas := 0; gasUsed := 0; blobGasUsed := 0;
+    number := 11; timeStamp := 1700000000; coinBase := 0xC0FFEEw;
+    gasLimit := 30000000;
     prevRandao := 0w; hash := 0w; parentBeaconBlockRoot := 0w;
     stateRoot := 0w; transactions := []; withdrawals := [];
     requestsHash := 0w; withdrawalsRoot := 0w; rlpSize := 0
@@ -240,7 +248,7 @@ End
 Definition differential_tx_def:
   differential_tx sender value data = <|
     from := sender; to := SOME contract_address; data := data; nonce := 0;
-    value := value; gasLimit := 10000000; gasPrice := 0; accessList := [];
+    value := value; gasLimit := 10000000; gasPrice := 9; accessList := [];
     blobVersionedHashes := []; maxFeePerBlobGas := NONE; maxFeePerGas := NONE;
     authorizationList := []
   |>
@@ -256,7 +264,7 @@ Definition differential_frame_def:
     self_address := contract_address; code_address := contract_address;
     sender_address := sender; call_value := value; call_data := data;
     static_context := F;
-    tx_params := initial_tx_params 1 [] differential_block
+    tx_params := initial_tx_params differential_chain_id [] differential_block
                    (differential_tx sender value data) 0
   |>
 End
@@ -303,7 +311,8 @@ Definition evm_execution_def:
     case input_call u c.case_input of
       INL d => (Diagnostic d, NONE, [])
     | INR (data, _) =>
-        case run_transaction (Collect empty_domain) F 1 [] differential_block
+        case run_transaction (Collect empty_domain) F differential_chain_id []
+               differential_block
                (differential_accounts code c.case_storage c.case_sender)
                (differential_tx c.case_sender c.case_value data) of
           SOME (r, accounts) =>

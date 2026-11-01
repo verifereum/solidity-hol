@@ -116,6 +116,7 @@ fun builtin_identifier v id =
 (* address(this) *)
 fun self_address v args =
   string_field v "kind" = "typeConversion" andalso
+  node_type (field v "expression") = "ElementaryTypeNameExpression" andalso
   string_field (field (field v "expression") "typeName") "name" = "address" andalso
   (case args of [a] => builtin_identifier a ~28 | _ => false)
 

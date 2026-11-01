@@ -43,9 +43,10 @@ Datatype:
   | YCallDataLoad | YCallDataSize | YCallValue | YMemoryGuard | YCaller
   | YLoadImmutable | YAddress
     (* the transaction and block *)
-  | YOrigin | YChainId | YNumber | YTimestamp | YCoinbase
+  | YOrigin | YGasPrice | YChainId | YNumber | YTimestamp | YCoinbase | YBaseFee
+  | YGasLimit
     (* events *)
-  | YLog0 | YLog1 | YLog2 | YLog3
+  | YLog0 | YLog1 | YLog2 | YLog3 | YLog4
     (* discards a value *)
   | YPop
     (* halting *)

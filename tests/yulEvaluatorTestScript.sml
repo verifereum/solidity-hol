@@ -16,9 +16,9 @@ Libs
  *)
 Definition yul_test_tx_params_def:
   yul_test_tx_params =
-    <| origin := 0xA1w; gasPrice := 0; baseFeePerGas := 0;
+    <| origin := 0xA1w; gasPrice := 9; baseFeePerGas := 3;
        baseFeePerBlobGas := 0; blockNumber := 7; blockTimeStamp := 1700;
-       blockCoinBase := 0xC0w; blockGasLimit := 0; prevRandao := 0w;
+       blockCoinBase := 0xC0w; blockGasLimit := 30000; prevRandao := 0w;
        prevHashes := []; blobHashes := []; chainId := 5; authRefund := 0 |>
 End
 
@@ -432,7 +432,7 @@ End
 
 val () = cv_auto_trans log3_code_def;
 
-(* mstore(0, address()) mstore(32, origin()) ... return(0, 192)
+(* mstore(0, address()) mstore(32, origin()) ... return(0, 288)
  * The executing account from the frame, the rest from its transaction and
  * block.
  *)
@@ -441,14 +441,15 @@ Definition environment_code_def:
     MAP (λ(i, b). YulExprStmt (YulBuiltin YMStore
                      [YulLit (LitNumber (n2w (32 * i))); YulBuiltin b []]))
       [(0, YAddress); (1, YOrigin); (2, YChainId); (3, YNumber);
-       (4, YTimestamp); (5, YCoinbase)] ++
+       (4, YTimestamp); (5, YCoinbase); (6, YGasPrice); (7, YBaseFee);
+       (8, YGasLimit)] ++
     [YulExprStmt (YulBuiltin YReturn
-       [YulLit (LitNumber 0w); YulLit (LitNumber 192w)])]
+       [YulLit (LitNumber 0w); YulLit (LitNumber 288w)])]
 End
 
 val () = cv_auto_trans environment_code_def;
 
-(* mstore(0, "ab") log0(0, 2) log2(0, 1, 11, 22) *)
+(* mstore(0, "ab") log0(0, 2) log2(0, 1, 11, 22) log4(1, 1, 1, 2, 3, 4) *)
 Definition log0_log2_code_def:
   log0_log2_code =
     [YulExprStmt (YulBuiltin YMStore
@@ -457,7 +458,10 @@ Definition log0_log2_code_def:
        [YulLit (LitNumber 0w); YulLit (LitNumber 2w)]);
      YulExprStmt (YulBuiltin YLog2
        [YulLit (LitNumber 0w); YulLit (LitNumber 1w); YulLit (LitNumber 11w);
-        YulLit (LitNumber 22w)])]
+        YulLit (LitNumber 22w)]);
+     YulExprStmt (YulBuiltin YLog4
+       [YulLit (LitNumber 1w); YulLit (LitNumber 1w); YulLit (LitNumber 1w);
+        YulLit (LitNumber 2w); YulLit (LitNumber 3w); YulLit (LitNumber 4w)])]
 End
 
 val () = cv_auto_trans log0_log2_code_def;
@@ -724,16 +728,20 @@ Theorem environment_builtins_read_the_frame_transaction_and_block:
              word_to_bytes_be (5w : bytes32) ++
              word_to_bytes_be (7w : bytes32) ++
              word_to_bytes_be (1700w : bytes32) ++
-             word_to_bytes_be (0xC0w : bytes32))
+             word_to_bytes_be (0xC0w : bytes32) ++
+             word_to_bytes_be (9w : bytes32) ++
+             word_to_bytes_be (3w : bytes32) ++
+             word_to_bytes_be (30000w : bytes32))
 Proof
   CONV_TAC cv_eval
 QED
 
-Theorem log0_and_log2_append_logs:
+Theorem log0_log2_and_log4_append_logs:
   (run 20 log0_log2_code).completion = YulNormal ∧
   (run 20 log0_log2_code).machine.logs =
     [<| logger := 0w; topics := []; data := [0x61w; 0x62w] |>;
-     <| logger := 0w; topics := [11w; 22w]; data := [0x61w] |>]
+     <| logger := 0w; topics := [11w; 22w]; data := [0x61w] |>;
+     <| logger := 0w; topics := [1w; 2w; 3w; 4w]; data := [0x62w] |>]
 Proof
   CONV_TAC cv_eval
 QED

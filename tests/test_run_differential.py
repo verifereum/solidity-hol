@@ -154,9 +154,16 @@ class CorpusTests(unittest.TestCase):
                 ({"calldata": "00"}, "calldata must be"),
                 ({}, "function must be"),
                 ({"calldata": "0x", "sender": 2**160}, "sender must be a 160-bit word"),
-                ({"calldata": "0x", "value": -1}, "value must be a 256-bit word"),
+                ({"calldata": "0x", "sender": "0x1000"}, "not be the contract address"),
+                ({"calldata": "0x", "value": -1}, "value must be a 127-bit word"),
+                ({"calldata": "0x", "value": 2**127}, "value must be a 127-bit word"),
+                ({"calldata": "0x12g4"}, "calldata must be"),
                 ({"calldata": "0x", "logs": [{"topics": [1] * 5, "data": "0x"}]},
                  "at most 4"),
+                ({"calldata": "0x", "logs": [{"topics": [2**256], "data": "0x"}]},
+                 r"topics\[0\] must be a 256-bit word"),
+                ({"calldata": "0x", "logs": [{"topics": [], "data": "ab"}]},
+                 "data must be 0x-prefixed hex"),
                 ({"calldata": "0x", "logs": [{"topics": []}]}, "exactly topics and data")]:
             case = {**base, **fields}
             with self.subTest(fields=fields), tempfile.TemporaryDirectory() as temporary:

@@ -425,7 +425,12 @@
         {"name": "self_address", "function": "self", "args": [], "expect": {"return": [4096]}},
         {"name": "sender", "function": "sender", "args": [], "sender": 16384, "expect": {"return": [16384]}},
         {"name": "origin", "function": "origin", "args": [], "sender": 16384, "expect": {"return": [16384]}},
-        {"name": "block_info", "function": "blockInfo", "args": [], "expect": {"return": [1, 1, 1, 0]}},
+        {"name": "block_info", "function": "blockInfo", "args": [], "expect": {"return": [11, 1700000000, 5, 12648430]}},
+        {"name": "fee_info", "function": "feeInfo", "args": [], "expect": {"return": [9, 7, 30000000]}},
+        {"name": "typed_topics", "function": "typed", "args": [-2, "0xdeadbeef", true], "expect": {"return": []}, "logs": [{"topics": ["0xfc3c23acad18f11bc4ef52fa0934da4333adec748ee5e40f84c25be6a0a7269c", "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe", "0xdeadbeef00000000000000000000000000000000000000000000000000000000", "0x0000000000000000000000000000000000000000000000000000000000000001"], "data": "0x"}]},
+        {"name": "four_topics_anonymous", "function": "four", "args": [], "expect": {"return": []}, "logs": [{"topics": ["0x0000000000000000000000000000000000000000000000000000000000000001", "0x0000000000000000000000000000000000000000000000000000000000000002", "0x0000000000000000000000000000000000000000000000000000000000000003", "0x0000000000000000000000000000000000000000000000000000000000000004"], "data": "0x"}]},
+        {"name": "emit_then_succeed", "function": "emitThenCheck", "args": [0], "expect": {"return": []}, "logs": [{"topics": ["0xff0c7f7b06a20eca4250394c03d994f0560c2cc82c3349fe9d95f30ee2d9d2d7"], "data": "0x0000000000000000000000000000000000000000000000000000000000000000"}]},
+        {"name": "revert_discards_logs", "function": "emitThenCheck", "args": [1], "expect": {"revert": "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000076e6f6e7a65726f00000000000000000000000000000000000000000000000000"}},
         {"name": "view_with_value_reverts", "function": "self", "args": [], "value": 1, "expect": {"revert": "0x"}},
         {"name": "note_logs_indexed_tag", "function": "note", "args": [7, true, "0xabababababababababababababababababababababababababababababababab"], "expect": {"return": []}, "logs": [{"topics": ["0x78a6dcdccb83e6cd3931ab7002ecfd066041fa0ed58be869ce152ce214eac4f2", "0x0000000000000000000000000000000000000000000000000000000000000007"], "data": "0x0000000000000000000000000000000000000000000000000000000000000001abababababababababababababababababababababababababababababababab"}]},
         {"name": "narrow_round_trip", "function": "narrow", "args": [255, -2, "0xabcd", false], "expect": {"return": [255, -2, "0xabcd", false]}},
@@ -435,6 +440,28 @@
         {"name": "narrow_dirty_bytes2_reverts", "calldata": "0x127df07e00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000abcd0100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "expect": {"revert": "0x"}},
         {"name": "narrow_dirty_bool_reverts", "calldata": "0x127df07e00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000abcd0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002", "expect": {"revert": "0x"}},
         {"name": "narrow_short_calldata_reverts", "calldata": "0x127df07e00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000abcd00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "expect": {"revert": "0x"}}
+      ]
+    },
+    {
+      "name": "fallback",
+      "source": "testdata/differential/fallback.sol",
+      "contract": "FallbackOnly",
+      "artifact": "testdata/differential/expected/fallback.json",
+      "cases": [
+        {"name": "empty_calldata_runs_fallback", "calldata": "0x", "expect": {"return": []}, "final_storage": {"0": 1}},
+        {"name": "selector_runs_fallback", "calldata": "0xdeadbeef", "storage": {"0": 4}, "expect": {"return": []}, "final_storage": {"0": 5}},
+        {"name": "value_reverts", "calldata": "0x", "value": 1, "expect": {"revert": "0x"}}
+      ]
+    },
+    {
+      "name": "receive",
+      "source": "testdata/differential/receive.sol",
+      "contract": "ReceiveOnly",
+      "artifact": "testdata/differential/expected/receive.json",
+      "cases": [
+        {"name": "empty_calldata_runs_receive", "calldata": "0x", "value": 4, "expect": {"return": []}, "final_storage": {"0": 4}},
+        {"name": "short_calldata_reverts", "calldata": "0x01", "expect": {"revert": "0x"}},
+        {"name": "selector_reverts", "calldata": "0xdeadbeef", "expect": {"revert": "0x"}}
       ]
     }
   ]

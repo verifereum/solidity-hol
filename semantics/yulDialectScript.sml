@@ -59,6 +59,10 @@ Definition builtin_name_def:
   builtin_name YCoinbase = "coinbase" ∧
   builtin_name YLog0 = "log0" ∧
   builtin_name YLog2 = "log2" ∧
+  builtin_name YLog4 = "log4" ∧
+  builtin_name YGasPrice = "gasprice" ∧
+  builtin_name YBaseFee = "basefee" ∧
+  builtin_name YGasLimit = "gaslimit" ∧
   builtin_name YStop = "stop" ∧
   builtin_name YPop = "pop" ∧
   builtin_name YReturn = "return" ∧
@@ -114,6 +118,10 @@ Definition builtin_of_name_def:
     else if name = "coinbase" then SOME YCoinbase
     else if name = "log0" then SOME YLog0
     else if name = "log2" then SOME YLog2
+    else if name = "log4" then SOME YLog4
+    else if name = "gasprice" then SOME YGasPrice
+    else if name = "basefee" then SOME YBaseFee
+    else if name = "gaslimit" then SOME YGasLimit
     else if name = "stop" then SOME YStop
     else if name = "pop" then SOME YPop
     else if name = "return" then SOME YReturn
@@ -189,6 +197,10 @@ Definition builtin_effect_def:
   builtin_effect YCoinbase = EffectFrame ∧
   builtin_effect YLog0 = EffectLog ∧
   builtin_effect YLog2 = EffectLog ∧
+  builtin_effect YLog4 = EffectLog ∧
+  builtin_effect YGasPrice = EffectFrame ∧
+  builtin_effect YBaseFee = EffectFrame ∧
+  builtin_effect YGasLimit = EffectFrame ∧
   builtin_effect YStop = EffectHalt ∧
   builtin_effect YPop = EffectPure ∧
   builtin_effect YReturn = EffectHalt ∧

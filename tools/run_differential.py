@@ -50,6 +50,10 @@ class CorpusError(Exception):
 # The corpus
 
 
+# contract_address in tests/solidityDifferentialScript.sml
+CONTRACT_ADDRESS = 0x1000
+
+
 def check_identifier(value: Any, what: str) -> str:
     if not isinstance(value, str) or IDENTIFIER.fullmatch(value) is None:
         raise CorpusError(f"{what} must be an identifier: {value!r}")
@@ -197,8 +201,11 @@ def load_corpus(path: Path) -> dict[str, Any]:
             check_call(case, what)
             if "sender" in case:
                 check_word(case["sender"], 160, f"{what}.sender")
+                if word(case["sender"]) == CONTRACT_ADDRESS:
+                    raise CorpusError(f"{what}.sender must not be the contract address")
             if "value" in case:
-                check_word(case["value"], 256, f"{what}.value")
+                # the harness funds the sender with 2^128 wei, gas included
+                check_word(case["value"], 127, f"{what}.value")
             if "logs" in case:
                 check_logs(case["logs"], f"{what}.logs")
             check_expectation(case.get("expect"), f"{what}.expect")

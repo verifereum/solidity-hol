@@ -170,20 +170,30 @@ Definition eval_pure_operation_def:
 End
 
 (* msg, this, tx and block reads, from the frame. *)
+(* The numeric fields are unbounded in the frame; the EVM reads each as a
+ * word, so as a uint256 it wraps.
+ *)
 Definition environment_value_def:
   environment_value (fr : source_frame) f =
     case f of
       MsgSender => AddressValue fr.sender_address
-    | MsgValue => IntegerValue (&fr.call_value)
+    | MsgValue =>
+        IntegerValue (wrap_integer F 256 (&fr.call_value))
     | SelfAddress => AddressValue fr.self_address
     | TxOrigin => AddressValue fr.tx_params.origin
-    | TxGasPrice => IntegerValue (&fr.tx_params.gasPrice)
-    | BlockNumber => IntegerValue (&fr.tx_params.blockNumber)
-    | BlockTimestamp => IntegerValue (&fr.tx_params.blockTimeStamp)
-    | BlockChainId => IntegerValue (&fr.tx_params.chainId)
+    | TxGasPrice =>
+        IntegerValue (wrap_integer F 256 (&fr.tx_params.gasPrice))
+    | BlockNumber =>
+        IntegerValue (wrap_integer F 256 (&fr.tx_params.blockNumber))
+    | BlockTimestamp =>
+        IntegerValue (wrap_integer F 256 (&fr.tx_params.blockTimeStamp))
+    | BlockChainId =>
+        IntegerValue (wrap_integer F 256 (&fr.tx_params.chainId))
     | BlockCoinbase => AddressValue fr.tx_params.blockCoinBase
-    | BlockBaseFee => IntegerValue (&fr.tx_params.baseFeePerGas)
-    | BlockGasLimit => IntegerValue (&fr.tx_params.blockGasLimit)
+    | BlockBaseFee =>
+        IntegerValue (wrap_integer F 256 (&fr.tx_params.baseFeePerGas))
+    | BlockGasLimit =>
+        IntegerValue (wrap_integer F 256 (&fr.tx_params.blockGasLimit))
 End
 
 (* Pure operations; calls and array mutations are handled by statements. *)

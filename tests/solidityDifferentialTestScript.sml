@@ -23,6 +23,17 @@ End
 
 val () = cv_trans_deep_embedding EVAL mutant_code_def;
 
+(* testdata/differential/mutant.sol: Token.mint, logging a different Transfer. *)
+Definition log_mutant_code_def:
+  log_mutant_code = REVERSE $ hex_to_rev_bytes [] $
+    ^(stringSyntax.fromMLstring
+        (artifact_deployed_bytecode
+           "../testdata/differential/expected/mutant.json"
+           "testdata/differential/mutant.sol" "LogMutant"))
+End
+
+val () = cv_trans_deep_embedding EVAL log_mutant_code_def;
+
 (* A call of a named function from the default sender, without value, that
  * logs nothing. *)
 Definition named_call_def:
@@ -199,6 +210,54 @@ Theorem unlisted_mapping_write_detected:
     (ExpectReturn [IntArg 0]) []) =
   StorageMismatch [(0,0); (1,0); (2,0); (3,0); (4,0); (5,0); (6,0)]
                   [(0,0); (1,0); (2,0); (3,0); (4,0); (5,0); (6,0)]
+Proof
+  simp_tac std_ss [differential_verdict_def, LET_THM] >>
+  CONV_TAC (cv_eval_call "observed_slots") >>
+  CONV_TAC cv_eval
+QED
+
+(* Logs: a call that agrees on outcome and storage but logs differently is a
+ * mismatch, and logs other than the case expects are unexpected. mint(0x3000,
+ * 5) writes the supply (slot 2) and balances[0x3000] (keccak256 of the key and
+ * slot 0).
+ *)
+Definition mint_call_def:
+  mint_call logs =
+    <| case_sender := 0x2000w; case_value := 0;
+       case_input := NamedCall "mint" [IntArg 0x3000; IntArg 5];
+       case_storage := []; case_expect := ExpectReturn [];
+       case_final :=
+         [(2, 5);
+          (68113724183316182233052564790125915752421945217496801851705428207216635038832,
+           5)];
+       case_logs := logs |>
+End
+
+val () = cv_auto_trans mint_call_def;
+
+Definition is_log_mismatch_def:
+  is_log_mismatch v = case v of LogMismatch _ _ => T | _ => F
+End
+
+Definition is_log_unexpected_def:
+  is_log_unexpected v = case v of LogUnexpected _ _ => T | _ => F
+End
+
+val () = cv_auto_trans is_log_mismatch_def;
+val () = cv_auto_trans is_log_unexpected_def;
+
+Theorem different_logs_detected:
+  is_log_mismatch (differential_verdict log_mutant_code corpus_token_unit
+    corpus_token_program 1000 (mint_call []))
+Proof
+  simp_tac std_ss [differential_verdict_def, LET_THM] >>
+  CONV_TAC (cv_eval_call "observed_slots") >>
+  CONV_TAC cv_eval
+QED
+
+Theorem unexpected_logs_detected:
+  is_log_unexpected (differential_verdict corpus_token_code corpus_token_unit
+    corpus_token_program 1000 (mint_call []))
 Proof
   simp_tac std_ss [differential_verdict_def, LET_THM] >>
   CONV_TAC (cv_eval_call "observed_slots") >>
