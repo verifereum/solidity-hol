@@ -27,7 +27,7 @@ locals or heap state.
 | Validated program environment | Resolved source calls, admitted call kind, ABI/layout information and compiler profile |
 | Evaluated source request | Target, calldata or initcode, value, salt where relevant, explicit requested gas if present; no deferred effectful expressions |
 | Source state | Meaningful frame, locals/heap, shared accounts/transient storage and logs after all operand effects |
-| Concrete boundary context | Existing EVM invocation and caller contexts underneath it, current rollback state, transaction parameters and domain mode |
+| Concrete boundary context | Existing EVM invocation and caller contexts underneath it, current rollback state, transaction-original accounts, transaction parameters and domain mode |
 | Concrete call-site representation | Code/parsed code/PC at the requested opcode; stack operands, calldata/initcode in concrete memory, output-memory destination |
 | Execution evidence | Distinguished-frame gas observations and other simulation evidence needed to justify the concrete call site; not persistent world state |
 
@@ -104,9 +104,11 @@ information before taking the callee checkpoint; do not replace this discipline
 with a blanket reset to the pre-opcode state on every failed call.
 
 Transaction-original state is not simply an immutable copy of current accounts.
-Verifereum creation setup can deliberately update the bottom original-account
-checkpoint for newly created accounts (`proceed_create` / `set_original`). A
-preservation theorem must account for that rule; the CALL-only original-storage
+Verifereum stores it in `execution_state.originalAccounts`, separately from saved
+rollback checkpoints. Creation setup deliberately resets the created account in
+that field (`proceed_create` / `set_original`), while saved rollback accounts
+retain pre-creation storage. A preservation theorem must account for that rule;
+the CALL-only original-storage
 witness is not a blanket immutability theorem for arbitrary CREATE subtrees.
 
 Frame-local gas evidence belongs to the distinguished source activation only.
@@ -118,13 +120,17 @@ storage clearing do not happen after each external call.
 ## Evidence now available
 
 - `solidityEVMBoundaryPropsTheory`: boundary well-formedness preservation;
-  unconditional transaction-parameter preservation; entered-subtree untouched
-  storage preservation under exact upstream checkpoint/access hypotheses.
+  unconditional transaction-parameter preservation; entered-subtree unaccessed
+  slots keep their value, or become zero in an account with nonce zero and empty
+  code at subtree entry, under exact upstream checkpoint/access hypotheses.
 - `solidityEVMBookkeepingTestTheory`: nonempty seeded access/domain/deletion and
   transient state survive successful/reverted calls; current storage 9, caller
   checkpoint 9 and transaction-original storage 5 are kept distinct; successful
   write changes current storage to 1 without resetting the checkpoints; caller
   tail metadata and an untouched storage slot are preserved.
+- `solidityEVMCreateTestTheory`: CREATE/CREATE2 clear storage in nonce-zero,
+  code-empty targets without accessing those slots; failed initcode and enclosing
+  reverts restore saved storage, including when creation occurs in a CALL subtree.
 - `solidityEVMReentryTestTheory`: a well-formed outer A invocation executes its
   actual prefix to CALL, B reenters deployed A's callback branch, and resumed A
   observes storage 7 and returns byte 7. Original A storage remains 0. This is

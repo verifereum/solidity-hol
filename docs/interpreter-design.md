@@ -13,7 +13,9 @@ implementation checkpoint is recorded in
 ## Evidence and revision scope
 
 - Verifereum: project dependency in `.holbuild/src/verifereum`, revision
-  `1b6508cefacfd54f78437fb72d7962503ddbe96c` (our pinned version).
+  `1b6508cefacfd54f78437fb72d7962503ddbe96c` during the initial inspection.
+  The dependency now uses `47a9174eb5214df0837b3cf3ca42f12c68b39abb`; the
+  original-account descriptions below reflect that migration.
 - Vyper-HOL: local checkout `/home/ubuntu/vyper-hol`. The checkout changed HEAD
   during this inspection, from `bf32bb56c4e6afe4548a1fb5827ca9643b793ccc` to
   `7ce7a3a0bbf80abae20b1930744f49e0367b95da`; observations below describe the
@@ -79,10 +81,13 @@ fuel-stability or external-interaction-tree theorems for Solidity.
 - `context`: EVM stack/memory/PC, return data, gas used, refund counters, logs,
   and message parameters;
 - `execution_state`: a stack of contexts with checkpoints, transaction
-  parameters, current rollback state, and domain enforcement/collection mode.
+  parameters, current rollback state, transaction-original accounts, and domain
+  enforcement/collection mode.
 
-`get_original` in `spec/vfmExecutionScript.sml` reads accounts from the bottom
-checkpoint. Original storage matters to EVM storage gas/refunds. A fresh
+`get_original` in `spec/vfmExecutionScript.sml` reads
+`execution_state.originalAccounts`. `set_original` updates that field separately
+from saved rollback checkpoints. Original storage matters to EVM storage
+gas/refunds. A fresh
 single-context execution cannot simply substitute current source-mutated
 accounts for transaction-original accounts without changing that behavior.
 
