@@ -139,7 +139,8 @@ class CorpusTests(unittest.TestCase):
     def test_accepts_transaction_cases(self) -> None:
         cases = [{"name": "raw", "calldata": "0x", "sender": "0x3000", "value": 5,
                   "expect": {"return": []},
-                  "logs": [{"topics": ["0x" + "11" * 32, 2], "data": "0x"}]},
+                  "logs": [{"topics": ["0x" + "11" * 32, 2], "data": "0x"},
+                           {"logger": "0x5000", "topics": [], "data": "0x"}]},
                  {"name": "named", "function": "f", "args": [], "value": "7",
                   "expect": {"revert": "0x"}, "logs": []}]
         with tempfile.TemporaryDirectory() as temporary:
@@ -154,7 +155,9 @@ class CorpusTests(unittest.TestCase):
                 ({"calldata": "00"}, "calldata must be"),
                 ({}, "function must be"),
                 ({"calldata": "0x", "sender": 2**160}, "sender must be a 160-bit word"),
-                ({"calldata": "0x", "sender": "0x1000"}, "not be the contract address"),
+                ({"calldata": "0x", "sender": "0x1000"}, "not be the contract or peer"),
+                ({"calldata": "0x", "sender": "0x5000"}, "not be the contract or peer"),
+                ({"calldata": "0x", "peer_storage": {}}, "peer_storage without a peer"),
                 ({"calldata": "0x", "value": -1}, "value must be a 127-bit word"),
                 ({"calldata": "0x", "value": 2**127}, "value must be a 127-bit word"),
                 ({"calldata": "0x12g4"}, "calldata must be"),
@@ -164,13 +167,43 @@ class CorpusTests(unittest.TestCase):
                  r"topics\[0\] must be a 256-bit word"),
                 ({"calldata": "0x", "logs": [{"topics": [], "data": "ab"}]},
                  "data must be 0x-prefixed hex"),
-                ({"calldata": "0x", "logs": [{"topics": []}]}, "exactly topics and data")]:
+                ({"calldata": "0x", "logs": [{"topics": []}]}, "must have topics, data"),
+                ({"calldata": "0x", "logs": [{"topics": [], "data": "0x", "logger": 2**160}]},
+                 r"logger must be a 160-bit word")]:
             case = {**base, **fields}
             with self.subTest(fields=fields), tempfile.TemporaryDirectory() as temporary:
                 path = Path(temporary) / "corpus.json"
                 path.write_text(json.dumps(corpus([case])), encoding="utf-8")
                 with self.assertRaisesRegex(driver.CorpusError, message):
                     driver.load_corpus(path)
+
+    def test_peer_suites(self) -> None:
+        peer = {"source": "p.sol", "contract": "P", "artifact": "p.json"}
+        case = {"name": "f", "calldata": "0x", "peer_storage": {"0": 1},
+                "expect": {"return": []}}
+        for suite_peer, message in [(peer, None),
+                                    ({**peer, "extra": "x"}, "peer must have exactly"),
+                                    ({**peer, "contract": ""}, "peer must have exactly")]:
+            data = corpus([case])
+            data["suites"][0]["peer"] = suite_peer
+            with self.subTest(peer=suite_peer), tempfile.TemporaryDirectory() as temporary:
+                path = Path(temporary) / "corpus.json"
+                path.write_text(json.dumps(data), encoding="utf-8")
+                if message is None:
+                    driver.load_corpus(path)
+                else:
+                    with self.assertRaisesRegex(driver.CorpusError, message):
+                        driver.load_corpus(path)
+
+    def test_detects_unstaged_peer_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            fake = FakeRoot(Path(temporary))
+            data = corpus()
+            data["suites"][0]["peer"] = {"source": SOURCE, "contract": "A",
+                                         "artifact": "testdata/peer.json"}
+            check = driver.check_staging(fake.root, driver.CORPUS, data)
+            self.assertEqual(check["status"], "fail")
+            self.assertIn("../testdata/peer.json", check["detail"])
 
     def test_detects_stale_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

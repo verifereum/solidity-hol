@@ -101,6 +101,10 @@ Datatype:
   | BlockBaseFee | BlockGasLimit
 End
 
+(* ExternalCallOperation kind selector parameter_types return_types target
+ * value arguments: a high-level call I(target).f{value: value}(arguments) of
+ * the function with that selector and those ABI types.
+ *)
 Datatype:
   core_operation
   = ScalarOperation sol_type arithmetic_mode core_operator (core_atom list)
@@ -114,7 +118,8 @@ Datatype:
   | ArrayPushOperation core_atom (core_atom option)
   | ArrayPopOperation core_atom
   | InternalCallOperation ast_id (core_atom list)
-  | ExternalCallOperation external_kind (core_atom list)
+  | ExternalCallOperation external_kind (byte list) (sol_type list)
+      (sol_type list) core_atom core_atom (core_atom list)
   | EnvironmentOperation environment_field
 End
 

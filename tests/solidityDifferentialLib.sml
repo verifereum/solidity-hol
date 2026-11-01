@@ -150,21 +150,26 @@ fun call_input c =
         [stringSyntax.fromMLstring f, arguments (array_field c "args")]
   | _ => fail "a case has either calldata or a function and its arguments"
 
-(* Logs as a list of {"topics": [...], "data": "0x..."}. *)
+(* Logs as a list of {"logger": address, "topics": [...], "data": "0x..."},
+ * the logger the contract by default. *)
 fun logs v =
   let
     val bytes32 = wordsSyntax.mk_int_word_type 256
     fun log l =
-      pairSyntax.mk_pair
-        (listSyntax.mk_list
+      pairSyntax.list_mk_pair
+        [word_term 160 (case JSONUtil.findField l "logger" of
+                          SOME a => integer a
+                        | NONE => 0x1000),
+         listSyntax.mk_list
            (map (word_term 256 o integer) (array_field l "topics"), bytes32),
-         bytes_term (hex_bytes (string_field l "data")))
+         bytes_term (hex_bytes (string_field l "data"))]
   in
     listSyntax.mk_list
       (map log (case v of NONE => [] | SOME (JSON.ARRAY ls) => ls
                         | SOME _ => fail "logs is a list"),
-       pairSyntax.mk_prod (listSyntax.mk_list_type bytes32,
-                           listSyntax.mk_list_type byte_ty))
+       pairSyntax.list_mk_prod
+         [wordsSyntax.mk_int_word_type 160, listSyntax.mk_list_type bytes32,
+          listSyntax.mk_list_type byte_ty])
   end
 
 (* Outcomes as JSON *)
@@ -192,7 +197,10 @@ fun logs_json tm =
     (map (fn e =>
             let val (_, fields) = TypeBase.dest_record e in
               json_object
-                [("topics", json_array
+                [("logger", json_string ("0x" ^ String.map Char.toLower
+                    (Arbnum.toHexString
+                       (wordsSyntax.dest_word_literal (Lib.assoc "logger" fields))))),
+                 ("topics", json_array
                     (map (fn t => json_string ("0x" ^ String.map Char.toLower
                                     (Arbnum.toHexString (wordsSyntax.dest_word_literal t))))
                        (fst (listSyntax.dest_list
@@ -231,6 +239,15 @@ fun prepared_constants prefix (prepared : solidityPrepareLib.prepared) =
     (lhs (concl unit_def), lhs (concl program_def))
   end
 
+fun code_definition name hex =
+  let
+    val def = define name
+                “REVERSE $ hex_to_rev_bytes [] ^(stringSyntax.fromMLstring hex)”
+    val () = cv_trans_deep_embedding EVAL def
+  in
+    lhs (concl def)
+  end
+
 fun code_constant prefix artifact source contract =
   let
     val hex = JSONUtil.asString (JSONUtil.get (artifact,
@@ -238,12 +255,20 @@ fun code_constant prefix artifact source contract =
                         "deployedBytecode", "object"]))
       handle e as JSONUtil.JSONError _ => fail (JSONUtil.exnMessage e)
            | e as JSONUtil.FieldNotFound _ => fail (JSONUtil.exnMessage e)
-    val def = define (prefix ^ "_code")
-                “REVERSE $ hex_to_rev_bytes [] ^(stringSyntax.fromMLstring hex)”
-    val () = cv_trans_deep_embedding EVAL def
   in
-    lhs (concl def)
+    code_definition (prefix ^ "_code") hex
   end
+
+(* The peer's code, from its own artifact; no code without a peer. *)
+fun peer_code root prefix s =
+  case JSONUtil.findField s "peer" of
+    NONE => listSyntax.mk_nil byte_ty
+  | SOME p =>
+      code_definition (prefix ^ "_peer_code")
+        (solidityImportLib.artifact_deployed_bytecode
+           (root ^ "/" ^ string_field p "artifact") (string_field p "source")
+           (string_field p "contract"))
+      handle solidityImportLib.ImportError msg => fail msg
 
 (* Cases *)
 
@@ -252,7 +277,7 @@ fun is_con name tm =
     is_const f andalso fst (dest_const f) = name
   end
 
-fun run_case {suite, code, unit, program, fuel} c =
+fun run_case {suite, code, peer, unit, program, fuel} c =
   let
     val case_name = name_field c "name"
     val theorem = suite ^ "_" ^ case_name
@@ -274,6 +299,8 @@ fun run_case {suite, code, unit, program, fuel} c =
                    | NONE => 0)),
         ("case_input", input),
         ("case_storage", storage (JSONUtil.findField c "storage")),
+        ("case_peer_code", peer),
+        ("case_peer_storage", storage (JSONUtil.findField c "peer_storage")),
         ("case_expect", expect),
         ("case_final", storage (JSONUtil.findField c "final_storage")),
         ("case_logs", logs (JSONUtil.findField c "logs"))])
@@ -384,12 +411,13 @@ fun run_suite root fuel s =
         {root = root, path = artifact, source = source}
       val (unit, program) = prepared_constants prefix (#prepared checked)
       val code = code_constant prefix (#artifact checked) source contract
+      val peer = peer_code root prefix s
       val () = emit [("kind", json_string "suite"),
                      ("suite", json_string suite),
                      ("status", json_string "ok"),
                      ("theorems", json_array (map json_string
                        [prefix ^ "_elaborates", prefix ^ "_program_wf"]))]
-      val env = {suite = suite, code = code, unit = unit,
+      val env = {suite = suite, code = code, peer = peer, unit = unit,
                  program = program, fuel = fuel}
     in
       List.foldl (fn (c, ok) => run_case env c andalso ok) true cases
