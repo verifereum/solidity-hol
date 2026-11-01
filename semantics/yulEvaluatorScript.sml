@@ -33,8 +33,8 @@
  *)
 Theory yulEvaluator
 Ancestors
-  yulAST yulState yulDialect vfmState vfmConstants vfmExecution keccak
-  cv_string_fmap
+  yulAST yulState yulDialect vfmState vfmConstants vfmExecution vfmCompute
+  keccak cv_string_fmap
 Libs
   cv_transLib wordsLib
 
