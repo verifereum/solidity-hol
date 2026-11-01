@@ -9,16 +9,16 @@ HOL command: `holbuild -j 4 build --force=theory yulDifferentialCorpusTheory` (s
 
 ## Totals
 
-- stages admitted: 51/51
-- cases run: 1035/1035
-- agreements: 1002
+- stages admitted: 57/57
+- cases run: 1059/1059
+- agreements: 1026
 - cases that are not agreements: 33 inconclusive
 
 | stage | admitted | cases run | agreements |
 | --- | ---: | ---: | ---: |
-| ir | 17/17 | 345 | 334 |
-| ir-optimized | 17/17 | 345 | 334 |
-| optimized | 17/17 | 345 | 334 |
+| ir | 19/19 | 353 | 342 |
+| ir-optimized | 19/19 | 353 | 342 |
+| optimized | 19/19 | 353 | 342 |
 
 ## Admissions
 
@@ -77,6 +77,12 @@ A stage the importer does not admit is reported here rather than worked around, 
 | external | ir | yes |  |
 | external | ir-optimized | yes |  |
 | external | optimized | yes |  |
+| inheritance | ir | yes |  |
+| inheritance | ir-optimized | yes |  |
+| inheritance | optimized | yes |  |
+| inheritance_diamond | ir | yes |  |
+| inheritance_diamond | ir-optimized | yes |  |
+| inheritance_diamond | optimized | yes |  |
 
 ## Kernel-checked witnesses
 
@@ -1087,6 +1093,30 @@ storage and in the log.
 | `yul_receive_selector_reverts_ir` | {"reverted": "0x"} |
 | `yul_receive_selector_reverts_ir_optimized` | {"reverted": "0x"} |
 | `yul_receive_selector_reverts_optimized` | {"reverted": "0x"} |
+| `yul_inheritance_base_calls_run_overrides_ir` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000000006"} |
+| `yul_inheritance_base_calls_run_overrides_ir_optimized` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000000006"} |
+| `yul_inheritance_base_calls_run_overrides_optimized` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000000006"} |
+| `yul_inheritance_inherited_state_accumulates_ir` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000000014"} |
+| `yul_inheritance_inherited_state_accumulates_ir_optimized` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000000014"} |
+| `yul_inheritance_inherited_state_accumulates_optimized` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000000014"} |
+| `yul_inheritance_base_update_overflow_panics_ir` | {"reverted": "0x4e487b710000000000000000000000000000000000000000000000000000000000000011"} |
+| `yul_inheritance_base_update_overflow_panics_ir_optimized` | {"reverted": "0x4e487b710000000000000000000000000000000000000000000000000000000000000011"} |
+| `yul_inheritance_base_update_overflow_panics_optimized` | {"reverted": "0x4e487b710000000000000000000000000000000000000000000000000000000000000011"} |
+| `yul_inheritance_dispatch_reaches_override_ir` | {"returned": "0x000000000000000000000000000000000000000000000000000000000000000c"} |
+| `yul_inheritance_dispatch_reaches_override_ir_optimized` | {"returned": "0x000000000000000000000000000000000000000000000000000000000000000c"} |
+| `yul_inheritance_dispatch_reaches_override_optimized` | {"returned": "0x000000000000000000000000000000000000000000000000000000000000000c"} |
+| `yul_inheritance_diamond_base_call_reaches_diamond_override_ir` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000000004"} |
+| `yul_inheritance_diamond_base_call_reaches_diamond_override_ir_optimized` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000000004"} |
+| `yul_inheritance_diamond_base_call_reaches_diamond_override_optimized` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000000004"} |
+| `yul_inheritance_diamond_diamond_override_reads_state_ir` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000000009"} |
+| `yul_inheritance_diamond_diamond_override_reads_state_ir_optimized` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000000009"} |
+| `yul_inheritance_diamond_diamond_override_reads_state_optimized` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000000009"} |
+| `yul_inheritance_diamond_fallback_override_runs_ir` | {"returned": "0x"} |
+| `yul_inheritance_diamond_fallback_override_runs_ir_optimized` | {"returned": "0x"} |
+| `yul_inheritance_diamond_fallback_override_runs_optimized` | {"returned": "0x"} |
+| `yul_inheritance_diamond_call_reaches_implementation_through_redeclaration_ir` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000000007"} |
+| `yul_inheritance_diamond_call_reaches_implementation_through_redeclaration_ir_optimized` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000000007"} |
+| `yul_inheritance_diamond_call_reaches_implementation_through_redeclaration_optimized` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000000007"} |
 
 ## External checks
 
@@ -1145,6 +1175,12 @@ Performed by this driver outside the kernel.
 | yul-artifact-generated | `testdata/yul/generated/external.ir.json` | pass |
 | yul-artifact-is-the-same-program | `testdata/yul/generated/external.ir.json` | pass |
 | yul-artifact-generated | `testdata/yul/generated/external.optimized.json` | pass |
+| yul-artifact-generated | `testdata/yul/generated/inheritance.ir.json` | pass |
+| yul-artifact-is-the-same-program | `testdata/yul/generated/inheritance.ir.json` | pass |
+| yul-artifact-generated | `testdata/yul/generated/inheritance.optimized.json` | pass |
+| yul-artifact-generated | `testdata/yul/generated/inheritance_diamond.ir.json` | pass |
+| yul-artifact-is-the-same-program | `testdata/yul/generated/inheritance_diamond.ir.json` | pass |
+| yul-artifact-generated | `testdata/yul/generated/inheritance_diamond.optimized.json` | pass |
 | yul-artifacts-staged | `tests/yulDifferentialCorpusScript.sml` | pass |
 
 ## What is not an agreement

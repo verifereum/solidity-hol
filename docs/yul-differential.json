@@ -254,6 +254,36 @@
       "admitted": true,
       "stage": "optimized",
       "suite": "external"
+    },
+    {
+      "admitted": true,
+      "stage": "ir",
+      "suite": "inheritance"
+    },
+    {
+      "admitted": true,
+      "stage": "ir-optimized",
+      "suite": "inheritance"
+    },
+    {
+      "admitted": true,
+      "stage": "optimized",
+      "suite": "inheritance"
+    },
+    {
+      "admitted": true,
+      "stage": "ir",
+      "suite": "inheritance_diamond"
+    },
+    {
+      "admitted": true,
+      "stage": "ir-optimized",
+      "suite": "inheritance_diamond"
+    },
+    {
+      "admitted": true,
+      "stage": "optimized",
+      "suite": "inheritance_diamond"
     }
   ],
   "corpus": "testdata/differential/corpus.json",
@@ -512,6 +542,36 @@
       "check": "yul-artifact-generated",
       "status": "pass",
       "subject": "testdata/yul/generated/external.optimized.json"
+    },
+    {
+      "check": "yul-artifact-generated",
+      "status": "pass",
+      "subject": "testdata/yul/generated/inheritance.ir.json"
+    },
+    {
+      "check": "yul-artifact-is-the-same-program",
+      "status": "pass",
+      "subject": "testdata/yul/generated/inheritance.ir.json"
+    },
+    {
+      "check": "yul-artifact-generated",
+      "status": "pass",
+      "subject": "testdata/yul/generated/inheritance.optimized.json"
+    },
+    {
+      "check": "yul-artifact-generated",
+      "status": "pass",
+      "subject": "testdata/yul/generated/inheritance_diamond.ir.json"
+    },
+    {
+      "check": "yul-artifact-is-the-same-program",
+      "status": "pass",
+      "subject": "testdata/yul/generated/inheritance_diamond.ir.json"
+    },
+    {
+      "check": "yul-artifact-generated",
+      "status": "pass",
+      "subject": "testdata/yul/generated/inheritance_diamond.optimized.json"
     },
     {
       "check": "yul-artifacts-staged",
@@ -11115,26 +11175,266 @@
       "status": "proved",
       "suite": "receive",
       "theorem": "yul_receive_selector_reverts_optimized"
+    },
+    {
+      "case": "base_calls_run_overrides",
+      "outcome": {
+        "returned": "0x0000000000000000000000000000000000000000000000000000000000000006"
+      },
+      "stage": "ir",
+      "status": "proved",
+      "suite": "inheritance",
+      "theorem": "yul_inheritance_base_calls_run_overrides_ir"
+    },
+    {
+      "case": "base_calls_run_overrides",
+      "outcome": {
+        "returned": "0x0000000000000000000000000000000000000000000000000000000000000006"
+      },
+      "stage": "ir-optimized",
+      "status": "proved",
+      "suite": "inheritance",
+      "theorem": "yul_inheritance_base_calls_run_overrides_ir_optimized"
+    },
+    {
+      "case": "base_calls_run_overrides",
+      "outcome": {
+        "returned": "0x0000000000000000000000000000000000000000000000000000000000000006"
+      },
+      "stage": "optimized",
+      "status": "proved",
+      "suite": "inheritance",
+      "theorem": "yul_inheritance_base_calls_run_overrides_optimized"
+    },
+    {
+      "case": "inherited_state_accumulates",
+      "outcome": {
+        "returned": "0x0000000000000000000000000000000000000000000000000000000000000014"
+      },
+      "stage": "ir",
+      "status": "proved",
+      "suite": "inheritance",
+      "theorem": "yul_inheritance_inherited_state_accumulates_ir"
+    },
+    {
+      "case": "inherited_state_accumulates",
+      "outcome": {
+        "returned": "0x0000000000000000000000000000000000000000000000000000000000000014"
+      },
+      "stage": "ir-optimized",
+      "status": "proved",
+      "suite": "inheritance",
+      "theorem": "yul_inheritance_inherited_state_accumulates_ir_optimized"
+    },
+    {
+      "case": "inherited_state_accumulates",
+      "outcome": {
+        "returned": "0x0000000000000000000000000000000000000000000000000000000000000014"
+      },
+      "stage": "optimized",
+      "status": "proved",
+      "suite": "inheritance",
+      "theorem": "yul_inheritance_inherited_state_accumulates_optimized"
+    },
+    {
+      "case": "base_update_overflow_panics",
+      "outcome": {
+        "reverted": "0x4e487b710000000000000000000000000000000000000000000000000000000000000011"
+      },
+      "stage": "ir",
+      "status": "proved",
+      "suite": "inheritance",
+      "theorem": "yul_inheritance_base_update_overflow_panics_ir"
+    },
+    {
+      "case": "base_update_overflow_panics",
+      "outcome": {
+        "reverted": "0x4e487b710000000000000000000000000000000000000000000000000000000000000011"
+      },
+      "stage": "ir-optimized",
+      "status": "proved",
+      "suite": "inheritance",
+      "theorem": "yul_inheritance_base_update_overflow_panics_ir_optimized"
+    },
+    {
+      "case": "base_update_overflow_panics",
+      "outcome": {
+        "reverted": "0x4e487b710000000000000000000000000000000000000000000000000000000000000011"
+      },
+      "stage": "optimized",
+      "status": "proved",
+      "suite": "inheritance",
+      "theorem": "yul_inheritance_base_update_overflow_panics_optimized"
+    },
+    {
+      "case": "dispatch_reaches_override",
+      "outcome": {
+        "returned": "0x000000000000000000000000000000000000000000000000000000000000000c"
+      },
+      "stage": "ir",
+      "status": "proved",
+      "suite": "inheritance",
+      "theorem": "yul_inheritance_dispatch_reaches_override_ir"
+    },
+    {
+      "case": "dispatch_reaches_override",
+      "outcome": {
+        "returned": "0x000000000000000000000000000000000000000000000000000000000000000c"
+      },
+      "stage": "ir-optimized",
+      "status": "proved",
+      "suite": "inheritance",
+      "theorem": "yul_inheritance_dispatch_reaches_override_ir_optimized"
+    },
+    {
+      "case": "dispatch_reaches_override",
+      "outcome": {
+        "returned": "0x000000000000000000000000000000000000000000000000000000000000000c"
+      },
+      "stage": "optimized",
+      "status": "proved",
+      "suite": "inheritance",
+      "theorem": "yul_inheritance_dispatch_reaches_override_optimized"
+    },
+    {
+      "case": "base_call_reaches_diamond_override",
+      "outcome": {
+        "returned": "0x0000000000000000000000000000000000000000000000000000000000000004"
+      },
+      "stage": "ir",
+      "status": "proved",
+      "suite": "inheritance_diamond",
+      "theorem": "yul_inheritance_diamond_base_call_reaches_diamond_override_ir"
+    },
+    {
+      "case": "base_call_reaches_diamond_override",
+      "outcome": {
+        "returned": "0x0000000000000000000000000000000000000000000000000000000000000004"
+      },
+      "stage": "ir-optimized",
+      "status": "proved",
+      "suite": "inheritance_diamond",
+      "theorem": "yul_inheritance_diamond_base_call_reaches_diamond_override_ir_optimized"
+    },
+    {
+      "case": "base_call_reaches_diamond_override",
+      "outcome": {
+        "returned": "0x0000000000000000000000000000000000000000000000000000000000000004"
+      },
+      "stage": "optimized",
+      "status": "proved",
+      "suite": "inheritance_diamond",
+      "theorem": "yul_inheritance_diamond_base_call_reaches_diamond_override_optimized"
+    },
+    {
+      "case": "diamond_override_reads_state",
+      "outcome": {
+        "returned": "0x0000000000000000000000000000000000000000000000000000000000000009"
+      },
+      "stage": "ir",
+      "status": "proved",
+      "suite": "inheritance_diamond",
+      "theorem": "yul_inheritance_diamond_diamond_override_reads_state_ir"
+    },
+    {
+      "case": "diamond_override_reads_state",
+      "outcome": {
+        "returned": "0x0000000000000000000000000000000000000000000000000000000000000009"
+      },
+      "stage": "ir-optimized",
+      "status": "proved",
+      "suite": "inheritance_diamond",
+      "theorem": "yul_inheritance_diamond_diamond_override_reads_state_ir_optimized"
+    },
+    {
+      "case": "diamond_override_reads_state",
+      "outcome": {
+        "returned": "0x0000000000000000000000000000000000000000000000000000000000000009"
+      },
+      "stage": "optimized",
+      "status": "proved",
+      "suite": "inheritance_diamond",
+      "theorem": "yul_inheritance_diamond_diamond_override_reads_state_optimized"
+    },
+    {
+      "case": "fallback_override_runs",
+      "outcome": {
+        "returned": "0x"
+      },
+      "stage": "ir",
+      "status": "proved",
+      "suite": "inheritance_diamond",
+      "theorem": "yul_inheritance_diamond_fallback_override_runs_ir"
+    },
+    {
+      "case": "fallback_override_runs",
+      "outcome": {
+        "returned": "0x"
+      },
+      "stage": "ir-optimized",
+      "status": "proved",
+      "suite": "inheritance_diamond",
+      "theorem": "yul_inheritance_diamond_fallback_override_runs_ir_optimized"
+    },
+    {
+      "case": "fallback_override_runs",
+      "outcome": {
+        "returned": "0x"
+      },
+      "stage": "optimized",
+      "status": "proved",
+      "suite": "inheritance_diamond",
+      "theorem": "yul_inheritance_diamond_fallback_override_runs_optimized"
+    },
+    {
+      "case": "call_reaches_implementation_through_redeclaration",
+      "outcome": {
+        "returned": "0x0000000000000000000000000000000000000000000000000000000000000007"
+      },
+      "stage": "ir",
+      "status": "proved",
+      "suite": "inheritance_diamond",
+      "theorem": "yul_inheritance_diamond_call_reaches_implementation_through_redeclaration_ir"
+    },
+    {
+      "case": "call_reaches_implementation_through_redeclaration",
+      "outcome": {
+        "returned": "0x0000000000000000000000000000000000000000000000000000000000000007"
+      },
+      "stage": "ir-optimized",
+      "status": "proved",
+      "suite": "inheritance_diamond",
+      "theorem": "yul_inheritance_diamond_call_reaches_implementation_through_redeclaration_ir_optimized"
+    },
+    {
+      "case": "call_reaches_implementation_through_redeclaration",
+      "outcome": {
+        "returned": "0x0000000000000000000000000000000000000000000000000000000000000007"
+      },
+      "stage": "optimized",
+      "status": "proved",
+      "suite": "inheritance_diamond",
+      "theorem": "yul_inheritance_diamond_call_reaches_implementation_through_redeclaration_optimized"
     }
   ],
   "per_stage": {
     "ir": {
-      "agreements": 334,
-      "cases_run": 345,
-      "stages_admitted": 17,
-      "stages_expected": 17
+      "agreements": 342,
+      "cases_run": 353,
+      "stages_admitted": 19,
+      "stages_expected": 19
     },
     "ir-optimized": {
-      "agreements": 334,
-      "cases_run": 345,
-      "stages_admitted": 17,
-      "stages_expected": 17
+      "agreements": 342,
+      "cases_run": 353,
+      "stages_admitted": 19,
+      "stages_expected": 19
     },
     "optimized": {
-      "agreements": 334,
-      "cases_run": 345,
-      "stages_admitted": 17,
-      "stages_expected": 17
+      "agreements": 342,
+      "cases_run": 353,
+      "stages_admitted": 19,
+      "stages_expected": 19
     }
   },
   "solc": "~/.local/opt/solc-0.8.37/solc",
@@ -11144,13 +11444,13 @@
     "optimized"
   ],
   "totals": {
-    "agreements": 1002,
+    "agreements": 1026,
     "case_statuses": {
       "inconclusive": 33
     },
-    "cases_expected": 1035,
-    "cases_run": 1035,
-    "stages_admitted": 51,
-    "stages_expected": 51
+    "cases_expected": 1059,
+    "cases_run": 1059,
+    "stages_admitted": 57,
+    "stages_expected": 57
   }
 }
