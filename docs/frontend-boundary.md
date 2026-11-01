@@ -119,8 +119,11 @@ corpus contains only single declarations.
 Function definitions already record visibility, mutability, kind, virtuality,
 parameters, return parameters, modifiers, implementation status, and optional
 selectors. Contract definitions record inheritance-related and used-event/error
-metadata. The current corpus has no inheritance clauses or modifiers, so their
-resolution requirements remain to be established by later reconnaissance.
+metadata. Inheritance needs two of these annotations (the differential fixture
+`inheritance.sol`): the importer flattens a contract along its
+`linearizedBaseContracts`, and `call_table` resolves overrides through each
+function's `baseFunctions`. The corpus has no modifiers or `super` calls, so
+their resolution requirements remain to be established.
 
 ## Storage layout
 

@@ -4,13 +4,17 @@
  * solidityImportLib builds these terms from a compiler artifact and fails
  * closed: an unknown nodeType, a missing required field, or a feature outside
  * the subset (public, constant, immutable or initialised state variables,
- * modifiers, inheritance, named or try calls, built-ins other than
+ * modifiers, super, named or try calls, built-ins other than
  * require, assert, revert, members of msg, tx and block and address(this), literal subdenominations,
  * inline arrays, type names other than elementary types, arrays and mappings, ...)
  * raises ImportError. Semantic nodes keep their compiler id and source range;
  * declarations are referred to by id, and names are diagnostic only. Type
  * annotations are kept as the compiler's encoded typeIdentifier and decoded
  * here, never from the display typeString.
+ *
+ * A unit holds its deployable contracts: those neither abstract, nor an
+ * interface, nor a base of another contract of the unit. Each is flattened
+ * along its linearization (src_contract); its bases must be in the same unit.
  *
  * Types are normalized from elementary, array and mapping type-name nodes; value
  * types are decoded from typeIdentifiers. Both yield only valid shapes (normalize_type_name_valid,
@@ -21,13 +25,13 @@
  *  - every parameter, return, local and state variable has a normalized
  *    elementary, array or mapping type, the default data location, and a
  *    type identifier agreeing with that type, and the enclosing function, block, for statement or
- *    contract as its scope; event parameters are elementary, scoped by
+ *    one of the contract's bases as its scope; event parameters are elementary, scoped by
  *    their event;
  *  - the contract's storage layout lists its state variables in declaration
  *    order, each with its own typeIdentifier and a slot below 2 ** 256;
  *  - every identifier resolves, within its lexical scope, to a variable of the
  *    annotated type, or, as the callee of a call, to a function of the same
- *    contract; calls have matching arity and are annotated with the callee's
+ *    contract, the most derived override of the one it names (call_table); calls have matching arity and are annotated with the callee's
  *    return types; conversions are annotated with their normalized target type;
  *    environment reads with their member's type; emits name an event of the
  *    contract with as many arguments as it has parameters;
@@ -35,7 +39,9 @@
  *    assignments, returns name the enclosing function's return list, break and
  *    continue occur in loop bodies, conditions are boolean;
  *  - functions, receive and fallback are pure, view, nonpayable or payable,
- *    and only non-pure ones refer to state variables; contracts are not derived and are scoped by the unit;
+ *    and only non-pure ones refer to state variables; functions a more derived one
+ *    overrides are not checked, since nothing reaches them; contracts are
+ *    scoped by the unit, functions by a base of their contract;
  *  - operators belong to the admitted set and every other expression
  *    annotation decodes to an elementary, rational literal or tuple type.
  *
@@ -159,7 +165,8 @@ End
 
 (* Parameter lists are represented by their ids and declarations. The kind is
  * function, receive or fallback; the selector is that of an external or
- * public function.
+ * public function. The base functions are the declarations it overrides
+ * directly (the compiler's baseFunctions).
  *)
 Datatype:
   src_function = <|
@@ -170,6 +177,7 @@ Datatype:
     fn_visibility : string;
     fn_mutability : string;
     fn_selector : byte list option;
+    fn_base_functions : num list;
     fn_parameters_id : num;
     fn_parameters : src_variable list;
     fn_returns_id : num;
@@ -211,11 +219,17 @@ Datatype:
   |>
 End
 
+(* A contract flattened along its linearization (the compiler's
+ * linearizedBaseContracts, most derived first, which bases lists): the
+ * members of all its bases, functions most derived first, state variables in
+ * storage order. Declarations without a body are left out.
+ *)
 Datatype:
   src_contract = <|
     contract_info : node_info;
     contract_name : string;
     contract_scope : num;
+    contract_bases : num list;
     contract_state_variables : src_variable list;
     contract_storage : src_storage_entry list;
     contract_structs : src_struct list;
@@ -969,12 +983,40 @@ Definition scoped_variable_def:
     else NONE
 End
 
+(* A state variable, declared by one of the contract's bases. *)
+Definition state_variable_def:
+  state_variable bases (v : src_variable) =
+    if MEM v.var_scope bases then scoped_variable v.var_scope v else NONE
+End
+
+(* The function a call to each declaration runs: the most derived function
+ * that is it or overrides it. Functions come most derived first; a
+ * declaration without a body is reached through the functions overriding it.
+ *)
+Definition call_table_def:
+  (call_table [] = []) ∧
+  (call_table ((f : src_function) :: fs) =
+    (f.fn_info.node_id, f) :: MAP (λx. (x, f)) f.fn_base_functions ++
+    MAP (λ(x, g). (x, if MEM g.fn_info.node_id f.fn_base_functions then f else g))
+      (call_table fs))
+End
+
+(* The functions no other function overrides: those calls and the dispatch
+ * table can reach. *)
+Definition live_functions_def:
+  live_functions fs =
+    let table = call_table fs in
+    FILTER (λ(f : src_function).
+              OPTION_MAP (λg. g.fn_info.node_id)
+                (ALOOKUP table f.fn_info.node_id) = SOME f.fn_info.node_id) fs
+End
+
 (* A pure function sees no state variables. Whether a view function writes
  * one is the compiler's check.
  *)
 Definition check_function_def:
-  check_function structs events functions state contract_id (f : src_function) ⇔
-    f.fn_scope = contract_id ∧
+  check_function structs events functions state bases (f : src_function) ⇔
+    MEM f.fn_scope bases ∧
     (f.fn_kind = "function" ∨ f.fn_kind = "receive" ∨ f.fn_kind = "fallback") ∧
     (f.fn_mutability = "pure" ∨ f.fn_mutability = "view" ∨
      f.fn_mutability = "nonpayable" ∨ f.fn_mutability = "payable") ∧
@@ -1003,8 +1045,8 @@ Definition storage_layout_ok_def:
 End
 
 Definition check_struct_def:
-  check_struct unit_id contract_id (s : src_struct) ⇔
-    (s.struct_scope = contract_id ∨ s.struct_scope = unit_id) ∧
+  check_struct unit_id bases (s : src_struct) ⇔
+    (MEM s.struct_scope bases ∨ s.struct_scope = unit_id) ∧
     s.struct_members ≠ [] ∧
     EVERY (λv. v.var_scope = s.struct_info.node_id ∧ IS_SOME (field_variable_type v))
       s.struct_members ∧
@@ -1025,17 +1067,17 @@ End
 Definition check_contract_def:
   check_contract unit_id (c : src_contract) ⇔
     c.contract_scope = unit_id ∧
-    EVERY (check_struct unit_id c.contract_info.node_id) c.contract_structs ∧
+    EVERY (check_struct unit_id c.contract_bases) c.contract_structs ∧
     EVERY check_event c.contract_events ∧
     storage_layout_ok F c.contract_state_variables c.contract_storage ∧
-    case all_some (MAP (scoped_variable c.contract_info.node_id)
+    case all_some (MAP (state_variable c.contract_bases)
                      c.contract_state_variables) of
       SOME state =>
         EVERY (check_function c.contract_structs
                  (MAP (λe. (e.event_info.node_id, e)) c.contract_events)
-                 (MAP (λf. (f.fn_info.node_id, f)) c.contract_functions)
-                 state c.contract_info.node_id)
-          c.contract_functions
+                 (call_table c.contract_functions)
+                 state c.contract_bases)
+          (live_functions c.contract_functions)
     | NONE => F
 End
 
@@ -1145,6 +1187,9 @@ Proof
 QED
 
 val () = cv_auto_trans scoped_variable_def;
+val () = cv_auto_trans state_variable_def;
+val () = cv_auto_trans call_table_def;
+val () = cv_auto_trans live_functions_def;
 val () = cv_auto_trans storage_layout_ok_def;
 val () = cv_auto_trans check_function_def;
 val () = cv_auto_trans check_struct_def;

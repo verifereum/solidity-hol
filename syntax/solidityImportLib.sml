@@ -487,12 +487,8 @@ fun function v = within v (fn v =>
     require v (List.exists (fn k => k = string_field v "kind")
                  ["function", "receive", "fallback"])
       ("unsupported function kind " ^ string_field v "kind");
-    require v (bool_field v "implemented") "unimplemented functions";
     require v (null (JSONUtil.arrayMap I (field v "modifiers")))
       "modifiers are not supported";
-    require v (not (bool_field v "virtual")) "virtual functions";
-    require v (not (isSome (optional_field v "overrides")))
-      "overrides are not supported";
     record "src_function"
       [("fn_info", info v), ("fn_name", mk_str (string_field v "name")),
        ("fn_scope", mk_num (int_field v "scope")),
@@ -503,6 +499,11 @@ fun function v = within v (fn v =>
         mk_opt (listSyntax.mk_list_type (wordsSyntax.mk_int_word_type 8))
           (Option.map (mk_bytes v o JSONUtil.asString)
              (optional_field v "functionSelector"))),
+       ("fn_base_functions", listSyntax.mk_list
+          (case optional_field v "baseFunctions" of
+             SOME ids => JSONUtil.arrayMap (mk_num o JSONUtil.asIntInf) ids
+           | NONE => [],
+           numSyntax.num)),
        ("fn_parameters_id", params_id), ("fn_parameters", params),
        ("fn_returns_id", returns_id), ("fn_returns", returns),
        ("fn_body", stmt (field v "body"))]
@@ -560,80 +561,111 @@ fun struct_declaration types v = within v (fn v =>
          layout)]
   end)
 
-(* The selected contract's layout also describes file-level struct types
- * referenced by its state variables.
+(* A deployable contract, flattened along its linearization (most derived
+ * first), whose contracts declared lists by id: the implemented functions of
+ * its bases, most derived first, their events and structs, and their state
+ * variables base first, the order of the storage layout. The layout also
+ * describes file-level struct types referenced by its state variables.
  *)
-fun contract external_structs contracts v = within v (fn v =>
+fun contract external_structs contracts declared v = within v (fn v =>
   let
-    val id = int_field v "id"
     val name = string_field v "name"
-    val members = JSONUtil.arrayMap I (field v "nodes")
-    fun members_of ty = List.filter (fn m => node_type m = ty) members
+    val bases =
+      map (fn id =>
+             case List.find (fn (i, _) => i = id) declared of
+               SOME (_, c) => c
+             | NONE => fail (describe v ^ ": base contract " ^
+                             IntInf.toString id ^ " is not in this unit"))
+        (JSONUtil.arrayMap JSONUtil.asIntInf (field v "linearizedBaseContracts"))
+    fun nodes c = JSONUtil.arrayMap I (field c "nodes")
+    fun members_of ty cs =
+      List.concat
+        (map (fn c => List.filter (fn m => node_type m = ty) (nodes c)) cs)
     val () =
-      List.app (fn m => within m (fn m =>
-                  require m (node_type m = "FunctionDefinition" orelse
-                             node_type m = "VariableDeclaration" orelse
-                             node_type m = "StructDefinition" orelse
-                             node_type m = "EventDefinition")
-                    "unsupported contract member"))
-        members
+      List.app (fn c => within c (fn c =>
+        (require c (string_field c "contractKind" = "contract" orelse
+                    string_field c "contractKind" = "interface")
+           ("unsupported contract kind " ^ string_field c "contractKind");
+         List.app (fn m => within m (fn m =>
+                     require m (node_type m = "FunctionDefinition" orelse
+                                node_type m = "VariableDeclaration" orelse
+                                node_type m = "StructDefinition" orelse
+                                node_type m = "EventDefinition")
+                       "unsupported contract member"))
+           (nodes c))))
+        bases
     val layout =
       JSONUtil.get (contracts,
         [JSONUtil.SEL name, JSONUtil.SEL "storageLayout"])
   in
     expect v "ContractDefinition";
-    require v (string_field v "contractKind" = "contract")
-      ("unsupported contract kind " ^ string_field v "contractKind");
-    require v (not (bool_field v "abstract")) "abstract contracts";
-    require v (null (JSONUtil.arrayMap I (field v "baseContracts")))
-      "inheritance is not supported";
-    require v (JSONUtil.arrayMap JSONUtil.asIntInf
-                 (field v "linearizedBaseContracts") = [id])
-      "inheritance is not supported";
     record "src_contract"
       [("contract_info", info v),
-       ("contract_name", mk_str (string_field v "name")),
+       ("contract_name", mk_str name),
        ("contract_scope", mk_num (int_field v "scope")),
+       ("contract_bases", listSyntax.mk_list
+          (JSONUtil.arrayMap (mk_num o JSONUtil.asIntInf)
+             (field v "linearizedBaseContracts"), numSyntax.num)),
        ("contract_state_variables",
         listSyntax.mk_list
-          (map (declaration true) (members_of "VariableDeclaration"),
+          (map (declaration true) (members_of "VariableDeclaration" (rev bases)),
            variable_ty)),
        ("contract_storage",
         listSyntax.mk_list
           (JSONUtil.arrayMap storage_entry (field layout "storage"), storage_entry_ty)),
        ("contract_structs", listSyntax.mk_list
           (map (struct_declaration (field layout "types"))
-             (external_structs @ members_of "StructDefinition"), struct_ty)),
+             (external_structs @ members_of "StructDefinition" (rev bases)),
+           struct_ty)),
        ("contract_events", listSyntax.mk_list
-          (map event (members_of "EventDefinition"), event_ty)),
+          (map event (members_of "EventDefinition" bases), event_ty)),
        ("contract_functions",
         listSyntax.mk_list
-          (map function (members_of "FunctionDefinition"), function_ty))]
+          (map function
+             (List.filter (fn f => bool_field f "implemented")
+                (members_of "FunctionDefinition" bases)),
+           function_ty))]
   end)
 
 (* File-level structs accompany each contract that can refer to them;
- * pragmas carry no semantics for the pinned profile.
+ * pragmas carry no semantics for the pinned profile. Interfaces, abstract
+ * contracts and the bases of other contracts are imported only as bases.
  *)
 fun import_source_unit v contracts = within v (fn v =>
   let
     val members = JSONUtil.arrayMap I (field v "nodes")
     val structs = List.filter (fn m => node_type m = "StructDefinition") members
+    val declared =
+      map (fn c => (int_field c "id", c))
+        (List.filter (fn m => node_type m = "ContractDefinition") members)
     val () =
       function_declarations :=
         List.concat
-          (map (fn c =>
+          (map (fn (_, c) =>
                   List.mapPartial
                     (fn f => if node_type f = "FunctionDefinition"
                              then SOME (int_field f "id", f) else NONE)
                     (JSONUtil.arrayMap I (field c "nodes")))
-             (List.filter (fn m => node_type m = "ContractDefinition") members))
+             declared)
+    val inherited =
+      List.concat
+        (map (fn (_, c) =>
+                tl (JSONUtil.arrayMap JSONUtil.asIntInf
+                      (field c "linearizedBaseContracts")))
+           declared)
     fun member m acc =
       case node_type m of
         "PragmaDirective" => acc
       | "StructDefinition" => acc
       | "ContractDefinition" =>
           if string_field m "contractKind" = "interface" then acc
-          else contract structs contracts m :: acc
+          else
+            (require m (string_field m "contractKind" = "contract")
+               ("unsupported contract kind " ^ string_field m "contractKind");
+             if bool_field m "abstract" orelse
+                List.exists (fn i => i = int_field m "id") inherited
+             then acc
+             else contract structs contracts declared m :: acc)
       | other => fail (describe m ^ ": unsupported source unit member " ^ other)
     val contracts =
       List.foldr (fn (m, acc) => within m (fn m => member m acc)) []
