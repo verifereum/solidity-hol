@@ -55,9 +55,9 @@ rebinding and content copying are distinct core operations; the latter two
 remain extension points rather than implemented aggregate semantics.
 
 Memory/calldata execution and a memory model compatible with inline assembly
-remain unresolved. Concrete CALL/CREATE boundary experiments exist separately;
-connecting them to source execution still needs an external-call context/gas
-contract. Core well-formedness alone does not rule out `InvalidCompletion`:
+remain unresolved. High-level external calls run the callee on Verifereum
+through `externalCall`, a provisional adapter with a fixed gas budget and a
+fresh callee frame; creation is not connected yet. Core well-formedness alone does not rule out `InvalidCompletion`:
 for example, a storage write in a static frame is deliberately invalid.
 
 ## Yul

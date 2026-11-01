@@ -444,10 +444,10 @@ Definition call_external_def:
            NONE => abrupt_result (InvalidCompletion "bad call arguments") st gas
          | SOME data =>
            let static = (kind = ExternalStaticCall ∨ st.frame.static_context) in
-           if static ∧ v ≠ 0 then
-             abrupt_result (InvalidCompletion "value in static frame") st gas
-           else if rets = [] ∧ (lookup_account callee st.world.accounts).code = []
+           if rets = [] ∧ (lookup_account callee st.world.accounts).code = []
            then abrupt_result (RevertCompletion []) st gas
+           else if static ∧ v ≠ 0 then
+             abrupt_result (InvalidCompletion "value in static frame") st gas
            else
              case run_external_call st.frame.self_address callee
                     (selector ++ data) (Num v) static external_call_gas

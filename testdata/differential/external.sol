@@ -12,6 +12,11 @@ interface ISelf {
     function echoValue() external payable returns (uint256);
 }
 
+// Declares this contract's bump as view, so a call through it is a STATICCALL.
+interface IView {
+    function bump(uint256 by) external view returns (uint256);
+}
+
 // High-level calls: to a token at a given address, and back into this
 // contract, whose code then runs as bytecode.
 contract Caller {
@@ -46,6 +51,11 @@ contract Caller {
     function bumpSelf(uint256 by) external returns (uint256) {
         uint256 seen = ISelf(address(this)).bump(by);
         return seen + calls;
+    }
+
+    // The static call's storage write halts the callee, so this reverts.
+    function bumpStatic(uint256 by) external view returns (uint256) {
+        return IView(address(this)).bump(by);
     }
 
     function echoValue() external payable returns (uint256) {

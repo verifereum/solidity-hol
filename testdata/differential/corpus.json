@@ -479,6 +479,7 @@
         {"name": "mint_via_without_code_reverts", "function": "mintVia", "args": [24576, 12288, 1], "expect": {"revert": "0x"}},
         {"name": "balance_via_static_call", "function": "balanceVia", "args": [20480, 12288], "peer_storage": {"68113724183316182233052564790125915752421945217496801851705428207216635038832": 9}, "expect": {"return": [9]}},
         {"name": "bump_self_sees_callee_write", "function": "bumpSelf", "args": [3], "storage": {"0": 4}, "expect": {"return": [14]}, "final_storage": {"0": 7}},
+        {"name": "bump_static_halts_on_write", "function": "bumpStatic", "args": [3], "storage": {"0": 4}, "expect": {"revert": "0x"}},
         {"name": "forward_passes_value", "function": "forward", "args": [3], "value": 5, "expect": {"return": [3]}},
         {"name": "forward_without_balance_reverts", "function": "forward", "args": [3], "expect": {"revert": "0x"}}
       ]
