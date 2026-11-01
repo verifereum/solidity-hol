@@ -1,10 +1,10 @@
 (* Elaboration of the normalised source AST (solidityImport) to the ordered
  * core, for the pinned profile solc-0.8.37-via-ir-osaka.
  *
- * Admitted: one contract of functions over elementary value types, with
- * value-type state variables, storage structs, scalar-key mappings and
- * fixed/dynamic storage arrays, member/indexed scalar reads and updates,
- * array lengths, scalar push/pop and locals
+ * Admitted: one contract, flattened along its bases, of functions over
+ * elementary value types, with value-type state variables, storage structs,
+ * scalar-key mappings and fixed/dynamic storage arrays, member/indexed scalar
+ * reads and updates, array lengths, scalar push/pop and locals
  * (including tuple declarations with holes), internal calls with single or
  * multiple returns, explicit elementary conversions, literals, unary, binary,
  * comparison and short-circuit operators, simple and compound assignment to
@@ -12,8 +12,10 @@
  * do-while, for, break, continue, return and unchecked blocks. Built-in
  * require/assert/revert admit boolean conditions and literal string messages.
  * Reads of msg.sender, msg.value, tx.origin, tx.gasprice, block members and
- * address(this), and emits of events with elementary parameters. External
- * and public functions, receive and fallback form the dispatch table.
+ * address(this), and emits of events with elementary parameters. An internal
+ * call runs the most derived override of the function it names (call_table);
+ * the functions no other overrides are elaborated, and the external and
+ * public ones among them, receive and fallback form the dispatch table.
  * Other string runtime operations and unsupported forms are rejected (NONE).
  *
  * Schedules, read from the compiler's IR for this profile (the ir output in
@@ -541,7 +543,8 @@ Definition elab_expr_def:
                        (case elab_args ctx n params args of
                           SOME ((sa, atoms), n1) =>
                             SOME ((sa ++ [DefineStmt (AstId n1) (call_result_type rets)
-                                            (InternalCallOperation (AstId f) atoms)],
+                                            (InternalCallOperation
+                                               (AstId callee.fn_info.node_id) atoms)],
                                    BoundAtom (AstId n1), call_value rets), n1 + 1)
                         | NONE => NONE)
                    | NONE => NONE)
@@ -1056,15 +1059,16 @@ Definition special_function_def:
 End
 
 (* Raw lowering of a valid unit of one contract, with fresh ids above its
- * node ids; the first function is the entry procedure. A SOME result is not
- * yet a checked program: consumers must establish wf_core_program through
- * solidityPrepareLib before execution.
+ * node ids; the first live function is the entry procedure. A SOME result is
+ * not yet a checked program: consumers must establish wf_core_program
+ * through solidityPrepareLib before execution.
  *)
 Definition elaborate_unit_def:
   elaborate_unit (u : src_unit) =
     if ¬valid_src_unit u then NONE else
     case u.unit_contracts of
       [c] =>
+        let fs = live_functions c.contract_functions in
         (case all_some (MAP variable_binding c.contract_state_variables) of
            NONE => NONE
          | SOME state =>
@@ -1073,18 +1077,18 @@ Definition elaborate_unit_def:
                    core_state_variables state c.contract_storage,
                    elab_functions c.contract_structs
                      (MAP (λe. (e.event_info.node_id, e)) c.contract_events)
-                     (MAP (λf. (f.fn_info.node_id, f)) c.contract_functions)
-                     state (MAX_LIST (unit_ids u) + 1) c.contract_functions) of
+                     (call_table c.contract_functions)
+                     state (MAX_LIST (unit_ids u) + 1) fs) of
                (SOME decls, SOME layouts, SOME cvs, SOME (p :: ps, _)) =>
                  SOME <| procedures := p :: ps; state_variables := cvs;
                          struct_layouts := layouts; type_declarations := decls;
                          entry_procedure := p.procedure_id;
                          external_functions :=
-                           external_functions c.contract_functions;
+                           external_functions fs;
                          receive_procedure := OPTION_MAP FST
-                           (special_function "receive" c.contract_functions);
+                           (special_function "receive" fs);
                          fallback_procedure :=
-                           special_function "fallback" c.contract_functions |>
+                           special_function "fallback" fs |>
              | _ => NONE)
     | _ => NONE
 End
