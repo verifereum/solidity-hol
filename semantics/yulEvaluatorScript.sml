@@ -321,11 +321,32 @@ Definition eval_yul_builtin_def:
     | (YCallValue, []) => EvalValues [m.call_value] m
     | (YMemoryGuard, [x]) => EvalValues [x] m
     | (YCaller, []) => EvalValues [n2w (w2n m.caller_address)] m
+    | (YAddress, []) => EvalValues [n2w (w2n m.self_address)] m
+    | (YOrigin, []) =>
+        EvalValues [n2w (w2n m.transaction_parameters.origin)] m
+    | (YChainId, []) => EvalValues [n2w m.transaction_parameters.chainId] m
+    | (YNumber, []) =>
+        EvalValues [n2w m.transaction_parameters.blockNumber] m
+    | (YTimestamp, []) =>
+        EvalValues [n2w m.transaction_parameters.blockTimeStamp] m
+    | (YCoinbase, []) =>
+        EvalValues [n2w (w2n m.transaction_parameters.blockCoinBase)] m
+    | (YLog0, [p; s]) =>
+        let (m', bs) = yul_memory_region m (w2n p) (w2n s) in
+          EvalValues []
+            (m' with logs := m'.logs ++
+              [<| logger := m'.self_address; topics := []; data := bs |>])
     | (YLog1, [p; s; topic]) =>
         let (m', bs) = yul_memory_region m (w2n p) (w2n s) in
           EvalValues []
             (m' with logs := m'.logs ++
               [<| logger := m'.self_address; topics := [topic];
+                  data := bs |>])
+    | (YLog2, [p; s; t1; t2]) =>
+        let (m', bs) = yul_memory_region m (w2n p) (w2n s) in
+          EvalValues []
+            (m' with logs := m'.logs ++
+              [<| logger := m'.self_address; topics := [t1; t2];
                   data := bs |>])
     | (YLog3, [p; s; t1; t2; t3]) =>
         let (m', bs) = yul_memory_region m (w2n p) (w2n s) in
@@ -334,6 +355,7 @@ Definition eval_yul_builtin_def:
               [<| logger := m'.self_address; topics := [t1; t2; t3];
                   data := bs |>])
     | (YPop, [_]) => EvalValues [] m
+    | (YStop, []) => EvalAbrupt (YulReturn []) m
     | (YReturn, [p; s]) =>
         let (m', bs) = yul_memory_region m (w2n p) (w2n s) in
           EvalAbrupt (YulReturn bs) m'

@@ -28,6 +28,10 @@
  * carries the table the frame's caller supplies, keyed by that name, and a
  * name it does not carry is an invalid outcome.
  *
+ * The transaction and block the frame runs in are Verifereum's transaction
+ * parameters, read by origin(), chainid(), number(), timestamp() and
+ * coinbase().
+ *
  * Gas is not modelled: nothing in the pinned subset reads it.
  *)
 Theory yulState
@@ -52,7 +56,8 @@ Datatype:
     immutables : string |-> bytes32;
     memory : num |-> word8;
     memory_size : num;
-    scopes : (string |-> bytes32) list
+    scopes : (string |-> bytes32) list;
+    transaction_parameters : transaction_parameters
   |>
 End
 
