@@ -37,6 +37,7 @@ Definition bookkeeping_fixture_def:
     | _ => [] in
     es with <|
       contexts := contexts; rollback := seeded;
+      originalAccounts := original.accounts;
       msdomain := Collect <| addresses := fINSERT 0x300w fEMPTY;
         storageKeys := fINSERT (SK 0x300w 7w) fEMPTY;
         fullStorages := fINSERT 0x300w fEMPTY |>
@@ -59,6 +60,7 @@ Definition bookkeeping_summary_def:
                w2n (lookup_storage 0w (lookup_account 0x200w final.rollback.accounts).storage),
                w2n (lookup_storage 0w (lookup_account 0x200w saved.accounts).storage),
                w2n (lookup_storage 0w (lookup_account 0x200w original.accounts).storage),
+               w2n (lookup_storage 0w (lookup_account 0x200w final.originalAccounts).storage),
                w2n (lookup_storage 1w (lookup_account 0x200w final.rollback.accounts).storage),
                w2n (lookup_storage 7w (lookup_transient_storage 0x300w final.rollback.tStorage)),
                final.rollback.toDelete = [0x400w],
@@ -78,7 +80,7 @@ val () = cv_auto_trans bookkeeping_summary_def;
 
 Theorem successful_call_preserves_seeded_bookkeeping:
   bookkeeping_summary [0x60w; 1w; 0x60w; 0w; 0x55w; 0w] =
-    SOME (1w, 1, 9, 5, 88, 42, T, T, T, T, T, T, T, T)
+    SOME (1w, 1, 9, 5, 5, 88, 42, T, T, T, T, T, T, T, T)
 Proof
   CONV_TAC cv_eval
 QED
@@ -86,7 +88,7 @@ QED
 Theorem reverted_call_preserves_original_and_saved_bookkeeping:
   bookkeeping_summary [0x60w; 1w; 0x60w; 0w; 0x55w;
                        0x60w; 0w; 0x60w; 0w; 0xfdw] =
-    SOME (0w, 9, 9, 5, 88, 42, T, T, T, T, T, T, T, T)
+    SOME (0w, 9, 9, 5, 5, 88, 42, T, T, T, T, T, T, T, T)
 Proof
   CONV_TAC cv_eval
 QED

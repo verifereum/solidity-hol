@@ -636,8 +636,8 @@ Definition check_core_stmts_def:
     else NONE) ∧
   (check_core_stmts env ctx (_ :: _) = NONE)
 Termination
-  WF_REL_TAC ‘measure (λ(env, ctx, ss). core_stmt1_size ss)’ >>
-  rw[core_stmt_size_def]
+  WF_REL_TAC ‘measure (λ(env, ctx, ss). list_size core_stmt_size ss)’ >>
+  rw[core_stmt_size_def, list_size_def]
 End
 
 Definition wf_core_stmts_def:

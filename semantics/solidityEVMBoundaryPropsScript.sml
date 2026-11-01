@@ -70,6 +70,7 @@ QED
 (* Storage preservation applies to the entered subtree, with precisely the
  * upstream checkpoint assumptions. In particular, saved accounts need not
  * equal current accounts, but their differing slots must be covered by accesses.
+ * CREATE may clear an unaccessed slot in a nonce-zero, code-empty account.
  *)
 Theorem boundary_subtree_preserves_unaccessed_storage:
   positioned_at_boundary instruction es ∧
@@ -81,7 +82,9 @@ Theorem boundary_subtree_preserves_unaccessed_storage:
   execute_boundary instruction es = SOME (result, final) ⇒
   ∀a k. ¬fIN (SK a k) final.rollback.accesses.storageKeys ⇒
     lookup_storage k (lookup_account a final.rollback.accounts).storage =
-    lookup_storage k (lookup_account a entered.rollback.accounts).storage
+    lookup_storage k (lookup_account a entered.rollback.accounts).storage ∨
+    lookup_storage k (lookup_account a final.rollback.accounts).storage = 0w ∧
+    ¬account_already_created (lookup_account a entered.rollback.accounts)
 Proof
   rpt strip_tac
   \\ ‘run_call entered = SOME (result, final)’ by

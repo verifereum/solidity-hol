@@ -1011,7 +1011,8 @@ val stmt_ids_pre_def = cv_auto_trans_pre_rec
 Theorem stmt_ids_pre[cv_pre,local]:
   (∀v. stmt_ids_pre v) ∧ (∀v. stmts_ids_pre v) ∧ (∀v. option_stmt_ids_pre v)
 Proof
-  ho_match_mp_tac (fetch "-" "src_stmt_induction") >> rpt strip_tac >>
+  CONV_TAC (RAND_CONV (REWR_CONV CONJ_COMM)) >>
+  ho_match_mp_tac stmt_ids_ind >> rpt strip_tac >>
   simp[Once stmt_ids_pre_def] >> rw[] >> fs[]
 QED
 
