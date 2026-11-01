@@ -14,7 +14,7 @@ Libs
 Definition yul_test_machine_def:
   yul_test_machine =
     <| accounts := empty_accounts; logs := []; self_address := 0w;
-       call_value := 0w; call_data := [];
+       caller_address := 0w; call_value := 0w; call_data := [];
        immutables := (FEMPTY : string |-> bytes32); memory := FEMPTY;
        memory_size := 0; scopes := [] |>
 End
@@ -25,13 +25,14 @@ End
 
 val () = cv_auto_trans run_def;
 
-(* The frame the builtins that read it run on: an account of its own, and one
- * immutable the constructor patched in under the name "3".
+(* The frame the builtins that read it run on: an account of its own, a caller
+ * that is not that account, and one immutable the constructor patched in under
+ * the name "3".
  *)
 Definition yul_frame_machine_def:
   yul_frame_machine =
     <| accounts := empty_accounts; logs := []; self_address := 0x1234w;
-       call_value := 0w; call_data := [];
+       caller_address := 0x5678w; call_value := 0w; call_data := [];
        immutables := (FEMPTY : string |-> bytes32) |+ ("3", 42w);
        memory := FEMPTY; memory_size := 0; scopes := [] |>
 End
@@ -368,8 +369,8 @@ End
 val () = cv_auto_trans string_literal_code_def;
 
 (* mstore(0, caller()) mstore(32, loadimmutable("3")) return(0, 64)
- * Both frame inputs come from the frame's caller: the account the code runs
- * for, and the value the constructor patched in under the name "3".
+ * Both frame inputs come from the frame's caller: the sender that called the
+ * account in, and the value the constructor patched in under the name "3".
  *)
 Definition frame_code_def:
   frame_code =
@@ -391,6 +392,17 @@ Definition unknown_immutable_code_def:
 End
 
 val () = cv_auto_trans unknown_immutable_code_def;
+
+(* loadimmutable(3): a number is not a name, so the call is not the form the
+ * dispatcher reads the immutables table for, and the value-based dispatch,
+ * which has no case for it, makes it an error rather than a zero.
+ *)
+Definition immutable_number_code_def:
+  immutable_number_code =
+    [YulExprStmt (YulBuiltin YLoadImmutable [YulLit (LitNumber 3w)])]
+End
+
+val () = cv_auto_trans immutable_number_code_def;
 
 (* mstore(0, "ab") log3(0, 2, 11, 22, 33)
  * The log's payload is the memory range the call names -- the two bytes just
@@ -421,6 +433,23 @@ Definition mcopy_code_def:
 End
 
 val () = cv_auto_trans mcopy_code_def;
+
+(* mstore(0, "abcd") mcopy(2, 0, 4) return(0, 6)
+ * Source and destination overlap, and the four bytes read are the four that
+ * were there before the copy began: a copy that wrote as it read would leave
+ * 0x6162 6162 6162 instead.
+ *)
+Definition mcopy_overlap_code_def:
+  mcopy_overlap_code =
+    [YulExprStmt (YulBuiltin YMStore
+       [YulLit (LitNumber 0w); YulLit (LitBytes [0x61w; 0x62w; 0x63w; 0x64w])]);
+     YulExprStmt (YulBuiltin YMCopy
+       [YulLit (LitNumber 2w); YulLit (LitNumber 0w); YulLit (LitNumber 4w)]);
+     YulExprStmt (YulBuiltin YReturn
+       [YulLit (LitNumber 0w); YulLit (LitNumber 6w)])]
+End
+
+val () = cv_auto_trans mcopy_overlap_code_def;
 
 (* pop(1) mstore(0, 7) return(0, 32) *)
 Definition pop_code_def:
@@ -586,7 +615,7 @@ QED
 
 Theorem caller_and_immutable_come_from_the_frame:
   (run_frame 20 frame_code).completion =
-  YulReturn (word_to_bytes_be (0x1234w : bytes32) ++
+  YulReturn (word_to_bytes_be (0x5678w : bytes32) ++
              word_to_bytes_be (42w : bytes32))
 Proof
   CONV_TAC cv_eval
@@ -607,9 +636,23 @@ Proof
   CONV_TAC cv_eval
 QED
 
+Theorem a_loadimmutable_without_a_name_is_invalid:
+  (run_frame 20 immutable_number_code).completion =
+  YulInvalid "bad builtin call"
+Proof
+  CONV_TAC cv_eval
+QED
+
 Theorem mcopy_copies_memory:
   (run 20 mcopy_code).completion =
   YulReturn (word_to_bytes_be (0x1122334455667788w : bytes32))
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem mcopy_reads_before_it_writes:
+  (run 20 mcopy_overlap_code).completion =
+  YulReturn [0x61w; 0x62w; 0x61w; 0x62w; 0x63w; 0x64w]
 Proof
   CONV_TAC cv_eval
 QED

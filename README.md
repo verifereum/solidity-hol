@@ -71,8 +71,8 @@ an explicit invalid outcome rather than a value; the two ill-formed inputs the
 compiler rejects by itself — a `break` in a `for` loop's post block, and a call
 returning several values in argument position — are accepted. The node kinds
 and builtins the pinned compiler emits, per fixture and per stage of its Yul
-pipeline — the unoptimized Yul, and the optimizer's output with the optimizer
-off and on — are enumerated in
+pipeline — the unoptimized Yul, and the optimized artifact with the Yul
+optimizer off and on — are enumerated in
 [testdata/yul/reconnaissance.md](testdata/yul/reconnaissance.md).
 
 ## Validation

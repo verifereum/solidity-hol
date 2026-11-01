@@ -16,6 +16,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 import yul_reconnaissance as recon  # noqa: E402
 
 ARTIFACT = ROOT / "testdata" / "yul" / "reconnaissance.json"
+REPORT = ROOT / "testdata" / "yul" / "reconnaissance.md"
 
 
 class ParserTests(unittest.TestCase):
@@ -206,6 +207,11 @@ class GeneratedArtifactTests(unittest.TestCase):
                 self.assertTrue(entry["fixtures"])
             for entry in summary["nodeKinds"].values():
                 self.assertTrue(entry["fixtures"])
+
+    def test_the_report_is_the_markdown_the_artifact_renders_to(self) -> None:
+        artifact = json.loads(ARTIFACT.read_text(encoding="utf-8"))
+        self.assertEqual(recon.render_markdown(artifact),
+                         REPORT.read_text(encoding="utf-8"))
 
     def test_records_the_pin_profile_and_selection_it_was_made_with(self) -> None:
         artifact = json.loads(ARTIFACT.read_text(encoding="utf-8"))

@@ -19,10 +19,12 @@ top-level `object`) and the runtime object (the nested one whose name ends in
 absent from the result.
 
 The enumeration is per stage, in the order the compiler's pipeline produces
-them: `ir` with the optimizer off, then `irOptimized` with the optimizer off
-(what the Yul optimizer is handed) and `irOptimized` with the optimizer on at
-the profile's run count (what the bytecode is generated from).  Each fixture is
-compiled once per optimizer setting, both its artifacts at once.
+them: `ir`, then `irOptimized` with the optimizer off, then `irOptimized` with
+the optimizer on at the profile's run count.  The compiler prints the two
+artifacts through different paths, so `irOptimized` is not the same text as
+`ir` even with the optimizer off, and the report keeps all three rather than
+treating any one of them as another's input.  Each fixture is compiled once per
+optimizer setting, both its artifacts at once.
 
 The parser accepts the Yul dialect of the compiler's IR printer: identifiers
 (including `.`-qualified and `$`-escaped ones), hex/binary/decimal numbers,
@@ -69,9 +71,9 @@ class Stage:
     optimizer_enabled: bool
 
 
-# The stages, in pipeline order.  `ir` is the unoptimized Yul the optimizer is
-# handed, so it comes from the optimizer-off compile; `irOptimized` is the
-# artifact both before and after the Yul optimizer runs.
+# The stages, in pipeline order: the unoptimized artifact, then the optimized
+# one with the Yul optimizer off and on.  `irOptimized` differs from `ir` even
+# with the optimizer off, so no stage stands in for another's input.
 STAGES = (
     Stage(id="ir", artifact="ir", optimizer_enabled=False),
     Stage(id="ir-optimized-off", artifact="irOptimized", optimizer_enabled=False),

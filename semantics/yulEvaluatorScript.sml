@@ -320,7 +320,7 @@ Definition eval_yul_builtin_def:
     | (YCallDataSize, []) => EvalValues [n2w (LENGTH m.call_data)] m
     | (YCallValue, []) => EvalValues [m.call_value] m
     | (YMemoryGuard, [x]) => EvalValues [x] m
-    | (YCaller, []) => EvalValues [n2w (w2n m.self_address)] m
+    | (YCaller, []) => EvalValues [n2w (w2n m.caller_address)] m
     | (YLog1, [p; s; topic]) =>
         let (m', bs) = yul_memory_region m (w2n p) (w2n s) in
           EvalValues []

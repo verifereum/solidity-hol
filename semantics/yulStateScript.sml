@@ -1,7 +1,8 @@
 (* The machine a Yul runtime frame runs on.
  *
  * A frame is split the way the EVM boundary is: the frame's own fields
- * (address, call value, call data, memory, local scopes) are transient, while
+ * (address, the caller's address, call value, call data, memory, local
+ * scopes) are transient, while
  * the accounts and the log are the caller-observable world. Raw execution
  * leaves both changed; finish_yul_frame says which of them survives, rolling
  * the world back to its initial value for revert, invalid and out-of-fuel and
@@ -15,6 +16,11 @@
  * an access of no bytes touches nothing. The pinned compiler never emits
  * msize(), so there is no builtin for it; the size is still there for the
  * frame's caller to read (yul_memory_size).
+ *
+ * The two addresses are the EVM's two: self_address is the account the frame
+ * runs for -- the one storage is addressed at, and the one a log entry names as
+ * its logger -- while caller_address is the sender the frame's builtins read as
+ * caller(), which is ADDRESS and CALLER respectively.
  *
  * Immutables are frame inputs like the call data, except that the constructor
  * patched them into the code rather than the caller passing them: the runtime
@@ -40,6 +46,7 @@ Datatype:
     accounts : evm_accounts;
     logs : event list;
     self_address : address;
+    caller_address : address;
     call_value : bytes32;
     call_data : byte list;
     immutables : string |-> bytes32;
