@@ -252,31 +252,38 @@ fun is_con name tm =
     is_const f andalso fst (dest_const f) = name
   end
 
+(* A corpus case as solidityDifferential's differential_case record, which is
+ * what both the bytecode run and the Yul run are given, and the fuel it runs
+ * with. *)
+fun case_term c =
+  TypeBase.mk_record
+    (mk_thy_type {Thy = "solidityDifferential", Tyop = "differential_case",
+                  Args = []},
+     [("case_sender",
+       word_term 160 (case JSONUtil.findField c "sender" of
+                        SOME v => integer v
+                      | NONE => 0x2000)),
+      ("case_value",
+       num_term (case JSONUtil.findField c "value" of
+                   SOME v => integer v
+                 | NONE => 0)),
+      ("case_input", call_input c),
+      ("case_storage", storage (JSONUtil.findField c "storage")),
+      ("case_expect", expectation (field c "expect")),
+      ("case_final", storage (JSONUtil.findField c "final_storage")),
+      ("case_logs", logs (JSONUtil.findField c "logs"))])
+
+fun case_fuel c fuel =
+  case JSONUtil.findField c "fuel" of SOME v => integer v | NONE => fuel
+
 fun run_case {suite, code, unit, program, fuel} c =
   let
     val case_name = name_field c "name"
     val theorem = suite ^ "_" ^ case_name
-    val fuel = case JSONUtil.findField c "fuel" of
-                 SOME v => integer v
-               | NONE => fuel
+    val fuel = case_fuel c fuel
     val input = call_input c
     val expect = expectation (field c "expect")
-    val case_tm = TypeBase.mk_record
-      (mk_thy_type {Thy = "solidityDifferential", Tyop = "differential_case",
-                    Args = []},
-       [("case_sender",
-         word_term 160 (case JSONUtil.findField c "sender" of
-                          SOME v => integer v
-                        | NONE => 0x2000)),
-        ("case_value",
-         num_term (case JSONUtil.findField c "value" of
-                     SOME v => integer v
-                   | NONE => 0)),
-        ("case_input", input),
-        ("case_storage", storage (JSONUtil.findField c "storage")),
-        ("case_expect", expect),
-        ("case_final", storage (JSONUtil.findField c "final_storage")),
-        ("case_logs", logs (JSONUtil.findField c "logs"))])
+    val case_tm = case_term c
     val verdict_tm =
       list_mk_comb (prim_mk_const {Thy = "solidityDifferential",
                                    Name = "differential_verdict"},
@@ -487,18 +494,17 @@ fun yul_stage_code prefix suite source contract (tag, json_tag, path, stage) =
                       ("message", json_string (General.exnMessage e))];
             NONE)
 
-fun yul_verdict_term {code, unit, program, function, args, initial, expect,
-                      final, ycode} =
+fun yul_verdict_term {code, unit, program, fuel, case_tm, ycode} =
   list_mk_comb
     (prim_mk_const {Thy = "yulDifferential", Name = "yul_case_verdict"},
-     [code, unit, program, stringSyntax.fromMLstring function, args, initial,
-      expect, final, num_term (IntInf.fromInt yul_fuel), ycode])
+     [code, unit, program, num_term fuel, case_tm,
+      num_term (IntInf.fromInt yul_fuel), ycode])
 
-fun yul_expected_outcome unit function expect =
+fun yul_expected_outcome unit input expect =
   rhs (concl (cv_eval
     (list_mk_comb (prim_mk_const {Thy = "solidityDifferential",
                                   Name = "expected_outcome"},
-                   [unit, stringSyntax.fromMLstring function, expect]))))
+                   [unit, input, expect]))))
 
 (* One case at one stage: a single cv_eval of the verdict, which runs the
  * bytecode and the Yul. An agreement saves the case's yul_agrees theorem.
@@ -515,11 +521,9 @@ fun run_yul_stage env (stage_tag, json_tag, ycode) =
       emit_yul (base @ [("status", json_string status)] @ extra)
     val tm = yul_verdict_term
       {code = #code env, unit = #unit env, program = #program env,
-       function = #function env, args = #args env, initial = #initial env,
-       expect = #expect env, final = #final env, ycode = ycode}
+       fuel = #fuel env, case_tm = #case_tm env, ycode = ycode}
     val th = cv_eval tm
-    val (verdict, logs) = pairSyntax.dest_pair (rhs (concl th))
-    val log_count = length (fst (listSyntax.dest_list logs))
+    val verdict = rhs (concl th)
     fun both_sides () =
       (* On Unexpected the second operand is the expectation, not the Yul run
        * (see run_case's own case for it), and printing it as the Yul run would
@@ -532,30 +536,22 @@ fun run_yul_stage env (stage_tag, json_tag, ycode) =
       | _ => []
   in
     if is_con "Agree" verdict then
-      if log_count <> 0 then
-        (emit_status "logged"
-           [("theorem", json_string theorem),
-            ("message", json_string
-               "the Yul run wrote a log; the core and bytecode runs record none")];
-         false)
-      else
-        let
-          val agrees_tm =
-            list_mk_comb
-              (prim_mk_const {Thy = "yulDifferential", Name = "yul_agrees"},
-               snd (strip_comb tm))
-          val proved = EQT_ELIM
-            ((PURE_REWRITE_CONV [yulDifferentialTheory.yul_agrees_def, th,
-                                 pairTheory.FST, pairTheory.SND]
-                THENC REWRITE_CONV [is_agreement_def, pairTheory.FST, pairTheory.SND])
-               agrees_tm)
-          val _ = save_thm (theorem, proved)
-        in
-          emit_status "agree"
-            [("theorem", json_string theorem),
-             ("outcome", outcome_json (rand verdict)), ("logs", "0")];
-          true
-        end
+      let
+        val agrees_tm =
+          list_mk_comb
+            (prim_mk_const {Thy = "yulDifferential", Name = "yul_agrees"},
+             snd (strip_comb tm))
+        val proved = EQT_ELIM
+          ((PURE_REWRITE_CONV [yulDifferentialTheory.yul_agrees_def, th]
+              THENC REWRITE_CONV [is_agreement_def])
+             agrees_tm)
+        val _ = save_thm (theorem, proved)
+      in
+        emit_status "agree"
+          [("theorem", json_string theorem),
+           ("outcome", outcome_json (rand verdict))];
+        true
+      end
     else if is_con "StorageMismatch" verdict orelse
             is_con "StorageUnexpected" verdict then
       let
@@ -569,18 +565,31 @@ fun run_yul_stage env (stage_tag, json_tag, ycode) =
           (if mismatch then "storage-mismatch" else "storage-unexpected")
           [("message", json_string
              "Complete storage is compared; displayed values cover the listed slots."),
-           ("logs", Int.toString log_count),
            ("bytecode_storage", storage_json bytecode_st),
            (if mismatch then "yul_storage" else "expected_storage",
             storage_json other_st)];
         false
       end
+    else if is_con "LogMismatch" verdict orelse is_con "LogUnexpected" verdict then
+      let
+        val mismatch = is_con "LogMismatch" verdict
+        val (bytecode_logs, other_logs) =
+          case snd (strip_comb verdict) of
+            [b, x] => (b, x)
+          | _ => raise ERR "run_yul_stage" "unexpected verdict"
+      in
+        emit_status
+          (if mismatch then "log-mismatch" else "log-unexpected")
+          [("bytecode_logs", logs_json bytecode_logs),
+           (if mismatch then "yul_logs" else "expected_logs",
+            logs_json other_logs)];
+        false
+      end
     else
       (emit_status
          (String.map Char.toLower (fst (dest_const (fst (strip_comb verdict)))))
-         ([("logs", Int.toString log_count),
-           ("expected",
-            outcome_json (yul_expected_outcome (#unit env) (#function env)
+         ([("expected",
+            outcome_json (yul_expected_outcome (#unit env) (#input env)
                             (#expect env)))]
           @ both_sides ());
        false)
@@ -597,11 +606,8 @@ fun run_case_three_way suite_name env c =
   let
     val case_env =
       {suite = suite_name, case_name = name_field c "name",
-       function = string_field c "function",
-       args = arguments (array_field c "args"),
-       initial = storage (JSONUtil.findField c "storage"),
-       expect = expectation (field c "expect"),
-       final = storage (JSONUtil.findField c "final_storage"),
+       case_tm = case_term c, input = call_input c,
+       expect = expectation (field c "expect"), fuel = case_fuel c (#fuel env),
        unit = #unit env, code = #code env, program = #program env}
   in
     List.foldl (fn (stage, ok) => run_yul_stage case_env stage andalso ok)
@@ -614,7 +620,7 @@ fun run_case_three_way suite_name env c =
                ("message", json_string (General.exnMessage e))];
      false)
 
-fun run_suite_three_way root yul_root s =
+fun run_suite_three_way root yul_root fuel s =
   let
     val suite = name_field s "name"
     val prefix = "corpus_" ^ suite
@@ -628,7 +634,8 @@ fun run_suite_three_way root yul_root s =
     val code = code_constant prefix (#artifact checked) source contract
     val stages = List.mapPartial (yul_stage_code prefix suite source contract)
                    (yul_stages yul_root suite)
-    val env = {unit = unit, code = code, program = program, stages = stages}
+    val env = {unit = unit, code = code, program = program, stages = stages,
+               fuel = fuel}
   in
     emit_yul [("kind", json_string "suite"), ("suite", json_string suite),
               ("status", json_string "ok"),
@@ -664,8 +671,9 @@ fun run_three_way {root, corpus, yul_root} =
     val v = JSONParser.parseFile path
     val () = if string_field v "format" = "solidity-hol-differential-corpus-v1"
              then () else raise ERR "run_three_way" (path ^ ": unsupported format")
+    val fuel = integer (field v "fuel")
     val ok = List.foldl (fn (s, ok) =>
-                           run_suite_three_way root yul_root s andalso ok)
+                           run_suite_three_way root yul_root fuel s andalso ok)
                true (array_field v "suites")
   in
     if ok then ()

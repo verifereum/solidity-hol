@@ -5,7 +5,7 @@
  *
  * The Yul artifacts this reads are generated from the pinned compiler by
  * tools/run_yul_differential.py, which writes them here and then builds this
- * theory; they are not committed (the ASTs of the twelve suites are tens of
+ * theory; they are not committed (the ASTs of the corpus's suites are tens of
  * megabytes). The importer's own tests use the small committed fixture under
  * testdata/yul/expected (tests/yulImportTest).
  *)
@@ -36,6 +36,10 @@ val () = holbuild_extra_deps [
   "../testdata/differential/expected/shadowed_builtins.json",
   "../testdata/differential/expected/storage_structs.json",
   "../testdata/differential/expected/storage_structs_top_level.json",
+  "../testdata/differential/expected/token.json",
+  "../testdata/differential/expected/context.json",
+  "../testdata/differential/expected/fallback.json",
+  "../testdata/differential/expected/receive.json",
   "../testdata/yul/generated/pure_core.ir.json",
   "../testdata/yul/generated/pure_core.optimized.json",
   "../testdata/yul/generated/scalars.ir.json",
@@ -60,6 +64,14 @@ val () = holbuild_extra_deps [
   "../testdata/yul/generated/storage_structs.optimized.json",
   "../testdata/yul/generated/storage_structs_top_level.ir.json",
   "../testdata/yul/generated/storage_structs_top_level.optimized.json",
+  "../testdata/yul/generated/token.ir.json",
+  "../testdata/yul/generated/token.optimized.json",
+  "../testdata/yul/generated/context.ir.json",
+  "../testdata/yul/generated/context.optimized.json",
+  "../testdata/yul/generated/fallback.ir.json",
+  "../testdata/yul/generated/fallback.optimized.json",
+  "../testdata/yul/generated/receive.ir.json",
+  "../testdata/yul/generated/receive.optimized.json",
 ]
 
 val () = solidityDifferentialLib.run_three_way

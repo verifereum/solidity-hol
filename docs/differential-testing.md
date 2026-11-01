@@ -72,8 +72,7 @@ separately from a disagreement, and the stage's cases are not run there.
 Each case at each stage gets one `yul_agrees` theorem
 (`tests/yulDifferentialScript.sml`), which is the corpus's comparison with the
 Yul run standing where the core run stands: the same calldata, the same
-outcome, the complete committed storage, and no log, since neither of the
-other two runs records one.
+outcome, the complete committed storage, and the log the case declares.
 
 The ASTs are tens of megabytes across the corpus, so the tool generates them
 with the pinned compiler instead of committing them, and the run is far longer

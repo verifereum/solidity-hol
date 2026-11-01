@@ -3,31 +3,30 @@
  *
  * The corpus theory (solidityDifferentialCorpus) holds the elaborated core and
  * verifereum's EVM, on the compiled bytecode, to each case's committed
- * expectation: the outcome it declares and the storage it lists. This theory
- * holds the Yul semantics to the same expectation, on the Yul the same
- * compiler emitted for the same source, at the three stages the design
- * separates (docs/roadmap.md, milestone 2): irAst, the code generator's own
- * output; irOptimizedAst with the optimizer off, after the transformations
+ * expectation: the outcome it declares, the storage it lists and the logs it
+ * expects. This theory holds the Yul semantics to the same expectation, on the
+ * Yul the same compiler emitted for the same source, at the three stages the
+ * design separates (docs/roadmap.md, milestone 2): irAst, the code generator's
+ * own output; irOptimizedAst with the optimizer off, after the transformations
  * solc runs then; and irOptimizedAst with the optimizer on, which is what a
  * production build hands to the backend.
  *
  * A run is a frame, as at the EVM boundary: the contract account at
- * contract_address holding the case's initial storage, the case's calldata,
- * no call value, and nothing else. Its observation is the outcome the EVM
- * sees (a return of ABI-encoded data, a revert, or a diagnostic), the
- * contract's committed storage, and the log the frame wrote; a revert takes
- * the initial world back, as finish_yul_frame says. The calldata is built by
- * the same call_data the bytecode run uses, so the two sides are called
- * identically, and the verdict is solidityDifferential's own, with the Yul
+ * contract_address holding the case's initial storage, the case's sender
+ * funded for the value it sends, and the case's calldata, call value and
+ * transaction parameters -- the same ones the bytecode run is given, so that
+ * caller, callvalue, origin, chainid and the rest read the same values on both
+ * sides. Its observation is the outcome the EVM sees (a return of ABI-encoded
+ * data, a revert, or a diagnostic), the contract's committed storage and the
+ * log the frame wrote; a revert takes the initial world back, as
+ * finish_yul_frame says. The calldata is built by the same input_call the
+ * bytecode run uses, so a named call and raw calldata are called identically
+ * on both sides, and the verdict is solidityDifferential's own, with the Yul
  * run standing where the core run stands: a Mismatch is the bytecode run and
  * the Yul run disagreeing on the outcome, an Unexpected is both agreeing on
  * something the case does not declare, Inconclusive is either side being a
- * diagnostic, and the storage verdicts compare complete committed storage.
- *
- * The log is part of the agreement: the corpus's other two sides record none
- * (the core evaluator's frames have no log, and run_transaction does not
- * expose the EVM's), so a Yul run that writes one is not agreement, and the
- * case is reported for classification instead of passing silently.
+ * diagnostic, the storage verdicts compare complete committed storage, and the
+ * log verdicts compare the log the frame wrote with the one the case expects.
  *)
 Theory yulDifferential
 Ancestors
@@ -35,61 +34,40 @@ Ancestors
 Libs
   cv_transLib wordsLib intLib
 
-(* The frame the corpus's cases run in: the contract account at
- * contract_address with the case's storage, reached by the same sender the
- * differential transaction comes from (differential_tx's from), so caller and
- * callvalue are what the bytecode run sees. There are no immutables to load:
- * no corpus suite is compiled with any.
+(* The frame the corpus's cases run in. There are no immutables to load: no
+ * corpus suite is compiled with any.
  *)
 Definition yul_differential_machine_def:
-  yul_differential_machine data storage =
-    <| accounts := contract_accounts [] storage;
+  yul_differential_machine c data =
+    <| accounts := differential_accounts [] c.case_storage c.case_sender;
        logs := [];
        self_address := contract_address;
-       caller_address := 0x2000w;
-       call_value := 0w;
+       caller_address := c.case_sender;
+       call_value := n2w c.case_value;
        call_data := data;
        immutables := (FEMPTY : string |-> bytes32);
        memory := FEMPTY;
        memory_size := 0;
-       scopes := [] |>
+       scopes := [];
+       transaction_parameters :=
+         initial_tx_params differential_chain_id [] differential_block
+           (differential_tx c.case_sender c.case_value data) 0 |>
 End
 
-Datatype:
-  yul_observation = <|
-    observed_outcome : call_outcome;
-    observed_storage : storage option;
-    observed_logs : event list
-  |>
-End
-
-(* What the frame's caller sees, as finish_yul_frame decides it. *)
+(* What the frame's caller sees, as finish_yul_frame decides it: the same
+ * shape contract_observation gives the bytecode run.
+ *)
 Definition yul_frame_observation_def:
   yul_frame_observation frames =
     case frames of
       YulFrameSuccess data w =>
-        <| observed_outcome := Returned data;
-           observed_storage := SOME (lookup_account contract_address w.accounts).storage;
-           observed_logs := w.logs |>
+        (Returned data,
+         SOME (lookup_account contract_address w.accounts).storage, w.logs)
     | YulFrameRevert data w =>
-        <| observed_outcome := Reverted data;
-           observed_storage := SOME (lookup_account contract_address w.accounts).storage;
-           observed_logs := w.logs |>
-    | YulFrameInvalid _ =>
-        <| observed_outcome := Diagnostic InvalidCompletion;
-           observed_storage := NONE;
-           observed_logs := [] |>
-    | YulFrameResourceLimit =>
-        <| observed_outcome := Diagnostic OutOfFuel;
-           observed_storage := NONE;
-           observed_logs := [] |>
-End
-
-Definition yul_execution_def:
-  yul_execution code fuel data storage =
-    let m = yul_differential_machine data storage in
-    let r = run_yul fuel code m in
-    yul_frame_observation (finish_yul_frame m r.machine r.completion)
+        (Reverted data,
+         SOME (lookup_account contract_address w.accounts).storage, w.logs)
+    | YulFrameInvalid _ => (Diagnostic InvalidCompletion, NONE, [])
+    | YulFrameResourceLimit => (Diagnostic OutOfFuel, NONE, [])
 End
 
 (* A case's call: the same calldata the bytecode run is given, so an
@@ -97,58 +75,65 @@ End
  * sides.
  *)
 Definition yul_case_execution_def:
-  yul_case_execution u name args storage code fuel =
-    case function_types u name of
-      NONE => <| observed_outcome := Diagnostic UnknownFunction;
-                 observed_storage := NONE; observed_logs := [] |>
-    | SOME (params, rets) =>
-        case argument_values params args of
-          NONE => <| observed_outcome := Diagnostic UnencodableArguments;
-                     observed_storage := NONE; observed_logs := [] |>
-        | SOME vs =>
-            case call_data name params vs of
-              NONE => <| observed_outcome := Diagnostic UnencodableArguments;
-                         observed_storage := NONE; observed_logs := [] |>
-            | SOME data => yul_execution code fuel data storage
+  yul_case_execution code u c fuel =
+    case input_call u c.case_input of
+      INL d => (Diagnostic d, NONE, [])
+    | INR (data, _) =>
+        let m = yul_differential_machine c data in
+        let r = run_yul fuel code m in
+        yul_frame_observation (finish_yul_frame m r.machine r.completion)
 End
 
-(* The verdict on one case at one stage, with the log the run wrote. *)
+Definition yul_observation_def:
+  yul_observation code u c fuel slots =
+    project_observation slots (yul_case_execution code u c fuel)
+End
+
+(* The verdict on one case at one stage, as differential_verdict decides it
+ * with the Yul run standing where the core run stands.
+ *)
 Definition yul_case_verdict_def:
-  yul_case_verdict code u prog name args storage e final yfuel ycode =
-    let slots = observed_slots prog storage final in
-    let evm_run = evm_execution code u name args storage in
-    let run = yul_case_execution u name args storage ycode yfuel in
+  yul_case_verdict code u prog fuel c yfuel ycode =
+    let slots = observed_slots prog c.case_storage c.case_final in
+    let evm_run = evm_execution code u c in
+    let yul_run = yul_case_execution ycode u c yfuel in
     let evm = project_observation slots evm_run in
-    let yul = project_observation slots (run.observed_outcome, run.observed_storage) in
-    ((case compare_observations
-             (expected_outcome u name e, expected_storage storage final slots)
-             evm yul of
-        Agree outcome =>
-          if SND evm_run ≠ run.observed_storage then
-            StorageMismatch (SND evm) (SND yul)
-          else if SND evm_run ≠ SOME (seed_storage (final ++ storage)) then
-            StorageUnexpected (SND evm) (expected_storage storage final slots)
-          else Agree outcome
-      | other => other),
-     run.observed_logs)
+    let yul = project_observation slots yul_run in
+    case compare_observations
+      (expected_outcome u c.case_input c.case_expect,
+       expected_storage c.case_storage c.case_final slots) evm yul of
+      Agree outcome =>
+        if FST (SND evm_run) ≠ FST (SND yul_run) then
+          StorageMismatch (SND evm) (SND yul)
+        else if FST (SND evm_run) ≠
+                SOME (seed_storage (c.case_final ++ c.case_storage)) then
+          StorageUnexpected (SND evm)
+            (expected_storage c.case_storage c.case_final slots)
+        else if SND (SND evm_run) ≠ SND (SND yul_run) then
+          LogMismatch (SND (SND evm_run)) (SND (SND yul_run))
+        else if SND (SND evm_run) ≠ expected_logs c.case_logs then
+          LogUnexpected (SND (SND evm_run)) (expected_logs c.case_logs)
+        else Agree outcome
+    | other => other
 End
 
 Definition yul_agrees_def:
-  yul_agrees code u prog name args storage e final yfuel ycode ⇔
-    is_agreement (FST (yul_case_verdict code u prog name args storage e final yfuel ycode)) ∧
-    SND (yul_case_verdict code u prog name args storage e final yfuel ycode) = []
+  yul_agrees code u prog fuel c yfuel ycode ⇔
+    is_agreement (yul_case_verdict code u prog fuel c yfuel ycode)
 End
 
-(* The complete-storage check of yul_case_verdict cannot turn an agreement
- * into a disagreement: what holds when compare_observations agrees is what
- * the verdict's own storage comparison leaves alone.
+(* The complete-storage and complete-log checks of yul_case_verdict cannot
+ * turn an agreement into a disagreement: what holds when compare_observations
+ * agrees is what the verdict's own checks leave alone.
  *)
-Theorem complete_storage_check_agreement[local]:
+Theorem complete_check_agreement[local]:
   is_agreement
     (case verdict of
        Agree outcome =>
-         if evm_st ≠ src_st then StorageMismatch evm_slots src_slots
-         else if src_st ≠ expected_st then StorageUnexpected evm_slots expected_slots
+         if b1 then StorageMismatch s1 s2
+         else if b2 then StorageUnexpected s3 s4
+         else if b3 then LogMismatch l1 l2
+         else if b4 then LogUnexpected l3 l4
          else Agree outcome
      | other => other) ⇒
   is_agreement verdict
@@ -158,19 +143,19 @@ Proof
 QED
 
 (* What an agreement establishes: the Yul run returns or reverts what the case
- * expects, and leaves no log. The bytecode run's side is
+ * expects, and it is never a diagnostic. The bytecode run's side is
  * solidityDifferential's differential_agrees_outcomes.
  *)
 Theorem yul_agrees_outcomes:
-  yul_agrees code u prog name args storage e final yfuel ycode ⇒
-  ¬is_diagnostic (expected_outcome u name e) ∧
-  (yul_case_execution u name args storage ycode yfuel).observed_outcome =
-    expected_outcome u name e ∧
-  (yul_case_execution u name args storage ycode yfuel).observed_logs = []
+  yul_agrees code u prog fuel c yfuel ycode ∧
+  slots = observed_slots prog c.case_storage c.case_final ⇒
+  ¬is_diagnostic (expected_outcome u c.case_input c.case_expect) ∧
+  yul_observation ycode u c yfuel slots =
+    (expected_outcome u c.case_input c.case_expect,
+     expected_storage c.case_storage c.case_final slots)
 Proof
-  rw[yul_agrees_def, yul_case_verdict_def, project_observation_def,
-     pairTheory.FST, pairTheory.SND] >>
-  drule complete_storage_check_agreement >> strip_tac >>
+  rw[yul_agrees_def, yul_case_verdict_def, yul_observation_def] >>
+  drule complete_check_agreement >> strip_tac >>
   drule compare_observations_agree >> simp[]
 QED
 
@@ -178,17 +163,26 @@ QED
  * lists: the whole committed storage, as the bytecode run's agreement is.
  *)
 Theorem yul_agrees_storage:
-  yul_agrees code u prog name args storage e final yfuel ycode ⇒
-  (yul_case_execution u name args storage ycode yfuel).observed_storage =
-    SOME (seed_storage (final ++ storage))
+  yul_agrees code u prog fuel c yfuel ycode ⇒
+  FST (SND (yul_case_execution ycode u c yfuel)) =
+    SOME (seed_storage (c.case_final ++ c.case_storage))
 Proof
-  rw[yul_agrees_def, yul_case_verdict_def, pairTheory.FST, pairTheory.SND] >>
+  rw[yul_agrees_def, yul_case_verdict_def] >>
+  BasicProvers.every_case_tac >> gvs[is_agreement_def]
+QED
+
+(* And the log it wrote is the one the case expects. *)
+Theorem yul_agrees_logs:
+  yul_agrees code u prog fuel c yfuel ycode ⇒
+  SND (SND (yul_case_execution ycode u c yfuel)) = expected_logs c.case_logs
+Proof
+  rw[yul_agrees_def, yul_case_verdict_def] >>
   BasicProvers.every_case_tac >> gvs[is_agreement_def]
 QED
 
 val () = cv_auto_trans yul_differential_machine_def;
 val () = cv_auto_trans yul_frame_observation_def;
-val () = cv_auto_trans yul_execution_def;
 val () = cv_auto_trans yul_case_execution_def;
+val () = cv_auto_trans yul_observation_def;
 val () = cv_auto_trans yul_case_verdict_def;
 val () = cv_auto_trans yul_agrees_def;

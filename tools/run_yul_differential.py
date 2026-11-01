@@ -24,7 +24,7 @@ The ASTs are generated here rather than committed: they are tens of megabytes
 across the corpus. The small committed fixtures under testdata/yul/expected
 test the importer itself, in CI, where the pinned compiler is not installed.
 
-The whole run is 289 cases times three stages, far too long for CI, so this is
+The whole run is hundreds of cases times three stages, far too long for CI, so this is
 a documented tool. Its report (docs/yul-differential.md and .json by default)
 is committed. Run it with the pinned compiler:
 
@@ -216,7 +216,11 @@ def build_report(corpus_path: Path, corpus: dict[str, Any], solc: Path,
                              "message": hol.get("error", "the HOL build failed"),
                              "log": hol.get("log")})
     else:
-        stage_counts = {}
+        # No HOL run, so nothing was admitted or run: the report says so
+        # rather than leaving the stages out of it.
+        stage_counts = {stage: {"stages_admitted": 0, "stages_expected": 0,
+                                "cases_run": 0, "agreements": 0}
+                        for stage in STAGES}
         expected = sum(len(suite["cases"]) for suite in corpus["suites"]) * len(STAGES)
     return {
         "format": REPORT_FORMAT,
@@ -273,7 +277,8 @@ def summarise(report: dict[str, Any]) -> str:
     lines += ["", "## Kernel-checked witnesses", "",
               "Theorems of yulDifferentialCorpusTheory, proved by the HOL kernel (with "
               "cv_compute) when the theory was built. Each relates the Yul run to the "
-              "bytecode run and to the case's expectation, and says the run left no log.",
+              "bytecode run and to the case's expectation, and says what the run left in",
+              "storage and in the log.",
               "", "| theorem | outcome |", "| --- | --- |"]
     for witness in report["kernel_checked"]:
         lines.append(f"| `{witness['theorem']}` | {json.dumps(witness.get('outcome'))} |")
@@ -285,7 +290,8 @@ def summarise(report: dict[str, Any]) -> str:
         lines.append(f"| {item['check']} | `{item['subject']}` | {status} |")
     lines += ["", "## Disagreements and failures", "",
               "Each case's status is one of agree, mismatch, unexpected, storage-mismatch, "
-              "storage-unexpected, inconclusive, logged or error; only agree is an "
+              "storage-unexpected, log-mismatch, log-unexpected, inconclusive or error; "
+              "only agree is an "
               "agreement. A case at a stage the importer did not admit is not a "
               "disagreement: it is counted above as an admission.", ""]
     if not report["failures"]:

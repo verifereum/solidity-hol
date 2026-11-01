@@ -228,6 +228,24 @@ class DriverTests(unittest.TestCase):
 
 
 class CommittedTests(unittest.TestCase):
+    def test_a_run_without_hol_reports_no_stage_results(self) -> None:
+        """--no-hol still writes a report: the compiler-side checks, and every
+        stage counted as neither admitted nor run."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = FakeRoot(Path(temporary))
+            report_dir = root.root / "report"
+            with contextlib.redirect_stdout(io.StringIO()):
+                status = driver.main(["--solc", str(root.fake_solc()), "--no-hol",
+                                      "--report-dir", str(report_dir)], root=root.root)
+            report = json.loads(
+                (report_dir / "yul-differential.json").read_text(encoding="utf-8"))
+            summary = (report_dir / "yul-differential.md").read_text(encoding="utf-8")
+        self.assertEqual(status, 0)
+        self.assertIsNone(report["hol"])
+        self.assertEqual(report["totals"]["stages_admitted"], 0)
+        self.assertEqual(sorted(report["per_stage"]), sorted(driver.STAGES))
+        self.assertIn("The HOL corpus was not run", summary)
+
     def test_the_committed_corpus_theory_stages_every_artifact(self) -> None:
         loaded = core.load_corpus(ROOT / core.CORPUS)
         written = [f"{driver.YUL_ROOT.as_posix()}/{suite['name']}.{tag}.json"
