@@ -141,14 +141,19 @@ fun word_term bits i =
     wordsSyntax.mk_wordi (Arbnum.fromString (IntInf.toString i), bits)
   else fail ("not a " ^ Int.toString bits ^ "-bit word: " ^ IntInf.toString i)
 
-(* Calldata as 0x hex, or a named function and its arguments. *)
-fun call_input c =
-  case (JSONUtil.findField c "calldata", JSONUtil.findField c "function") of
-    (SOME (JSON.STRING s), NONE) => con "RawCall" [bytes_term (hex_bytes s)]
-  | (NONE, SOME (JSON.STRING f)) =>
+(* Calldata as 0x hex, a named function and its arguments, or a creation
+ * ("deploy": true) from the suite's initcode with constructor arguments. *)
+fun call_input initcode c =
+  case (JSONUtil.findField c "calldata", JSONUtil.findField c "function",
+        JSONUtil.findField c "deploy") of
+    (SOME (JSON.STRING s), NONE, NONE) => con "RawCall" [bytes_term (hex_bytes s)]
+  | (NONE, SOME (JSON.STRING f), NONE) =>
       con "NamedCall"
         [stringSyntax.fromMLstring f, arguments (array_field c "args")]
-  | _ => fail "a case has either calldata or a function and its arguments"
+  | (NONE, NONE, SOME (JSON.TRUE)) =>
+      con "Deploy" [initcode (), arguments (array_field c "args")]
+  | _ => fail "a case has either calldata, a function and its arguments, \
+              \or deploy and the constructor's arguments"
 
 (* Logs as a list of {"logger": address, "topics": [...], "data": "0x..."},
  * the logger the contract by default. *)
@@ -248,15 +253,16 @@ fun code_definition name hex =
     lhs (concl def)
   end
 
-fun code_constant prefix artifact source contract =
+(* The deployed code ("deployedBytecode") or initcode ("bytecode"). *)
+fun code_constant name kind artifact source contract =
   let
     val hex = JSONUtil.asString (JSONUtil.get (artifact,
       map JSONUtil.SEL ["output", "contracts", source, contract, "evm",
-                        "deployedBytecode", "object"]))
+                        kind, "object"]))
       handle e as JSONUtil.JSONError _ => fail (JSONUtil.exnMessage e)
            | e as JSONUtil.FieldNotFound _ => fail (JSONUtil.exnMessage e)
   in
-    code_definition (prefix ^ "_code") hex
+    code_definition name hex
   end
 
 (* The peer's code, from its own artifact; no code without a peer. *)
@@ -277,14 +283,14 @@ fun is_con name tm =
     is_const f andalso fst (dest_const f) = name
   end
 
-fun run_case {suite, code, peer, unit, program, fuel} c =
+fun run_case {suite, code, initcode, peer, unit, program, fuel} c =
   let
     val case_name = name_field c "name"
     val theorem = suite ^ "_" ^ case_name
     val fuel = case JSONUtil.findField c "fuel" of
                  SOME v => integer v
                | NONE => fuel
-    val input = call_input c
+    val input = call_input initcode c
     val expect = expectation (field c "expect")
     val case_tm = TypeBase.mk_record
       (mk_thy_type {Thy = "solidityDifferential", Tyop = "differential_case",
@@ -410,15 +416,25 @@ fun run_suite root fuel s =
       val checked = solidityPrepareLib.prepare_artifact
         {root = root, path = artifact, source = source}
       val (unit, program) = prepared_constants prefix (#prepared checked)
-      val code = code_constant prefix (#artifact checked) source contract
+      val code = code_constant (prefix ^ "_code") "deployedBytecode"
+                   (#artifact checked) source contract
+      (* Defined once, by the suite's first creation case. *)
+      val initcode_constant = ref NONE
+      fun initcode () =
+        case !initcode_constant of
+          SOME tm => tm
+        | NONE =>
+            let val tm = code_constant (prefix ^ "_initcode") "bytecode"
+                           (#artifact checked) source contract
+            in initcode_constant := SOME tm; tm end
       val peer = peer_code root prefix s
       val () = emit [("kind", json_string "suite"),
                      ("suite", json_string suite),
                      ("status", json_string "ok"),
                      ("theorems", json_array (map json_string
                        [prefix ^ "_elaborates", prefix ^ "_program_wf"]))]
-      val env = {suite = suite, code = code, peer = peer, unit = unit,
-                 program = program, fuel = fuel}
+      val env = {suite = suite, code = code, initcode = initcode, peer = peer,
+                 unit = unit, program = program, fuel = fuel}
     in
       List.foldl (fn (c, ok) => run_case env c andalso ok) true cases
     end

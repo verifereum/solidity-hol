@@ -495,6 +495,17 @@
         {"name": "base_update_overflow_panics", "function": "bump", "args": [1], "storage": {"0": "115792089237316195423570985008687907853269984665640564039457584007913129639935"}, "expect": {"panic": "0x11"}},
         {"name": "dispatch_reaches_override", "function": "peek", "args": [8193], "storage": {"2": 7, "103313835155301363846162118174845647368154603271475845237394604746666688557604": 5}, "expect": {"return": [12]}}
       ]
+    },
+    {
+      "name": "constructors",
+      "source": "testdata/differential/constructors.sol",
+      "contract": "Top",
+      "artifact": "testdata/differential/expected/constructors.json",
+      "cases": [
+        {"name": "creation_runs_arguments_then_initializers_base_first", "deploy": true, "args": [5], "expect": {"return": []}, "final_storage": {"0": 7, "1": 20, "2": 10, "3": 400, "4": 10, "5": 12, "6": 6000}},
+        {"name": "creation_panics_in_base_constructor", "deploy": true, "args": ["115792089237316195423570985008687907853269984665640564039457584007913129639935"], "expect": {"panic": "0x11"}},
+        {"name": "nonpayable_creation_with_value_reverts", "deploy": true, "args": [5], "value": 1, "expect": {"revert": "0x"}}
+      ]
     }
   ]
 }
