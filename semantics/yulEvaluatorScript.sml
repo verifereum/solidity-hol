@@ -27,7 +27,9 @@
  *
  * Memory, storage, calls and logs: the builtins that read or write them are in
  * eval_yul_builtin below, on the machine in yulState. Memory is byte-addressed
- * and every access raises its active size. Nothing here reads gas.
+ * and every access raises its active size. Nothing here reads gas. Message
+ * calls (call, staticcall), extcodesize, the return data builtins and gas are
+ * in the dialect but not evaluated yet: a call to one ends in YulInvalid.
  *)
 Theory yulEvaluator
 Ancestors
@@ -377,6 +379,12 @@ Definition eval_yul_builtin_def:
     | (YCodeCopy, _) => EvalAbrupt (YulInvalid "object-level builtin") m
     | (YDataSize, _) => EvalAbrupt (YulInvalid "object-level builtin") m
     | (YDataOffset, _) => EvalAbrupt (YulInvalid "object-level builtin") m
+    | (YCall, _) => EvalAbrupt (YulInvalid "builtin not evaluated") m
+    | (YStaticCall, _) => EvalAbrupt (YulInvalid "builtin not evaluated") m
+    | (YExtCodeSize, _) => EvalAbrupt (YulInvalid "builtin not evaluated") m
+    | (YReturnDataSize, _) => EvalAbrupt (YulInvalid "builtin not evaluated") m
+    | (YReturnDataCopy, _) => EvalAbrupt (YulInvalid "builtin not evaluated") m
+    | (YGas, _) => EvalAbrupt (YulInvalid "builtin not evaluated") m
     | _ => EvalAbrupt (YulInvalid "bad builtin call") m
 End
 

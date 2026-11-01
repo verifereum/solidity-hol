@@ -94,9 +94,24 @@ End
  * FunctionCall (kind functionCall): callee, positional arguments.
  * FunctionCall (kind typeConversion): target type name, argument.
  * Environment: a member of msg, tx or block, or address(this).
+ * ExternalCall (I(target).f{value: v}(args)): the declaration of f, whether
+ * a value is given, and the operands in evaluation order: the target, the
+ * value if given, the positional arguments.
  *)
 Datatype:
   src_builtin = RequireBuiltin | AssertBuiltin | RevertBuiltin
+End
+
+(* The declaration a high-level call refers to: an external or public
+ * function of an interface or contract.
+ *)
+Datatype:
+  src_external = <|
+    ext_selector : byte list;
+    ext_mutability : string;
+    ext_parameters : src_variable list;
+    ext_returns : src_variable list
+  |>
 End
 
 Datatype:
@@ -116,6 +131,7 @@ Datatype:
       (src_expr option) string
   | SrcTypeConversion node_info src_type_name src_expr string
   | SrcEnvironment node_info environment_field string
+  | SrcExternalCall node_info src_external bool (src_expr list) string
 End
 
 (* VariableDeclarationStatement: assignments, declarations (NONE for a hole),
@@ -572,6 +588,8 @@ Definition expr_ids_def:
   (expr_ids (SrcTypeConversion info tn e _) =
     info.node_id :: type_name_ids tn ++ expr_ids e) ∧
   (expr_ids (SrcEnvironment info _ _) = [info.node_id]) ∧
+  (expr_ids (SrcExternalCall info _ _ operands _) =
+    info.node_id :: exprs_ids operands) ∧
   (component_ids [] = []) ∧
   (component_ids (NONE :: cs) = component_ids cs) ∧
   (component_ids (SOME e :: cs) = expr_ids e ++ component_ids cs) ∧
@@ -809,6 +827,19 @@ Definition check_expr_def:
   (check_expr env (SrcEnvironment _ f tid) =
     if source_type_matches (environment_type f) tid
     then SOME (SrcType (environment_type f)) else NONE) ∧
+  (* Value only for a payable callee, as the compiler requires; elaboration
+     converts the target to an address. *)
+  (check_expr env (SrcExternalCall _ callee with_value operands tid) =
+    case (all_some (MAP variable_type callee.ext_parameters),
+          all_some (MAP variable_type callee.ext_returns),
+          decode_type_identifier tid) of
+      (SOME params, SOME rets, SOME vt) =>
+        if MEM callee.ext_mutability ["pure"; "view"; "nonpayable"; "payable"] ∧
+           (with_value ⇒ callee.ext_mutability = "payable") ∧
+           LENGTH operands = LENGTH params + (if with_value then 2 else 1) ∧
+           check_exprs env operands ∧ vt = call_value_type rets
+        then SOME vt else NONE
+    | _ => NONE) ∧
   (check_components env [] ⇔ T) ∧
   (check_components env (NONE :: cs) ⇔ check_components env cs) ∧
   (check_components env (SOME e :: cs) ⇔

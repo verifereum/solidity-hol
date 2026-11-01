@@ -225,6 +225,7 @@ Definition expr_assigns_def:
   (expr_assigns (SrcMemberAccess _ root_expr _ _) ⇔ expr_assigns root_expr) ∧
   (expr_assigns (SrcArrayLength _ root_expr _) ⇔ expr_assigns root_expr) ∧
   (expr_assigns (SrcTypeConversion _ _ e _) ⇔ expr_assigns e) ∧
+  (expr_assigns (SrcExternalCall _ _ _ operands _) ⇔ exprs_assign operands) ∧
   (expr_assigns _ ⇔ F) ∧
   (components_assign [] ⇔ F) ∧
   (components_assign (NONE :: cs) ⇔ components_assign cs) ∧
@@ -248,6 +249,17 @@ Definition call_value_def:
   (call_value [] = ElabTuple []) ∧
   (call_value [ty] = ElabType ty) ∧
   (call_value tys = ElabTuple tys)
+End
+
+(* A high-level call of a view or pure function is a static call. *)
+Definition external_call_value_def:
+  external_call_value n mutability selector params rets ss target value args =
+    let kind = if mutability = "view" ∨ mutability = "pure"
+               then ExternalStaticCall else ExternalCall in
+    ((ss ++ [DefineStmt (AstId n) (call_result_type rets)
+               (ExternalCallOperation kind selector params rets target value
+                  args)],
+      BoundAtom (AstId n), call_value rets), n + 1)
 End
 
 (* The components of a multiple-value binding, as fresh bindings. *)
@@ -552,6 +564,26 @@ Definition elab_expr_def:
                          BoundAtom (AstId n2), ElabTuple []), n2 + 1)
                    | NONE => NONE)
               | NONE => NONE))
+    | SrcExternalCall _ callee with_value operands _ =>
+        (case (all_some (MAP variable_type callee.ext_parameters),
+               all_some (MAP variable_type callee.ext_returns)) of
+           (SOME params, SOME rets) =>
+             (case elab_args ctx n
+                     (AddressT NonpayableAddress ::
+                      (if with_value then [UintT 256] else []) ++ params)
+                     operands of
+                SOME ((ss, t :: atoms), n1) =>
+                  (case (with_value, atoms) of
+                     (T, v :: args) =>
+                       SOME (external_call_value n1 callee.ext_mutability
+                               callee.ext_selector params rets ss t v args)
+                   | (F, args) =>
+                       SOME (external_call_value n1 callee.ext_mutability
+                               callee.ext_selector params rets ss t
+                               (ConstantAtom (IntegerValue 0)) args)
+                   | _ => NONE)
+              | _ => NONE)
+         | _ => NONE)
     | SrcEnvironment _ f _ =>
         let (ss, a) = bind_value n (environment_type f) (EnvironmentOperation f) in
         SOME ((ss, a, ElabType (environment_type f)), n + 1)

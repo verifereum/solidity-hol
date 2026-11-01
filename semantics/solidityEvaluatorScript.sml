@@ -26,7 +26,7 @@
  *)
 Theory solidityEvaluator
 Ancestors
-  solidityStorage solidityABI
+  solidityStorage solidityABI externalCall
 Libs
   cv_transLib wordsLib intLib
 
@@ -420,6 +420,55 @@ Definition emit_event_def:
         | NONE => abrupt_result (InvalidCompletion "bad event arguments") st gas
 End
 
+(* The gas a high-level call gives its callee. The source does not track gas,
+ * where the bytecode passes all but a 64th of what it has left.
+ *)
+Definition external_call_gas_def:
+  external_call_gas = 10000000n
+End
+
+(* A high-level call, as the compiler's code makes it: arguments ABI-encoded
+ * after the selector; a call that expects no return data reverts on a target
+ * without code; a failed call reverts with the callee's revert data; return
+ * data the decoder rejects reverts with none. A successful call leaves the
+ * world the callee left, with its logs after the caller's.
+ *)
+Definition call_external_def:
+  call_external x ty kind selector params rets target value args
+                (st : source_state) gas =
+    case (eval_atom st.scopes target, eval_atom st.scopes value,
+          eval_atoms st.scopes args) of
+      (SOME (ScalarValue (AddressValue callee)),
+       SOME (ScalarValue (IntegerValue v)), SOME vs) =>
+        (case encoded_values params vs of
+           NONE => abrupt_result (InvalidCompletion "bad call arguments") st gas
+         | SOME data =>
+           let static = (kind = ExternalStaticCall ∨ st.frame.static_context) in
+           if rets = [] ∧ (lookup_account callee st.world.accounts).code = []
+           then abrupt_result (RevertCompletion []) st gas
+           else if static ∧ v ≠ 0 then
+             abrupt_result (InvalidCompletion "value in static frame") st gas
+           else
+             case run_external_call st.frame.self_address callee
+                    (selector ++ data) (Num v) static external_call_gas
+                    st.world.accounts st.world.transient st.frame.tx_params of
+               NONE =>
+                 abrupt_result (InvalidCompletion "call outside the model") st gas
+             | SOME r =>
+               if ¬r.call_success then
+                 abrupt_result (RevertCompletion r.call_return) st gas
+               else
+                 let st' = st with world :=
+                       <| accounts := r.call_accounts;
+                          transient := r.call_transient;
+                          logs := st.world.logs ++ r.call_logs |> in
+                 case decode_arguments rets r.call_return of
+                   SOME rvs =>
+                     normal_result (define_binding x ty (pack_results rvs) st') gas
+                 | NONE => abrupt_result (RevertCompletion []) st' gas)
+    | _ => abrupt_result (InvalidCompletion "bad call operands") st gas
+End
+
 (* Every statement except internal calls, if and while. *)
 Definition simple_stmt_def:
   simple_stmt env s st gas =
@@ -428,6 +477,9 @@ Definition simple_stmt_def:
         push_storage_array env x ty a value st gas
     | DefineStmt x ty (ArrayPopOperation a) =>
         pop_storage_array env x ty a st gas
+    | DefineStmt x ty (ExternalCallOperation kind selector params rets target
+                         value args) =>
+        call_external x ty kind selector params rets target value args st gas
     | DefineStmt x ty op =>
         (case eval_operation env st op of
            ValueOk v => normal_result (define_binding x ty v st) gas

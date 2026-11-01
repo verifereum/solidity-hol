@@ -64,6 +64,12 @@ Definition builtin_name_def:
   builtin_name YBaseFee = "basefee" ∧
   builtin_name YGasLimit = "gaslimit" ∧
   builtin_name YStop = "stop" ∧
+  builtin_name YCall = "call" ∧
+  builtin_name YStaticCall = "staticcall" ∧
+  builtin_name YExtCodeSize = "extcodesize" ∧
+  builtin_name YReturnDataSize = "returndatasize" ∧
+  builtin_name YReturnDataCopy = "returndatacopy" ∧
+  builtin_name YGas = "gas" ∧
   builtin_name YPop = "pop" ∧
   builtin_name YReturn = "return" ∧
   builtin_name YRevert = "revert" ∧
@@ -123,6 +129,12 @@ Definition builtin_of_name_def:
     else if name = "basefee" then SOME YBaseFee
     else if name = "gaslimit" then SOME YGasLimit
     else if name = "stop" then SOME YStop
+    else if name = "call" then SOME YCall
+    else if name = "staticcall" then SOME YStaticCall
+    else if name = "extcodesize" then SOME YExtCodeSize
+    else if name = "returndatasize" then SOME YReturnDataSize
+    else if name = "returndatacopy" then SOME YReturnDataCopy
+    else if name = "gas" then SOME YGas
     else if name = "pop" then SOME YPop
     else if name = "return" then SOME YReturn
     else if name = "revert" then SOME YRevert
@@ -142,8 +154,12 @@ Datatype:
   | EffectStorage   (* reads or writes the executing account's storage *)
   | EffectFrame     (* reads the frame: its call data, its call value, the
                        account it runs for, an immutable the constructor
-                       patched into its code, or the transaction and block
-                       it runs in *)
+                       patched into its code, the transaction and block it
+                       runs in, its remaining gas, or the return data of its
+                       last call *)
+  | EffectCall      (* reaches other accounts: a message call, which reads
+                       its input from memory, writes its output there and
+                       changes the world, or another account's code size *)
   | EffectLog       (* appends a log entry, whose payload it reads from
                        memory: a touch like any other, so it can raise the
                        frame's memory size *)
@@ -202,6 +218,12 @@ Definition builtin_effect_def:
   builtin_effect YBaseFee = EffectFrame ∧
   builtin_effect YGasLimit = EffectFrame ∧
   builtin_effect YStop = EffectHalt ∧
+  builtin_effect YCall = EffectCall ∧
+  builtin_effect YStaticCall = EffectCall ∧
+  builtin_effect YExtCodeSize = EffectCall ∧
+  builtin_effect YReturnDataSize = EffectFrame ∧
+  builtin_effect YReturnDataCopy = EffectMemory ∧
+  builtin_effect YGas = EffectFrame ∧
   builtin_effect YPop = EffectPure ∧
   builtin_effect YReturn = EffectHalt ∧
   builtin_effect YRevert = EffectHalt ∧

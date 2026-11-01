@@ -8,8 +8,12 @@ with initial storage and an expected result, final storage and logs.
 A case calls either a named function with arguments (`function`, `args`),
 encoded after its selector, or raw `calldata`. Optional `sender` (default
 `0x2000`) and `value` (default 0) set the transaction's sender and value, and
-`logs` lists the expected logs as `{"topics": [...], "data": "0x..."}`, all
-logged by the contract (default: none). The evaluator runs the same calldata
+`logs` lists the expected logs as `{"logger": ..., "topics": [...], "data":
+"0x..."}`, the logger the contract unless given (default: none). A suite may
+name a `peer`, a contract (`source`, `contract`, `artifact`) whose deployed
+code sits at `0x5000` with the case's `peer_storage`, for the contract to call;
+the evaluator's high-level calls run it, and any call back into the contract,
+as bytecode in Verifereum. The evaluator runs the same calldata
 through the elaborated program's dispatcher (`solidityEntry`), so selector
 lookup, payability, argument decoding, `receive` and `fallback` are compared
 too. Raw calldata declares no return types, so its `return` expectation is

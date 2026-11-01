@@ -36,7 +36,10 @@ Libs
 
 (* The frame the corpus's cases run in: the contract account at
  * contract_address holding the case's initial storage, the case's sender
- * funded for the value it sends, the case's calldata and call value, and the
+ * funded for the value it sends, the peer contract the case's suite declares
+ * (whose code is bytecode the Yul side never runs: the corpus's external-call
+ * cases reach it through builtins the dialect does not have, so their stages
+ * are not admitted), the case's calldata and call value, and the
  * transaction and block the bytecode run is given -- its own frame's
  * transaction parameters, so that origin, gasprice, chainid and the block
  * builtins read on both sides what the corpus's transaction says, rather than
@@ -45,7 +48,9 @@ Libs
  *)
 Definition yul_differential_machine_def:
   yul_differential_machine c data =
-    <| accounts := differential_accounts [] c.case_storage c.case_sender;
+    <| accounts :=
+         case_accounts [] c.case_storage c.case_sender c.case_peer_code
+           c.case_peer_storage;
        logs := [];
        self_address := contract_address;
        caller_address := c.case_sender;

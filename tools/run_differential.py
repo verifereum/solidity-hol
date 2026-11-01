@@ -52,6 +52,7 @@ class CorpusError(Exception):
 
 # contract_address in tests/solidityDifferentialScript.sml
 CONTRACT_ADDRESS = 0x1000
+PEER_ADDRESS = 0x5000
 
 
 def check_identifier(value: Any, what: str) -> str:
@@ -123,12 +124,16 @@ def check_word(value: Any, bits: int, what: str) -> None:
 
 
 def check_logs(value: Any, what: str) -> None:
-    """Logs are a list of {"topics": [word, ...], "data": "0x..."}."""
+    """Logs are a list of {"logger": address, "topics": [word, ...], "data": "0x..."},
+    the logger the contract when absent."""
     if not isinstance(value, list):
         raise CorpusError(f"{what} must be a list")
     for index, log in enumerate(value):
-        if not isinstance(log, dict) or set(log) != {"topics", "data"}:
-            raise CorpusError(f"{what}[{index}] must have exactly topics and data")
+        if not isinstance(log, dict) or not {"topics", "data"} <= set(log) <= {
+                "logger", "topics", "data"}:
+            raise CorpusError(f"{what}[{index}] must have topics, data and an optional logger")
+        if "logger" in log:
+            check_word(log["logger"], 160, f"{what}[{index}].logger")
         if not isinstance(log["topics"], list) or len(log["topics"]) > 4:
             raise CorpusError(f"{what}[{index}].topics must be a list of at most 4 words")
         for topic, topic_word in enumerate(log["topics"]):
@@ -182,6 +187,12 @@ def load_corpus(path: Path) -> dict[str, Any]:
         for key in ("source", "contract", "artifact"):
             if not isinstance(suite.get(key), str) or not suite[key]:
                 raise CorpusError(f"suite {name}: {key} must be a string")
+        if "peer" in suite:
+            peer = suite["peer"]
+            if not isinstance(peer, dict) or set(peer) != {"source", "contract", "artifact"} \
+                    or not all(isinstance(v, str) and v for v in peer.values()):
+                raise CorpusError(
+                    f"suite {name}: peer must have exactly source, contract and artifact strings")
         cases = suite.get("cases")
         if not isinstance(cases, list) or not cases:
             raise CorpusError(f"suite {name}: cases must be a non-empty list")
@@ -201,8 +212,9 @@ def load_corpus(path: Path) -> dict[str, Any]:
             check_call(case, what)
             if "sender" in case:
                 check_word(case["sender"], 160, f"{what}.sender")
-                if word(case["sender"]) == CONTRACT_ADDRESS:
-                    raise CorpusError(f"{what}.sender must not be the contract address")
+                if word(case["sender"]) in (CONTRACT_ADDRESS, PEER_ADDRESS):
+                    raise CorpusError(
+                        f"{what}.sender must not be the contract or peer address")
             if "value" in case:
                 # the harness funds the sender with 2^128 wei, gas included
                 check_word(case["value"], 127, f"{what}.value")
@@ -211,12 +223,14 @@ def load_corpus(path: Path) -> dict[str, Any]:
             check_expectation(case.get("expect"), f"{what}.expect")
             if "fuel" in case:
                 check_fuel(case["fuel"], f"{what}.fuel")
-            for key in ("storage", "final_storage"):
+            for key in ("storage", "final_storage", "peer_storage"):
                 if key in case:
                     check_storage(case[key], f"{what}.{key}")
+            if "peer_storage" in case and "peer" not in suite:
+                raise CorpusError(f"{what}: peer_storage without a peer")
             unknown = set(case) - {"name", "function", "args", "calldata", "sender",
-                                   "value", "storage", "expect", "final_storage",
-                                   "logs", "fuel"}
+                                   "value", "storage", "peer_storage", "expect",
+                                   "final_storage", "logs", "fuel"}
             if unknown:
                 raise CorpusError(f"{what}: unknown fields {sorted(unknown)}")
     return corpus
@@ -241,6 +255,11 @@ def check(name: str, subject: str, failure: str | None) -> dict[str, str]:
     return result
 
 
+def compiled_contracts(suite: dict[str, Any]) -> list[dict[str, str]]:
+    """The suite's contract and its peer, if any: each a source, contract and artifact."""
+    return [suite] + ([suite["peer"]] if "peer" in suite else [])
+
+
 def read_artifact(root: Path, path: str) -> dict[str, Any]:
     artifact = exporter.read_json(root / path)
     if not isinstance(artifact, dict) or artifact.get("format") != ARTIFACT_FORMAT:
@@ -258,7 +277,7 @@ def check_artifacts(root: Path, corpus: dict[str, Any]) -> list[dict[str, str]]:
     profile = exporter.read_json(root / exporter.DEFAULT_PROFILE.relative_to(exporter.ROOT))
     checks: list[dict[str, str]] = []
     artifacts: dict[str, dict[str, Any] | None] = {}
-    for suite in corpus["suites"]:
+    for suite in (c for s in corpus["suites"] for c in compiled_contracts(s)):
         path = suite["artifact"]
         if path not in artifacts:
             try:
@@ -336,7 +355,8 @@ def check_staging(root: Path, corpus_path: Path, corpus: dict[str, Any]) -> dict
     """The corpus theory must stage the corpus and every artifact, so that
     holbuild rebuilds it when any of them changes."""
     staged = staged_files((root / CORPUS_SCRIPT).read_text(encoding="utf-8"))
-    wanted = {f"../{corpus_path.as_posix()}"} | {f"../{s['artifact']}" for s in corpus["suites"]}
+    wanted = {f"../{corpus_path.as_posix()}"} | {
+        f"../{c['artifact']}" for s in corpus["suites"] for c in compiled_contracts(s)}
     missing = sorted(wanted - staged)
     return check(
         "corpus-staged", CORPUS_SCRIPT.as_posix(),
@@ -346,7 +366,7 @@ def check_staging(root: Path, corpus_path: Path, corpus: dict[str, Any]) -> dict
 
 def reproduce_artifacts(root: Path, corpus: dict[str, Any], solc: Path, regenerate: bool) -> list[dict[str, str]]:
     checks = []
-    for path in sorted({suite["artifact"] for suite in corpus["suites"]}):
+    for path in sorted({c["artifact"] for s in corpus["suites"] for c in compiled_contracts(s)}):
         try:
             committed = read_artifact(root, path)
             sources = [root / name for name in committed["input"]["sources"]]
@@ -425,7 +445,8 @@ def write_reproduction(root: Path, directory: Path, suite: dict[str, Any],
     except (OSError, json.JSONDecodeError, CorpusError):
         artifact = None
     inputs = {"suite": suite["name"]}
-    inputs.update({key: suite[key] for key in ("source", "contract", "artifact")})
+    inputs.update({key: suite[key] for key in ("source", "contract", "artifact", "peer")
+                   if key in suite})
     if case is not None:
         inputs.update({"case": case["name"],
                        **{key: case[key] for key in ("function", "args", "calldata")
@@ -433,6 +454,7 @@ def write_reproduction(root: Path, directory: Path, suite: dict[str, Any],
                        "sender": case.get("sender", "0x2000"),
                        "value": case.get("value", 0),
                        "storage": case.get("storage", {}),
+                       "peer_storage": case.get("peer_storage", {}),
                        "expect": case["expect"],
                        "final_storage": case.get("final_storage", {}),
                        "logs": case.get("logs", []),
