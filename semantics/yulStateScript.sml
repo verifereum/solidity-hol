@@ -16,6 +16,12 @@
  * msize(), so there is no builtin for it; the size is still there for the
  * frame's caller to read (yul_memory_size).
  *
+ * Immutables are frame inputs like the call data, except that the constructor
+ * patched them into the code rather than the caller passing them: the runtime
+ * code reads one by the name its loadimmutable literal spells, so the machine
+ * carries the table the frame's caller supplies, keyed by that name, and a
+ * name it does not carry is an invalid outcome.
+ *
  * Gas is not modelled: nothing in the pinned subset reads it.
  *)
 Theory yulState
@@ -36,6 +42,7 @@ Datatype:
     self_address : address;
     call_value : bytes32;
     call_data : byte list;
+    immutables : string |-> bytes32;
     memory : num |-> word8;
     memory_size : num;
     scopes : (string |-> bytes32) list

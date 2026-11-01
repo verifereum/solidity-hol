@@ -14,7 +14,8 @@ Libs
 Definition yul_test_machine_def:
   yul_test_machine =
     <| accounts := empty_accounts; logs := []; self_address := 0w;
-       call_value := 0w; call_data := []; memory := FEMPTY;
+       call_value := 0w; call_data := [];
+       immutables := (FEMPTY : string |-> bytes32); memory := FEMPTY;
        memory_size := 0; scopes := [] |>
 End
 
@@ -23,6 +24,23 @@ Definition run_def:
 End
 
 val () = cv_auto_trans run_def;
+
+(* The frame the builtins that read it run on: an account of its own, and one
+ * immutable the constructor patched in under the name "3".
+ *)
+Definition yul_frame_machine_def:
+  yul_frame_machine =
+    <| accounts := empty_accounts; logs := []; self_address := 0x1234w;
+       call_value := 0w; call_data := [];
+       immutables := (FEMPTY : string |-> bytes32) |+ ("3", 42w);
+       memory := FEMPTY; memory_size := 0; scopes := [] |>
+End
+
+Definition run_frame_def:
+  run_frame fuel code = run_yul fuel code yul_frame_machine
+End
+
+val () = cv_auto_trans run_frame_def;
 
 (* mstore(0, add(2, 3)) return(0, 32) *)
 Definition add_code_def:
@@ -349,6 +367,81 @@ End
 
 val () = cv_auto_trans string_literal_code_def;
 
+(* mstore(0, caller()) mstore(32, loadimmutable("3")) return(0, 64)
+ * Both frame inputs come from the frame's caller: the account the code runs
+ * for, and the value the constructor patched in under the name "3".
+ *)
+Definition frame_code_def:
+  frame_code =
+    [YulExprStmt (YulBuiltin YMStore
+       [YulLit (LitNumber 0w); YulBuiltin YCaller []]);
+     YulExprStmt (YulBuiltin YMStore
+       [YulLit (LitNumber 32w);
+        YulBuiltin YLoadImmutable [YulLit (LitBytes [0x33w])]]);
+     YulExprStmt (YulBuiltin YReturn
+       [YulLit (LitNumber 0w); YulLit (LitNumber 64w)])]
+End
+
+val () = cv_auto_trans frame_code_def;
+
+(* An immutable the frame's table does not carry is an error, not a zero. *)
+Definition unknown_immutable_code_def:
+  unknown_immutable_code =
+    [YulExprStmt (YulBuiltin YLoadImmutable [YulLit (LitBytes [0x39w])])]
+End
+
+val () = cv_auto_trans unknown_immutable_code_def;
+
+(* mstore(0, "ab") log3(0, 2, 11, 22, 33)
+ * The log's payload is the memory range the call names -- the two bytes just
+ * written -- and its three topics are the three the call supplies.
+ *)
+Definition log3_code_def:
+  log3_code =
+    [YulExprStmt (YulBuiltin YMStore
+       [YulLit (LitNumber 0w); YulLit (LitBytes [0x61w; 0x62w])]);
+     YulExprStmt (YulBuiltin YLog3
+       [YulLit (LitNumber 0w); YulLit (LitNumber 2w); YulLit (LitNumber 11w);
+        YulLit (LitNumber 22w); YulLit (LitNumber 33w)])]
+End
+
+val () = cv_auto_trans log3_code_def;
+
+(* mstore(0, 0x1122334455667788) mcopy(32, 0, 32) return(32, 32)
+ * The word read back is the one that was written, through the copy.
+ *)
+Definition mcopy_code_def:
+  mcopy_code =
+    [YulExprStmt (YulBuiltin YMStore
+       [YulLit (LitNumber 0w); YulLit (LitNumber 0x1122334455667788w)]);
+     YulExprStmt (YulBuiltin YMCopy
+       [YulLit (LitNumber 32w); YulLit (LitNumber 0w); YulLit (LitNumber 32w)]);
+     YulExprStmt (YulBuiltin YReturn
+       [YulLit (LitNumber 32w); YulLit (LitNumber 32w)])]
+End
+
+val () = cv_auto_trans mcopy_code_def;
+
+(* pop(1) mstore(0, 7) return(0, 32) *)
+Definition pop_code_def:
+  pop_code =
+    [YulExprStmt (YulBuiltin YPop [YulLit (LitNumber 1w)]);
+     YulExprStmt (YulBuiltin YMStore
+       [YulLit (LitNumber 0w); YulLit (LitNumber 7w)]);
+     YulExprStmt (YulBuiltin YReturn
+       [YulLit (LitNumber 0w); YulLit (LitNumber 32w)])]
+End
+
+val () = cv_auto_trans pop_code_def;
+
+(* let x := pop(1): pop yields nothing, so there is nothing to bind. *)
+Definition pop_binding_code_def:
+  pop_binding_code =
+    [YulLet ["x"] (SOME (YulBuiltin YPop [YulLit (LitNumber 1w)]))]
+End
+
+val () = cv_auto_trans pop_binding_code_def;
+
 Theorem add_returns_five:
   (run 20 add_code).completion = YulReturn (word_to_bytes_be (5w : bytes32))
 Proof
@@ -487,6 +580,43 @@ QED
 
 Theorem unbound_name_is_invalid:
   (run 20 unbound_code).completion = YulInvalid "unbound name"
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem caller_and_immutable_come_from_the_frame:
+  (run_frame 20 frame_code).completion =
+  YulReturn (word_to_bytes_be (0x1234w : bytes32) ++
+             word_to_bytes_be (42w : bytes32))
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem an_immutable_the_frame_does_not_carry_is_invalid:
+  (run_frame 20 unknown_immutable_code).completion =
+  YulInvalid "unknown immutable"
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem log3_appends_a_log_with_three_topics:
+  (run 20 log3_code).completion = YulNormal ∧
+  (run 20 log3_code).machine.logs =
+    [<| logger := 0w; topics := [11w; 22w; 33w]; data := [0x61w; 0x62w] |>]
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem mcopy_copies_memory:
+  (run 20 mcopy_code).completion =
+  YulReturn (word_to_bytes_be (0x1122334455667788w : bytes32))
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem pop_discards_its_argument_and_yields_none:
+  (run 20 pop_code).completion = YulReturn (word_to_bytes_be (7w : bytes32)) ∧
+  (run 20 pop_binding_code).completion = YulInvalid "bad binding"
 Proof
   CONV_TAC cv_eval
 QED

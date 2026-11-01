@@ -22,8 +22,8 @@
  * user-defined function can return several. Binding or returning the wrong
  * number of them is an error rather than a silent truncation, as is a literal
  * too long for the dialect, an unknown function, an unbound name, a builtin
- * called with the wrong number of arguments, and the object-level builtins,
- * which a runtime object never contains.
+ * called with the wrong number of arguments, an immutable the frame does not
+ * carry, and the object-level builtins, which a runtime object never contains.
  *
  * Memory, storage, calls and logs: the builtins that read or write them are in
  * eval_yul_builtin below, on the machine in yulState. Memory is byte-addressed
@@ -248,6 +248,16 @@ Definition yul_literal_value_def:
   yul_literal_value (LitBool b) = SOME (b2w b)
 End
 
+(* The name a string literal spells, one character per byte.  A Yul name is the
+ * text the compiler wrote, and loadimmutable's argument is a name rather than a
+ * value, so the frame's immutable table is keyed by this and the evaluator
+ * reads its argument as text rather than as a word.
+ *)
+Definition yul_name_of_bytes_def:
+  (yul_name_of_bytes ([] : byte list) = "") ∧
+  (yul_name_of_bytes (b :: bs) = CHR (w2n b) :: yul_name_of_bytes bs)
+End
+
 (* Expression results: values, or an abrupt completion with the machine it
  * left behind. *)
 Datatype:
@@ -293,6 +303,14 @@ Definition eval_yul_builtin_def:
         let (m', bs) = yul_mload m (w2n p) in
           EvalValues [word_of_bytes_be bs] m'
     | (YMStore, [p; v]) => EvalValues [] (yul_mstore m (w2n p) v)
+    | (YMCopy, [d; s; l]) =>
+        (* both ranges are touched, whichever of them reaches further, and the
+         * bytes are read before any is written, so overlapping regions copy as
+         * the EVM's MCOPY does *)
+        let (m', bs) = yul_memory_region m (w2n s) (w2n l) in
+          EvalValues []
+            (yul_memory_write (yul_memory_touch m' (w2n d) (w2n l))
+               (w2n d) bs)
     | (YSLoad, [s]) => EvalValues [yul_sload m s] m
     | (YSStore, [s; v]) => EvalValues [] (yul_sstore m s v)
     | (YCallDataLoad, [i]) =>
@@ -302,12 +320,20 @@ Definition eval_yul_builtin_def:
     | (YCallDataSize, []) => EvalValues [n2w (LENGTH m.call_data)] m
     | (YCallValue, []) => EvalValues [m.call_value] m
     | (YMemoryGuard, [x]) => EvalValues [x] m
+    | (YCaller, []) => EvalValues [n2w (w2n m.self_address)] m
     | (YLog1, [p; s; topic]) =>
         let (m', bs) = yul_memory_region m (w2n p) (w2n s) in
           EvalValues []
             (m' with logs := m'.logs ++
               [<| logger := m'.self_address; topics := [topic];
                   data := bs |>])
+    | (YLog3, [p; s; t1; t2; t3]) =>
+        let (m', bs) = yul_memory_region m (w2n p) (w2n s) in
+          EvalValues []
+            (m' with logs := m'.logs ++
+              [<| logger := m'.self_address; topics := [t1; t2; t3];
+                  data := bs |>])
+    | (YPop, [_]) => EvalValues [] m
     | (YReturn, [p; s]) =>
         let (m', bs) = yul_memory_region m (w2n p) (w2n s) in
           EvalAbrupt (YulReturn bs) m'
@@ -318,6 +344,23 @@ Definition eval_yul_builtin_def:
     | (YDataSize, _) => EvalAbrupt (YulInvalid "object-level builtin") m
     | (YDataOffset, _) => EvalAbrupt (YulInvalid "object-level builtin") m
     | _ => EvalAbrupt (YulInvalid "bad builtin call") m
+End
+
+(* loadimmutable is the one builtin whose operand is a name rather than a value:
+ * the compiler writes loadimmutable("3"), and the name is the text between the
+ * literal's quotes.  That form is dispatched here, on the argument's syntax;
+ * everything else, a loadimmutable whose argument is not a name literal
+ * included, goes to eval_yul_builtin on its values, where the default is an
+ * error.
+ *)
+Definition eval_yul_builtin_call_def:
+  eval_yul_builtin_call op args vs m =
+    case (op, args) of
+      (YLoadImmutable, [YulLit (LitBytes nm)]) =>
+        (case FLOOKUP m.immutables (yul_name_of_bytes nm) of
+           SOME v => EvalValues [v] m
+         | NONE => EvalAbrupt (YulInvalid "unknown immutable") m)
+    | _ => eval_yul_builtin op vs m
 End
 
 (* Termination measures, one per group of the mutual recursion: the relation
@@ -446,7 +489,7 @@ Definition eval_yul_block_def:
   (eval_yul_expr n fns (YulBuiltin op args) m =
      case eval_yul_args n fns args m of
        EvalAbrupt c m' => EvalAbrupt c m'
-     | EvalValues vs m' => eval_yul_builtin op vs m') ∧
+     | EvalValues vs m' => eval_yul_builtin_call op args vs m') ∧
   (eval_yul_expr n fns (YulApply f args) m =
      if n = 0 then EvalAbrupt YulOutOfFuel m
      else
@@ -571,7 +614,32 @@ val () = cv_auto_trans yul_bind_scope_def;
 val () = cv_auto_trans yul_bind_def;
 val () = cv_auto_trans yul_assign_def;
 val () = cv_auto_trans yul_literal_value_def;
+
+(* CHR is defined only up to 255, so the translation of a byte -> char function
+ * carries that bound as a precondition, which cv_auto_trans cannot discharge on
+ * its own: a byte satisfies it by construction, but the fact needs saying.
+ * The translations below may call the converted function because of the
+ * yul_name_of_bytes_pre theorem.
+ *)
+Theorem w2n_byte_lt[local]:
+  ∀(b : word8). w2n b < 256
+Proof
+  gen_tac >> qspec_then ‘b’ mp_tac wordsTheory.w2n_lt >>
+  simp[EVAL “dimword (:8)”]
+QED
+
+val yul_name_of_bytes_pre_def =
+  cv_trans_pre "yul_name_of_bytes_pre" yul_name_of_bytes_def;
+
+Theorem yul_name_of_bytes_pre[cv_pre]:
+  ∀bs. yul_name_of_bytes_pre bs
+Proof
+  Induct >> rpt strip_tac >>
+  once_rewrite_tac [yul_name_of_bytes_pre_def] >> fs [w2n_byte_lt]
+QED
+
 val () = cv_auto_trans eval_yul_builtin_def;
+val () = cv_auto_trans eval_yul_builtin_call_def;
 val () = cv_auto_trans yul_env_def;
 
 (* Termination of the translated evaluator: a scaled (fuel, size) order on the
