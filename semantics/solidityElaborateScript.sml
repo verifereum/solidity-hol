@@ -558,8 +558,14 @@ Definition elab_expr_def:
     | SrcTypeConversion _ tn e _ =>
         (case (normalize_type_name tn, elab_expr ctx n e) of
            (SOME ty, SOME ((ss, a, vt), n1)) =>
-             (case vt of
-                ElabTuple _ => NONE
+             (case (vt, ty, a) of
+                (ElabTuple _, _, _) => NONE
+              | (ElabLiteral, AddressT _, ConstantAtom (IntegerValue i)) =>
+                (* address(0): the literal is the address, as in solc *)
+                if 0 ≤ i ∧ i < 2 ** 160 then
+                  SOME ((ss, ConstantAtom (AddressValue (n2w (Num i))),
+                         ElabType ty), n1)
+                else NONE
               | _ =>
                 let (cs, v) = bind_value n1 ty (ConvertOperation ty a) in
                 SOME ((ss ++ cs, v, ElabType ty), n1 + 1))
