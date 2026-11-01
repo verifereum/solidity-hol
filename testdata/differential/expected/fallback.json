@@ -1,0 +1,270 @@
+{
+  "compiler": {
+    "pin": "f401782df49be312ea4ef52a2d467cf5183b5906",
+    "reportedVersion": "solc, the solidity compiler commandline interface\nVersion: 0.8.37+commit.f401782d.Linux.g++"
+  },
+  "format": "solidity-hol-solc-artifact-v1",
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "debug": {
+        "revertStrings": "default"
+      },
+      "evmVersion": "osaka",
+      "metadata": {
+        "appendCBOR": false,
+        "bytecodeHash": "none"
+      },
+      "optimizer": {
+        "enabled": false,
+        "runs": 200
+      },
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "storageLayout",
+            "transientStorageLayout",
+            "evm.bytecode.object",
+            "evm.deployedBytecode.object",
+            "evm.methodIdentifiers",
+            "ir",
+            "irOptimized"
+          ]
+        }
+      },
+      "viaIR": true
+    },
+    "sources": {
+      "testdata/differential/fallback.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity 0.8.37;\n\n// Dispatch with only a nonpayable fallback: it runs on any calldata, empty\n// included, and reverts on value.\ncontract FallbackOnly {\n    uint256 private calls;\n\n    fallback() external {\n        calls += 1;\n    }\n}\n"
+      }
+    }
+  },
+  "output": {
+    "contracts": {
+      "testdata/differential/fallback.sol": {
+        "FallbackOnly": {
+          "abi": [
+            {
+              "stateMutability": "nonpayable",
+              "type": "fallback"
+            }
+          ],
+          "evm": {
+            "bytecode": {
+              "object": "608060405234601a57600e601e565b60f3610029823960f390f35b6024565b60405190565b5f80fdfe608060405234601057600e60d5565b005b5f80fd5b90565b90565b90565b602c60286030926014565b601a565b6017565b90565b5f1c90565b90565b60446048916033565b6038565b90565b60539054603b565b90565b634e487b7160e01b5f52601160045260245ffd5b6076607b919392936017565b926017565b8201809211608557565b6056565b5f1b90565b9060985f19916089565b9181191691161790565b60b160ad60b5926017565b601a565b6017565b90565b90565b9060cb60c760d19260a2565b60b8565b8254608e565b9055565b60f160ec60e16001601d565b60e85f604b565b606a565b5f60bb565b56"
+            },
+            "deployedBytecode": {
+              "object": "608060405234601057600e60d5565b005b5f80fd5b90565b90565b90565b602c60286030926014565b601a565b6017565b90565b5f1c90565b90565b60446048916033565b6038565b90565b60539054603b565b90565b634e487b7160e01b5f52601160045260245ffd5b6076607b919392936017565b926017565b8201809211608557565b6056565b5f1b90565b9060985f19916089565b9181191691161790565b60b160ad60b5926017565b601a565b6017565b90565b90565b9060cb60c760d19260a2565b60b8565b8254608e565b9055565b60f160ec60e16001601d565b60e85f604b565b606a565b5f60bb565b56"
+            },
+            "methodIdentifiers": {}
+          },
+          "ir": "\n/// @use-src 0:\"testdata/differential/fallback.sol\"\nobject \"FallbackOnly_12\" {\n    code {\n        /// @src 0:168:273  \"contract FallbackOnly {...\"\n        mstore(64, memoryguard(128))\n        if callvalue() { revert_error_ca66f745a3ce8ff40e2ccaf1ad45db7774001b90d25810abd9040049be7bf4bb() }\n\n        constructor_FallbackOnly_12()\n\n        let _1 := allocate_unbounded()\n        codecopy(_1, dataoffset(\"FallbackOnly_12_deployed\"), datasize(\"FallbackOnly_12_deployed\"))\n\n        return(_1, datasize(\"FallbackOnly_12_deployed\"))\n\n        function allocate_unbounded() -> memPtr {\n            memPtr := mload(64)\n        }\n\n        function revert_error_ca66f745a3ce8ff40e2ccaf1ad45db7774001b90d25810abd9040049be7bf4bb() {\n            revert(0, 0)\n        }\n\n        /// @src 0:168:273  \"contract FallbackOnly {...\"\n        function constructor_FallbackOnly_12() {\n\n            /// @src 0:168:273  \"contract FallbackOnly {...\"\n\n        }\n        /// @src 0:168:273  \"contract FallbackOnly {...\"\n\n    }\n    /// @use-src 0:\"testdata/differential/fallback.sol\"\n    object \"FallbackOnly_12_deployed\" {\n        code {\n            /// @src 0:168:273  \"contract FallbackOnly {...\"\n            mstore(64, memoryguard(128))\n\n            if callvalue() { revert_error_ca66f745a3ce8ff40e2ccaf1ad45db7774001b90d25810abd9040049be7bf4bb() }\n            fun__11() stop()\n\n            function shift_right_224_unsigned(value) -> newValue {\n                newValue :=\n\n                shr(224, value)\n\n            }\n\n            function allocate_unbounded() -> memPtr {\n                memPtr := mload(64)\n            }\n\n            function revert_error_ca66f745a3ce8ff40e2ccaf1ad45db7774001b90d25810abd9040049be7bf4bb() {\n                revert(0, 0)\n            }\n\n            function cleanup_t_rational_1_by_1(value) -> cleaned {\n                cleaned := value\n            }\n\n            function cleanup_t_uint256(value) -> cleaned {\n                cleaned := value\n            }\n\n            function identity(value) -> ret {\n                ret := value\n            }\n\n            function convert_t_rational_1_by_1_to_t_uint256(value) -> converted {\n                converted := cleanup_t_uint256(identity(cleanup_t_rational_1_by_1(value)))\n            }\n\n            function shift_right_0_unsigned(value) -> newValue {\n                newValue :=\n\n                shr(0, value)\n\n            }\n\n            function cleanup_from_storage_t_uint256(value) -> cleaned {\n                cleaned := value\n            }\n\n            function extract_from_storage_value_offset_0_t_uint256(slot_value) -> value {\n                value := cleanup_from_storage_t_uint256(shift_right_0_unsigned(slot_value))\n            }\n\n            function read_from_storage_split_offset_0_t_uint256(slot) -> value {\n                value := extract_from_storage_value_offset_0_t_uint256(sload(slot))\n\n            }\n\n            function panic_error_0x11() {\n                mstore(0, 35408467139433450592217433187231851964531694900788300625387963629091585785856)\n                mstore(4, 0x11)\n                revert(0, 0x24)\n            }\n\n            function checked_add_t_uint256(x, y) -> sum {\n                x := cleanup_t_uint256(x)\n                y := cleanup_t_uint256(y)\n                sum := add(x, y)\n\n                if gt(x, sum) { panic_error_0x11() }\n\n            }\n\n            function shift_left_0(value) -> newValue {\n                newValue :=\n\n                shl(0, value)\n\n            }\n\n            function update_byte_slice_32_shift_0(value, toInsert) -> result {\n                let mask := 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\n                toInsert := shift_left_0(toInsert)\n                value := and(value, not(mask))\n                result := or(value, and(toInsert, mask))\n            }\n\n            function convert_t_uint256_to_t_uint256(value) -> converted {\n                converted := cleanup_t_uint256(identity(cleanup_t_uint256(value)))\n            }\n\n            function prepare_store_t_uint256(value) -> ret {\n                ret := value\n            }\n\n            function update_storage_value_offset_0_t_uint256_to_t_uint256(slot, value_0) {\n                let convertedValue_0 := convert_t_uint256_to_t_uint256(value_0)\n                sstore(slot, update_byte_slice_32_shift_0(sload(slot), prepare_store_t_uint256(convertedValue_0)))\n            }\n\n            /// @ast-id 11\n            /// @src 0:224:271  \"fallback() external {...\"\n            function fun__11() {\n\n                /// @src 0:263:264  \"1\"\n                let expr_7 := 0x01\n                /// @src 0:254:264  \"calls += 1\"\n                let _1 := convert_t_rational_1_by_1_to_t_uint256(expr_7)\n                let _2 := read_from_storage_split_offset_0_t_uint256(0x00)\n                let expr_8 := checked_add_t_uint256(_2, _1)\n\n                update_storage_value_offset_0_t_uint256_to_t_uint256(0x00, expr_8)\n\n            }\n            /// @src 0:168:273  \"contract FallbackOnly {...\"\n\n        }\n\n        data \".metadata\" hex\"\"\n    }\n\n}\n\n",
+          "irOptimized": "/// @use-src 0:\"testdata/differential/fallback.sol\"\nobject \"FallbackOnly_12\" {\n    code {\n        {\n            /// @src 0:168:273  \"contract FallbackOnly {...\"\n            mstore(64, memoryguard(0x80))\n            if callvalue()\n            {\n                revert_error_ca66f745a3ce8ff40e2ccaf1ad45db7774001b90d25810abd9040049be7bf4bb()\n            }\n            let _1 := allocate_unbounded()\n            codecopy(_1, dataoffset(\"FallbackOnly_12_deployed\"), datasize(\"FallbackOnly_12_deployed\"))\n            return(_1, datasize(\"FallbackOnly_12_deployed\"))\n        }\n        function allocate_unbounded() -> memPtr\n        { memPtr := mload(64) }\n        function revert_error_ca66f745a3ce8ff40e2ccaf1ad45db7774001b90d25810abd9040049be7bf4bb()\n        { revert(0, 0) }\n    }\n    /// @use-src 0:\"testdata/differential/fallback.sol\"\n    object \"FallbackOnly_12_deployed\" {\n        code {\n            {\n                /// @src 0:168:273  \"contract FallbackOnly {...\"\n                mstore(64, memoryguard(0x80))\n                if callvalue()\n                {\n                    revert_error_ca66f745a3ce8ff40e2ccaf1ad45db7774001b90d25810abd9040049be7bf4bb()\n                }\n                fun()\n                stop()\n            }\n            function revert_error_ca66f745a3ce8ff40e2ccaf1ad45db7774001b90d25810abd9040049be7bf4bb()\n            { revert(0, 0) }\n            function cleanup_rational_by(value) -> cleaned\n            { cleaned := value }\n            function cleanup_uint256(value) -> cleaned\n            { cleaned := value }\n            function identity(value) -> ret\n            { ret := value }\n            function convert_rational_by_to_uint256(value) -> converted\n            {\n                converted := cleanup_uint256(identity(cleanup_rational_by(value)))\n            }\n            function shift_right_unsigned(value) -> newValue\n            { newValue := shr(0, value) }\n            function cleanup_from_storage_uint256(value) -> cleaned\n            { cleaned := value }\n            function extract_from_storage_value_offset_uint256(slot_value) -> value\n            {\n                value := cleanup_from_storage_uint256(shift_right_unsigned(slot_value))\n            }\n            function read_from_storage_split_offset_uint256(slot) -> value\n            {\n                value := extract_from_storage_value_offset_uint256(sload(slot))\n            }\n            function panic_error_0x11()\n            {\n                mstore(0, shl(224, 0x4e487b71))\n                mstore(4, 0x11)\n                revert(0, 0x24)\n            }\n            function checked_add_uint256(x, y) -> sum\n            {\n                x := cleanup_uint256(x)\n                y := cleanup_uint256(y)\n                sum := add(x, y)\n                if gt(x, sum) { panic_error_0x11() }\n            }\n            function shift_left(value) -> newValue\n            { newValue := shl(0, value) }\n            function update_byte_slice_shift(value, toInsert) -> result\n            {\n                let mask := not(0)\n                toInsert := shift_left(toInsert)\n                value := and(value, not(mask))\n                result := or(value, and(toInsert, mask))\n            }\n            function convert_uint256_to_uint256(value) -> converted\n            {\n                converted := cleanup_uint256(identity(cleanup_uint256(value)))\n            }\n            function prepare_store_uint256(value) -> ret\n            { ret := value }\n            function update_storage_value_offset_uint256_to_uint256(slot, value)\n            {\n                let convertedValue := convert_uint256_to_uint256(value)\n                sstore(slot, update_byte_slice_shift(sload(slot), prepare_store_uint256(convertedValue)))\n            }\n            /// @ast-id 11 @src 0:224:271  \"fallback() external {...\"\n            function fun()\n            {\n                /// @src 0:263:264  \"1\"\n                let expr := 0x01\n                /// @src 0:254:264  \"calls += 1\"\n                let _1 := convert_rational_by_to_uint256(expr)\n                let _2 := read_from_storage_split_offset_uint256(0x00)\n                let expr_1 := checked_add_uint256(_2, _1)\n                update_storage_value_offset_uint256_to_uint256(0x00, expr_1)\n            }\n        }\n        data \".metadata\" hex\"\"\n    }\n}\n",
+          "storageLayout": {
+            "storage": [
+              {
+                "astId": 3,
+                "contract": "testdata/differential/fallback.sol:FallbackOnly",
+                "label": "calls",
+                "offset": 0,
+                "slot": "0",
+                "type": "t_uint256"
+              }
+            ],
+            "types": {
+              "t_uint256": {
+                "encoding": "inplace",
+                "label": "uint256",
+                "numberOfBytes": "32"
+              }
+            }
+          },
+          "transientStorageLayout": {
+            "storage": [],
+            "types": null
+          }
+        }
+      }
+    },
+    "sources": {
+      "testdata/differential/fallback.sol": {
+        "ast": {
+          "absolutePath": "testdata/differential/fallback.sol",
+          "exportedSymbols": {
+            "FallbackOnly": [
+              12
+            ]
+          },
+          "id": 13,
+          "license": "MIT",
+          "nodeType": "SourceUnit",
+          "nodes": [
+            {
+              "id": 1,
+              "literals": [
+                "solidity",
+                "0.8",
+                ".37"
+              ],
+              "nodeType": "PragmaDirective",
+              "src": "32:23:0"
+            },
+            {
+              "abstract": false,
+              "baseContracts": [],
+              "canonicalName": "FallbackOnly",
+              "contractDependencies": [],
+              "contractKind": "contract",
+              "fullyImplemented": true,
+              "id": 12,
+              "linearizedBaseContracts": [
+                12
+              ],
+              "name": "FallbackOnly",
+              "nameLocation": "177:12:0",
+              "nodeType": "ContractDefinition",
+              "nodes": [
+                {
+                  "constant": false,
+                  "id": 3,
+                  "mutability": "mutable",
+                  "name": "calls",
+                  "nameLocation": "212:5:0",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 12,
+                  "src": "196:21:0",
+                  "stateVariable": true,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_uint256",
+                    "typeString": "uint256"
+                  },
+                  "typeName": {
+                    "id": 2,
+                    "name": "uint256",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "196:7:0",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_uint256",
+                      "typeString": "uint256"
+                    }
+                  },
+                  "visibility": "private"
+                },
+                {
+                  "body": {
+                    "id": 10,
+                    "nodeType": "Block",
+                    "src": "244:27:0",
+                    "statements": [
+                      {
+                        "expression": {
+                          "id": 8,
+                          "isConstant": false,
+                          "isLValue": false,
+                          "isPure": false,
+                          "lValueRequested": false,
+                          "leftHandSide": {
+                            "id": 6,
+                            "name": "calls",
+                            "nodeType": "Identifier",
+                            "overloadedDeclarations": [],
+                            "referencedDeclaration": 3,
+                            "src": "254:5:0",
+                            "typeDescriptions": {
+                              "typeIdentifier": "t_uint256",
+                              "typeString": "uint256"
+                            }
+                          },
+                          "nodeType": "Assignment",
+                          "operator": "+=",
+                          "rightHandSide": {
+                            "hexValue": "31",
+                            "id": 7,
+                            "isConstant": false,
+                            "isLValue": false,
+                            "isPure": true,
+                            "kind": "number",
+                            "lValueRequested": false,
+                            "nodeType": "Literal",
+                            "src": "263:1:0",
+                            "typeDescriptions": {
+                              "typeIdentifier": "t_rational_1_by_1",
+                              "typeString": "int_const 1"
+                            },
+                            "value": "1"
+                          },
+                          "src": "254:10:0",
+                          "typeDescriptions": {
+                            "typeIdentifier": "t_uint256",
+                            "typeString": "uint256"
+                          }
+                        },
+                        "id": 9,
+                        "nodeType": "ExpressionStatement",
+                        "src": "254:10:0"
+                      }
+                    ]
+                  },
+                  "id": 11,
+                  "implemented": true,
+                  "kind": "fallback",
+                  "modifiers": [],
+                  "name": "",
+                  "nameLocation": "-1:-1:-1",
+                  "nodeType": "FunctionDefinition",
+                  "parameters": {
+                    "id": 4,
+                    "nodeType": "ParameterList",
+                    "parameters": [],
+                    "src": "232:2:0"
+                  },
+                  "returnParameters": {
+                    "id": 5,
+                    "nodeType": "ParameterList",
+                    "parameters": [],
+                    "src": "244:0:0"
+                  },
+                  "scope": 12,
+                  "src": "224:47:0",
+                  "stateMutability": "nonpayable",
+                  "virtual": false,
+                  "visibility": "external"
+                }
+              ],
+              "scope": 13,
+              "src": "168:105:0",
+              "usedErrors": [],
+              "usedEvents": []
+            }
+          ],
+          "src": "32:242:0"
+        },
+        "id": 0
+      }
+    }
+  },
+  "profile": {
+    "compilerVersion": "0.8.37",
+    "settings": {
+      "debug": {
+        "revertStrings": "default"
+      },
+      "evmVersion": "osaka",
+      "metadata": {
+        "appendCBOR": false,
+        "bytecodeHash": "none"
+      },
+      "optimizer": {
+        "enabled": false,
+        "runs": 200
+      },
+      "viaIR": true
+    }
+  }
+}

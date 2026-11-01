@@ -51,6 +51,19 @@ Definition builtin_name_def:
   builtin_name YLoadImmutable = "loadimmutable" ∧
   builtin_name YLog1 = "log1" ∧
   builtin_name YLog3 = "log3" ∧
+  builtin_name YAddress = "address" ∧
+  builtin_name YOrigin = "origin" ∧
+  builtin_name YChainId = "chainid" ∧
+  builtin_name YNumber = "number" ∧
+  builtin_name YTimestamp = "timestamp" ∧
+  builtin_name YCoinbase = "coinbase" ∧
+  builtin_name YLog0 = "log0" ∧
+  builtin_name YLog2 = "log2" ∧
+  builtin_name YLog4 = "log4" ∧
+  builtin_name YGasPrice = "gasprice" ∧
+  builtin_name YBaseFee = "basefee" ∧
+  builtin_name YGasLimit = "gaslimit" ∧
+  builtin_name YStop = "stop" ∧
   builtin_name YPop = "pop" ∧
   builtin_name YReturn = "return" ∧
   builtin_name YRevert = "revert" ∧
@@ -97,6 +110,19 @@ Definition builtin_of_name_def:
     else if name = "loadimmutable" then SOME YLoadImmutable
     else if name = "log1" then SOME YLog1
     else if name = "log3" then SOME YLog3
+    else if name = "address" then SOME YAddress
+    else if name = "origin" then SOME YOrigin
+    else if name = "chainid" then SOME YChainId
+    else if name = "number" then SOME YNumber
+    else if name = "timestamp" then SOME YTimestamp
+    else if name = "coinbase" then SOME YCoinbase
+    else if name = "log0" then SOME YLog0
+    else if name = "log2" then SOME YLog2
+    else if name = "log4" then SOME YLog4
+    else if name = "gasprice" then SOME YGasPrice
+    else if name = "basefee" then SOME YBaseFee
+    else if name = "gaslimit" then SOME YGasLimit
+    else if name = "stop" then SOME YStop
     else if name = "pop" then SOME YPop
     else if name = "return" then SOME YReturn
     else if name = "revert" then SOME YRevert
@@ -115,8 +141,9 @@ Datatype:
   | EffectMemory    (* reads or writes the frame's memory *)
   | EffectStorage   (* reads or writes the executing account's storage *)
   | EffectFrame     (* reads the frame: its call data, its call value, the
-                       account it runs for, or an immutable the constructor
-                       patched into its code *)
+                       account it runs for, an immutable the constructor
+                       patched into its code, or the transaction and block
+                       it runs in *)
   | EffectLog       (* appends a log entry, whose payload it reads from
                        memory: a touch like any other, so it can raise the
                        frame's memory size *)
@@ -162,6 +189,19 @@ Definition builtin_effect_def:
   builtin_effect YLoadImmutable = EffectFrame ∧
   builtin_effect YLog1 = EffectLog ∧
   builtin_effect YLog3 = EffectLog ∧
+  builtin_effect YAddress = EffectFrame ∧
+  builtin_effect YOrigin = EffectFrame ∧
+  builtin_effect YChainId = EffectFrame ∧
+  builtin_effect YNumber = EffectFrame ∧
+  builtin_effect YTimestamp = EffectFrame ∧
+  builtin_effect YCoinbase = EffectFrame ∧
+  builtin_effect YLog0 = EffectLog ∧
+  builtin_effect YLog2 = EffectLog ∧
+  builtin_effect YLog4 = EffectLog ∧
+  builtin_effect YGasPrice = EffectFrame ∧
+  builtin_effect YBaseFee = EffectFrame ∧
+  builtin_effect YGasLimit = EffectFrame ∧
+  builtin_effect YStop = EffectHalt ∧
   builtin_effect YPop = EffectPure ∧
   builtin_effect YReturn = EffectHalt ∧
   builtin_effect YRevert = EffectHalt ∧

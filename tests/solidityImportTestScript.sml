@@ -6,7 +6,7 @@ Theory solidityImportTest
 Ancestors
   solidityImport
 Libs
-  solidityImportLib cv_transLib intLib
+  solidityImportLib cv_transLib intLib wordsLib
 
 (* Read by holbuild's dependency scanner, which stages the fixture. *)
 fun holbuild_extra_deps (_ : string list) = ()
@@ -369,6 +369,9 @@ val () = edited_unit_with storage_contracts "pure_writes_state"
 val () = edited_unit_with storage_contracts "payable_function"
   (edit_first "FunctionDefinition"
      (set_field "stateMutability" (JSON.STRING "payable")) storage_ast)
+val () = edited_unit_with storage_contracts "unknown_mutability"
+  (edit_first "FunctionDefinition"
+     (set_field "stateMutability" (JSON.STRING "constant")) storage_ast)
 
 Theorem layout_type_mismatch_rejected:
   ¬valid_src_unit layout_type_mismatch
@@ -400,8 +403,14 @@ Proof
   CONV_TAC cv_eval
 QED
 
-Theorem payable_function_rejected:
-  ¬valid_src_unit payable_function
+Theorem payable_function_valid:
+  valid_src_unit payable_function
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem unknown_mutability_rejected:
+  ¬valid_src_unit unknown_mutability
 Proof
   CONV_TAC cv_eval
 QED

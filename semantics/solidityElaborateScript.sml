@@ -11,13 +11,16 @@
  * locals and state variables, tuple assignment, ++ and --, if, while,
  * do-while, for, break, continue, return and unchecked blocks. Built-in
  * require/assert/revert admit boolean conditions and literal string messages.
+ * Reads of msg.sender, msg.value, tx.origin, tx.gasprice, block members and
+ * address(this), and emits of events with elementary parameters. External
+ * and public functions, receive and fallback form the dispatch table.
  * Other string runtime operations and unsupported forms are rejected (NONE).
  *
  * Schedules, read from the compiler's IR for this profile (the ir output in
  * testdata/frontend/expected/pure_core.json) and checked against the compiled
  * bytecode by the differential tests:
- *  - binary operands, call arguments and tuple components are evaluated left
- *    to right, each read of a local or a state variable being a copy taken
+ *  - binary operands, call and emit arguments and tuple components are
+ *    evaluated left to right, each read of a local or a state variable being a copy taken
  *    when it is evaluated;
  *  - && and || evaluate their right operand only when needed;
  *  - x op= e evaluates e, then reads x, then writes x;
@@ -49,6 +52,7 @@ Datatype:
   elab_ctx = <|
     functions : (num # src_function) list;
     structs : src_struct list;
+    events : (num # src_event) list;
     variables : (num # sol_type) list;
     state : (num # sol_type) list;
     returns : (num # sol_type) list;
@@ -548,11 +552,20 @@ Definition elab_expr_def:
                          BoundAtom (AstId n2), ElabTuple []), n2 + 1)
                    | NONE => NONE)
               | NONE => NONE))
+    | SrcEnvironment _ f _ =>
+        let (ss, a) = bind_value n (environment_type f) (EnvironmentOperation f) in
+        SOME ((ss, a, ElabType (environment_type f)), n + 1)
     | SrcTypeConversion _ tn e _ =>
         (case (normalize_type_name tn, elab_expr ctx n e) of
            (SOME ty, SOME ((ss, a, vt), n1)) =>
-             (case vt of
-                ElabTuple _ => NONE
+             (case (vt, ty, a) of
+                (ElabTuple _, _, _) => NONE
+              | (ElabLiteral, AddressT _, ConstantAtom (IntegerValue i)) =>
+                (* address(0): the literal is the address, as in solc *)
+                if 0 ≤ i ∧ i < 2 ** 160 then
+                  SOME ((ss, ConstantAtom (AddressValue (n2w (Num i))),
+                         ElabType ty), n1)
+                else NONE
               | _ =>
                 let (cs, v) = bind_value n1 ty (ConvertOperation ty a) in
                 SOME ((ss ++ cs, v, ElabType ty), n1 + 1))
@@ -744,6 +757,24 @@ Definition set_flag_def:
   set_flag (t : num) (n : num) a = assign_local t n BoolT a
 End
 
+(* Events: topic 0, the parameter types, and the arguments of EmitStmt. *)
+Definition event_topic_def:
+  event_topic (e : src_event) =
+    if e.event_anonymous then NONE
+    else SOME (word_of_bytes T (0w : bytes32) e.event_selector)
+End
+
+Definition event_parameter_def:
+  event_parameter ((v : src_variable), (indexed : bool)) =
+    OPTION_MAP (λty. (ty, indexed)) (variable_type v)
+End
+
+Definition emit_arguments_def:
+  (emit_arguments ((ty, indexed) :: ps) (a :: as) =
+    (ty, indexed, a) :: emit_arguments ps as) ∧
+  (emit_arguments _ _ = [])
+End
+
 (* Statements; lists return the context after their declarations. Nested
  * blocks are spliced into the enclosing list: ids are unique, so the core
  * scopes need not mirror the source blocks.
@@ -857,6 +888,18 @@ Definition elab_stmts_def:
            SOME (cs, as, n2) => SOME ((ss ++ cs ++ [ReturnStmt as], ctx), n2)
          | NONE => NONE)
     | NONE => NONE) ∧
+  (elab_stmt ctx n (SrcEmit _ ev args) =
+    case ALOOKUP ctx.events ev of
+      NONE => NONE
+    | SOME e =>
+        case all_some (MAP event_parameter e.event_parameters) of
+          NONE => NONE
+        | SOME ps =>
+            case elab_args ctx n (MAP FST ps) args of
+              SOME ((ss, as), n1) =>
+                SOME ((ss ++ [EmitStmt (event_topic e) (emit_arguments ps as)],
+                       ctx), n1)
+            | NONE => NONE) ∧
   (* An optional for initialization or loop expression. *)
   (elab_for_init ctx n NONE = SOME (([], ctx), n)) ∧
   (elab_for_init ctx n (SOME st) = elab_stmt ctx n st)
@@ -887,11 +930,12 @@ End
  * their declaration ids.
  *)
 Definition elab_function_def:
-  elab_function structs functions state n (f : src_function) =
+  elab_function structs events functions state n (f : src_function) =
     case (all_some (MAP variable_binding f.fn_parameters),
           all_some (MAP variable_binding f.fn_returns), f.fn_body) of
       (SOME ps, SOME rs, SrcBlock _ ss) =>
-        (case elab_stmts <| functions := functions; structs := structs; variables := ps ++ rs;
+        (case elab_stmts <| functions := functions; structs := structs;
+                            events := events; variables := ps ++ rs;
                             state := state; returns := rs;
                             mode := CheckedArithmetic |> n ss of
            SOME ((code, _), n1) =>
@@ -904,11 +948,11 @@ Definition elab_function_def:
 End
 
 Definition elab_functions_def:
-  (elab_functions structs functions state n [] = SOME ([], n)) ∧
-  (elab_functions structs functions state n (f :: fs) =
-    case elab_function structs functions state n f of
+  (elab_functions structs events functions state n [] = SOME ([], n)) ∧
+  (elab_functions structs events functions state n (f :: fs) =
+    case elab_function structs events functions state n f of
       SOME (p, n1) =>
-        (case elab_functions structs functions state n1 fs of
+        (case elab_functions structs events functions state n1 fs of
            SOME (ps, n2) => SOME (p :: ps, n2)
          | NONE => NONE)
     | NONE => NONE)
@@ -958,6 +1002,27 @@ Definition elab_struct_layouts_def:
                           :: layouts))
 End
 
+(* The dispatch table: the functions with a selector, which the compiler
+ * gives exactly the external and public ones. *)
+Definition external_functions_def:
+  (external_functions [] = []) ∧
+  (external_functions ((f : src_function) :: fs) =
+    case f.fn_selector of
+      SOME selector =>
+        <| selector := selector; external_procedure := AstId f.fn_info.node_id;
+           payable := (f.fn_mutability = "payable") |> :: external_functions fs
+    | NONE => external_functions fs)
+End
+
+(* The receive or fallback function, and whether it is payable. *)
+Definition special_function_def:
+  (special_function kind [] = NONE) ∧
+  (special_function kind ((f : src_function) :: fs) =
+    if f.fn_kind = kind then
+      SOME (AstId f.fn_info.node_id, f.fn_mutability = "payable")
+    else special_function kind fs)
+End
+
 (* Raw lowering of a valid unit of one contract, with fresh ids above its
  * node ids; the first function is the entry procedure. A SOME result is not
  * yet a checked program: consumers must establish wf_core_program through
@@ -975,12 +1040,19 @@ Definition elaborate_unit_def:
                    elab_struct_layouts c.contract_structs,
                    core_state_variables state c.contract_storage,
                    elab_functions c.contract_structs
+                     (MAP (λe. (e.event_info.node_id, e)) c.contract_events)
                      (MAP (λf. (f.fn_info.node_id, f)) c.contract_functions)
                      state (MAX_LIST (unit_ids u) + 1) c.contract_functions) of
                (SOME decls, SOME layouts, SOME cvs, SOME (p :: ps, _)) =>
                  SOME <| procedures := p :: ps; state_variables := cvs;
                          struct_layouts := layouts; type_declarations := decls;
-                         entry_procedure := p.procedure_id |>
+                         entry_procedure := p.procedure_id;
+                         external_functions :=
+                           external_functions c.contract_functions;
+                         receive_procedure := OPTION_MAP FST
+                           (special_function "receive" c.contract_functions);
+                         fallback_procedure :=
+                           special_function "fallback" c.contract_functions |>
              | _ => NONE)
     | _ => NONE
 End
@@ -1059,6 +1131,10 @@ Proof
 QED
 
 val () = cv_auto_trans elab_condition_def;
+val () = cv_auto_trans
+  (REWRITE_RULE [GSYM byteTheory.word_of_bytes_be_def] event_topic_def);
+val () = cv_auto_trans event_parameter_def;
+val () = cv_auto_trans emit_arguments_def;
 
 val coerce_values_pre_def =
   cv_auto_trans_pre "coerce_values_pre" coerce_values_def;
@@ -1113,4 +1189,6 @@ val () = cv_auto_trans elab_functions_def;
 val () = cv_auto_trans core_state_variables_def;
 val () = cv_auto_trans elab_type_declarations_def;
 val () = cv_auto_trans elab_struct_layouts_def;
+val () = cv_auto_trans external_functions_def;
+val () = cv_auto_trans special_function_def;
 val () = cv_auto_trans elaborate_unit_def;

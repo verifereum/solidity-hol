@@ -136,6 +136,37 @@ fun storage v =
     | SOME _ => fail "storage is an object from slot to value"
   end
 
+fun word_term bits i =
+  if 0 <= i andalso i < IntInf.pow (2, bits) then
+    wordsSyntax.mk_wordi (Arbnum.fromString (IntInf.toString i), bits)
+  else fail ("not a " ^ Int.toString bits ^ "-bit word: " ^ IntInf.toString i)
+
+(* Calldata as 0x hex, or a named function and its arguments. *)
+fun call_input c =
+  case (JSONUtil.findField c "calldata", JSONUtil.findField c "function") of
+    (SOME (JSON.STRING s), NONE) => con "RawCall" [bytes_term (hex_bytes s)]
+  | (NONE, SOME (JSON.STRING f)) =>
+      con "NamedCall"
+        [stringSyntax.fromMLstring f, arguments (array_field c "args")]
+  | _ => fail "a case has either calldata or a function and its arguments"
+
+(* Logs as a list of {"topics": [...], "data": "0x..."}. *)
+fun logs v =
+  let
+    val bytes32 = wordsSyntax.mk_int_word_type 256
+    fun log l =
+      pairSyntax.mk_pair
+        (listSyntax.mk_list
+           (map (word_term 256 o integer) (array_field l "topics"), bytes32),
+         bytes_term (hex_bytes (string_field l "data")))
+  in
+    listSyntax.mk_list
+      (map log (case v of NONE => [] | SOME (JSON.ARRAY ls) => ls
+                        | SOME _ => fail "logs is a list"),
+       pairSyntax.mk_prod (listSyntax.mk_list_type bytes32,
+                           listSyntax.mk_list_type byte_ty))
+  end
+
 (* Outcomes as JSON *)
 
 fun hex_of_bytes tm =
@@ -155,6 +186,20 @@ fun outcome_json tm =
         json_object [("diagnostic", json_string (fst (dest_const d)))]
     | _ => json_string (term_to_string tm)
   end
+
+fun logs_json tm =
+  json_array
+    (map (fn e =>
+            let val (_, fields) = TypeBase.dest_record e in
+              json_object
+                [("topics", json_array
+                    (map (fn t => json_string ("0x" ^ String.map Char.toLower
+                                    (Arbnum.toHexString (wordsSyntax.dest_word_literal t))))
+                       (fst (listSyntax.dest_list
+                               (Lib.assoc "topics" fields))))),
+                 ("data", json_string (hex_of_bytes (Lib.assoc "data" fields)))]
+            end)
+         (fst (listSyntax.dest_list tm)))
 
 fun storage_json tm =
   json_object
@@ -211,20 +256,31 @@ fun run_case {suite, code, unit, program, fuel} c =
   let
     val case_name = name_field c "name"
     val theorem = suite ^ "_" ^ case_name
-    val function = string_field c "function"
     val fuel = case JSONUtil.findField c "fuel" of
                  SOME v => integer v
                | NONE => fuel
-    val args = arguments (array_field c "args")
-    val initial = storage (JSONUtil.findField c "storage")
+    val input = call_input c
     val expect = expectation (field c "expect")
-    val final = storage (JSONUtil.findField c "final_storage")
+    val case_tm = TypeBase.mk_record
+      (mk_thy_type {Thy = "solidityDifferential", Tyop = "differential_case",
+                    Args = []},
+       [("case_sender",
+         word_term 160 (case JSONUtil.findField c "sender" of
+                          SOME v => integer v
+                        | NONE => 0x2000)),
+        ("case_value",
+         num_term (case JSONUtil.findField c "value" of
+                     SOME v => integer v
+                   | NONE => 0)),
+        ("case_input", input),
+        ("case_storage", storage (JSONUtil.findField c "storage")),
+        ("case_expect", expect),
+        ("case_final", storage (JSONUtil.findField c "final_storage")),
+        ("case_logs", logs (JSONUtil.findField c "logs"))])
     val verdict_tm =
       list_mk_comb (prim_mk_const {Thy = "solidityDifferential",
                                    Name = "differential_verdict"},
-                    [code, unit, program, num_term fuel,
-                     stringSyntax.fromMLstring function, args, initial, expect,
-                     final])
+                    [code, unit, program, num_term fuel, case_tm])
     val verdict = cv_eval verdict_tm
     val result = rhs (concl verdict)
     val base = [("kind", json_string "case"), ("suite", json_string suite),
@@ -243,6 +299,21 @@ fun run_case {suite, code, unit, program, fuel} c =
                       ("theorem", json_string theorem),
                       ("outcome", outcome_json (rand result))]);
         true
+      end
+    else if is_con "LogMismatch" result orelse is_con "LogUnexpected" result then
+      let
+        val mismatch = is_con "LogMismatch" result
+        val (bytecode, other) =
+          case snd (strip_comb result) of
+            [b, x] => (b, x)
+          | _ => raise ERR "run_case" "unexpected verdict"
+      in
+        emit (base @ [("status", json_string (if mismatch then "log-mismatch"
+                                              else "log-unexpected")),
+                      ("bytecode_logs", logs_json bytecode),
+                      (if mismatch then "source_logs" else "expected_logs",
+                       logs_json other)]);
+        false
       end
     else if is_con "StorageMismatch" result orelse is_con "StorageUnexpected" result
     then
@@ -269,8 +340,7 @@ fun run_case {suite, code, unit, program, fuel} c =
         val expected = rhs (concl (cv_eval
                          (list_mk_comb (prim_mk_const {Thy = "solidityDifferential",
                                                        Name = "expected_outcome"},
-                                        [unit, stringSyntax.fromMLstring function,
-                                         expect]))))
+                                        [unit, input, expect]))))
         val (kind, args) = strip_comb result
         val (bytecode, source) =
           case (fst (dest_const kind), args) of
