@@ -421,6 +421,17 @@ fun run_suite root fuel s =
     let
       val checked = solidityPrepareLib.prepare_artifact
         {root = root, path = artifact, source = source}
+      (* The importer keeps the one contract no other inherits; the bytecode
+       * compared must be that contract's. *)
+      fun record_field name tm = Lib.assoc name (snd (TypeBase.dest_record tm))
+      val names =
+        map (stringSyntax.fromHOLstring o record_field "contract_name")
+          (fst (listSyntax.dest_list
+                  (record_field "unit_contracts" (#unit (#prepared checked)))))
+      val () =
+        if names = [contract] then ()
+        else fail ("the unit's contracts are [" ^ String.concatWith ", " names ^
+                   "], not " ^ contract)
       val (unit, program) = prepared_constants prefix (#prepared checked)
       val code = code_constant prefix (#artifact checked) source contract
       val peer = peer_code root prefix s

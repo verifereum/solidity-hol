@@ -1,6 +1,6 @@
-(* Import of the pinned compiler's AST for testdata/frontend/pure_core.sol and
- * testdata/differential/storage.sol, and negative fixtures derived from them
- * by single edits to the JSON.
+(* Import of the pinned compiler's AST for testdata/frontend/pure_core.sol,
+ * testdata/differential/storage.sol and other differential fixtures, and
+ * negative fixtures derived from them by edits to the JSON.
  *)
 Theory solidityImportTest
 Ancestors
@@ -17,7 +17,8 @@ val () = holbuild_extra_deps [
   "../testdata/differential/expected/storage_arrays.json",
   "../testdata/differential/expected/dynamic_storage_arrays.json",
   "../testdata/differential/expected/builtins.json",
-  "../testdata/differential/expected/storage_structs.json"
+  "../testdata/differential/expected/storage_structs.json",
+  "../testdata/differential/expected/inheritance.json"
 ]
 
 val fixture = "../testdata/frontend/expected/pure_core.json"
@@ -182,9 +183,11 @@ val () = import_error "modifier"
 val () = import_error "named arguments"
   (edit_first "FunctionCall"
      (set_field "names" (JSON.ARRAY [JSON.STRING "n"])) ast)
-val () = import_error "inheritance"
+val () = import_error "base outside the unit"
   (edit_first "ContractDefinition"
-     (set_field "linearizedBaseContracts" (JSON.ARRAY [])) ast)
+     (fn c => set_field "linearizedBaseContracts"
+                (JSON.ARRAY [JSONUtil.lookupField c "id", JSON.INT 999999]) c)
+     ast)
 
 (* Builtin references outside call position remain unsupported; the rejection
  * names the identifier's node.
@@ -618,3 +621,77 @@ val () = import_error_with Malformed struct_contracts "missing field identity"
 
 val () = import_error_with Malformed struct_contracts "missing struct type identity"
   (edit_first "UserDefinedTypeName" (drop_field "referencedDeclaration") struct_ast)
+
+(* Inheritance: only the deployable contract is imported, flattened along its
+ * linearization; calls through the bases reach the most derived overrides. *)
+
+val inheritance_fixture = "../testdata/differential/expected/inheritance.json"
+val inheritance_source = "testdata/differential/inheritance.sol"
+
+Definition inheritance_unit_def:
+  inheritance_unit = ^(import_artifact inheritance_fixture inheritance_source)
+End
+
+val () = cv_auto_trans inheritance_unit_def;
+
+Theorem inheritance_unit_valid:
+  valid_src_unit inheritance_unit
+Proof
+  CONV_TAC cv_eval
+QED
+
+(* Counter._scale has no body and is left out; Counter.peek, Counter._sender
+ * and Context._sender are overridden. *)
+Theorem inheritance_unit_flattened:
+  MAP (λc. c.contract_name) inheritance_unit.unit_contracts = ["Doubling"] ∧
+  MAP (λf. f.fn_name)
+    (HD inheritance_unit.unit_contracts).contract_functions =
+  ["peek"; "_scale"; "_sender"; "bump"; "peek"; "_sender"; "_update";
+   "_sender"; "_who"] ∧
+  MAP (λf. f.fn_name)
+    (live_functions (HD inheritance_unit.unit_contracts).contract_functions) =
+  ["peek"; "_scale"; "_sender"; "bump"; "_update"; "_who"] ∧
+  MAP (λv. v.var_name)
+    (HD inheritance_unit.unit_contracts).contract_state_variables =
+  ["total"; "counts"; "calls"]
+Proof
+  EVAL_TAC
+QED
+
+(* Every _sender, Context's too, resolves to Doubling's. *)
+Theorem inheritance_overrides_resolve:
+  EVERY (λf. f.fn_name = "_sender" ⇒
+             OPTION_MAP (λg. g.fn_scope)
+               (ALOOKUP (call_table
+                  (HD inheritance_unit.unit_contracts).contract_functions)
+                  f.fn_info.node_id) =
+             SOME (HD inheritance_unit.unit_contracts).contract_info.node_id)
+    (HD inheritance_unit.unit_contracts).contract_functions
+Proof
+  EVAL_TAC
+QED
+
+val inheritance_ast =
+  artifact_part inheritance_fixture ["sources", inheritance_source, "ast"]
+val inheritance_contracts =
+  artifact_part inheritance_fixture ["contracts", inheritance_source]
+
+fun map_nodes f (JSON.OBJECT kvs) =
+      f (JSON.OBJECT (map (fn (k, x) => (k, map_nodes f x)) kvs))
+  | map_nodes f (JSON.ARRAY vs) = JSON.ARRAY (map (map_nodes f) vs)
+  | map_nodes _ v = v
+
+(* Without Doubling._scale's baseFunctions, Counter.bump's call of the
+ * unimplemented Counter._scale reaches no function. *)
+val () = edited_unit_with inheritance_contracts "unresolved_override"
+  (map_nodes
+     (fn v => if is_node "FunctionDefinition" v andalso
+                 JSONUtil.asString (JSONUtil.lookupField v "name") = "_scale"
+              then drop_field "baseFunctions" v else v)
+     inheritance_ast)
+
+Theorem unresolved_override_rejected:
+  ¬valid_src_unit unresolved_override
+Proof
+  CONV_TAC cv_eval
+QED
