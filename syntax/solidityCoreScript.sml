@@ -91,6 +91,16 @@ Datatype:
   external_kind = ExternalCall | ExternalStaticCall | ExternalDelegateCall
 End
 
+(* The call and transaction context a body reads: msg.sender, msg.value,
+ * address(this), tx.origin, tx.gasprice and the block's scalars.
+ *)
+Datatype:
+  environment_field
+  = MsgSender | MsgValue | SelfAddress | TxOrigin | TxGasPrice
+  | BlockNumber | BlockTimestamp | BlockChainId | BlockCoinbase
+  | BlockBaseFee | BlockGasLimit
+End
+
 Datatype:
   core_operation
   = ScalarOperation sol_type arithmetic_mode core_operator (core_atom list)
@@ -105,6 +115,7 @@ Datatype:
   | ArrayPopOperation core_atom
   | InternalCallOperation ast_id (core_atom list)
   | ExternalCallOperation external_kind (core_atom list)
+  | EnvironmentOperation environment_field
 End
 
 (* Explicitly separate scalar writes, reference binding, and content copying.
@@ -127,6 +138,9 @@ Datatype:
   | ContinueStmt
   | RevertStmt core_atom
   | PanicStmt num
+  (* topic0 (NONE for an anonymous event), then each argument with its type
+   * and whether it is indexed *)
+  | EmitStmt (bytes32 option) ((sol_type # bool # core_atom) list)
 End
 
 Datatype:
@@ -167,13 +181,29 @@ Datatype:
   | StructDeclaration ((ast_id # sol_type) list)
 End
 
+(* A function calldata reaches by its 4-byte selector: its procedure and
+ * whether it accepts value. *)
+Datatype:
+  core_external_function = <|
+    selector : byte list;
+    external_procedure : ast_id;
+    payable : bool
+  |>
+End
+
+(* Dispatch: external functions by selector; empty calldata reaches receive,
+ * and any other unmatched calldata the fallback, given with whether it is
+ * payable. *)
 Datatype:
   core_program = <|
     procedures : core_procedure list;
     state_variables : core_state_variable list;
     struct_layouts : core_struct_layout list;
     type_declarations : (ast_id # core_type_declaration) list;
-    entry_procedure : ast_id
+    entry_procedure : ast_id;
+    external_functions : core_external_function list;
+    receive_procedure : ast_id option;
+    fallback_procedure : (ast_id # bool) option
   |>
 End
 

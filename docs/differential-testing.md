@@ -2,8 +2,18 @@
 
 `tools/run_differential.py` checks the maintained corpus in
 `testdata/differential/corpus.json`. Each suite supplies a compiler artifact,
-source unit and deployed contract; each case supplies arguments, initial
-storage and an expected result. The HOL corpus theory proves one
+source unit and deployed contract; each case is a transaction to the contract
+with initial storage and an expected result, final storage and logs.
+
+A case calls either a named function with arguments (`function`, `args`),
+encoded after its selector, or raw `calldata`. Optional `sender` (default
+`0x2000`) and `value` (default 0) set the transaction's sender and value, and
+`logs` lists the expected logs as `{"topics": [...], "data": "0x..."}`, all
+logged by the contract (default: none). The evaluator runs the same calldata
+through the elaborated program's dispatcher (`solidityEntry`), so selector
+lookup, payability, argument decoding, `receive` and `fallback` are compared
+too. Raw calldata declares no return types, so its `return` expectation is
+`[]`. The HOL corpus theory proves one
 `differential_agrees` theorem per case. Diagnostic failures and exhausted fuel
 are inconclusive, never agreement.
 
@@ -13,8 +23,8 @@ source, and checks the full core program. The evaluator executes that core;
 Verifereum executes the recorded bytecode. This comparison does not certify
 the compiler or its artifact producer.
 
-Both runs return an outcome and the complete committed storage of the tested
-contract. Source frame completion rolls back writes on panic or revert before
+Both runs return an outcome, the complete committed storage of the tested
+contract and the logs. Source frame completion rolls back writes on panic or revert before
 comparison. The verdict compares total word-to-word storage functions by HOL
 equality, so agreement includes every slot, including unlisted mapping keys and
 cleared slots. The existing Verifereum from/to theorem and HOL's generic cv

@@ -39,7 +39,12 @@ Definition initial_state_def:
                 transient := empty_transient_storage;
                 logs := [] |>;
     frame := <| self_address := 0w; code_address := 0w; sender_address := 0w;
-                call_value := 0; call_data := []; static_context := F |>;
+                call_value := 0; call_data := []; static_context := F;
+                tx_params := <| origin := 0w; gasPrice := 0; baseFeePerGas := 0;
+                  baseFeePerBlobGas := 0; blockNumber := 0; blockTimeStamp := 0;
+                  blockCoinBase := 0w; blockGasLimit := 0; prevRandao := 0w;
+                  prevHashes := []; blobHashes := []; chainId := 0;
+                  authRefund := 0 |> |>;
     scopes := [];
     heap := FEMPTY;
     next_heap_id := 0;

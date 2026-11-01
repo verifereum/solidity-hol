@@ -11,12 +11,24 @@ Ancestors
 Libs
   cv_transLib wordsLib
 
+(* The transaction and block a test frame runs in: distinct values, so a
+ * test can tell which one a builtin read.
+ *)
+Definition yul_test_tx_params_def:
+  yul_test_tx_params =
+    <| origin := 0xA1w; gasPrice := 9; baseFeePerGas := 3;
+       baseFeePerBlobGas := 0; blockNumber := 7; blockTimeStamp := 1700;
+       blockCoinBase := 0xC0w; blockGasLimit := 30000; prevRandao := 0w;
+       prevHashes := []; blobHashes := []; chainId := 5; authRefund := 0 |>
+End
+
 Definition yul_test_machine_def:
   yul_test_machine =
     <| accounts := empty_accounts; logs := []; self_address := 0w;
        caller_address := 0w; call_value := 0w; call_data := [];
        immutables := (FEMPTY : string |-> bytes32); memory := FEMPTY;
-       memory_size := 0; scopes := [] |>
+       memory_size := 0; scopes := [];
+       transaction_parameters := yul_test_tx_params |>
 End
 
 Definition run_def:
@@ -34,7 +46,8 @@ Definition yul_frame_machine_def:
     <| accounts := empty_accounts; logs := []; self_address := 0x1234w;
        caller_address := 0x5678w; call_value := 0w; call_data := [];
        immutables := (FEMPTY : string |-> bytes32) |+ ("3", 42w);
-       memory := FEMPTY; memory_size := 0; scopes := [] |>
+       memory := FEMPTY; memory_size := 0; scopes := [];
+       transaction_parameters := yul_test_tx_params |>
 End
 
 Definition run_frame_def:
@@ -419,6 +432,50 @@ End
 
 val () = cv_auto_trans log3_code_def;
 
+(* mstore(0, address()) mstore(32, origin()) ... return(0, 288)
+ * The executing account from the frame, the rest from its transaction and
+ * block.
+ *)
+Definition environment_code_def:
+  environment_code =
+    MAP (λ(i, b). YulExprStmt (YulBuiltin YMStore
+                     [YulLit (LitNumber (n2w (32 * i))); YulBuiltin b []]))
+      [(0, YAddress); (1, YOrigin); (2, YChainId); (3, YNumber);
+       (4, YTimestamp); (5, YCoinbase); (6, YGasPrice); (7, YBaseFee);
+       (8, YGasLimit)] ++
+    [YulExprStmt (YulBuiltin YReturn
+       [YulLit (LitNumber 0w); YulLit (LitNumber 288w)])]
+End
+
+val () = cv_auto_trans environment_code_def;
+
+(* mstore(0, "ab") log0(0, 2) log2(0, 1, 11, 22) log4(1, 1, 1, 2, 3, 4) *)
+Definition log0_log2_code_def:
+  log0_log2_code =
+    [YulExprStmt (YulBuiltin YMStore
+       [YulLit (LitNumber 0w); YulLit (LitBytes [0x61w; 0x62w])]);
+     YulExprStmt (YulBuiltin YLog0
+       [YulLit (LitNumber 0w); YulLit (LitNumber 2w)]);
+     YulExprStmt (YulBuiltin YLog2
+       [YulLit (LitNumber 0w); YulLit (LitNumber 1w); YulLit (LitNumber 11w);
+        YulLit (LitNumber 22w)]);
+     YulExprStmt (YulBuiltin YLog4
+       [YulLit (LitNumber 1w); YulLit (LitNumber 1w); YulLit (LitNumber 1w);
+        YulLit (LitNumber 2w); YulLit (LitNumber 3w); YulLit (LitNumber 4w)])]
+End
+
+val () = cv_auto_trans log0_log2_code_def;
+
+(* stop() revert(0, 0): stop halts with no data, so the revert never runs *)
+Definition stop_code_def:
+  stop_code =
+    [YulExprStmt (YulBuiltin YStop []);
+     YulExprStmt (YulBuiltin YRevert
+       [YulLit (LitNumber 0w); YulLit (LitNumber 0w)])]
+End
+
+val () = cv_auto_trans stop_code_def;
+
 (* mstore(0, 0x1122334455667788) mcopy(32, 0, 32) return(32, 32)
  * The word read back is the one that was written, through the copy.
  *)
@@ -660,6 +717,37 @@ QED
 Theorem pop_discards_its_argument_and_yields_none:
   (run 20 pop_code).completion = YulReturn (word_to_bytes_be (7w : bytes32)) ∧
   (run 20 pop_binding_code).completion = YulInvalid "bad binding"
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem environment_builtins_read_the_frame_transaction_and_block:
+  (run_frame 20 environment_code).completion =
+  YulReturn (word_to_bytes_be (0x1234w : bytes32) ++
+             word_to_bytes_be (0xA1w : bytes32) ++
+             word_to_bytes_be (5w : bytes32) ++
+             word_to_bytes_be (7w : bytes32) ++
+             word_to_bytes_be (1700w : bytes32) ++
+             word_to_bytes_be (0xC0w : bytes32) ++
+             word_to_bytes_be (9w : bytes32) ++
+             word_to_bytes_be (3w : bytes32) ++
+             word_to_bytes_be (30000w : bytes32))
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem log0_log2_and_log4_append_logs:
+  (run 20 log0_log2_code).completion = YulNormal ∧
+  (run 20 log0_log2_code).machine.logs =
+    [<| logger := 0w; topics := []; data := [0x61w; 0x62w] |>;
+     <| logger := 0w; topics := [11w; 22w]; data := [0x61w] |>;
+     <| logger := 0w; topics := [1w; 2w; 3w; 4w]; data := [0x62w] |>]
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem stop_halts_with_no_data:
+  (run 20 stop_code).completion = YulReturn []
 Proof
   CONV_TAC cv_eval
 QED

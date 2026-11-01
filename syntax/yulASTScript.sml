@@ -41,13 +41,16 @@ Datatype:
   | YKeccak256 | YMLoad | YMStore | YMCopy | YSLoad | YSStore
     (* frame and call data *)
   | YCallDataLoad | YCallDataSize | YCallValue | YMemoryGuard | YCaller
-  | YLoadImmutable
+  | YLoadImmutable | YAddress
+    (* the transaction and block *)
+  | YOrigin | YGasPrice | YChainId | YNumber | YTimestamp | YCoinbase | YBaseFee
+  | YGasLimit
     (* events *)
-  | YLog1 | YLog3
+  | YLog0 | YLog1 | YLog2 | YLog3 | YLog4
     (* discards a value *)
   | YPop
     (* halting *)
-  | YReturn | YRevert
+  | YStop | YReturn | YRevert
     (* object level: the creation object only *)
   | YCodeCopy | YDataSize | YDataOffset
 End

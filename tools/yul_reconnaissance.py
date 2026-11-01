@@ -87,7 +87,7 @@ STAGES = (
 EVM_DIALECT_BUILTINS = frozenset(
     """stop add sub mul div sdiv mod smod addmod mulmod exp signextend lt gt slt sgt
     eq iszero and or xor not byte shl shr sar keccak256 address balance selfbalance
-    caller callvalue calldataload calldatasize calldatacopy codesize codecopy
+    origin caller callvalue calldataload calldatasize calldatacopy codesize codecopy
     gasprice extcodesize extcodecopy returndatasize returndatacopy extcodehash
     create create2 call callcode delegatecall staticcall mload mstore mstore8 mcopy
     sload sstore tload tstore msize gas blockhash coinbase timestamp number
