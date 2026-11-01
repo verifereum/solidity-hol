@@ -1,5 +1,14 @@
-(* The importer's read of the pinned compiler's own Yul, and the negative
- * fixtures it fails closed on. See syntax/yulImportLib.sml.
+(* The importer's read of the pinned compiler's own Yul, and what it refuses.
+ * See syntax/yulImportLib.sml.
+ *
+ * The fixture is a real artifact of the pinned compiler, of the corpus's
+ * smallest suite, so the admitted shape is one solc really emits rather than
+ * one written to suit the importer. Its two stages cover both keys the
+ * importer reads (irAst and irOptimizedAst).
+ *
+ * The refusal cases below are built here as JSON values, each differing from
+ * an admitted minimal object in exactly one place; the build fails if the
+ * importer admits one of them, or refuses it for the wrong reason.
  *)
 Theory yulImportTest
 Ancestors
@@ -32,46 +41,121 @@ Definition shadowed_builtins_ir_optimized_def:
         yulImportLib.IrOptimized)
 End
 
+(* The optimizer's own output, which is the third stage the harness runs. *)
 Definition shadowed_builtins_optimized_def:
   shadowed_builtins_optimized =
     ^(yulImportLib.import_runtime_artifact optimized_fixture source contract
         yulImportLib.IrOptimized)
 End
 
-(* A smoke run of the imported runtime through the compiler's own dispatcher:
- * the corpus case shadowed_true, whose calldata is run(bool)'s selector
- * followed by the ABI word for true.
+(* The imported tree is a concrete term, and cv can translate it: what the
+ * harness runs is the object, not a re-reading of the file.
  *)
 val () = cv_auto_trans shadowed_builtins_ir_def;
 
-Definition probe_call_data_def:
-  probe_call_data =
-    [0x16w; 0x6Aw; 0x2Aw; 0xD5w] ++ REPLICATE 31 (0w : word8) ++ [0x01w]
-End
+(* What the importer refuses *)
 
-val () = cv_auto_trans probe_call_data_def;
+fun obj fields = JSON.OBJECT fields
+fun str s = JSON.STRING s
+fun arr vs = JSON.ARRAY vs
 
-Definition probe_machine_def:
-  probe_machine =
-    <| accounts := empty_accounts; logs := []; self_address := 0x1000w;
-       call_value := 0w; call_data := probe_call_data; memory := FEMPTY;
-       memory_size := 0; scopes := [] |>
-End
+fun identifier name = obj [("nodeType", str "YulIdentifier"), ("name", str name)]
+fun number value =
+  obj [("nodeType", str "YulLiteral"), ("kind", str "number"),
+       ("value", str value), ("type", str "")]
+fun call name args =
+  obj [("nodeType", str "YulFunctionCall"), ("functionName", identifier name),
+       ("arguments", arr args)]
+fun expression_statement e = obj [("nodeType", str "YulExpressionStatement"),
+                                  ("expression", e)]
 
-val () = cv_auto_trans probe_machine_def;
+fun object_node statements subobjects =
+  obj [("nodeType", str "YulObject"),
+       ("code", obj [("nodeType", str "YulCode"),
+                     ("block", obj [("nodeType", str "YulBlock"),
+                                    ("statements", arr statements)])]),
+       ("subObjects", arr subobjects)]
 
-val probe = cv_eval “(run_yul 200000 shadowed_builtins_ir probe_machine).completion”;
-val probe_completion = rhs (concl probe);
-val () = print ("PROBE-COMPLETION: " ^
-  (case strip_comb probe_completion of
-     (f, [bytes]) =>
-       fst (dest_const f) ^ " " ^
-       String.concat (map (fn b =>
-         StringCvt.padLeft #"0" 2
-           (String.map Char.toLower
-              (Arbnum.toHexString (wordsSyntax.dest_word_literal b))))
-         (fst (listSyntax.dest_list bytes)))
-   | _ => term_to_string probe_completion) ^ "\n");
-val probe_reverts = cv_eval “(run_yul 200000 shadowed_builtins_ir probe_machine).machine.accounts”;
-val () = print ("PROBE-ACCOUNTS-SIZE: " ^
-  Int.toString (term_size (rhs (concl probe_reverts))) ^ "\n");
+(* An admitted runtime object: one statement, pop(0), and one data section.
+ * The creation object's own code is not read, as yulImportLib says.
+ *)
+val data_section = obj [("nodeType", str "YulData"), ("name", str "d")]
+val creation_code = [expression_statement (call "pop" [number "0"])]
+
+fun output_with subobjects code =
+  obj [("contracts",
+        obj [("s.sol",
+              obj [("C",
+                    obj [("irAst",
+                          obj [("nodeType", str "YulObject"),
+                               ("code", obj [("nodeType", str "YulCode"),
+                                             ("block", obj [("nodeType", str "YulBlock"),
+                                                            ("statements", arr code)])]),
+                               ("subObjects", arr subobjects)])])])])]
+
+fun runtime_object statements = object_node statements [data_section]
+
+fun minimal_output () = output_with [runtime_object creation_code] creation_code
+
+fun import v = yulImportLib.import_runtime v "s.sol" "C" yulImportLib.Ir
+
+fun expect_unknown what v =
+  (ignore (import v);
+   raise ERR "yulImportTest"
+     (what ^ ": the importer admitted an object it must refuse"))
+  handle yulImportLib.ImportError _ => ()
+       | yulImportLib.MalformedInput msg =>
+           raise ERR "yulImportTest"
+             (what ^ ": refused, but as malformed rather than as unknown: " ^ msg)
+
+fun expect_malformed what v =
+  (ignore (import v);
+   raise ERR "yulImportTest"
+     (what ^ ": the importer admitted an object it must refuse"))
+  handle yulImportLib.MalformedInput _ => ()
+       | yulImportLib.ImportError msg =>
+           raise ERR "yulImportTest"
+             (what ^ ": refused, but as unknown rather than as malformed: " ^ msg)
+
+(* The base is admitted, so a refusal below is the change, not a typo here. *)
+val () = ignore (import (minimal_output ()));
+
+val () = expect_unknown "unknown node kind"
+  (output_with [runtime_object [obj [("nodeType", str "YulNonsense")]]]
+     creation_code)
+
+val () = expect_unknown "unknown builtin"
+  (output_with
+     [runtime_object [expression_statement (call "not_a_builtin" [])]] creation_code)
+
+val () = expect_unknown "call to an undefined function"
+  (output_with
+     [runtime_object [expression_statement (call "helper" [])]] creation_code)
+
+(* A runtime object's subobjects are its data sections and nothing else. *)
+val () = expect_unknown "object nested in the runtime object"
+  (output_with
+     [object_node creation_code [data_section, object_node creation_code []]]
+     creation_code)
+
+val () = expect_unknown "two subobjects at the top level"
+  (output_with [runtime_object creation_code, runtime_object creation_code]
+     creation_code)
+
+val () = expect_unknown "no runtime subobject" (output_with [] creation_code)
+
+val () = expect_unknown "empty runtime code"
+  (output_with [runtime_object []] creation_code)
+
+val () = expect_malformed "expression statement without an expression"
+  (output_with
+     [runtime_object [obj [("nodeType", str "YulExpressionStatement")]]]
+     creation_code)
+
+val () = expect_unknown "unsupported literal kind"
+  (output_with
+     [runtime_object
+        [expression_statement
+           (call "pop" [obj [("nodeType", str "YulLiteral"),
+                             ("kind", str "address"), ("value", str "0")]])]]
+     creation_code)

@@ -35,13 +35,21 @@ Ancestors
 Libs
   cv_transLib wordsLib intLib
 
+(* The frame the corpus's cases run in: the contract account at
+ * contract_address with the case's storage, reached by the same sender the
+ * differential transaction comes from (differential_tx's from), so caller and
+ * callvalue are what the bytecode run sees. There are no immutables to load:
+ * no corpus suite is compiled with any.
+ *)
 Definition yul_differential_machine_def:
   yul_differential_machine data storage =
     <| accounts := contract_accounts [] storage;
        logs := [];
        self_address := contract_address;
+       caller_address := 0x2000w;
        call_value := 0w;
        call_data := data;
+       immutables := (FEMPTY : string |-> bytes32);
        memory := FEMPTY;
        memory_size := 0;
        scopes := [] |>
@@ -112,16 +120,16 @@ Definition yul_case_verdict_def:
     let run = yul_case_execution u name args storage ycode yfuel in
     let evm = project_observation slots evm_run in
     let yul = project_observation slots (run.observed_outcome, run.observed_storage) in
-    (case compare_observations
-            (expected_outcome u name e, expected_storage storage final slots)
-            evm yul of
-       Agree outcome =>
-         if SND evm_run ≠ run.observed_storage then
-           StorageMismatch (SND evm) (SND yul)
-         else if SND evm_run ≠ SOME (seed_storage (final ++ storage)) then
-           StorageUnexpected (SND evm) (expected_storage storage final slots)
-         else Agree outcome
-     | other => other,
+    ((case compare_observations
+             (expected_outcome u name e, expected_storage storage final slots)
+             evm yul of
+        Agree outcome =>
+          if SND evm_run ≠ run.observed_storage then
+            StorageMismatch (SND evm) (SND yul)
+          else if SND evm_run ≠ SOME (seed_storage (final ++ storage)) then
+            StorageUnexpected (SND evm) (expected_storage storage final slots)
+          else Agree outcome
+      | other => other),
      run.observed_logs)
 End
 
@@ -131,22 +139,50 @@ Definition yul_agrees_def:
     SND (yul_case_verdict code u prog name args storage e final yfuel ycode) = []
 End
 
+(* The complete-storage check of yul_case_verdict cannot turn an agreement
+ * into a disagreement: what holds when compare_observations agrees is what
+ * the verdict's own storage comparison leaves alone.
+ *)
+Theorem complete_storage_check_agreement[local]:
+  is_agreement
+    (case verdict of
+       Agree outcome =>
+         if evm_st ≠ src_st then StorageMismatch evm_slots src_slots
+         else if src_st ≠ expected_st then StorageUnexpected evm_slots expected_slots
+         else Agree outcome
+     | other => other) ⇒
+  is_agreement verdict
+Proof
+  Cases_on ‘verdict’ >> simp[is_agreement_def] >>
+  rpt IF_CASES_TAC >> simp[is_agreement_def]
+QED
+
 (* What an agreement establishes: the Yul run returns or reverts what the case
- * expects, at the complete storage it expects, and leaves no log.
+ * expects, and leaves no log. The bytecode run's side is
+ * solidityDifferential's differential_agrees_outcomes.
  *)
 Theorem yul_agrees_outcomes:
-  yul_agrees code u prog name args storage e final yfuel ycode ∧
-  slots = observed_slots prog storage final ⇒
-  ¬is_diagnostic (FST (yul_case_verdict code u prog name args storage e final yfuel ycode)) ∧
-  FST (yul_case_verdict code u prog name args storage e final yfuel ycode) =
-    Agree (expected_outcome u name e) ∧
+  yul_agrees code u prog name args storage e final yfuel ycode ⇒
+  ¬is_diagnostic (expected_outcome u name e) ∧
   (yul_case_execution u name args storage ycode yfuel).observed_outcome =
     expected_outcome u name e ∧
-  (yul_case_execution u name args storage ycode yfuel).observed_storage =
-    SOME (seed_storage (final ++ storage)) ∧
   (yul_case_execution u name args storage ycode yfuel).observed_logs = []
 Proof
-  rw[yul_agrees_def, yul_case_verdict_def, is_agreement_def, is_diagnostic_def] >>
+  rw[yul_agrees_def, yul_case_verdict_def, project_observation_def,
+     pairTheory.FST, pairTheory.SND] >>
+  drule complete_storage_check_agreement >> strip_tac >>
+  drule compare_observations_agree >> simp[]
+QED
+
+(* And it is at the complete storage the case expects, not just the slots it
+ * lists: the whole committed storage, as the bytecode run's agreement is.
+ *)
+Theorem yul_agrees_storage:
+  yul_agrees code u prog name args storage e final yfuel ycode ⇒
+  (yul_case_execution u name args storage ycode yfuel).observed_storage =
+    SOME (seed_storage (final ++ storage))
+Proof
+  rw[yul_agrees_def, yul_case_verdict_def, pairTheory.FST, pairTheory.SND] >>
   BasicProvers.every_case_tac >> gvs[is_agreement_def]
 QED
 

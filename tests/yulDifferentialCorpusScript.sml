@@ -10,6 +10,8 @@
  * testdata/yul/expected (tests/yulImportTest).
  *)
 Theory yulDifferentialCorpus
+Ancestors
+  solidityDifferential yulAST yulState yulEvaluator yulDifferential
 Libs
   solidityDifferentialLib yulImportLib
 
@@ -22,15 +24,44 @@ val () = holbuild_extra_deps [
   "../SOLIDITY_PIN",
   "../profiles/solc-0.8.37-via-ir-osaka.json",
   "../profiles/solc-0.8.37-via-ir-osaka-optimized.json",
-  "../testdata/yul/reduced.json",
   "../testdata/frontend/expected/pure_core.json",
+  "../testdata/differential/expected/scalars.json",
+  "../testdata/differential/expected/control.json",
+  "../testdata/differential/expected/calls.json",
+  "../testdata/differential/expected/storage.json",
+  "../testdata/differential/expected/mappings.json",
+  "../testdata/differential/expected/storage_arrays.json",
+  "../testdata/differential/expected/dynamic_storage_arrays.json",
+  "../testdata/differential/expected/builtins.json",
   "../testdata/differential/expected/shadowed_builtins.json",
+  "../testdata/differential/expected/storage_structs.json",
+  "../testdata/differential/expected/storage_structs_top_level.json",
   "../testdata/yul/generated/pure_core.ir.json",
   "../testdata/yul/generated/pure_core.optimized.json",
+  "../testdata/yul/generated/scalars.ir.json",
+  "../testdata/yul/generated/scalars.optimized.json",
+  "../testdata/yul/generated/control.ir.json",
+  "../testdata/yul/generated/control.optimized.json",
+  "../testdata/yul/generated/calls.ir.json",
+  "../testdata/yul/generated/calls.optimized.json",
+  "../testdata/yul/generated/storage.ir.json",
+  "../testdata/yul/generated/storage.optimized.json",
+  "../testdata/yul/generated/mappings.ir.json",
+  "../testdata/yul/generated/mappings.optimized.json",
+  "../testdata/yul/generated/storage_arrays.ir.json",
+  "../testdata/yul/generated/storage_arrays.optimized.json",
+  "../testdata/yul/generated/dynamic_storage_arrays.ir.json",
+  "../testdata/yul/generated/dynamic_storage_arrays.optimized.json",
+  "../testdata/yul/generated/builtins.ir.json",
+  "../testdata/yul/generated/builtins.optimized.json",
   "../testdata/yul/generated/shadowed_builtins.ir.json",
   "../testdata/yul/generated/shadowed_builtins.optimized.json",
+  "../testdata/yul/generated/storage_structs.ir.json",
+  "../testdata/yul/generated/storage_structs.optimized.json",
+  "../testdata/yul/generated/storage_structs_top_level.ir.json",
+  "../testdata/yul/generated/storage_structs_top_level.optimized.json",
 ]
 
 val () = solidityDifferentialLib.run_three_way
-  {root = "..", corpus = "testdata/yul/reduced.json",
-   yul_root = "testdata/yul/generated"}
+  {root = "..", corpus = "testdata/differential/corpus.json",
+   yul_root = "../testdata/yul/generated"}
