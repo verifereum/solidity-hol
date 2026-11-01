@@ -260,6 +260,40 @@ Proof
   EVAL_TAC
 QED
 
+(* An external call to a constant address with the parameter as argument. *)
+Definition external_call_body_def:
+  external_call_body kind value = [
+    DefineStmt (AstId 82) (SingleType u256)
+      (ExternalCallOperation kind [1w; 2w; 3w; 4w] [u256] [u256]
+         (ConstantAtom (AddressValue 0x5000w)) value
+         [BoundAtom (AstId 80)])]
+End
+
+val () = cv_auto_trans external_call_body_def;
+
+Theorem external_call_accepted:
+  wf_core_procedure test_env
+    (with_body (external_call_body ExternalCall (ConstantAtom (IntegerValue 1))))
+Proof
+  EVAL_TAC
+QED
+
+Theorem external_delegate_call_rejected:
+  ¬wf_core_procedure test_env
+     (with_body (external_call_body ExternalDelegateCall
+                   (ConstantAtom (IntegerValue 0))))
+Proof
+  EVAL_TAC
+QED
+
+Theorem external_static_call_value_rejected:
+  ¬wf_core_procedure test_env
+     (with_body (external_call_body ExternalStaticCall
+                   (ConstantAtom (IntegerValue 1))))
+Proof
+  EVAL_TAC
+QED
+
 Theorem unknown_procedure_rejected:
   ¬wf_core_procedure test_env (with_body [
      DefineStmt (AstId 82) (SingleType u256)
