@@ -4,7 +4,8 @@
  * (solidityEntry) with the same calldata, sender and value.
  *
  * Both runs start from the same storage of the contract account, given as
- * slot/value pairs, and are observed by their outcome, by the contract's
+ * slot/value pairs, and of a peer contract, if any, that the contract can
+ * call: code from the same compiler at peer_address. They are observed by their outcome, by the contract's
  * complete committed storage, including unlisted hashed slots, and by the
  * logs. Listed slots
  * from the layout/initial/expected storage are retained for diagnostics and
@@ -18,7 +19,8 @@
  * integers, booleans or byte strings, typed by the function's parameters and
  * encoded after its selector; an input outside its type is a diagnostic, not
  * a call. Raw calldata declares no return types. Account balances are not
- * observed, so the evaluator's world is the one before the transaction.
+ * observed; the evaluator's world is the one after the value transfer, as
+ * Verifereum gives the contract's frame.
  *
  * Diagnostics are never agreement: an unknown function, an input or result
  * that cannot be encoded, fuel exhaustion, an invalid completion, an
@@ -121,6 +123,10 @@ Definition contract_address_def:
   contract_address = 0x1000w : address
 End
 
+Definition peer_address_def:
+  peer_address = 0x5000w : address
+End
+
 Definition seed_storage_def:
   (seed_storage [] = empty_storage) ∧
   (seed_storage ((k, v) :: kvs) =
@@ -169,6 +175,15 @@ Definition expected_storage_def:
       slots
 End
 
+(* The contract and the sender, with the peer's code and storage. *)
+Definition case_accounts_def:
+  case_accounts code storage sender peer_code peer_storage =
+    update_account peer_address
+      (empty_account_state with <| code := peer_code;
+                                   storage := seed_storage peer_storage |>)
+      (differential_accounts code storage sender)
+End
+
 (* Cases *)
 
 Datatype:
@@ -180,9 +195,10 @@ Datatype:
     ExpectReturn (argument list) | ExpectPanic num | ExpectRevert (byte list)
 End
 
-(* A transaction from the sender to the contract, from the initial storage,
- * with its expected outcome, final storage entries and logs, each log given
- * by its topics and data.
+(* A transaction from the sender to the contract, from the initial storage
+ * of the contract and of the peer (no code for none), with its expected
+ * outcome, final storage entries and logs, each log given by its logger,
+ * topics and data.
  *)
 Datatype:
   differential_case = <|
@@ -190,9 +206,11 @@ Datatype:
     case_value : num;
     case_input : call_input;
     case_storage : (num # num) list;
+    case_peer_code : byte list;
+    case_peer_storage : (num # num) list;
     case_expect : expectation;
     case_final : (num # num) list;
-    case_logs : (bytes32 list # byte list) list
+    case_logs : (address # bytes32 list # byte list) list
   |>
 End
 
@@ -220,8 +238,8 @@ End
 
 Definition expected_logs_def:
   (expected_logs [] = []) ∧
-  (expected_logs ((topics, data) :: logs) =
-    <| logger := contract_address; topics := topics; data := data |> ::
+  (expected_logs ((logger, topics, data) :: logs) =
+    <| logger := logger; topics := topics; data := data |> ::
     expected_logs logs)
 End
 
@@ -296,7 +314,9 @@ Definition source_execution_def:
         contract_observation
           (call_contract fuel prog (differential_frame c.case_sender c.case_value data)
              (differential_world
-                (differential_accounts code c.case_storage c.case_sender)))
+                (transfer_value c.case_sender contract_address c.case_value
+                   (case_accounts code c.case_storage c.case_sender
+                      c.case_peer_code c.case_peer_storage))))
 End
 
 Definition source_observation_def:
@@ -313,7 +333,8 @@ Definition evm_execution_def:
     | INR (data, _) =>
         case run_transaction (Collect empty_domain) F differential_chain_id []
                differential_block
-               (differential_accounts code c.case_storage c.case_sender)
+               (case_accounts code c.case_storage c.case_sender c.case_peer_code
+                  c.case_peer_storage)
                (differential_tx c.case_sender c.case_value data) of
           SOME (r, accounts) =>
             (case r.result of
@@ -495,6 +516,7 @@ val () = cv_auto_trans function_types_def;
 val () = cv_auto_trans seed_storage_def;
 val () = cv_auto_trans contract_accounts_def;
 val () = cv_auto_trans differential_accounts_def;
+val () = cv_auto_trans case_accounts_def;
 val () = cv_auto_trans listTheory.nub_def;
 val () = cv_auto_trans observed_slots_def;
 val () = cv_auto_trans storage_values_def;

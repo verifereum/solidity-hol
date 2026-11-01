@@ -570,6 +570,17 @@ Definition wf_core_operation_def:
     | NONE => F) ∧
   (wf_core_operation env ctx annotation (EnvironmentOperation f) ⇔
     annotation = SingleType (environment_type f)) ∧
+  (* High-level calls pass elementary values; a view or pure callee is
+     called statically, with no value. *)
+  (wf_core_operation env ctx annotation
+     (ExternalCallOperation kind selector params rets target value args) ⇔
+    kind ≠ ExternalDelegateCall ∧ LENGTH selector = 4 ∧
+    EVERY (λty. is_elementary_type ty ∧ valid_type_shape ty) (params ++ rets) ∧
+    wf_core_atom env ctx (SingleType (AddressT NonpayableAddress)) target ∧
+    wf_core_atom env ctx (SingleType (UintT 256)) value ∧
+    (kind = ExternalStaticCall ⇒ value = ConstantAtom (IntegerValue 0)) ∧
+    wf_core_atoms env ctx (MAP SingleType params) args ∧
+    annotation = call_result_type rets) ∧
   (wf_core_operation env ctx annotation _ ⇔ F)
 End
 

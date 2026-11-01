@@ -45,6 +45,9 @@ Datatype:
     (* the transaction and block *)
   | YOrigin | YGasPrice | YChainId | YNumber | YTimestamp | YCoinbase | YBaseFee
   | YGasLimit
+    (* message calls, other accounts and the frame's gas *)
+  | YCall | YStaticCall | YExtCodeSize | YReturnDataSize | YReturnDataCopy
+  | YGas
     (* events *)
   | YLog0 | YLog1 | YLog2 | YLog3 | YLog4
     (* discards a value *)

@@ -629,6 +629,8 @@ def compile_fixture(
         raise SystemExit(f"solc produced no contract for {name}")
     artifacts: dict[str, dict[str, str]] = {}
     for contract, section in sorted(contracts.items()):
+        if not any(section.get(artifact) for artifact in ARTIFACTS):
+            continue  # an interface or abstract contract has no code
         text_of = {}
         for artifact in ARTIFACTS:
             text = section.get(artifact)

@@ -184,6 +184,51 @@ fun type_name v = within v (fn v =>
       end)
   | other => fail (describe v ^ ": unsupported type name " ^ other))
 
+(* Declarations *)
+
+(* A local, parameter or return variable, or, given state, a state variable. *)
+fun declaration state v = within v (fn v =>
+  (expect v "VariableDeclaration";
+   require v (not (bool_field v "constant")) "constants are not supported";
+   require v (bool_field v "stateVariable" = state)
+     (if state then "expected a state variable"
+      else "expected a local variable");
+   require v (string_field v "mutability" = "mutable")
+     "immutable variables are not supported";
+   require v (not (isSome (optional_field v "value")))
+     "declaration values are not supported";
+   require v (not state orelse string_field v "visibility" <> "public")
+     "public state variables are not supported";
+   record "src_variable"
+     [("var_info", info v), ("var_name", mk_str (string_field v "name")),
+      ("var_scope", mk_num (int_field v "scope")),
+      ("var_type_name", type_name (field v "typeName")),
+      ("var_type_id", type_id v),
+      ("var_location", mk_str (string_field v "storageLocation"))]))
+
+val variable = declaration false
+
+fun parameter_list v = within v (fn v =>
+  (expect v "ParameterList";
+   (mk_num (int_field v "id"),
+    listSyntax.mk_list
+      (JSONUtil.arrayMap variable (field v "parameters"), variable_ty))))
+
+(* The function declarations of the unit being imported, by id: the targets
+ * of high-level calls. *)
+val function_declarations : (IntInf.int * JSON.value) list ref = ref []
+
+fun function_declaration v id =
+  case List.find (fn (i, _) => i = id) (!function_declarations) of
+    SOME (_, d) => d
+  | NONE => fail (describe v ^ ": calls only functions declared in this unit")
+
+(* A call of an external function of a contract or interface value. *)
+fun is_external_call callee =
+  node_type callee = "MemberAccess" andalso
+  String.isPrefix "t_function_external_"
+    (string_field (field callee "typeDescriptions") "typeIdentifier")
+
 (* Expressions *)
 
 fun expr v = within v (fn v =>
@@ -282,7 +327,10 @@ fun expr v = within v (fn v =>
         require v (not (bool_field v "tryCall")) "try calls are not supported";
         case string_field v "kind" of
           "functionCall" =>
-            if node_type callee = "Identifier" andalso
+            if is_external_call callee orelse
+               node_type callee = "FunctionCallOptions" then
+              external_call v callee args
+            else if node_type callee = "Identifier" andalso
                int_field callee "referencedDeclaration" < 0 then
               let
                 val id = int_field callee "referencedDeclaration"
@@ -315,32 +363,56 @@ fun expr v = within v (fn v =>
       end
   | other => fail (describe v ^ ": unsupported expression " ^ other))
 
+(* I(target).f{value: v}(args): the target is an address converted to a
+ * contract type; other contract-typed values are not supported. *)
+and external_call v callee args =
+  let
+    val (member, value) =
+      if node_type callee = "FunctionCallOptions" then
+        within callee (fn opts =>
+          (require opts
+             (JSONUtil.arrayMap JSONUtil.asString (field opts "names") =
+              ["value"])
+             "only the value call option is supported";
+           (field opts "expression",
+            SOME (expr (hd (JSONUtil.arrayMap I (field opts "options")))))))
+      else (callee, NONE)
+    val () = require member (is_external_call member)
+               "unsupported call options"
+    val base = field member "expression"
+    val () =
+      within base (fn b =>
+        require b (node_type b = "FunctionCall" andalso
+                   string_field b "kind" = "typeConversion" andalso
+                   String.isPrefix "t_contract$_"
+                     (string_field (field b "typeDescriptions") "typeIdentifier"))
+          "calls only on an address converted to a contract type")
+    val target =
+      case JSONUtil.arrayMap I (field base "arguments") of
+        [t] => expr t
+      | _ => fail (describe base ^ ": a conversion takes one argument")
+  in
+    con "SrcExternalCall"
+      [info v,
+       external_function
+         (function_declaration member (int_field member "referencedDeclaration")),
+       mk_bool (isSome value),
+       listSyntax.mk_list (target :: (case value of SOME x => [x] | NONE => []) @ args,
+                           expr_ty),
+       type_id v]
+  end
+
+(* The declaration a high-level call refers to. *)
+and external_function v = within v (fn v =>
+  (expect v "FunctionDefinition";
+   record "src_external"
+     [("ext_selector", mk_bytes v (string_field v "functionSelector")),
+      ("ext_mutability", mk_str (string_field v "stateMutability")),
+      ("ext_parameters", #2 (parameter_list (field v "parameters"))),
+      ("ext_returns", #2 (parameter_list (field v "returnParameters")))]))
+
 fun optional_expr v k =
   mk_opt expr_ty (Option.map expr (optional_field v k))
-
-(* Declarations *)
-
-(* A local, parameter or return variable, or, given state, a state variable. *)
-fun declaration state v = within v (fn v =>
-  (expect v "VariableDeclaration";
-   require v (not (bool_field v "constant")) "constants are not supported";
-   require v (bool_field v "stateVariable" = state)
-     (if state then "expected a state variable"
-      else "expected a local variable");
-   require v (string_field v "mutability" = "mutable")
-     "immutable variables are not supported";
-   require v (not (isSome (optional_field v "value")))
-     "declaration values are not supported";
-   require v (not state orelse string_field v "visibility" <> "public")
-     "public state variables are not supported";
-   record "src_variable"
-     [("var_info", info v), ("var_name", mk_str (string_field v "name")),
-      ("var_scope", mk_num (int_field v "scope")),
-      ("var_type_name", type_name (field v "typeName")),
-      ("var_type_id", type_id v),
-      ("var_location", mk_str (string_field v "storageLocation"))]))
-
-val variable = declaration false
 
 (* Statements *)
 
@@ -405,12 +477,6 @@ and stmts v = listSyntax.mk_list (JSONUtil.arrayMap stmt v, stmt_ty)
 and optional_stmt v k = mk_opt stmt_ty (Option.map stmt (optional_field v k))
 
 (* Functions, contracts and source units *)
-
-fun parameter_list v = within v (fn v =>
-  (expect v "ParameterList";
-   (mk_num (int_field v "id"),
-    listSyntax.mk_list
-      (JSONUtil.arrayMap variable (field v "parameters"), variable_ty))))
 
 fun function v = within v (fn v =>
   let
@@ -552,11 +618,22 @@ fun import_source_unit v contracts = within v (fn v =>
   let
     val members = JSONUtil.arrayMap I (field v "nodes")
     val structs = List.filter (fn m => node_type m = "StructDefinition") members
+    val () =
+      function_declarations :=
+        List.concat
+          (map (fn c =>
+                  List.mapPartial
+                    (fn f => if node_type f = "FunctionDefinition"
+                             then SOME (int_field f "id", f) else NONE)
+                    (JSONUtil.arrayMap I (field c "nodes")))
+             (List.filter (fn m => node_type m = "ContractDefinition") members))
     fun member m acc =
       case node_type m of
         "PragmaDirective" => acc
       | "StructDefinition" => acc
-      | "ContractDefinition" => contract structs contracts m :: acc
+      | "ContractDefinition" =>
+          if string_field m "contractKind" = "interface" then acc
+          else contract structs contracts m :: acc
       | other => fail (describe m ^ ": unsupported source unit member " ^ other)
     val contracts =
       List.foldr (fn (m, acc) => within m (fn m => member m acc)) []
