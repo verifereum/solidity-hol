@@ -16,13 +16,15 @@
  * grammar says so; a body below is therefore a statement list, not a nested
  * block node.
  *
- * The builtins are exactly those the pinned solc emits over the fixtures in
- * testdata/ (see testdata/yul/reconnaissance.json; the unittest
- * tests/test_yul_reconnaissance.py checks the dialect's names against it).
- * The three object-level ones
- * (codecopy, datasize, dataoffset) occur only in the creation object, whose
- * semantics is a later step; they are here so the set is complete and the
- * evaluator can reject them rather than misread them.
+ * The builtins are those the pinned solc emits over the fixtures in
+ * testdata/ in either of its Yul stages (see testdata/yul/reconnaissance.json;
+ * the unittest tests/test_yul_reconnaissance.py checks the dialect's names
+ * against it), plus the ones contracts beyond the corpus need: the executing
+ * account, a three-topic log, a memory-to-memory copy and an immutable value
+ * the constructor patched in.  The three object-level ones (codecopy,
+ * datasize, dataoffset) occur only in the creation object, whose semantics is
+ * a later step; they are here so the set is complete and the evaluator can
+ * reject them rather than misread them.
  *)
 Theory yulAST
 Ancestors
@@ -36,11 +38,14 @@ Datatype:
   | YLt | YGt | YSLt | YSGt | YEq | YIsZero | YAnd | YOr | YXor | YNot
   | YShl | YShr | YSar
     (* hashing, memory, storage *)
-  | YKeccak256 | YMLoad | YMStore | YSLoad | YSStore
+  | YKeccak256 | YMLoad | YMStore | YMCopy | YSLoad | YSStore
     (* frame and call data *)
-  | YCallDataLoad | YCallDataSize | YCallValue | YMemoryGuard
+  | YCallDataLoad | YCallDataSize | YCallValue | YMemoryGuard | YCaller
+  | YLoadImmutable
     (* events *)
-  | YLog1
+  | YLog1 | YLog3
+    (* discards a value *)
+  | YPop
     (* halting *)
   | YReturn | YRevert
     (* object level: the creation object only *)

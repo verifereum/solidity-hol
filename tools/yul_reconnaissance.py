@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Reconnaissance: the Yul subset the pinned solc emits in its `ir` artifact.
+"""Reconnaissance: the Yul subset the pinned solc emits, unoptimized and
+optimized.
 
 Compiles every fixture under `testdata/` with the pinned compiler and the
-`solc-0.8.37-via-ir-osaka` profile, asks for the unoptimized `ir` artifact,
-parses it with the small Yul parser below, and enumerates
+`solc-0.8.37-via-ir-osaka` profile, asks for the `ir` and `irOptimized`
+artifacts, parses each with the small Yul parser below, and enumerates
 
   * the Yul node kinds that occur,
   * the builtins that occur -- a call to a name that no `function` definition
@@ -16,6 +17,14 @@ each with the fixtures that exercise it, split into the creation object (the
 top-level `object`) and the runtime object (the nested one whose name ends in
 `_deployed`).  Nothing is filtered: what the fixtures do not exercise is simply
 absent from the result.
+
+The enumeration is per stage, in the order the compiler's pipeline produces
+them: `ir`, then `irOptimized` with the optimizer off, then `irOptimized` with
+the optimizer on at the profile's run count.  The compiler prints the two
+artifacts through different paths, so `irOptimized` is not the same text as
+`ir` even with the optimizer off, and the report keeps all three rather than
+treating any one of them as another's input.  Each fixture is compiled once per
+optimizer setting, both its artifacts at once.
 
 The parser accepts the Yul dialect of the compiler's IR printer: identifiers
 (including `.`-qualified and `$`-escaped ones), hex/binary/decimal numbers,
@@ -47,7 +56,29 @@ from export_solc_artifacts import (  # noqa: E402
 )
 
 FIXTURE_DIRS = (ROOT / "testdata" / "frontend", ROOT / "testdata" / "differential")
-OUTPUT_SELECTION: dict[str, dict[str, list[str]]] = {"*": {"*": ["ir"]}}
+# Both artifacts are requested in one compile, so each fixture is compiled once
+# per optimizer setting and the stages below pick their artifact out of it.
+ARTIFACTS = ("ir", "irOptimized")
+OUTPUT_SELECTION: dict[str, dict[str, list[str]]] = {"*": {"*": list(ARTIFACTS)}}
+
+
+@dataclass(frozen=True)
+class Stage:
+    """One point of the compiler's Yul pipeline that the report enumerates."""
+
+    id: str
+    artifact: str
+    optimizer_enabled: bool
+
+
+# The stages, in pipeline order: the unoptimized artifact, then the optimized
+# one with the Yul optimizer off and on.  `irOptimized` differs from `ir` even
+# with the optimizer off, so no stage stands in for another's input.
+STAGES = (
+    Stage(id="ir", artifact="ir", optimizer_enabled=False),
+    Stage(id="ir-optimized-off", artifact="irOptimized", optimizer_enabled=False),
+    Stage(id="ir-optimized-on", artifact="irOptimized", optimizer_enabled=True),
+)
 
 # The EVM dialect's builtin set, from the Solidity documentation's "Yul / EVM
 # dialect" list plus the object-level builtins.  A call to a name outside it
@@ -58,11 +89,11 @@ EVM_DIALECT_BUILTINS = frozenset(
     eq iszero and or xor not byte shl shr sar keccak256 address balance selfbalance
     caller callvalue calldataload calldatasize calldatacopy codesize codecopy
     gasprice extcodesize extcodecopy returndatasize returndatacopy extcodehash
-    create create2 call callcode delegatecall staticcall mload mstore mstore8 sload
-    sstore tload tstore msize gas blockhash coinbase timestamp number difficulty
-    prevrandao gaslimit chainid basefee blobhash blobbasefee log0 log1 log2 log3
-    log4 return revert selfdestruct invalid memoryguard linkersymbol setimmutable
-    loadimmutable datasize dataoffset datacopy""".split()
+    create create2 call callcode delegatecall staticcall mload mstore mstore8 mcopy
+    sload sstore tload tstore msize gas blockhash coinbase timestamp number
+    difficulty prevrandao gaslimit chainid basefee blobhash blobbasefee log0 log1
+    log2 log3 log4 return revert selfdestruct invalid pop memoryguard linkersymbol
+    setimmutable loadimmutable datasize dataoffset datacopy""".split()
 )
 
 VERBATIM_RE = re.compile(r"verbatim_\d+i_\d+o")
@@ -566,22 +597,46 @@ def source_name(path: Path) -> str:
     return path.resolve().relative_to(ROOT).as_posix()
 
 
-def compile_fixture(solc: Path, path: Path, profile_path: Path) -> dict[str, str]:
-    """The unoptimized `ir` artifact of every contract in one fixture."""
+def optimizer_settings(settings: dict[str, Any], enabled: bool) -> dict[str, Any]:
+    """The profile's optimizer settings with `enabled` forced: the run count
+    and everything else about the optimizer stay the profile's."""
+    optimizer = dict(settings.get("optimizer") or {})
+    optimizer["enabled"] = enabled
+    return optimizer
+
+
+def compile_fixture(
+    solc: Path, path: Path, profile_path: Path, optimizer_enabled: bool
+) -> dict[str, dict[str, str]]:
+    """Both Yul artifacts of every contract in one fixture, from one compile."""
     profile = read_json(profile_path)
     settings = profile.get("settings")
     if not isinstance(settings, dict):
         raise SystemExit(f"{profile_path} must contain a settings object")
+    name = source_name(path)
     compiler_input = {
         "language": "Solidity",
-        "sources": {source_name(path): {"content": path.read_text(encoding="utf-8")}},
-        "settings": {**settings, "outputSelection": OUTPUT_SELECTION},
+        "sources": {name: {"content": path.read_text(encoding="utf-8")}},
+        "settings": {
+            **settings,
+            "optimizer": optimizer_settings(settings, optimizer_enabled),
+            "outputSelection": OUTPUT_SELECTION,
+        },
     }
     output = compile_standard_json(solc, compiler_input)
-    contracts = output.get("contracts", {}).get(source_name(path))
+    contracts = output.get("contracts", {}).get(name)
     if not contracts:
-        raise SystemExit(f"solc produced no contract for {source_name(path)}")
-    return {name: contract["ir"] for name, contract in sorted(contracts.items())}
+        raise SystemExit(f"solc produced no contract for {name}")
+    artifacts: dict[str, dict[str, str]] = {}
+    for contract, section in sorted(contracts.items()):
+        text_of = {}
+        for artifact in ARTIFACTS:
+            text = section.get(artifact)
+            if not isinstance(text, str) or not text.strip():
+                raise SystemExit(f"solc produced no {artifact} for {name}:{contract}")
+            text_of[artifact] = text
+        artifacts[contract] = text_of
+    return artifacts
 
 
 def add_counts(
@@ -664,48 +719,111 @@ def object_level_forms(fixtures: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def fixtures_for_stage(
+    fixtures: list[dict[str, Any]], stage: str
+) -> list[dict[str, Any]]:
+    """The fixtures with each contract's objects narrowed to one stage."""
+    return [
+        {
+            **fixture,
+            "contracts": [
+                {
+                    **contract,
+                    "objects": [
+                        obj for obj in contract["objects"] if obj["stage"] == stage
+                    ],
+                }
+                for contract in fixture["contracts"]
+            ],
+        }
+        for fixture in fixtures
+    ]
+
+
 def build_artifact(solc: Path, profile_path: Path) -> dict[str, Any]:
     pin = PIN_FILE.read_text(encoding="ascii").strip()
     if re.fullmatch(r"[0-9a-f]{40}", pin) is None:
         raise SystemExit(f"{PIN_FILE} must contain one lowercase 40-character SHA")
     profile = read_json(profile_path)
     expected_version = profile.get("compilerVersion")
-    if not isinstance(expected_version, str):
-        raise SystemExit("profile must contain compilerVersion")
+    settings = profile.get("settings")
+    if not isinstance(expected_version, str) or not isinstance(settings, dict):
+        raise SystemExit("profile must contain compilerVersion and a settings object")
     identity = compiler_identity(solc, expected_version, pin)
 
     fixtures = []
     for path in fixture_sources():
-        contracts = compile_fixture(solc, path, profile_path)
+        compiled = {
+            enabled: compile_fixture(solc, path, profile_path, enabled)
+            for enabled in (False, True)
+        }
+        contracts = []
+        for name in sorted(compiled[False]):
+            objects = []
+            for stage in STAGES:
+                text = compiled[stage.optimizer_enabled][name][stage.artifact]
+                objects.extend(
+                    {"stage": stage.id, **obj} for obj in analyse_artifact(text)
+                )
+            contracts.append({"contract": name, "objects": objects})
         fixtures.append(
             {
                 "source": source_name(path),
                 # The source's own hash, so a test can tell that the numbers
                 # below still describe the fixture on disk without a compiler.
                 "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
-                "contracts": [
-                    {
-                        "contract": name,
-                        "objects": analyse_artifact(ir),
-                    }
-                    for name, ir in sorted(contracts.items())
-                ],
+                "contracts": contracts,
             }
         )
     return {
-        "format": "solidity-hol-yul-reconnaissance-v1",
+        "format": "solidity-hol-yul-reconnaissance-v2",
         "compiler": {"pin": pin, "reportedVersion": identity},
         "profile": profile,
         "outputSelection": OUTPUT_SELECTION,
+        "stages": [
+            {
+                "id": stage.id,
+                "artifact": stage.artifact,
+                "optimizer": optimizer_settings(settings, stage.optimizer_enabled),
+            }
+            for stage in STAGES
+        ],
         "fixtures": fixtures,
-        "summary": build_report(fixtures),
+        "summary": {
+            stage.id: build_report(fixtures_for_stage(fixtures, stage.id))
+            for stage in STAGES
+        },
     }
 
 
-def render_markdown(artifact: dict[str, Any]) -> str:
-    summary = artifact["summary"]
+def stage_title(stage: dict[str, Any]) -> str:
+    optimizer = stage["optimizer"]
+    if optimizer.get("enabled"):
+        setting = f"optimizer on, `runs: {optimizer.get('runs')}`"
+    else:
+        setting = "optimizer off"
+    return f"`{stage['id']}`: the `{stage['artifact']}` artifact, {setting}"
+
+
+def role_table(caption: str, label: str, counts: dict[str, Any]) -> list[str]:
+    """One stage's counts, a row per name and a column per object role."""
     lines = [
-        "# Yul reconnaissance: the pinned compiler's `ir` artifact",
+        f"### {caption}",
+        "",
+        f"| {label} | creation | runtime | subobject | fixtures |",
+        "| --- | ---: | ---: | ---: | --- |",
+    ]
+    for name, entry in counts.items():
+        lines.append(
+            f"| `{name}` | {entry['creation']} | {entry['runtime']} | "
+            f"{entry['subobject']} | {len(entry['fixtures'])} |"
+        )
+    return lines
+
+
+def render_markdown(artifact: dict[str, Any]) -> str:
+    lines = [
+        "# Yul reconnaissance: the pinned compiler's Yul, unoptimized and optimized",
         "",
         "Generated by `tools/yul_reconnaissance.py`; do not edit by hand.",
         "",
@@ -713,56 +831,40 @@ def render_markdown(artifact: dict[str, Any]) -> str:
         f"- fixtures: {len(artifact['fixtures'])}",
         "",
         "`creation` is the top-level `object`, `runtime` the nested `_deployed` one.",
-        "",
-        "## Node kinds",
-        "",
-        "| node kind | creation | runtime | subobject | fixtures |",
-        "| --- | ---: | ---: | ---: | --- |",
     ]
-    for kind, entry in summary["nodeKinds"].items():
-        lines.append(
-            f"| `{kind}` | {entry['creation']} | {entry['runtime']} | "
-            f"{entry['subobject']} | {len(entry['fixtures'])} |"
+    for stage in artifact["stages"]:
+        summary = artifact["summary"][stage["id"]]
+        lines += ["", f"## {stage_title(stage)}", ""]
+        lines += role_table("Node kinds", "node kind", summary["nodeKinds"])
+        lines += [""]
+        lines += role_table("Builtins", "builtin", summary["builtins"])
+        lines += [
+            "",
+            "Unclassified builtin names (must be empty): "
+            + (
+                ", ".join(f"`{name}`" for name in summary["unknownBuiltins"])
+                or "none"
+            )
+            + ".",
+            "",
+        ]
+        lines += role_table(
+            "Object-level forms", "form", summary["objectLevelForms"]
         )
-    lines += [
-        "",
-        "## Builtins",
-        "",
-        "| builtin | creation | runtime | subobject | fixtures |",
-        "| --- | ---: | ---: | ---: | --- |",
-    ]
-    for name, entry in summary["builtins"].items():
-        lines.append(
-            f"| `{name}` | {entry['creation']} | {entry['runtime']} | "
-            f"{entry['subobject']} | {len(entry['fixtures'])} |"
-        )
-    lines += [
-        "",
-        "Unclassified builtin names (must be empty): "
-        + (", ".join(f"`{name}`" for name in summary["unknownBuiltins"]) or "none")
-        + ".",
-        "",
-        "## Object-level forms",
-        "",
-        "| form | creation | runtime | subobject | fixtures |",
-        "| --- | ---: | ---: | ---: | --- |",
-    ]
-    for name, entry in summary["objectLevelForms"].items():
-        lines.append(
-            f"| `{name}` | {entry['creation']} | {entry['runtime']} | "
-            f"{entry['subobject']} | {len(entry['fixtures'])} |"
-        )
-    lines += ["", "## Builtins by fixture", ""]
-    for fixture in artifact["fixtures"]:
-        for contract in fixture["contracts"]:
-            for obj in contract["objects"]:
-                if obj["role"] != "runtime":
-                    continue
-                names = ", ".join(f"`{name}`" for name in sorted(obj["builtins"]))
-                kinds = ", ".join(f"`{kind}`" for kind in sorted(obj["nodeKinds"]))
-                lines.append(f"- `{fixture['source']}` `{contract['contract']}` ({obj['name']})")
-                lines.append(f"  - kinds: {kinds}")
-                lines.append(f"  - builtins: {names}")
+        lines += ["", "### Builtins by fixture", ""]
+        for fixture in artifact["fixtures"]:
+            for contract in fixture["contracts"]:
+                for obj in contract["objects"]:
+                    if obj["stage"] != stage["id"] or obj["role"] != "runtime":
+                        continue
+                    names = ", ".join(f"`{name}`" for name in sorted(obj["builtins"]))
+                    kinds = ", ".join(f"`{kind}`" for kind in sorted(obj["nodeKinds"]))
+                    lines.append(
+                        f"- `{fixture['source']}` `{contract['contract']}` "
+                        f"({obj['name']})"
+                    )
+                    lines.append(f"  - kinds: {kinds}")
+                    lines.append(f"  - builtins: {names}")
     return "\n".join(lines) + "\n"
 
 
