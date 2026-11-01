@@ -76,7 +76,15 @@ separately from a disagreement, and the stage's cases are not run there.
 Each case at each stage gets one `yul_agrees` theorem
 (`tests/yulDifferentialScript.sml`), which is the corpus's comparison with the
 Yul run standing where the core run stands: the same calldata, the same
-outcome, the complete committed storage, and the log the case declares.
+outcome, the complete committed storage, and the log the case declares. The
+frame is the bytecode run's world — the same sender, value, calldata,
+transaction parameters and peer contract — with the imported Yul in place of
+the contract's own code.
+
+What the run cannot reach is the evaluator, not the importer: the dialect names
+the call family, so a stage that uses it is admitted, but the Yul semantics
+answers those builtins with `YulInvalid "builtin not evaluated"`, so a case
+that calls the peer is a diagnostic on every stage of the Yul run.
 
 The ASTs are tens of megabytes across the corpus, so the tool generates them
 with the pinned compiler instead of committing them, and the run is far longer
