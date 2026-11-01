@@ -16,6 +16,9 @@
  * call runs the most derived override of the function it names (call_table);
  * the functions no other overrides are elaborated, and the external and
  * public ones among them, receive and fallback form the dispatch table.
+ * State-variable initializers, constructors and base-constructor arguments
+ * (inheritance specifiers or constructor modifiers) form one creation
+ * procedure.
  * Other string runtime operations and unsupported forms are rejected (NONE).
  *
  * Schedules, read from the compiler's IR for this profile (the ir output in
@@ -31,7 +34,10 @@
  *  - a tuple assignment evaluates its right-hand side into fresh values, then
  *    writes the targets from right to left;
  *  - return values and declared variables are converted as the source types
- *    require.
+ *    require;
+ *  - creation evaluates the base-constructor arguments of each contract, most
+ *    derived first, then, base first, runs each contract's state-variable
+ *    initializers in declaration order and then its constructor body.
  *
  * Loops: a while condition is elaborated into the loop prelude, which reruns
  * on every iteration. for (init; c; next) body runs init once, then a loop

@@ -150,7 +150,7 @@ fun call_input initcode c =
   | (NONE, SOME (JSON.STRING f), NONE) =>
       con "NamedCall"
         [stringSyntax.fromMLstring f, arguments (array_field c "args")]
-  | (NONE, NONE, SOME (JSON.TRUE)) =>
+  | (NONE, NONE, SOME (JSON.BOOL true)) =>
       con "Deploy" [initcode (), arguments (array_field c "args")]
   | _ => fail "a case has either calldata, a function and its arguments, \
               \or deploy and the constructor's arguments"

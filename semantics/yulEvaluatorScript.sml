@@ -376,6 +376,7 @@ Definition eval_yul_builtin_def:
     | (YRevert, [p; s]) =>
         let (m', bs) = yul_memory_region m (w2n p) (w2n s) in
           EvalAbrupt (YulRevert bs) m'
+    | (YCodeSize, _) => EvalAbrupt (YulInvalid "object-level builtin") m
     | (YCodeCopy, _) => EvalAbrupt (YulInvalid "object-level builtin") m
     | (YDataSize, _) => EvalAbrupt (YulInvalid "object-level builtin") m
     | (YDataOffset, _) => EvalAbrupt (YulInvalid "object-level builtin") m
