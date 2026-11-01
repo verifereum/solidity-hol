@@ -22,8 +22,10 @@
  * against it), plus the ones contracts beyond the corpus need: the executing
  * account, a three-topic log, a memory-to-memory copy and an immutable value
  * the constructor patched in.  The four object-level ones (codesize,
- * codecopy, datasize, dataoffset) occur only in the creation object, whose semantics is
- * a later step; they are here so the set is complete and the evaluator can
+ * codecopy, datasize, dataoffset) read the running code or the object's
+ * layout, which the evaluator does not model; the compiler emits them in
+ * creation objects, and inline assembly can use codesize and codecopy
+ * anywhere. They are here so the set is complete and the evaluator can
  * reject them rather than misread them.
  *)
 Theory yulAST

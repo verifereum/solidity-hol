@@ -1157,7 +1157,8 @@ Definition creation_payable_def:
 End
 
 (* Raw lowering of a valid unit of one contract, with fresh ids above its
- * node ids; the first live function is the entry procedure. A SOME result is
+ * node ids; the first live function is the entry procedure, or the creation
+ * procedure when there is none. A SOME result is
  * not yet a checked program: consumers must establish wf_core_program
  * through solidityPrepareLib before execution.
  *)
@@ -1177,7 +1178,7 @@ Definition elaborate_unit_def:
                      (MAP (λe. (e.event_info.node_id, e)) c.contract_events)
                      (call_table c.contract_functions)
                      state (MAX_LIST (unit_ids u) + 1) fs) of
-               (SOME decls, SOME layouts, SOME cvs, SOME (p :: ps, n)) =>
+               (SOME decls, SOME layouts, SOME cvs, SOME (ps, n)) =>
                  (case elab_creation
                          <| functions := call_table c.contract_functions;
                             structs := c.contract_structs;
@@ -1187,9 +1188,12 @@ Definition elaborate_unit_def:
                             mode := CheckedArithmetic |> c n of
                     NONE => NONE
                   | SOME (creation, _) =>
-                 SOME <| procedures := p :: ps ++ [creation]; state_variables := cvs;
+                 SOME <| procedures := ps ++ [creation]; state_variables := cvs;
                          struct_layouts := layouts; type_declarations := decls;
-                         entry_procedure := p.procedure_id;
+                         entry_procedure :=
+                           (case ps of
+                              p :: _ => p.procedure_id
+                            | [] => creation.procedure_id);
                          external_functions :=
                            external_functions fs;
                          receive_procedure := OPTION_MAP FST

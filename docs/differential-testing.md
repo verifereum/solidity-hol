@@ -19,8 +19,8 @@ lookup, payability, argument decoding, `receive` and `fallback` are compared
 too. Raw calldata declares no return types, so its `return` expectation is
 `[]`.
 
-A case with `"deploy": true` and the constructor's `args` is a creation
-instead: Verifereum runs a creation transaction whose data is the artifact's
+A case with `"deploy": true` and the constructor's `args` (or, as
+`calldata`, their raw encoding) is a creation instead: Verifereum runs a creation transaction whose data is the artifact's
 initcode followed by the encoded arguments, and the evaluator runs the
 program's creation procedure (`deploy_contract`) on the encoded arguments, at
 the address the transaction creates (`address_for_create` of the sender at

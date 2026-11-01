@@ -144,7 +144,9 @@ class CorpusTests(unittest.TestCase):
                  {"name": "named", "function": "f", "args": [], "value": "7",
                   "expect": {"revert": "0x"}, "logs": []},
                  {"name": "deploy", "deploy": True, "args": [1],
-                  "expect": {"return": []}}]
+                  "expect": {"return": []}},
+                 {"name": "deploy_raw", "deploy": True, "calldata": "0x01",
+                  "expect": {"revert": "0x"}}]
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "corpus.json"
             path.write_text(json.dumps(corpus(cases)), encoding="utf-8")
@@ -154,7 +156,7 @@ class CorpusTests(unittest.TestCase):
         base = {"name": "f", "expect": {"return": []}}
         for fields, message in [
                 ({"calldata": "0x", "function": "f"}, "calldata excludes"),
-                ({"calldata": "0x", "deploy": True}, "calldata excludes"),
+                ({"calldata": "0x", "deploy": True, "args": []}, "calldata excludes"),
                 ({"deploy": False, "args": []}, "deploy must be true"),
                 ({"deploy": True, "function": "f", "args": []}, "deploy must be true"),
                 ({"deploy": True, "args": [], "storage": {"0": 1}}, "deploy must be true"),

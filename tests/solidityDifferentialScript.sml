@@ -187,12 +187,12 @@ End
 (* Cases *)
 
 (* A call to the deployed contract, or its creation from initcode with
- * constructor arguments. *)
+ * constructor arguments, given as values or as raw bytes. *)
 Datatype:
   call_input =
     NamedCall string (argument list)
   | RawCall (byte list)
-  | Deploy (byte list) (argument list)
+  | Deploy (byte list) (argument list + byte list)
 End
 
 Datatype:
@@ -251,7 +251,8 @@ Definition input_call_def:
               NONE => INL UnencodableArguments
             | SOME data => INR (data, rets)) ∧
   (input_call u (RawCall data) = INR (data, [])) ∧
-  (input_call u (Deploy code args) =
+  (input_call u (Deploy code (INR data)) = INR (data, [])) ∧
+  (input_call u (Deploy code (INL args)) =
     case constructor_types u of
       NONE => INL UnknownFunction
     | SOME (params, _) =>

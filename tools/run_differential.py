@@ -144,17 +144,19 @@ def check_logs(value: Any, what: str) -> None:
 
 def check_call(case: dict[str, Any], what: str) -> None:
     """A case calls either raw calldata or a named function with arguments, or
-    deploys the contract with the constructor's arguments."""
+    deploys the contract with the constructor's arguments or, as calldata,
+    their raw encoding."""
+    if "deploy" in case and (case["deploy"] is not True or "function" in case
+                             or "storage" in case):
+        raise CorpusError(f"{what}: deploy must be true and excludes function and storage")
     if "calldata" in case:
-        if "function" in case or "args" in case or "deploy" in case:
-            raise CorpusError(f"{what}: calldata excludes function, deploy and args")
+        if "function" in case or "args" in case:
+            raise CorpusError(f"{what}: calldata excludes function and args")
         if not isinstance(case["calldata"], str) or HEX.fullmatch(case["calldata"]) is None:
             raise CorpusError(f"{what}: calldata must be 0x-prefixed hex")
         return
-    if "deploy" in case:
-        if case["deploy"] is not True or "function" in case or "storage" in case:
-            raise CorpusError(f"{what}: deploy must be true and excludes function and storage")
-    elif not isinstance(case.get("function"), str) or not case["function"]:
+    if "deploy" not in case and (not isinstance(case.get("function"), str)
+                                 or not case["function"]):
         raise CorpusError(f"{what}: function must be a string")
     args = case.get("args")
     if not isinstance(args, list):

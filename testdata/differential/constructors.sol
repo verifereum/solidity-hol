@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
 
-// A constructor chain with base arguments given in the inheritance list and
-// on the constructor, and initializers with side effects. Creation evaluates
+// A constructor chain with base arguments given on the constructors, and
+// initializers with side effects; the most derived constructor is payable. Creation evaluates
 // the base arguments, most derived first, then runs each contract's
 // initializers and constructor, base first; tick records the order.
 contract Root {
@@ -20,11 +20,11 @@ contract Root {
     }
 }
 
-contract Mid is Root(7) {
+contract Mid is Root {
     uint256 m = tick(100);
     uint256 mid;
 
-    constructor(uint256 y) {
+    constructor(uint256 y) Root(tick(7)) {
         mid = y + tick(1);
     }
 }
@@ -32,8 +32,9 @@ contract Mid is Root(7) {
 contract Top is Mid {
     uint256 top;
     uint256 t = tick(1000);
+    uint256 paid = msg.value;
 
-    constructor(uint256 z) Mid(tick(z)) {
+    constructor(uint256 z) payable Mid(tick(z)) {
         top = z + tick(1);
     }
 }

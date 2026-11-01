@@ -167,7 +167,8 @@ Datatype:
                        frame's memory size *)
   | EffectHalt      (* ends the frame, returning or reverting data from
                        memory *)
-  | EffectObject    (* the creation object's data and subobjects *)
+  | EffectObject    (* the running code, or the object's data and
+                       subobjects *)
 End
 
 Definition builtin_effect_def:
@@ -241,8 +242,8 @@ Proof
   Cases_on ‘b’ >> EVAL_TAC
 QED
 
-(* The four object-level builtins are the only ones a runtime frame cannot
- * reach, and the evaluator rejects them.
+(* The four object-level builtins read the running code or the object's
+ * layout, which the evaluator does not model, and it rejects them.
  *)
 Theorem builtin_effect_object:
   ∀b. builtin_effect b = EffectObject ⇔

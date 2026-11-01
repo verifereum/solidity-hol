@@ -142,7 +142,8 @@ fun word_term bits i =
   else fail ("not a " ^ Int.toString bits ^ "-bit word: " ^ IntInf.toString i)
 
 (* Calldata as 0x hex, a named function and its arguments, or a creation
- * ("deploy": true) from the suite's initcode with constructor arguments. *)
+ * ("deploy": true) from the suite's initcode with the constructor's arguments
+ * or, as calldata, their raw encoding. *)
 fun call_input initcode c =
   case (JSONUtil.findField c "calldata", JSONUtil.findField c "function",
         JSONUtil.findField c "deploy") of
@@ -151,9 +152,15 @@ fun call_input initcode c =
       con "NamedCall"
         [stringSyntax.fromMLstring f, arguments (array_field c "args")]
   | (NONE, NONE, SOME (JSON.BOOL true)) =>
-      con "Deploy" [initcode (), arguments (array_field c "args")]
+      con "Deploy" [initcode (),
+                    sumSyntax.mk_inl (arguments (array_field c "args"),
+                                      listSyntax.mk_list_type byte_ty)]
+  | (SOME (JSON.STRING s), NONE, SOME (JSON.BOOL true)) =>
+      con "Deploy" [initcode (),
+                    sumSyntax.mk_inr (bytes_term (hex_bytes s),
+                                      listSyntax.mk_list_type argument_ty)]
   | _ => fail "a case has either calldata, a function and its arguments, \
-              \or deploy and the constructor's arguments"
+              \or deploy and the constructor's arguments or calldata"
 
 (* Logs as a list of {"logger": address, "topics": [...], "data": "0x..."},
  * the logger the contract by default. *)
