@@ -24,14 +24,17 @@
  *  - all node ids are distinct;
  *  - every parameter, return, local and state variable has a normalized
  *    elementary, array or mapping type, the default data location, and a
- *    type identifier agreeing with that type, and the enclosing function, block, for statement or
- *    one of the contract's bases as its scope; event parameters are elementary, scoped by
- *    their event;
- *  - the contract's storage layout lists its state variables in declaration
- *    order, each with its own typeIdentifier and a slot below 2 ** 256;
+ *    type identifier agreeing with that type, and the enclosing function,
+ *    block, for statement or one of the contract's bases as its scope; event
+ *    parameters are elementary, scoped by their event;
+ *  - the contract's bases are distinct and start with the contract itself;
+ *  - the contract's storage layout lists its state variables in
+ *    linearization order, bases first, each with its own typeIdentifier and
+ *    a slot below 2 ** 256;
  *  - every identifier resolves, within its lexical scope, to a variable of the
  *    annotated type, or, as the callee of a call, to a function of the same
- *    contract, the most derived override of the one it names (call_table); calls have matching arity and are annotated with the callee's
+ *    contract, the most derived override of the one it names (call_table);
+ *    calls have matching arity and are annotated with the callee's
  *    return types; conversions are annotated with their normalized target type;
  *    environment reads with their member's type; emits name an event of the
  *    contract with as many arguments as it has parameters;
@@ -39,9 +42,9 @@
  *    assignments, returns name the enclosing function's return list, break and
  *    continue occur in loop bodies, conditions are boolean;
  *  - functions, receive and fallback are pure, view, nonpayable or payable,
- *    and only non-pure ones refer to state variables; functions a more derived one
- *    overrides are not checked, since nothing reaches them; contracts are
- *    scoped by the unit, functions by a base of their contract;
+ *    and only non-pure ones refer to state variables; functions a more
+ *    derived one overrides are not checked, since nothing reaches them;
+ *    contracts are scoped by the unit, functions by a base of their contract;
  *  - operators belong to the admitted set and every other expression
  *    annotation decodes to an elementary, rational literal or tuple type.
  *
@@ -49,7 +52,9 @@
  * against commonType and parameter types, literal ranges), return value
  * arity and types, assignment target shapes and their types, and evaluation
  * order, which the AST does not record. Left to the compiler: storage layout
- * calculation, and that view functions write no state variable.
+ * calculation, that view functions write no state variable, and the
+ * override metadata: which declarations each function overrides, and that
+ * functions come most derived first.
  *)
 Theory solidityImport
 Ancestors
@@ -165,8 +170,9 @@ End
 
 (* Parameter lists are represented by their ids and declarations. The kind is
  * function, receive or fallback; the selector is that of an external or
- * public function. The base functions are the declarations it overrides
- * directly (the compiler's baseFunctions).
+ * public function. The base functions are the declarations it overrides,
+ * directly or through other overridden declarations (the closure of the
+ * compiler's baseFunctions).
  *)
 Datatype:
   src_function = <|
@@ -1104,6 +1110,8 @@ End
 Definition check_contract_def:
   check_contract unit_id (c : src_contract) ⇔
     c.contract_scope = unit_id ∧
+    (case c.contract_bases of x :: _ => x = c.contract_info.node_id | [] => F) ∧
+    ALL_DISTINCT c.contract_bases ∧
     EVERY (check_struct unit_id c.contract_bases) c.contract_structs ∧
     EVERY check_event c.contract_events ∧
     storage_layout_ok F c.contract_state_variables c.contract_storage ∧

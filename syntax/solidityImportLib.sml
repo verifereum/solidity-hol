@@ -478,6 +478,22 @@ and optional_stmt v k = mk_opt stmt_ty (Option.map stmt (optional_field v k))
 
 (* Functions, contracts and source units *)
 
+(* The declarations a function overrides: those it names, and those they
+ * override in turn, so that a call naming a declaration without a body
+ * reaches the function implementing it however many declarations lie
+ * between them. *)
+fun overridden v =
+  let
+    fun direct d =
+      case optional_field d "baseFunctions" of
+        SOME ids => JSONUtil.arrayMap JSONUtil.asIntInf ids
+      | NONE => []
+    fun close [] = []
+      | close (id :: ids) = id :: close (direct (function_declaration v id) @ ids)
+  in
+    close (direct v)
+  end
+
 fun function v = within v (fn v =>
   let
     val (params_id, params) = parameter_list (field v "parameters")
@@ -502,11 +518,8 @@ fun function v = within v (fn v =>
         mk_opt (listSyntax.mk_list_type (wordsSyntax.mk_int_word_type 8))
           (Option.map (mk_bytes v o JSONUtil.asString)
              (optional_field v "functionSelector"))),
-       ("fn_base_functions", listSyntax.mk_list
-          (case optional_field v "baseFunctions" of
-             SOME ids => JSONUtil.arrayMap (mk_num o JSONUtil.asIntInf) ids
-           | NONE => [],
-           numSyntax.num)),
+       ("fn_base_functions",
+        listSyntax.mk_list (map mk_num (overridden v), numSyntax.num)),
        ("fn_parameters_id", params_id), ("fn_parameters", params),
        ("fn_returns_id", returns_id), ("fn_returns", returns),
        ("fn_body", stmt (field v "body"))]
@@ -575,13 +588,20 @@ fun struct_declaration types v = within v (fn v =>
 fun contract external_structs contracts declared v = within v (fn v =>
   let
     val name = string_field v "name"
+    val linearization =
+      JSONUtil.arrayMap JSONUtil.asIntInf (field v "linearizedBaseContracts")
+    val () =
+      require v (case linearization of
+                   id :: _ => id = int_field v "id"
+                 | [] => false)
+        "the linearization does not start with the contract itself"
     val bases =
       map (fn id =>
              case List.find (fn (i, _) => i = id) declared of
                SOME (_, c) => c
              | NONE => fail (describe v ^ ": base contract " ^
                              IntInf.toString id ^ " is not in this unit"))
-        (JSONUtil.arrayMap JSONUtil.asIntInf (field v "linearizedBaseContracts"))
+        linearization
     fun nodes c = JSONUtil.arrayMap I (field c "nodes")
     fun members_of ty cs =
       List.concat
@@ -696,8 +716,10 @@ fun import_source_unit v contracts = within v (fn v =>
     val inherited =
       List.concat
         (map (fn (_, c) =>
-                tl (JSONUtil.arrayMap JSONUtil.asIntInf
-                      (field c "linearizedBaseContracts")))
+                case JSONUtil.arrayMap JSONUtil.asIntInf
+                       (field c "linearizedBaseContracts") of
+                  _ :: bases => bases
+                | [] => [])
            declared)
     fun member m acc =
       case node_type m of

@@ -36,6 +36,7 @@ val () = holbuild_extra_deps [
   "../testdata/differential/expected/receive.json",
   "../testdata/differential/expected/external.json",
   "../testdata/differential/expected/inheritance.json",
+  "../testdata/differential/expected/inheritance_diamond.json",
   "../testdata/differential/expected/constructors.json"
 ]
 

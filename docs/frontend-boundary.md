@@ -251,7 +251,7 @@ import error, not a partial semantic result.
 ## Open reconnaissance work
 
 Before fixing a complete core AST, extend the corpus to cover control flow,
-tuple holes, modifiers, inheritance and `super`, external calls, creation,
+tuple holes, modifiers, `super`, external calls, creation,
 try/catch, errors, fallback/receive, dynamic and memory/calldata arrays, bytes/string, function
 pointers, transient storage, and custom storage layout bases. The first HOL type
 theory can begin from the normalized types already observed, provided unsupported
