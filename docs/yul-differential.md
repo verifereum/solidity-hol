@@ -3,9 +3,9 @@
 The differential corpus through the Yul the pinned compiler emitted for the same sources, at the three stages the design separates, held to the same expectation the core evaluator and the deployed bytecode are held to.
 
 - corpus: `testdata/differential/corpus.json`
-- compiler: `/home/claude/.local/opt/solc-0.8.37/solc`
+- compiler: `~/.local/opt/solc-0.8.37/solc`
 
-HOL command: `holbuild -j 8 build --force=theory yulDifferentialCorpusTheory` (status 0).
+HOL command: `holbuild -j 4 build --force=theory yulDifferentialCorpusTheory` (status 0).
 
 ## Totals
 

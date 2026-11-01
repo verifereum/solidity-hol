@@ -120,15 +120,16 @@ fun expect_malformed what v =
 (* The base is admitted, so a refusal below is the change, not a typo here. *)
 val () = ignore (import (minimal_output ()));
 
-(* A string literal, as the compiler emits one: the decoded text in `value` and
- * the bytes in `hexValue`, which is hex without the 0x the numbers carry. What
- * the importer must read is the bytes -- a literal written in hex has no text
- * of its own -- so this pins the byte list in the imported tree.
+(* A string literal, as the compiler emits one: the bytes in `hexValue`, which
+ * is hex without the 0x the numbers carry, and the decoded text in `value`,
+ * which is null when the literal is written in hex and has no text at all. What
+ * the importer must read is the bytes, so this fixture is a hex literal whose
+ * text is not there and whose bytes are not text.
  *)
 val () =
   let
     val literal = obj [("nodeType", str "YulLiteral"), ("kind", str "string"),
-                       ("value", str "abc"), ("hexValue", str "616263"),
+                       ("value", JSON.NULL), ("hexValue", str "00ff"),
                        ("type", str "")]
     val imported =
       import (output_with
@@ -136,7 +137,7 @@ val () =
                                    (call "mstore" [number "0", literal])]]
                 creation_code)
     val expected = listSyntax.mk_list
-      (map (fn i => wordsSyntax.mk_wordii (i, 8)) [0x61, 0x62, 0x63],
+      (map (fn i => wordsSyntax.mk_wordii (i, 8)) [0x00, 0xff],
        wordsSyntax.mk_int_word_type 8)
   in
     if List.exists (fn t => aconv t expected) (find_terms (fn _ => true) imported)

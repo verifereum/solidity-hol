@@ -375,7 +375,7 @@
     "command": [
       "holbuild",
       "-j",
-      "8",
+      "4",
       "build",
       "--force=theory",
       "yulDifferentialCorpusTheory"
@@ -9055,7 +9055,27 @@
       "theorem": "yul_storage_structs_top_level_field_bounds_rollback_optimized"
     }
   ],
-  "solc": "/home/claude/.local/opt/solc-0.8.37/solc",
+  "per_stage": {
+    "ir": {
+      "agreements": 289,
+      "cases_run": 289,
+      "stages_admitted": 12,
+      "stages_expected": 12
+    },
+    "ir-optimized": {
+      "agreements": 289,
+      "cases_run": 289,
+      "stages_admitted": 12,
+      "stages_expected": 12
+    },
+    "optimized": {
+      "agreements": 289,
+      "cases_run": 289,
+      "stages_admitted": 12,
+      "stages_expected": 12
+    }
+  },
+  "solc": "~/.local/opt/solc-0.8.37/solc",
   "stages": [
     "ir",
     "ir-optimized",

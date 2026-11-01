@@ -41,7 +41,8 @@ def corpus(cases=None):
 class FakeRoot:
     """A repository root with one suite, its artifacts, and a fake compiler."""
 
-    def __init__(self, directory: Path, deployed: str = DEPLOYED, staged: bool = True) -> None:
+    def __init__(self, directory: Path, deployed: str = DEPLOYED,
+                 unstaged: str | None = None) -> None:
         self.root = directory
         self.write(core.CORPUS.as_posix(), json.dumps(corpus()))
         self.write(SOURCE, "contract A {}\n")
@@ -55,8 +56,9 @@ class FakeRoot:
         self.deployed = deployed
         artifacts = [f"../{driver.YUL_ROOT.as_posix()}/{name}.{tag}.json"
                      for name in ("a",) for tag, _ in driver.ARTIFACT_STAGES]
-        if staged:
-            artifacts.append(f"../{core.CORPUS.as_posix()}")
+        artifacts.append(f"../{core.CORPUS.as_posix()}")
+        if unstaged is not None:
+            artifacts.remove(unstaged)
         self.write(driver.CORPUS_SCRIPT.as_posix(), "\n".join(
             ["fun holbuild_extra_deps (_ : string list) = ()",
              "val () = holbuild_extra_deps ["] +
@@ -114,7 +116,15 @@ class FakeRoot:
         return exit_status, report
 
 
-def stage(suite: str, name: str, status: str = "ok", **rest) -> dict:
+def suite_result(name: str, stages: list[str], status: str = "ok", **rest) -> dict:
+    """The suite's own line, which is also the evidence for which stages were
+    admitted: the theory writes one when it gets through the suite's stages."""
+    return {"kind": "suite", "suite": name, "status": status, "stages": stages, **rest}
+
+
+def rejection(suite: str, name: str, status: str = "import-rejected", **rest) -> dict:
+    """The line the importer's refusal of one stage produces; nothing else
+    emits a stage line."""
     return {"kind": "stage", "suite": suite, "stage": name, "status": status, **rest}
 
 
@@ -127,7 +137,7 @@ RETURNED = {"returned": "0x" + "00" * 31 + "02"}
 
 
 def all_agree() -> list[dict]:
-    results = [stage("a", name) for name in driver.STAGES]
+    results = [suite_result("a", list(driver.STAGES))]
     results += [case("a", "f_returns", name, outcome=RETURNED) for name in driver.STAGES]
     return results
 
@@ -148,8 +158,8 @@ class DriverTests(unittest.TestCase):
     def test_a_stage_that_is_not_admitted_is_counted_separately(self) -> None:
         """Its cases are not run there, so they are an admission, not a
         disagreement, and not a missing result."""
-        results = [stage("a", driver.IR), stage("a", driver.IR_OPTIMIZED),
-                   stage("a", driver.OPTIMIZED, "import-rejected", message="no nodeType")]
+        results = [suite_result("a", [driver.IR, driver.IR_OPTIMIZED]),
+                   rejection("a", driver.OPTIMIZED, message="no nodeType")]
         results += [case("a", "f_returns", name, outcome=RETURNED)
                     for name in (driver.IR, driver.IR_OPTIMIZED)]
         with tempfile.TemporaryDirectory() as temporary:
@@ -174,9 +184,29 @@ class DriverTests(unittest.TestCase):
     def test_a_missing_result_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             status, report = FakeRoot(Path(temporary)).run(
-                [stage("a", name) for name in driver.STAGES], status=0)
+                [suite_result("a", list(driver.STAGES))], status=0)
         self.assertEqual(status, 1)
         self.assertEqual([f["status"] for f in report["failures"]], ["missing"] * 3)
+
+    def test_a_suite_with_no_result_admits_nothing(self) -> None:
+        """A build that stopped before a suite reports it admits no stage of it:
+        silence is not evidence."""
+        with tempfile.TemporaryDirectory() as temporary:
+            status, report = FakeRoot(Path(temporary)).run([], status=0)
+        self.assertEqual(status, 1)
+        self.assertEqual(report["totals"]["stages_admitted"], 0)
+        self.assertEqual([a["admitted"] for a in report["admissions"]], [False] * 3)
+        self.assertEqual([(f["kind"], f["status"]) for f in report["failures"]],
+                         [("suite", "missing")])
+
+    def test_a_failed_suite_is_reported_with_its_message(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            status, report = FakeRoot(Path(temporary)).run(
+                [suite_result("a", [], "prepare-failed", message="the artifact is stale")])
+        self.assertEqual(status, 1)
+        self.assertEqual([(f["kind"], f["status"]) for f in report["failures"]],
+                         [("suite", "prepare-failed")])
+        self.assertEqual(report["totals"]["stages_admitted"], 0)
 
     def test_the_yul_must_be_the_same_program_as_the_bytecode(self) -> None:
         """The optimizer-off compile's bytecode is what the corpus validates,
@@ -188,11 +218,13 @@ class DriverTests(unittest.TestCase):
         self.assertEqual([f["check"] for f in failed], ["yul-artifact-is-the-same-program"])
 
     def test_a_generated_artifact_that_is_not_staged_fails(self) -> None:
+        missing = f"../{driver.YUL_ROOT.as_posix()}/a.optimized.json"
         with tempfile.TemporaryDirectory() as temporary:
-            status, report = FakeRoot(Path(temporary), staged=False).run(all_agree())
+            status, report = FakeRoot(Path(temporary), unstaged=missing).run(all_agree())
         self.assertEqual(status, 1)
         failed = [f for f in report["failures"] if f["kind"] == "external-check"]
         self.assertEqual([f["check"] for f in failed], ["yul-artifacts-staged"])
+        self.assertIn("a.optimized.json", failed[0]["detail"])
 
 
 class CommittedTests(unittest.TestCase):

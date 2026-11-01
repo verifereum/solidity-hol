@@ -451,8 +451,14 @@ fun run_yul_stage env (stage_tag, json_tag, ycode) =
     val (verdict, logs) = pairSyntax.dest_pair (rhs (concl th))
     val log_count = length (fst (listSyntax.dest_list logs))
     fun both_sides () =
-      case snd (strip_comb verdict) of
-        [a, b] => [("bytecode", outcome_json a), ("yul", outcome_json b)]
+      (* On Unexpected the second operand is the expectation, not the Yul run
+       * (see run_case's own case for it), and printing it as the Yul run would
+       * name the wrong thing.
+       *)
+      case (fst (dest_const (fst (strip_comb verdict))), snd (strip_comb verdict)) of
+        ("Unexpected", [agreed, _]) =>
+          [("bytecode", outcome_json agreed), ("yul", outcome_json agreed)]
+      | (_, [a, b]) => [("bytecode", outcome_json a), ("yul", outcome_json b)]
       | _ => []
   in
     if is_con "Agree" verdict then
@@ -557,7 +563,8 @@ fun run_suite_three_way root yul_root s =
     emit_yul [("kind", json_string "suite"), ("suite", json_string suite),
               ("status", json_string "ok"),
               ("stages",
-               json_array (map (fn (tag, _, _) => json_string tag) stages))];
+               json_array (map (fn (_, json_tag, _) => json_string json_tag)
+                             stages))];
     List.foldl (fn (c, ok) => run_case_three_way suite env c andalso ok)
       true cases
   end

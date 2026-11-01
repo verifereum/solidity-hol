@@ -44,6 +44,15 @@ import export_solc_yul as yul_exporter
 import run_differential as core
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def display_path(path: Path) -> str:
+    """A path as the documentation names it: under `~` when it is in the home
+    directory, so the committed report does not carry one machine's layout."""
+    try:
+        return "~/" + path.resolve().relative_to(Path.home()).as_posix()
+    except (ValueError, RuntimeError):
+        return path.as_posix()
 CORPUS_SCRIPT = Path("tests/yulDifferentialCorpusScript.sml")
 YUL_ROOT = Path("testdata/yul/generated")
 THEORY = "yulDifferentialCorpusTheory"
@@ -65,8 +74,11 @@ AGREEMENT = "agree"
 ADMISSION_FAILURES = ("import-rejected", "import-malformed", "error")
 
 
-def deployed_bytecode(artifact: dict[str, Any], source: str, contract: str) -> str:
-    return artifact["output"]["contracts"][source][contract]["evm"]["deployedBytecode"]["object"]
+def deployed_bytecode(artifact: dict[str, Any], source: str, contract: str) -> str | None:
+    """The deployed bytecode of one contract, or None when the output has none."""
+    bytecode = (artifact.get("output", {}).get("contracts", {}).get(source, {})
+                .get(contract, {}).get("evm", {}).get("deployedBytecode", {}).get("object"))
+    return bytecode if isinstance(bytecode, str) and bytecode else None
 
 
 def generate_artifacts(root: Path, corpus: dict[str, Any], solc: Path,
@@ -94,13 +106,18 @@ def generate_artifacts(root: Path, corpus: dict[str, Any], solc: Path,
             exporter.write_json_atomic(root / path, artifact)
             checks.append(core.check("yul-artifact-generated", path.as_posix(), None))
             if tag == "ir" and corpus_artifact is not None:
-                same = (deployed_bytecode(artifact, source, suite["contract"]) ==
-                        deployed_bytecode(corpus_artifact, source, suite["contract"]))
-                checks.append(core.check(
-                    "yul-artifact-is-the-same-program", path.as_posix(),
-                    None if same else
-                    "the optimizer-off compile's deployed bytecode differs from the corpus "
-                    "artifact's, so its Yul does not describe the bytecode the corpus checks"))
+                fresh_code = deployed_bytecode(artifact, source, suite["contract"])
+                corpus_code = deployed_bytecode(corpus_artifact, source, suite["contract"])
+                if fresh_code is None or corpus_code is None:
+                    detail = "no deployed bytecode in the " + (
+                        "generated Yul artifact" if fresh_code is None
+                        else "corpus artifact")
+                else:
+                    detail = None if fresh_code == corpus_code else (
+                        "the optimizer-off compile's deployed bytecode differs from the corpus "
+                        "artifact's, so its Yul does not describe the bytecode the corpus checks")
+                checks.append(core.check("yul-artifact-is-the-same-program",
+                                         path.as_posix(), detail))
     return checks, written
 
 
@@ -128,22 +145,43 @@ def build_report(corpus_path: Path, corpus: dict[str, Any], solc: Path,
     cases_run = 0
     if hol is not None:
         results = hol["results"]
+        suite_results = {r.get("suite"): r for r in results if r.get("kind") == "suite"}
         stage_results = {(r.get("suite"), r.get("stage")): r
                          for r in results if r.get("kind") == "stage"}
         case_results = {(r.get("suite"), r.get("case"), r.get("stage")): r
                         for r in results if r.get("kind") == "case" and "stage" in r}
+        stage_counts = {stage: {"cases_run": 0, "agreements": 0} for stage in STAGES}
         built = hol["status"] == 0
         expected = sum(len(suite["cases"]) for suite in corpus["suites"]) * len(STAGES)
         for suite in corpus["suites"]:
+            suite_result = suite_results.get(suite["name"])
+            if suite_result is None and built and hol["ran"]:
+                suite_result = {"kind": "suite", "suite": suite["name"], "status": "missing",
+                                "message": "no suite result was reported"}
+            if suite_result is not None and suite_result.get("status") != "ok":
+                failures.append({"kind": "suite", **suite_result})
+            # A stage is admitted when the suite reports it and no stage line
+            # says otherwise: the theory emits a stage line only when the
+            # importer rejects one, so silence on its own is no evidence, and a
+            # build that stopped early admits nothing.
+            reported = set(suite_result.get("stages", [])) \
+                if suite_result is not None and suite_result.get("status") == "ok" else set()
             admitted = set()
             for stage in STAGES:
                 stage_result = stage_results.get((suite["name"], stage))
-                admission = {"suite": suite["name"], "stage": stage, "admitted": True}
-                if stage_result is not None and stage_result.get("status") != "ok":
-                    admission.update(admitted=False, status=stage_result.get("status"),
+                rejected = stage_result is not None and stage_result.get("status") != "ok"
+                admission = {"suite": suite["name"], "stage": stage,
+                             "admitted": stage in reported and not rejected}
+                if rejected:
+                    admission.update(status=stage_result.get("status"),
                                      message=stage_result.get("message"))
+                elif not admission["admitted"]:
+                    admission.update(status="unreported" if suite_result is not None
+                                     else "not run",
+                                     message=(suite_result or {}).get("message"))
+                if rejected:
                     failures.append({"kind": "admission", **admission})
-                else:
+                elif admission["admitted"]:
                     admitted.add(stage)
                 admissions.append(admission)
             for case in suite["cases"]:
@@ -154,7 +192,9 @@ def build_report(corpus_path: Path, corpus: dict[str, Any], solc: Path,
                     result = case_results.get((suite["name"], case["name"], stage))
                     if result is not None:
                         cases_run += 1
+                        stage_counts[stage]["cases_run"] += 1
                     if result is not None and result.get("status") == AGREEMENT:
+                        stage_counts[stage]["agreements"] += 1
                         kernel_checked.append({"theorem": theorem, "suite": suite["name"],
                                                "case": case["name"], "stage": stage,
                                                "status": "proved" if hol["ran"]
@@ -167,19 +207,25 @@ def build_report(corpus_path: Path, corpus: dict[str, Any], solc: Path,
                                          "suite": suite["name"], "case": case["name"],
                                          "stage": stage, "status": "missing",
                                          "message": "no result was reported"})
-        if hol["status"] != 0 and not failures:
+        for stage in STAGES:
+            stage_counts[stage]["stages_admitted"] = sum(
+                1 for a in admissions if a["stage"] == stage and a["admitted"])
+            stage_counts[stage]["stages_expected"] = len(admissions) // len(STAGES)
+        if hol["status"] != 0 and not any(f["kind"] in ("suite", "case") for f in failures):
             failures.append({"kind": "hol-build", "status": hol["status"],
                              "message": hol.get("error", "the HOL build failed"),
                              "log": hol.get("log")})
     else:
+        stage_counts = {}
         expected = sum(len(suite["cases"]) for suite in corpus["suites"]) * len(STAGES)
     return {
         "format": REPORT_FORMAT,
         "corpus": corpus_path.as_posix(),
-        "solc": str(solc),
+        "solc": display_path(solc),
         "hol": None if hol is None else {k: hol[k] for k in ("command", "status", "ran")
                                          if k in hol},
         "stages": list(STAGES),
+        "per_stage": stage_counts,
         "totals": {
             "stages_admitted": sum(1 for a in admissions if a["admitted"]),
             "stages_expected": len(admissions),
@@ -214,10 +260,9 @@ def summarise(report: dict[str, Any]) -> str:
               f"- agreements: {totals['agreements']}", "",
               "| stage | admitted | cases run | agreements |", "| --- | ---: | ---: | ---: |"]
     for stage in report["stages"]:
-        stage_admissions = [a for a in report["admissions"] if a["stage"] == stage]
-        witnesses = [w for w in report["kernel_checked"] if w["stage"] == stage]
-        lines.append(f"| {stage} | {sum(1 for a in stage_admissions if a['admitted'])}"
-                     f"/{len(stage_admissions)} | {len(witnesses)} | {len(witnesses)} |")
+        counts = report["per_stage"][stage]
+        lines.append(f"| {stage} | {counts['stages_admitted']}/{counts['stages_expected']}"
+                     f" | {counts['cases_run']} | {counts['agreements']} |")
     lines += ["", "## Admissions", "",
               "A stage the importer does not admit is reported here rather than worked "
               "around, and its cases are not run at that stage.", "",
