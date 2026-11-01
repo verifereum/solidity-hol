@@ -136,6 +136,35 @@ class CorpusTests(unittest.TestCase):
                 with self.assertRaisesRegex(driver.CorpusError, message):
                     driver.load_corpus(path)
 
+    def test_accepts_transaction_cases(self) -> None:
+        cases = [{"name": "raw", "calldata": "0x", "sender": "0x3000", "value": 5,
+                  "expect": {"return": []},
+                  "logs": [{"topics": ["0x" + "11" * 32, 2], "data": "0x"}]},
+                 {"name": "named", "function": "f", "args": [], "value": "7",
+                  "expect": {"revert": "0x"}, "logs": []}]
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "corpus.json"
+            path.write_text(json.dumps(corpus(cases)), encoding="utf-8")
+            driver.load_corpus(path)
+
+    def test_rejects_malformed_transaction_cases(self) -> None:
+        base = {"name": "f", "expect": {"return": []}}
+        for fields, message in [
+                ({"calldata": "0x", "function": "f"}, "calldata excludes"),
+                ({"calldata": "00"}, "calldata must be"),
+                ({}, "function must be"),
+                ({"calldata": "0x", "sender": 2**160}, "sender must be a 160-bit word"),
+                ({"calldata": "0x", "value": -1}, "value must be a 256-bit word"),
+                ({"calldata": "0x", "logs": [{"topics": [1] * 5, "data": "0x"}]},
+                 "at most 4"),
+                ({"calldata": "0x", "logs": [{"topics": []}]}, "exactly topics and data")]:
+            case = {**base, **fields}
+            with self.subTest(fields=fields), tempfile.TemporaryDirectory() as temporary:
+                path = Path(temporary) / "corpus.json"
+                path.write_text(json.dumps(corpus([case])), encoding="utf-8")
+                with self.assertRaisesRegex(driver.CorpusError, message):
+                    driver.load_corpus(path)
+
     def test_detects_stale_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             fake = FakeRoot(Path(temporary), source="contract A { }\n")

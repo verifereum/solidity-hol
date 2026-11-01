@@ -199,7 +199,9 @@ Definition test_program_def:
                    wrapper_proc; void_proc; convert_proc; scope_proc];
     struct_layouts := []; type_declarations := test_decls;
     state_variables := [];
-    entry_procedure := AstId 6
+    entry_procedure := AstId 6;
+    external_functions := []; receive_procedure := NONE;
+    fallback_procedure := NONE
   |>
 End
 
@@ -389,6 +391,79 @@ QED
 
 Theorem enum_bound_admitted:
   wf_type_declaration test_env (EnumDeclaration 256)
+Proof
+  EVAL_TAC
+QED
+
+(* Events: at most four topics, counting topic 0 unless anonymous. *)
+Definition indexed_args_def:
+  indexed_args n = REPLICATE n (u256, T, BoundAtom (AstId 80))
+End
+
+Theorem emit_four_topics_admitted:
+  wf_core_procedure test_env (with_body [
+     EmitStmt (SOME 0w) (indexed_args 3 ++ [(BoolT, F, ConstantAtom (BoolValue T))]);
+     EmitStmt NONE (indexed_args 4);
+     ReturnStmt [BoundAtom (AstId 80)]])
+Proof
+  EVAL_TAC
+QED
+
+Theorem emit_five_topics_rejected:
+  ¬wf_core_procedure test_env (with_body [
+     EmitStmt (SOME 0w) (indexed_args 4); ReturnStmt [BoundAtom (AstId 80)]])
+Proof
+  EVAL_TAC
+QED
+
+Theorem emit_mistyped_argument_rejected:
+  ¬wf_core_procedure test_env (with_body [
+     EmitStmt NONE [(BoolT, F, BoundAtom (AstId 80))];
+     ReturnStmt [BoundAtom (AstId 80)]])
+Proof
+  EVAL_TAC
+QED
+
+(* Dispatch: distinct 4-byte selectors of procedures with ABI parameters and
+ * returns; receive and fallback take and return nothing.
+ *)
+Definition external_def:
+  external selector f =
+    <| selector := selector; external_procedure := AstId f; payable := F |>
+End
+
+Theorem dispatch_admitted:
+  wf_core_dispatch test_env (test_program with <|
+    external_functions := [external [1w; 2w; 3w; 4w] 1; external [1w; 2w; 3w; 5w] 6];
+    receive_procedure := SOME (AstId 7);
+    fallback_procedure := SOME (AstId 7, T) |>)
+Proof
+  EVAL_TAC
+QED
+
+Theorem duplicate_selector_rejected:
+  ¬wf_core_dispatch test_env (test_program with
+    external_functions := [external [1w; 2w; 3w; 4w] 1; external [1w; 2w; 3w; 4w] 6])
+Proof
+  EVAL_TAC
+QED
+
+Theorem short_selector_rejected:
+  ¬wf_core_dispatch test_env (test_program with
+    external_functions := [external [1w; 2w; 3w] 1])
+Proof
+  EVAL_TAC
+QED
+
+Theorem unknown_external_procedure_rejected:
+  ¬wf_core_dispatch test_env (test_program with
+    external_functions := [external [1w; 2w; 3w; 4w] 77])
+Proof
+  EVAL_TAC
+QED
+
+Theorem receive_with_parameters_rejected:
+  ¬wf_core_dispatch test_env (test_program with receive_procedure := SOME (AstId 1))
 Proof
   EVAL_TAC
 QED
@@ -754,7 +829,9 @@ Definition struct_layout_environment_def:
     <| procedures := []; state_variables := []; struct_layouts := layouts;
        type_declarations := MAP (λs. (s.struct_id, StructDeclaration
          (MAP (λv. (v.state_id, v.state_type)) s.struct_fields))) layouts;
-       entry_procedure := AstId 0 |>
+       entry_procedure := AstId 0;
+       external_functions := []; receive_procedure := NONE;
+       fallback_procedure := NONE |>
 End
 
 Theorem packed_struct_layout_checked:

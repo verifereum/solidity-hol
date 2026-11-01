@@ -41,7 +41,8 @@ Datatype:
     sender_address : address;
     call_value : num;
     call_data : byte list;
-    static_context : bool
+    static_context : bool;
+    tx_params : transaction_parameters
   |>
 End
 

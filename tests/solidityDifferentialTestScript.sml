@@ -23,6 +23,17 @@ End
 
 val () = cv_trans_deep_embedding EVAL mutant_code_def;
 
+(* A call of a named function from the default sender, without value, that
+ * logs nothing. *)
+Definition named_call_def:
+  named_call name args storage expect final =
+    <| case_sender := 0x2000w; case_value := 0; case_input := NamedCall name args;
+       case_storage := storage; case_expect := expect; case_final := final;
+       case_logs := [] |>
+End
+
+val () = cv_auto_trans named_call_def;
+
 (* Evaluates the one call of the named function, so that the bytecode run,
  * the evaluator run and the comparison are separate proof steps.
  *)
@@ -35,8 +46,8 @@ fun cv_eval_call name =
 
 Theorem altered_expectation_detected:
   differential_verdict corpus_pure_core_code corpus_pure_core_unit
-    corpus_pure_core_program 1000 "add" [IntArg 2; IntArg 3] []
-    (ExpectReturn [IntArg 6]) [] =
+    corpus_pure_core_program 1000 (named_call "add" [IntArg 2; IntArg 3] []
+    (ExpectReturn [IntArg 6]) []) =
   Unexpected (returned [Uint 8] [NumV 5]) (returned [Uint 8] [NumV 6])
 Proof
   simp_tac std_ss [differential_verdict_def, LET_THM] >>
@@ -46,8 +57,8 @@ QED
 
 Theorem altered_panic_code_detected:
   differential_verdict corpus_pure_core_code corpus_pure_core_unit
-    corpus_pure_core_program 1000 "add" [IntArg 200; IntArg 100] []
-    (ExpectPanic 0x12) [] =
+    corpus_pure_core_program 1000 (named_call "add" [IntArg 200; IntArg 100] []
+    (ExpectPanic 0x12) []) =
   Unexpected (Reverted (panic_data 0x11)) (Reverted (panic_data 0x12))
 Proof
   simp_tac std_ss [differential_verdict_def, LET_THM] >>
@@ -57,8 +68,8 @@ QED
 
 Theorem altered_final_storage_detected:
   differential_verdict corpus_storage_code corpus_storage_unit
-    corpus_storage_program 1000 "setTotal" [IntArg 7] []
-    (ExpectReturn []) [(0, 8)] =
+    corpus_storage_program 1000 (named_call "setTotal" [IntArg 7] []
+    (ExpectReturn []) [(0, 8)]) =
   StorageUnexpected [(1, 0); (2, 0); (3, 0); (0, 7)]
     [(1, 0); (2, 0); (3, 0); (0, 8)]
 Proof
@@ -69,8 +80,8 @@ QED
 
 Theorem mismatching_fixture_detected:
   differential_verdict mutant_code corpus_pure_core_unit
-    corpus_pure_core_program 1000 "add" [IntArg 200; IntArg 100] []
-    (ExpectPanic 0x11) [] =
+    corpus_pure_core_program 1000 (named_call "add" [IntArg 200; IntArg 100] []
+    (ExpectPanic 0x11) []) =
   Mismatch (returned [Uint 8] [NumV 44]) (Reverted (panic_data 0x11))
 Proof
   simp_tac std_ss [differential_verdict_def, LET_THM] >>
@@ -81,8 +92,8 @@ QED
 (* The mutant agrees where it behaves like the source. *)
 Theorem mismatching_fixture_agrees_in_range:
   differential_agrees mutant_code corpus_pure_core_unit
-    corpus_pure_core_program 1000 "add" [IntArg 2; IntArg 3] []
-    (ExpectReturn [IntArg 5]) []
+    corpus_pure_core_program 1000 (named_call "add" [IntArg 2; IntArg 3] []
+    (ExpectReturn [IntArg 5]) [])
 Proof
   simp_tac std_ss [differential_agrees_def, differential_verdict_def, LET_THM] >>
   CONV_TAC (cv_eval_call "observed_slots") >>
@@ -91,8 +102,8 @@ QED
 
 Theorem fuel_exhaustion_inconclusive:
   differential_verdict corpus_pure_core_code corpus_pure_core_unit
-    corpus_pure_core_program 1 "fact" [IntArg 5] []
-    (ExpectReturn [IntArg 120]) [] =
+    corpus_pure_core_program 1 (named_call "fact" [IntArg 5] []
+    (ExpectReturn [IntArg 120]) []) =
   Inconclusive (returned [Uint 256] [NumV 120]) (Diagnostic OutOfFuel)
 Proof
   simp_tac std_ss [differential_verdict_def, LET_THM] >>
@@ -103,7 +114,7 @@ QED
 (* Equal diagnostics on both sides are still not agreement. *)
 Theorem unknown_function_inconclusive:
   differential_verdict corpus_pure_core_code corpus_pure_core_unit
-    corpus_pure_core_program 1000 "missing" [] [] (ExpectReturn []) [] =
+    corpus_pure_core_program 1000 (named_call "missing" [] [] (ExpectReturn []) []) =
   Inconclusive (Diagnostic UnknownFunction) (Diagnostic UnknownFunction)
 Proof
   simp_tac std_ss [differential_verdict_def, LET_THM] >>
@@ -113,8 +124,8 @@ QED
 
 Theorem argument_out_of_range_inconclusive:
   differential_verdict corpus_pure_core_code corpus_pure_core_unit
-    corpus_pure_core_program 1000 "add" [IntArg 256; IntArg 0] []
-    (ExpectReturn [IntArg 0]) [] =
+    corpus_pure_core_program 1000 (named_call "add" [IntArg 256; IntArg 0] []
+    (ExpectReturn [IntArg 0]) []) =
   Inconclusive (Diagnostic UnencodableArguments)
     (Diagnostic UnencodableArguments)
 Proof
@@ -153,10 +164,12 @@ Proof
 QED
 
 Theorem unlisted_mapping_write_escaped_slot_projection:
-  evm_observation corpus_mappings_code corpus_mappings_unit "read" [IntArg 0]
-      [] (observed_slots unlisted_write_program [] []) =
+  evm_observation corpus_mappings_code corpus_mappings_unit
+      (named_call "read" [IntArg 0] [] (ExpectReturn [IntArg 0]) [])
+      (observed_slots unlisted_write_program [] []) =
   source_observation corpus_mappings_code corpus_mappings_unit
-      unlisted_write_program 1000 "read" [IntArg 0] []
+      unlisted_write_program 1000
+      (named_call "read" [IntArg 0] [] (ExpectReturn [IntArg 0]) [])
       (observed_slots unlisted_write_program [] [])
 Proof
   CONV_TAC (cv_eval_call "observed_slots") >>
@@ -166,12 +179,14 @@ QED
 
 Theorem unlisted_mapping_write_old_comparison_agrees:
   compare_observations
-    (expected_outcome corpus_mappings_unit "read" (ExpectReturn [IntArg 0]), [(0,0); (1,0); (2,0); (3,0); (4,0); (5,0); (6,0)])
-    (evm_observation corpus_mappings_code corpus_mappings_unit "read" [IntArg 0]
-      [] (observed_slots unlisted_write_program [] []))
+    (expected_outcome corpus_mappings_unit (NamedCall "read" [IntArg 0]) (ExpectReturn [IntArg 0]), [(0,0); (1,0); (2,0); (3,0); (4,0); (5,0); (6,0)])
+    (evm_observation corpus_mappings_code corpus_mappings_unit
+      (named_call "read" [IntArg 0] [] (ExpectReturn [IntArg 0]) [])
+      (observed_slots unlisted_write_program [] []))
     (source_observation corpus_mappings_code corpus_mappings_unit
-      unlisted_write_program 1000 "read" [IntArg 0] []
-      (observed_slots unlisted_write_program [] [])) = Agree (expected_outcome corpus_mappings_unit "read" (ExpectReturn [IntArg 0]))
+      unlisted_write_program 1000
+      (named_call "read" [IntArg 0] [] (ExpectReturn [IntArg 0]) [])
+      (observed_slots unlisted_write_program [] [])) = Agree (expected_outcome corpus_mappings_unit (NamedCall "read" [IntArg 0]) (ExpectReturn [IntArg 0]))
 Proof
   CONV_TAC (cv_eval_call "observed_slots") >>
   CONV_TAC (cv_eval_call "evm_observation") >>
@@ -180,8 +195,8 @@ QED
 
 Theorem unlisted_mapping_write_detected:
   differential_verdict corpus_mappings_code corpus_mappings_unit
-    unlisted_write_program 1000 "read" [IntArg 0] []
-    (ExpectReturn [IntArg 0]) [] =
+    unlisted_write_program 1000 (named_call "read" [IntArg 0] []
+    (ExpectReturn [IntArg 0]) []) =
   StorageMismatch [(0,0); (1,0); (2,0); (3,0); (4,0); (5,0); (6,0)]
                   [(0,0); (1,0); (2,0); (3,0); (4,0); (5,0); (6,0)]
 Proof

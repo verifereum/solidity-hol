@@ -26,7 +26,7 @@
  *)
 Theory solidityEvaluator
 Ancestors
-  solidityStorage
+  solidityStorage solidityABI
 Libs
   cv_transLib wordsLib intLib
 
@@ -169,6 +169,23 @@ Definition eval_pure_operation_def:
     | _ => ValueAbrupt (InvalidCompletion "unsupported operation")
 End
 
+(* msg, this, tx and block reads, from the frame. *)
+Definition environment_value_def:
+  environment_value (fr : source_frame) f =
+    case f of
+      MsgSender => AddressValue fr.sender_address
+    | MsgValue => IntegerValue (&fr.call_value)
+    | SelfAddress => AddressValue fr.self_address
+    | TxOrigin => AddressValue fr.tx_params.origin
+    | TxGasPrice => IntegerValue (&fr.tx_params.gasPrice)
+    | BlockNumber => IntegerValue (&fr.tx_params.blockNumber)
+    | BlockTimestamp => IntegerValue (&fr.tx_params.blockTimeStamp)
+    | BlockChainId => IntegerValue (&fr.tx_params.chainId)
+    | BlockCoinbase => AddressValue fr.tx_params.blockCoinBase
+    | BlockBaseFee => IntegerValue (&fr.tx_params.baseFeePerGas)
+    | BlockGasLimit => IntegerValue (&fr.tx_params.blockGasLimit)
+End
+
 (* Pure operations; calls and array mutations are handled by statements. *)
 Definition eval_operation_def:
   eval_operation env (st : source_state) op =
@@ -194,6 +211,8 @@ Definition eval_operation_def:
            (SOME (ReferenceValue r), SOME (ScalarValue s)) =>
              navigate_storage env st.world.accounts r s
          | _ => ValueAbrupt (InvalidCompletion "bad index operands"))
+    | EnvironmentOperation f =>
+        ValueOk (ScalarValue (environment_value st.frame f))
     | _ => eval_pure_operation env st.scopes op
 End
 
@@ -365,6 +384,32 @@ Definition pop_storage_array_def:
     | _ => abrupt_result (InvalidCompletion "bad dynamic array reference") st gas
 End
 
+Definition eval_event_args_def:
+  (eval_event_args scopes [] = SOME []) ∧
+  (eval_event_args scopes ((ty, indexed, a) :: args) =
+    case (eval_atom scopes a, eval_event_args scopes args) of
+      (SOME v, SOME vs) => SOME ((ty, indexed, v) :: vs)
+    | _ => NONE)
+End
+
+(* A log of the executing account, appended to the world's logs, so a revert
+ * of the frame discards it with the rest of the world. As with storage
+ * writes, an emit in a static frame fails.
+ *)
+Definition emit_event_def:
+  emit_event topic args (st : source_state) gas =
+    if st.frame.static_context then
+      abrupt_result (InvalidCompletion "emit in static frame") st gas
+    else case eval_event_args st.scopes args of
+      NONE => abrupt_result (InvalidCompletion "unbound atom") st gas
+    | SOME vs =>
+        case event_log st.frame.self_address topic vs of
+          SOME e =>
+            normal_result
+              (st with world := st.world with logs := st.world.logs ++ [e]) gas
+        | NONE => abrupt_result (InvalidCompletion "bad event arguments") st gas
+End
+
 (* Every statement except internal calls, if and while. *)
 Definition simple_stmt_def:
   simple_stmt env s st gas =
@@ -397,6 +442,7 @@ Definition simple_stmt_def:
     | BreakStmt => abrupt_result BreakCompletion st gas
     | ContinueStmt => abrupt_result ContinueCompletion st gas
     | PanicStmt code => abrupt_result (PanicCompletion code) st gas
+    | EmitStmt topic args => emit_event topic args st gas
     | RevertStmt a =>
         (case eval_atom st.scopes a of
            SOME (ScalarValue (BytesValue data)) =>

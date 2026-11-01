@@ -4,7 +4,8 @@
  * solidityImportLib builds these terms from a compiler artifact and fails
  * closed: an unknown nodeType, a missing required field, or a feature outside
  * the subset (public, constant, immutable or initialised state variables,
- * modifiers, inheritance, named or try calls, literal subdenominations,
+ * modifiers, inheritance, named or try calls, built-ins other than
+ * require, assert, revert, members of msg, tx and block and address(this), literal subdenominations,
  * inline arrays, type names other than elementary types, arrays and mappings, ...)
  * raises ImportError. Semantic nodes keep their compiler id and source range;
  * declarations are referred to by id, and names are diagnostic only. Type
@@ -20,18 +21,21 @@
  *  - every parameter, return, local and state variable has a normalized
  *    elementary, array or mapping type, the default data location, and a
  *    type identifier agreeing with that type, and the enclosing function, block, for statement or
- *    contract as its scope;
+ *    contract as its scope; event parameters are elementary, scoped by
+ *    their event;
  *  - the contract's storage layout lists its state variables in declaration
  *    order, each with its own typeIdentifier and a slot below 2 ** 256;
  *  - every identifier resolves, within its lexical scope, to a variable of the
  *    annotated type, or, as the callee of a call, to a function of the same
  *    contract; calls have matching arity and are annotated with the callee's
  *    return types; conversions are annotated with their normalized target type;
+ *    environment reads with their member's type; emits name an event of the
+ *    contract with as many arguments as it has parameters;
  *  - declaration statements list exactly their declarations' ids as
  *    assignments, returns name the enclosing function's return list, break and
  *    continue occur in loop bodies, conditions are boolean;
- *  - functions are pure, view or nonpayable, and only non-pure ones refer to
- *    state variables; contracts are not derived and are scoped by the unit;
+ *  - functions, receive and fallback are pure, view, nonpayable or payable,
+ *    and only non-pure ones refer to state variables; contracts are not derived and are scoped by the unit;
  *  - operators belong to the admitted set and every other expression
  *    annotation decodes to an elementary, rational literal or tuple type.
  *
@@ -89,6 +93,7 @@ End
  * TupleExpression: components, NONE for a hole.
  * FunctionCall (kind functionCall): callee, positional arguments.
  * FunctionCall (kind typeConversion): target type name, argument.
+ * Environment: a member of msg, tx or block, or address(this).
  *)
 Datatype:
   src_builtin = RequireBuiltin | AssertBuiltin | RevertBuiltin
@@ -110,11 +115,13 @@ Datatype:
   | SrcBuiltinCall node_info node_info src_builtin (src_expr option)
       (src_expr option) string
   | SrcTypeConversion node_info src_type_name src_expr string
+  | SrcEnvironment node_info environment_field string
 End
 
 (* VariableDeclarationStatement: assignments, declarations (NONE for a hole),
  * initial value. ForStatement: initialization, condition, loop expression,
- * body. Return: functionReturnParameters, expression.
+ * body. Return: functionReturnParameters, expression. Emit: the event's id,
+ * positional arguments.
  *)
 Datatype:
   src_stmt
@@ -131,17 +138,22 @@ Datatype:
   | SrcBreak node_info
   | SrcContinue node_info
   | SrcReturn node_info num (src_expr option)
+  | SrcEmit node_info num (src_expr list)
 End
 
-(* Parameter lists are represented by their ids and declarations. *)
+(* Parameter lists are represented by their ids and declarations. The kind is
+ * function, receive or fallback; the selector is that of an external or
+ * public function.
+ *)
 Datatype:
   src_function = <|
     fn_info : node_info;
     fn_name : string;
     fn_scope : num;
+    fn_kind : string;
     fn_visibility : string;
     fn_mutability : string;
-    fn_selector : string option;
+    fn_selector : byte list option;
     fn_parameters_id : num;
     fn_parameters : src_variable list;
     fn_returns_id : num;
@@ -171,6 +183,18 @@ Datatype:
   |>
 End
 
+(* An event: its topic 0 (the compiler's eventSelector, which an anonymous
+ * event does not log) and its parameters, each with whether it is indexed.
+ *)
+Datatype:
+  src_event = <|
+    event_info : node_info;
+    event_anonymous : bool;
+    event_selector : byte list;
+    event_parameters : (src_variable # bool) list
+  |>
+End
+
 Datatype:
   src_contract = <|
     contract_info : node_info;
@@ -179,6 +203,7 @@ Datatype:
     contract_state_variables : src_variable list;
     contract_storage : src_storage_entry list;
     contract_structs : src_struct list;
+    contract_events : src_event list;
     contract_functions : src_function list
   |>
 End
@@ -546,6 +571,7 @@ Definition expr_ids_def:
     (case message of NONE => [] | SOME m => expr_ids m)) ∧
   (expr_ids (SrcTypeConversion info tn e _) =
     info.node_id :: type_name_ids tn ++ expr_ids e) ∧
+  (expr_ids (SrcEnvironment info _ _) = [info.node_id]) ∧
   (component_ids [] = []) ∧
   (component_ids (NONE :: cs) = component_ids cs) ∧
   (component_ids (SOME e :: cs) = expr_ids e ++ component_ids cs) ∧
@@ -582,6 +608,7 @@ Definition stmt_ids_def:
   (stmt_ids (SrcBreak info) = [info.node_id]) ∧
   (stmt_ids (SrcContinue info) = [info.node_id]) ∧
   (stmt_ids (SrcReturn info _ e) = info.node_id :: option_expr_ids e) ∧
+  (stmt_ids (SrcEmit info _ args) = info.node_id :: exprs_ids args) ∧
   (option_stmt_ids NONE = []) ∧
   (option_stmt_ids (SOME s) = stmt_ids s) ∧
   (stmts_ids [] = []) ∧
@@ -601,6 +628,8 @@ Definition contract_ids_def:
     FLAT (MAP (λs. s.struct_info.node_id ::
       FLAT (MAP variable_ids s.struct_members)) c.contract_structs) ++
     FLAT (MAP variable_ids c.contract_state_variables) ++
+    FLAT (MAP (λe. e.event_info.node_id ::
+      FLAT (MAP (variable_ids o FST) e.event_parameters)) c.contract_events) ++
     FLAT (MAP function_ids c.contract_functions)
 End
 
@@ -638,6 +667,7 @@ Datatype:
   import_env = <|
     functions : (num # src_function) list;
     structs : src_struct list;
+    events : (num # src_event) list;
     variables : (num # sol_type) list;
     state : (num # sol_type) list;
     scope : num;
@@ -776,6 +806,9 @@ Definition check_expr_def:
            decode_type_identifier tid = SOME (SrcType ty)
         then SOME (SrcType ty) else NONE
     | NONE => NONE) ∧
+  (check_expr env (SrcEnvironment _ f tid) =
+    if source_type_matches (environment_type f) tid
+    then SOME (SrcType (environment_type f)) else NONE) ∧
   (check_components env [] ⇔ T) ∧
   (check_components env (NONE :: cs) ⇔ check_components env cs) ∧
   (check_components env (SOME e :: cs) ⇔
@@ -881,7 +914,11 @@ Definition check_stmts_def:
   (check_stmt env (SrcContinue _) ⇔ env.in_loop) ∧
   (check_stmt env (SrcReturn _ returns_id e) ⇔
     returns_id = env.returns_id ∧
-    case e of NONE => T | SOME e => IS_SOME (check_expr env e))
+    case e of NONE => T | SOME e => IS_SOME (check_expr env e)) ∧
+  (check_stmt env (SrcEmit _ ev args) ⇔
+    case ALOOKUP env.events ev of
+      SOME e => LENGTH args = LENGTH e.event_parameters ∧ check_exprs env args
+    | NONE => F)
 Termination
   WF_REL_TAC ‘measure (λx. case x of
                  INL (env, ss) => list_size src_stmt_size ss
@@ -905,15 +942,17 @@ End
  * one is the compiler's check.
  *)
 Definition check_function_def:
-  check_function structs functions state contract_id (f : src_function) ⇔
+  check_function structs events functions state contract_id (f : src_function) ⇔
     f.fn_scope = contract_id ∧
+    (f.fn_kind = "function" ∨ f.fn_kind = "receive" ∨ f.fn_kind = "fallback") ∧
     (f.fn_mutability = "pure" ∨ f.fn_mutability = "view" ∨
-     f.fn_mutability = "nonpayable") ∧
+     f.fn_mutability = "nonpayable" ∨ f.fn_mutability = "payable") ∧
     case (all_some (MAP (scoped_variable f.fn_info.node_id)
                      (f.fn_parameters ++ f.fn_returns)), f.fn_body) of
       (SOME variables, SrcBlock info ss) =>
         IS_SOME (check_stmts
-          <| functions := functions; structs := structs; variables := variables;
+          <| functions := functions; structs := structs; events := events;
+             variables := variables;
              state := if f.fn_mutability = "pure" then [] else state;
              scope := info.node_id; returns_id := f.fn_returns_id;
              in_loop := F |> ss)
@@ -945,15 +984,24 @@ Definition check_struct_def:
         storage_layout_ok T s.struct_members fields
 End
 
+(* Event parameters are elementary value types declared by the event. *)
+Definition check_event_def:
+  check_event (e : src_event) ⇔
+    EVERY (λp. IS_SOME (scoped_variable e.event_info.node_id (FST p)))
+      e.event_parameters
+End
+
 Definition check_contract_def:
   check_contract unit_id (c : src_contract) ⇔
     c.contract_scope = unit_id ∧
     EVERY (check_struct unit_id c.contract_info.node_id) c.contract_structs ∧
+    EVERY check_event c.contract_events ∧
     storage_layout_ok F c.contract_state_variables c.contract_storage ∧
     case all_some (MAP (scoped_variable c.contract_info.node_id)
                      c.contract_state_variables) of
       SOME state =>
         EVERY (check_function c.contract_structs
+                 (MAP (λe. (e.event_info.node_id, e)) c.contract_events)
                  (MAP (λf. (f.fn_info.node_id, f)) c.contract_functions)
                  state c.contract_info.node_id)
           c.contract_functions
@@ -1069,5 +1117,6 @@ val () = cv_auto_trans scoped_variable_def;
 val () = cv_auto_trans storage_layout_ok_def;
 val () = cv_auto_trans check_function_def;
 val () = cv_auto_trans check_struct_def;
+val () = cv_auto_trans check_event_def;
 val () = cv_auto_trans check_contract_def;
 val () = cv_auto_trans valid_src_unit_def;
