@@ -34,8 +34,14 @@ Ancestors
 Libs
   cv_transLib wordsLib intLib
 
-(* The frame the corpus's cases run in. There are no immutables to load: no
- * corpus suite is compiled with any.
+(* The frame the corpus's cases run in: the contract account at
+ * contract_address holding the case's initial storage, the case's sender
+ * funded for the value it sends, the case's calldata and call value, and the
+ * transaction and block the bytecode run is given -- its own frame's
+ * transaction parameters, so that origin, gasprice, chainid and the block
+ * builtins read on both sides what the corpus's transaction says, rather than
+ * a second copy of it that could drift from the corpus's. There are no
+ * immutables to load: no corpus suite is compiled with any.
  *)
 Definition yul_differential_machine_def:
   yul_differential_machine c data =
@@ -46,9 +52,9 @@ Definition yul_differential_machine_def:
        call_value := n2w c.case_value;
        call_data := data;
        immutables := (FEMPTY : string |-> bytes32);
-       memory := FEMPTY;
+       memory := (FEMPTY : num |-> word8);
        memory_size := 0;
-       scopes := [];
+       scopes := ([] : (string |-> bytes32) list);
        transaction_parameters :=
          initial_tx_params differential_chain_id [] differential_block
            (differential_tx c.case_sender c.case_value data) 0 |>
