@@ -5,19 +5,20 @@ The differential corpus through the Yul the pinned compiler emitted for the same
 - corpus: `testdata/differential/corpus.json`
 - compiler: `~/.local/opt/solc-0.8.37/solc`
 
-HOL command: `holbuild -j 4 build --force=theory yulDifferentialCorpusTheory` (status 0).
+HOL command: `holbuild -j 4 build --force=theory yulDifferentialCorpusTheory` (status 1).
 
 ## Totals
 
-- stages admitted: 36/36
-- cases run: 867/867
-- agreements: 867
+- stages admitted: 51/51
+- cases run: 1035/1035
+- agreements: 1002
+- cases that are not agreements: 33 inconclusive
 
 | stage | admitted | cases run | agreements |
 | --- | ---: | ---: | ---: |
-| ir | 12/12 | 289 | 289 |
-| ir-optimized | 12/12 | 289 | 289 |
-| optimized | 12/12 | 289 | 289 |
+| ir | 17/17 | 345 | 334 |
+| ir-optimized | 17/17 | 345 | 334 |
+| optimized | 17/17 | 345 | 334 |
 
 ## Admissions
 
@@ -61,10 +62,26 @@ A stage the importer does not admit is reported here rather than worked around, 
 | storage_structs_top_level | ir | yes |  |
 | storage_structs_top_level | ir-optimized | yes |  |
 | storage_structs_top_level | optimized | yes |  |
+| token | ir | yes |  |
+| token | ir-optimized | yes |  |
+| token | optimized | yes |  |
+| context | ir | yes |  |
+| context | ir-optimized | yes |  |
+| context | optimized | yes |  |
+| fallback | ir | yes |  |
+| fallback | ir-optimized | yes |  |
+| fallback | optimized | yes |  |
+| receive | ir | yes |  |
+| receive | ir-optimized | yes |  |
+| receive | optimized | yes |  |
+| external | ir | yes |  |
+| external | ir-optimized | yes |  |
+| external | optimized | yes |  |
 
 ## Kernel-checked witnesses
 
-Theorems of yulDifferentialCorpusTheory, proved by the HOL kernel (with cv_compute) when the theory was built. Each relates the Yul run to the bytecode run and to the case's expectation, and says the run left no log.
+Theorems of yulDifferentialCorpusTheory, proved by the HOL kernel (with cv_compute) when the theory was built. Each relates the Yul run to the bytecode run and to the case's expectation, and says what the run left in
+storage and in the log.
 
 | theorem | outcome |
 | --- | --- |
@@ -935,6 +952,141 @@ Theorems of yulDifferentialCorpusTheory, proved by the HOL kernel (with cv_compu
 | `yul_storage_structs_top_level_field_bounds_rollback_ir` | {"reverted": "0x4e487b710000000000000000000000000000000000000000000000000000000000000032"} |
 | `yul_storage_structs_top_level_field_bounds_rollback_ir_optimized` | {"reverted": "0x4e487b710000000000000000000000000000000000000000000000000000000000000032"} |
 | `yul_storage_structs_top_level_field_bounds_rollback_optimized` | {"reverted": "0x4e487b710000000000000000000000000000000000000000000000000000000000000032"} |
+| `yul_token_mint_logs_transfer_ir` | {"returned": "0x"} |
+| `yul_token_mint_logs_transfer_ir_optimized` | {"returned": "0x"} |
+| `yul_token_mint_logs_transfer_optimized` | {"returned": "0x"} |
+| `yul_token_mint_to_zero_reverts_ir` | {"reverted": "0x08c379a00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000c6d696e7420746f207a65726f0000000000000000000000000000000000000000"} |
+| `yul_token_mint_to_zero_reverts_ir_optimized` | {"reverted": "0x08c379a00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000c6d696e7420746f207a65726f0000000000000000000000000000000000000000"} |
+| `yul_token_mint_to_zero_reverts_optimized` | {"reverted": "0x08c379a00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000c6d696e7420746f207a65726f0000000000000000000000000000000000000000"} |
+| `yul_token_transfer_moves_balance_ir` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000000001"} |
+| `yul_token_transfer_moves_balance_ir_optimized` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000000001"} |
+| `yul_token_transfer_moves_balance_optimized` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000000001"} |
+| `yul_token_transfer_from_other_sender_ir` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000000001"} |
+| `yul_token_transfer_from_other_sender_ir_optimized` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000000001"} |
+| `yul_token_transfer_from_other_sender_optimized` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000000001"} |
+| `yul_token_transfer_insufficient_reverts_ir` | {"reverted": "0x08c379a000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000014696e73756666696369656e742062616c616e6365000000000000000000000000"} |
+| `yul_token_transfer_insufficient_reverts_ir_optimized` | {"reverted": "0x08c379a000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000014696e73756666696369656e742062616c616e6365000000000000000000000000"} |
+| `yul_token_transfer_insufficient_reverts_optimized` | {"reverted": "0x08c379a000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000014696e73756666696369656e742062616c616e6365000000000000000000000000"} |
+| `yul_token_transfer_to_zero_reverts_ir` | {"reverted": "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000107472616e7366657220746f207a65726f00000000000000000000000000000000"} |
+| `yul_token_transfer_to_zero_reverts_ir_optimized` | {"reverted": "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000107472616e7366657220746f207a65726f00000000000000000000000000000000"} |
+| `yul_token_transfer_to_zero_reverts_optimized` | {"reverted": "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000107472616e7366657220746f207a65726f00000000000000000000000000000000"} |
+| `yul_token_approve_logs_approval_ir` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000000001"} |
+| `yul_token_approve_logs_approval_ir_optimized` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000000001"} |
+| `yul_token_approve_logs_approval_optimized` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000000001"} |
+| `yul_token_transfer_from_spends_allowance_ir` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000000001"} |
+| `yul_token_transfer_from_spends_allowance_ir_optimized` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000000001"} |
+| `yul_token_transfer_from_spends_allowance_optimized` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000000001"} |
+| `yul_token_transfer_from_over_allowance_reverts_ir` | {"reverted": "0x08c379a000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000016696e73756666696369656e7420616c6c6f77616e636500000000000000000000"} |
+| `yul_token_transfer_from_over_allowance_reverts_ir_optimized` | {"reverted": "0x08c379a000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000016696e73756666696369656e7420616c6c6f77616e636500000000000000000000"} |
+| `yul_token_transfer_from_over_allowance_reverts_optimized` | {"reverted": "0x08c379a000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000016696e73756666696369656e7420616c6c6f77616e636500000000000000000000"} |
+| `yul_token_balance_of_ir` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000000009"} |
+| `yul_token_balance_of_ir_optimized` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000000009"} |
+| `yul_token_balance_of_optimized` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000000009"} |
+| `yul_token_allowance_ir` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000000004"} |
+| `yul_token_allowance_ir_optimized` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000000004"} |
+| `yul_token_allowance_optimized` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000000004"} |
+| `yul_token_nonpayable_with_value_reverts_ir` | {"reverted": "0x"} |
+| `yul_token_nonpayable_with_value_reverts_ir_optimized` | {"reverted": "0x"} |
+| `yul_token_nonpayable_with_value_reverts_optimized` | {"reverted": "0x"} |
+| `yul_token_unknown_selector_reverts_ir` | {"reverted": "0x"} |
+| `yul_token_unknown_selector_reverts_ir_optimized` | {"reverted": "0x"} |
+| `yul_token_unknown_selector_reverts_optimized` | {"reverted": "0x"} |
+| `yul_token_empty_calldata_reverts_ir` | {"reverted": "0x"} |
+| `yul_token_empty_calldata_reverts_ir_optimized` | {"reverted": "0x"} |
+| `yul_token_empty_calldata_reverts_optimized` | {"reverted": "0x"} |
+| `yul_token_short_calldata_reverts_ir` | {"reverted": "0x"} |
+| `yul_token_short_calldata_reverts_ir_optimized` | {"reverted": "0x"} |
+| `yul_token_short_calldata_reverts_optimized` | {"reverted": "0x"} |
+| `yul_token_dirty_address_reverts_ir` | {"reverted": "0x"} |
+| `yul_token_dirty_address_reverts_ir_optimized` | {"reverted": "0x"} |
+| `yul_token_dirty_address_reverts_optimized` | {"reverted": "0x"} |
+| `yul_context_receive_with_value_ir` | {"returned": "0x"} |
+| `yul_context_receive_with_value_ir_optimized` | {"returned": "0x"} |
+| `yul_context_receive_with_value_optimized` | {"returned": "0x"} |
+| `yul_context_receive_without_value_ir` | {"returned": "0x"} |
+| `yul_context_receive_without_value_ir_optimized` | {"returned": "0x"} |
+| `yul_context_receive_without_value_optimized` | {"returned": "0x"} |
+| `yul_context_fallback_logs_anonymous_ir` | {"returned": "0x"} |
+| `yul_context_fallback_logs_anonymous_ir_optimized` | {"returned": "0x"} |
+| `yul_context_fallback_logs_anonymous_optimized` | {"returned": "0x"} |
+| `yul_context_fallback_on_short_calldata_ir` | {"returned": "0x"} |
+| `yul_context_fallback_on_short_calldata_ir_optimized` | {"returned": "0x"} |
+| `yul_context_fallback_on_short_calldata_optimized` | {"returned": "0x"} |
+| `yul_context_deposit_payable_ir` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000000008"} |
+| `yul_context_deposit_payable_ir_optimized` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000000008"} |
+| `yul_context_deposit_payable_optimized` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000000008"} |
+| `yul_context_self_address_ir` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000001000"} |
+| `yul_context_self_address_ir_optimized` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000001000"} |
+| `yul_context_self_address_optimized` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000001000"} |
+| `yul_context_sender_ir` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000004000"} |
+| `yul_context_sender_ir_optimized` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000004000"} |
+| `yul_context_sender_optimized` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000004000"} |
+| `yul_context_origin_ir` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000004000"} |
+| `yul_context_origin_ir_optimized` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000004000"} |
+| `yul_context_origin_optimized` | {"returned": "0x0000000000000000000000000000000000000000000000000000000000004000"} |
+| `yul_context_block_info_ir` | {"returned": "0x000000000000000000000000000000000000000000000000000000000000000b000000000000000000000000000000000000000000000000000000006553f10000000000000000000000000000000000000000000000000000000000000000050000000000000000000000000000000000000000000000000000000000c0ffee"} |
+| `yul_context_block_info_ir_optimized` | {"returned": "0x000000000000000000000000000000000000000000000000000000000000000b000000000000000000000000000000000000000000000000000000006553f10000000000000000000000000000000000000000000000000000000000000000050000000000000000000000000000000000000000000000000000000000c0ffee"} |
+| `yul_context_block_info_optimized` | {"returned": "0x000000000000000000000000000000000000000000000000000000000000000b000000000000000000000000000000000000000000000000000000006553f10000000000000000000000000000000000000000000000000000000000000000050000000000000000000000000000000000000000000000000000000000c0ffee"} |
+| `yul_context_fee_info_ir` | {"returned": "0x000000000000000000000000000000000000000000000000000000000000000900000000000000000000000000000000000000000000000000000000000000070000000000000000000000000000000000000000000000000000000001c9c380"} |
+| `yul_context_fee_info_ir_optimized` | {"returned": "0x000000000000000000000000000000000000000000000000000000000000000900000000000000000000000000000000000000000000000000000000000000070000000000000000000000000000000000000000000000000000000001c9c380"} |
+| `yul_context_fee_info_optimized` | {"returned": "0x000000000000000000000000000000000000000000000000000000000000000900000000000000000000000000000000000000000000000000000000000000070000000000000000000000000000000000000000000000000000000001c9c380"} |
+| `yul_context_typed_topics_ir` | {"returned": "0x"} |
+| `yul_context_typed_topics_ir_optimized` | {"returned": "0x"} |
+| `yul_context_typed_topics_optimized` | {"returned": "0x"} |
+| `yul_context_four_topics_anonymous_ir` | {"returned": "0x"} |
+| `yul_context_four_topics_anonymous_ir_optimized` | {"returned": "0x"} |
+| `yul_context_four_topics_anonymous_optimized` | {"returned": "0x"} |
+| `yul_context_emit_then_succeed_ir` | {"returned": "0x"} |
+| `yul_context_emit_then_succeed_ir_optimized` | {"returned": "0x"} |
+| `yul_context_emit_then_succeed_optimized` | {"returned": "0x"} |
+| `yul_context_revert_discards_logs_ir` | {"reverted": "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000076e6f6e7a65726f00000000000000000000000000000000000000000000000000"} |
+| `yul_context_revert_discards_logs_ir_optimized` | {"reverted": "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000076e6f6e7a65726f00000000000000000000000000000000000000000000000000"} |
+| `yul_context_revert_discards_logs_optimized` | {"reverted": "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000076e6f6e7a65726f00000000000000000000000000000000000000000000000000"} |
+| `yul_context_view_with_value_reverts_ir` | {"reverted": "0x"} |
+| `yul_context_view_with_value_reverts_ir_optimized` | {"reverted": "0x"} |
+| `yul_context_view_with_value_reverts_optimized` | {"reverted": "0x"} |
+| `yul_context_note_logs_indexed_tag_ir` | {"returned": "0x"} |
+| `yul_context_note_logs_indexed_tag_ir_optimized` | {"returned": "0x"} |
+| `yul_context_note_logs_indexed_tag_optimized` | {"returned": "0x"} |
+| `yul_context_narrow_round_trip_ir` | {"returned": "0x00000000000000000000000000000000000000000000000000000000000000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffeabcd0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"} |
+| `yul_context_narrow_round_trip_ir_optimized` | {"returned": "0x00000000000000000000000000000000000000000000000000000000000000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffeabcd0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"} |
+| `yul_context_narrow_round_trip_optimized` | {"returned": "0x00000000000000000000000000000000000000000000000000000000000000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffeabcd0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"} |
+| `yul_context_trailing_calldata_ignored_ir` | {"returned": "0x"} |
+| `yul_context_trailing_calldata_ignored_ir_optimized` | {"returned": "0x"} |
+| `yul_context_trailing_calldata_ignored_optimized` | {"returned": "0x"} |
+| `yul_context_narrow_dirty_uint8_reverts_ir` | {"reverted": "0x"} |
+| `yul_context_narrow_dirty_uint8_reverts_ir_optimized` | {"reverted": "0x"} |
+| `yul_context_narrow_dirty_uint8_reverts_optimized` | {"reverted": "0x"} |
+| `yul_context_narrow_dirty_int16_reverts_ir` | {"reverted": "0x"} |
+| `yul_context_narrow_dirty_int16_reverts_ir_optimized` | {"reverted": "0x"} |
+| `yul_context_narrow_dirty_int16_reverts_optimized` | {"reverted": "0x"} |
+| `yul_context_narrow_dirty_bytes2_reverts_ir` | {"reverted": "0x"} |
+| `yul_context_narrow_dirty_bytes2_reverts_ir_optimized` | {"reverted": "0x"} |
+| `yul_context_narrow_dirty_bytes2_reverts_optimized` | {"reverted": "0x"} |
+| `yul_context_narrow_dirty_bool_reverts_ir` | {"reverted": "0x"} |
+| `yul_context_narrow_dirty_bool_reverts_ir_optimized` | {"reverted": "0x"} |
+| `yul_context_narrow_dirty_bool_reverts_optimized` | {"reverted": "0x"} |
+| `yul_context_narrow_short_calldata_reverts_ir` | {"reverted": "0x"} |
+| `yul_context_narrow_short_calldata_reverts_ir_optimized` | {"reverted": "0x"} |
+| `yul_context_narrow_short_calldata_reverts_optimized` | {"reverted": "0x"} |
+| `yul_fallback_empty_calldata_runs_fallback_ir` | {"returned": "0x"} |
+| `yul_fallback_empty_calldata_runs_fallback_ir_optimized` | {"returned": "0x"} |
+| `yul_fallback_empty_calldata_runs_fallback_optimized` | {"returned": "0x"} |
+| `yul_fallback_selector_runs_fallback_ir` | {"returned": "0x"} |
+| `yul_fallback_selector_runs_fallback_ir_optimized` | {"returned": "0x"} |
+| `yul_fallback_selector_runs_fallback_optimized` | {"returned": "0x"} |
+| `yul_fallback_value_reverts_ir` | {"reverted": "0x"} |
+| `yul_fallback_value_reverts_ir_optimized` | {"reverted": "0x"} |
+| `yul_fallback_value_reverts_optimized` | {"reverted": "0x"} |
+| `yul_receive_empty_calldata_runs_receive_ir` | {"returned": "0x"} |
+| `yul_receive_empty_calldata_runs_receive_ir_optimized` | {"returned": "0x"} |
+| `yul_receive_empty_calldata_runs_receive_optimized` | {"returned": "0x"} |
+| `yul_receive_short_calldata_reverts_ir` | {"reverted": "0x"} |
+| `yul_receive_short_calldata_reverts_ir_optimized` | {"reverted": "0x"} |
+| `yul_receive_short_calldata_reverts_optimized` | {"reverted": "0x"} |
+| `yul_receive_selector_reverts_ir` | {"reverted": "0x"} |
+| `yul_receive_selector_reverts_ir_optimized` | {"reverted": "0x"} |
+| `yul_receive_selector_reverts_optimized` | {"reverted": "0x"} |
 
 ## External checks
 
@@ -978,10 +1130,57 @@ Performed by this driver outside the kernel.
 | yul-artifact-generated | `testdata/yul/generated/storage_structs_top_level.ir.json` | pass |
 | yul-artifact-is-the-same-program | `testdata/yul/generated/storage_structs_top_level.ir.json` | pass |
 | yul-artifact-generated | `testdata/yul/generated/storage_structs_top_level.optimized.json` | pass |
+| yul-artifact-generated | `testdata/yul/generated/token.ir.json` | pass |
+| yul-artifact-is-the-same-program | `testdata/yul/generated/token.ir.json` | pass |
+| yul-artifact-generated | `testdata/yul/generated/token.optimized.json` | pass |
+| yul-artifact-generated | `testdata/yul/generated/context.ir.json` | pass |
+| yul-artifact-is-the-same-program | `testdata/yul/generated/context.ir.json` | pass |
+| yul-artifact-generated | `testdata/yul/generated/context.optimized.json` | pass |
+| yul-artifact-generated | `testdata/yul/generated/fallback.ir.json` | pass |
+| yul-artifact-is-the-same-program | `testdata/yul/generated/fallback.ir.json` | pass |
+| yul-artifact-generated | `testdata/yul/generated/fallback.optimized.json` | pass |
+| yul-artifact-generated | `testdata/yul/generated/receive.ir.json` | pass |
+| yul-artifact-is-the-same-program | `testdata/yul/generated/receive.ir.json` | pass |
+| yul-artifact-generated | `testdata/yul/generated/receive.optimized.json` | pass |
+| yul-artifact-generated | `testdata/yul/generated/external.ir.json` | pass |
+| yul-artifact-is-the-same-program | `testdata/yul/generated/external.ir.json` | pass |
+| yul-artifact-generated | `testdata/yul/generated/external.optimized.json` | pass |
 | yul-artifacts-staged | `tests/yulDifferentialCorpusScript.sml` | pass |
 
-## Disagreements and failures
+## What is not an agreement
 
-Each case's status is one of agree, mismatch, unexpected, storage-mismatch, storage-unexpected, inconclusive, logged or error; only agree is an agreement. A case at a stage the importer did not admit is not a disagreement: it is counted above as an admission.
+Each case's status is one of agree, mismatch, unexpected, storage-mismatch, storage-unexpected, log-mismatch, log-unexpected, inconclusive or error; only agree is an agreement, and the rest are listed here with the status that classifies them. An inconclusive is a diagnostic on one side, not a disagreement. A case at a stage the importer did not admit is not a disagreement either: it is counted above as an admission. Failures of another kind -- a suite that would not prepare, an external check, the HOL build -- are listed here too.
 
-None.
+- {"bytecode": {"returned": "0x0000000000000000000000000000000000000000000000000000000000000014"}, "case": "pay_transfers_then_reads_balance", "expected": {"returned": "0x0000000000000000000000000000000000000000000000000000000000000014"}, "kind": "case", "stage": "ir", "status": "inconclusive", "suite": "external", "theorem": "yul_external_pay_transfers_then_reads_balance_ir", "yul": {"diagnostic": "InvalidCompletion"}}
+- {"bytecode": {"returned": "0x0000000000000000000000000000000000000000000000000000000000000014"}, "case": "pay_transfers_then_reads_balance", "expected": {"returned": "0x0000000000000000000000000000000000000000000000000000000000000014"}, "kind": "case", "stage": "ir-optimized", "status": "inconclusive", "suite": "external", "theorem": "yul_external_pay_transfers_then_reads_balance_ir_optimized", "yul": {"diagnostic": "InvalidCompletion"}}
+- {"bytecode": {"returned": "0x0000000000000000000000000000000000000000000000000000000000000014"}, "case": "pay_transfers_then_reads_balance", "expected": {"returned": "0x0000000000000000000000000000000000000000000000000000000000000014"}, "kind": "case", "stage": "optimized", "status": "inconclusive", "suite": "external", "theorem": "yul_external_pay_transfers_then_reads_balance_optimized", "yul": {"diagnostic": "InvalidCompletion"}}
+- {"bytecode": {"reverted": "0x08c379a000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000014696e73756666696369656e742062616c616e6365000000000000000000000000"}, "case": "pay_bubbles_callee_revert", "expected": {"reverted": "0x08c379a000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000014696e73756666696369656e742062616c616e6365000000000000000000000000"}, "kind": "case", "stage": "ir", "status": "inconclusive", "suite": "external", "theorem": "yul_external_pay_bubbles_callee_revert_ir", "yul": {"diagnostic": "InvalidCompletion"}}
+- {"bytecode": {"reverted": "0x08c379a000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000014696e73756666696369656e742062616c616e6365000000000000000000000000"}, "case": "pay_bubbles_callee_revert", "expected": {"reverted": "0x08c379a000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000014696e73756666696369656e742062616c616e6365000000000000000000000000"}, "kind": "case", "stage": "ir-optimized", "status": "inconclusive", "suite": "external", "theorem": "yul_external_pay_bubbles_callee_revert_ir_optimized", "yul": {"diagnostic": "InvalidCompletion"}}
+- {"bytecode": {"reverted": "0x08c379a000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000014696e73756666696369656e742062616c616e6365000000000000000000000000"}, "case": "pay_bubbles_callee_revert", "expected": {"reverted": "0x08c379a000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000014696e73756666696369656e742062616c616e6365000000000000000000000000"}, "kind": "case", "stage": "optimized", "status": "inconclusive", "suite": "external", "theorem": "yul_external_pay_bubbles_callee_revert_optimized", "yul": {"diagnostic": "InvalidCompletion"}}
+- {"bytecode": {"reverted": "0x"}, "case": "pay_without_code_fails_decoding", "expected": {"reverted": "0x"}, "kind": "case", "stage": "ir", "status": "inconclusive", "suite": "external", "theorem": "yul_external_pay_without_code_fails_decoding_ir", "yul": {"diagnostic": "InvalidCompletion"}}
+- {"bytecode": {"reverted": "0x"}, "case": "pay_without_code_fails_decoding", "expected": {"reverted": "0x"}, "kind": "case", "stage": "ir-optimized", "status": "inconclusive", "suite": "external", "theorem": "yul_external_pay_without_code_fails_decoding_ir_optimized", "yul": {"diagnostic": "InvalidCompletion"}}
+- {"bytecode": {"reverted": "0x"}, "case": "pay_without_code_fails_decoding", "expected": {"reverted": "0x"}, "kind": "case", "stage": "optimized", "status": "inconclusive", "suite": "external", "theorem": "yul_external_pay_without_code_fails_decoding_optimized", "yul": {"diagnostic": "InvalidCompletion"}}
+- {"bytecode": {"returned": "0x"}, "case": "mint_via_calls_token", "expected": {"returned": "0x"}, "kind": "case", "stage": "ir", "status": "inconclusive", "suite": "external", "theorem": "yul_external_mint_via_calls_token_ir", "yul": {"diagnostic": "InvalidCompletion"}}
+- {"bytecode": {"returned": "0x"}, "case": "mint_via_calls_token", "expected": {"returned": "0x"}, "kind": "case", "stage": "ir-optimized", "status": "inconclusive", "suite": "external", "theorem": "yul_external_mint_via_calls_token_ir_optimized", "yul": {"diagnostic": "InvalidCompletion"}}
+- {"bytecode": {"returned": "0x"}, "case": "mint_via_calls_token", "expected": {"returned": "0x"}, "kind": "case", "stage": "optimized", "status": "inconclusive", "suite": "external", "theorem": "yul_external_mint_via_calls_token_optimized", "yul": {"diagnostic": "InvalidCompletion"}}
+- {"bytecode": {"reverted": "0x08c379a00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000c6d696e7420746f207a65726f0000000000000000000000000000000000000000"}, "case": "mint_via_bubbles_callee_revert", "expected": {"reverted": "0x08c379a00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000c6d696e7420746f207a65726f0000000000000000000000000000000000000000"}, "kind": "case", "stage": "ir", "status": "inconclusive", "suite": "external", "theorem": "yul_external_mint_via_bubbles_callee_revert_ir", "yul": {"diagnostic": "InvalidCompletion"}}
+- {"bytecode": {"reverted": "0x08c379a00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000c6d696e7420746f207a65726f0000000000000000000000000000000000000000"}, "case": "mint_via_bubbles_callee_revert", "expected": {"reverted": "0x08c379a00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000c6d696e7420746f207a65726f0000000000000000000000000000000000000000"}, "kind": "case", "stage": "ir-optimized", "status": "inconclusive", "suite": "external", "theorem": "yul_external_mint_via_bubbles_callee_revert_ir_optimized", "yul": {"diagnostic": "InvalidCompletion"}}
+- {"bytecode": {"reverted": "0x08c379a00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000c6d696e7420746f207a65726f0000000000000000000000000000000000000000"}, "case": "mint_via_bubbles_callee_revert", "expected": {"reverted": "0x08c379a00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000c6d696e7420746f207a65726f0000000000000000000000000000000000000000"}, "kind": "case", "stage": "optimized", "status": "inconclusive", "suite": "external", "theorem": "yul_external_mint_via_bubbles_callee_revert_optimized", "yul": {"diagnostic": "InvalidCompletion"}}
+- {"bytecode": {"reverted": "0x"}, "case": "mint_via_without_code_reverts", "expected": {"reverted": "0x"}, "kind": "case", "stage": "ir", "status": "inconclusive", "suite": "external", "theorem": "yul_external_mint_via_without_code_reverts_ir", "yul": {"diagnostic": "InvalidCompletion"}}
+- {"bytecode": {"reverted": "0x"}, "case": "mint_via_without_code_reverts", "expected": {"reverted": "0x"}, "kind": "case", "stage": "ir-optimized", "status": "inconclusive", "suite": "external", "theorem": "yul_external_mint_via_without_code_reverts_ir_optimized", "yul": {"diagnostic": "InvalidCompletion"}}
+- {"bytecode": {"reverted": "0x"}, "case": "mint_via_without_code_reverts", "expected": {"reverted": "0x"}, "kind": "case", "stage": "optimized", "status": "inconclusive", "suite": "external", "theorem": "yul_external_mint_via_without_code_reverts_optimized", "yul": {"diagnostic": "InvalidCompletion"}}
+- {"bytecode": {"returned": "0x0000000000000000000000000000000000000000000000000000000000000009"}, "case": "balance_via_static_call", "expected": {"returned": "0x0000000000000000000000000000000000000000000000000000000000000009"}, "kind": "case", "stage": "ir", "status": "inconclusive", "suite": "external", "theorem": "yul_external_balance_via_static_call_ir", "yul": {"diagnostic": "InvalidCompletion"}}
+- {"bytecode": {"returned": "0x0000000000000000000000000000000000000000000000000000000000000009"}, "case": "balance_via_static_call", "expected": {"returned": "0x0000000000000000000000000000000000000000000000000000000000000009"}, "kind": "case", "stage": "ir-optimized", "status": "inconclusive", "suite": "external", "theorem": "yul_external_balance_via_static_call_ir_optimized", "yul": {"diagnostic": "InvalidCompletion"}}
+- {"bytecode": {"returned": "0x0000000000000000000000000000000000000000000000000000000000000009"}, "case": "balance_via_static_call", "expected": {"returned": "0x0000000000000000000000000000000000000000000000000000000000000009"}, "kind": "case", "stage": "optimized", "status": "inconclusive", "suite": "external", "theorem": "yul_external_balance_via_static_call_optimized", "yul": {"diagnostic": "InvalidCompletion"}}
+- {"bytecode": {"returned": "0x000000000000000000000000000000000000000000000000000000000000000e"}, "case": "bump_self_sees_callee_write", "expected": {"returned": "0x000000000000000000000000000000000000000000000000000000000000000e"}, "kind": "case", "stage": "ir", "status": "inconclusive", "suite": "external", "theorem": "yul_external_bump_self_sees_callee_write_ir", "yul": {"diagnostic": "InvalidCompletion"}}
+- {"bytecode": {"returned": "0x000000000000000000000000000000000000000000000000000000000000000e"}, "case": "bump_self_sees_callee_write", "expected": {"returned": "0x000000000000000000000000000000000000000000000000000000000000000e"}, "kind": "case", "stage": "ir-optimized", "status": "inconclusive", "suite": "external", "theorem": "yul_external_bump_self_sees_callee_write_ir_optimized", "yul": {"diagnostic": "InvalidCompletion"}}
+- {"bytecode": {"returned": "0x000000000000000000000000000000000000000000000000000000000000000e"}, "case": "bump_self_sees_callee_write", "expected": {"returned": "0x000000000000000000000000000000000000000000000000000000000000000e"}, "kind": "case", "stage": "optimized", "status": "inconclusive", "suite": "external", "theorem": "yul_external_bump_self_sees_callee_write_optimized", "yul": {"diagnostic": "InvalidCompletion"}}
+- {"bytecode": {"reverted": "0x"}, "case": "bump_static_halts_on_write", "expected": {"reverted": "0x"}, "kind": "case", "stage": "ir", "status": "inconclusive", "suite": "external", "theorem": "yul_external_bump_static_halts_on_write_ir", "yul": {"diagnostic": "InvalidCompletion"}}
+- {"bytecode": {"reverted": "0x"}, "case": "bump_static_halts_on_write", "expected": {"reverted": "0x"}, "kind": "case", "stage": "ir-optimized", "status": "inconclusive", "suite": "external", "theorem": "yul_external_bump_static_halts_on_write_ir_optimized", "yul": {"diagnostic": "InvalidCompletion"}}
+- {"bytecode": {"reverted": "0x"}, "case": "bump_static_halts_on_write", "expected": {"reverted": "0x"}, "kind": "case", "stage": "optimized", "status": "inconclusive", "suite": "external", "theorem": "yul_external_bump_static_halts_on_write_optimized", "yul": {"diagnostic": "InvalidCompletion"}}
+- {"bytecode": {"returned": "0x0000000000000000000000000000000000000000000000000000000000000003"}, "case": "forward_passes_value", "expected": {"returned": "0x0000000000000000000000000000000000000000000000000000000000000003"}, "kind": "case", "stage": "ir", "status": "inconclusive", "suite": "external", "theorem": "yul_external_forward_passes_value_ir", "yul": {"diagnostic": "InvalidCompletion"}}
+- {"bytecode": {"returned": "0x0000000000000000000000000000000000000000000000000000000000000003"}, "case": "forward_passes_value", "expected": {"returned": "0x0000000000000000000000000000000000000000000000000000000000000003"}, "kind": "case", "stage": "ir-optimized", "status": "inconclusive", "suite": "external", "theorem": "yul_external_forward_passes_value_ir_optimized", "yul": {"diagnostic": "InvalidCompletion"}}
+- {"bytecode": {"returned": "0x0000000000000000000000000000000000000000000000000000000000000003"}, "case": "forward_passes_value", "expected": {"returned": "0x0000000000000000000000000000000000000000000000000000000000000003"}, "kind": "case", "stage": "optimized", "status": "inconclusive", "suite": "external", "theorem": "yul_external_forward_passes_value_optimized", "yul": {"diagnostic": "InvalidCompletion"}}
+- {"bytecode": {"reverted": "0x"}, "case": "forward_without_balance_reverts", "expected": {"reverted": "0x"}, "kind": "case", "stage": "ir", "status": "inconclusive", "suite": "external", "theorem": "yul_external_forward_without_balance_reverts_ir", "yul": {"diagnostic": "InvalidCompletion"}}
+- {"bytecode": {"reverted": "0x"}, "case": "forward_without_balance_reverts", "expected": {"reverted": "0x"}, "kind": "case", "stage": "ir-optimized", "status": "inconclusive", "suite": "external", "theorem": "yul_external_forward_without_balance_reverts_ir_optimized", "yul": {"diagnostic": "InvalidCompletion"}}
+- {"bytecode": {"reverted": "0x"}, "case": "forward_without_balance_reverts", "expected": {"reverted": "0x"}, "kind": "case", "stage": "optimized", "status": "inconclusive", "suite": "external", "theorem": "yul_external_forward_without_balance_reverts_optimized", "yul": {"diagnostic": "InvalidCompletion"}}

@@ -222,6 +222,13 @@ def build_report(corpus_path: Path, corpus: dict[str, Any], solc: Path,
                                 "cases_run": 0, "agreements": 0}
                         for stage in STAGES}
         expected = sum(len(suite["cases"]) for suite in corpus["suites"]) * len(STAGES)
+    # A case's status beyond "agree" is what the report has to classify: an
+    # inconclusive is a diagnostic on one side, not a disagreement, and the
+    # totals say which of each there are.
+    case_statuses: dict[str, int] = {}
+    for failure in failures:
+        if failure["kind"] == "case":
+            case_statuses[failure["status"]] = case_statuses.get(failure["status"], 0) + 1
     return {
         "format": REPORT_FORMAT,
         "corpus": corpus_path.as_posix(),
@@ -236,6 +243,8 @@ def build_report(corpus_path: Path, corpus: dict[str, Any], solc: Path,
             "cases_run": cases_run,
             "cases_expected": expected,
             "agreements": len(kernel_checked),
+            "case_statuses": dict(sorted(case_statuses.items(),
+                                         key=lambda item: (-item[1], item[0]))),
         },
         "admissions": admissions,
         "kernel_checked": kernel_checked,
@@ -261,7 +270,11 @@ def summarise(report: dict[str, Any]) -> str:
     lines += ["", "## Totals", "",
               f"- stages admitted: {totals['stages_admitted']}/{totals['stages_expected']}",
               f"- cases run: {totals['cases_run']}/{totals['cases_expected']}",
-              f"- agreements: {totals['agreements']}", "",
+              f"- agreements: {totals['agreements']}"]
+    if totals["case_statuses"]:
+        lines.append("- cases that are not agreements: " + ", ".join(
+            f"{count} {status}" for status, count in totals["case_statuses"].items()))
+    lines += ["",
               "| stage | admitted | cases run | agreements |", "| --- | ---: | ---: | ---: |"]
     for stage in report["stages"]:
         counts = report["per_stage"][stage]
@@ -288,12 +301,15 @@ def summarise(report: dict[str, Any]) -> str:
     for item in report["external_checks"]:
         status = item["status"] + (f": {item['detail']}" if "detail" in item else "")
         lines.append(f"| {item['check']} | `{item['subject']}` | {status} |")
-    lines += ["", "## Disagreements and failures", "",
+    lines += ["", "## What is not an agreement", "",
               "Each case's status is one of agree, mismatch, unexpected, storage-mismatch, "
               "storage-unexpected, log-mismatch, log-unexpected, inconclusive or error; "
-              "only agree is an "
-              "agreement. A case at a stage the importer did not admit is not a "
-              "disagreement: it is counted above as an admission.", ""]
+              "only agree is an agreement, and the rest are listed here with the status "
+              "that classifies them. An inconclusive is a diagnostic on one side, not a "
+              "disagreement. A case at a stage the importer did not admit is not a "
+              "disagreement either: it is counted above as an admission. Failures of "
+              "another kind -- a suite that would not prepare, an external check, the HOL "
+              "build -- are listed here too.", ""]
     if not report["failures"]:
         lines.append("None.")
     for failure in report["failures"]:
@@ -336,7 +352,9 @@ def main(argv: list[str] | None = None, root: Path = ROOT) -> int:
     totals = report["totals"]
     print(f"yul differential: {totals['agreements']}/{totals['cases_expected']} agreements, "
           f"{totals['stages_admitted']}/{totals['stages_expected']} stages admitted, "
-          f"{len(report['failures'])} failures, "
+          f"{len(report['failures'])} not agreements"
+          + (f" ({', '.join(f'{c} {s}' for s, c in totals['case_statuses'].items())})"
+             if totals['case_statuses'] else "") + ", "
           f"{sum(1 for c in checks if c['status'] == 'pass')}/{len(checks)} external checks "
           f"passed; report in {report_dir}")
     return 0 if not report["failures"] and (hol is None or hol["status"] == 0) else 1

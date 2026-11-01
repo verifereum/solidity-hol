@@ -150,7 +150,7 @@ class DriverTests(unittest.TestCase):
         self.assertEqual(report["failures"], [])
         self.assertEqual(report["totals"], {"stages_admitted": 3, "stages_expected": 3,
                                             "cases_run": 3, "cases_expected": 3,
-                                            "agreements": 3})
+                                            "agreements": 3, "case_statuses": {}})
         self.assertEqual([w["theorem"] for w in report["kernel_checked"]],
                          ["yul_a_f_returns_ir", "yul_a_f_returns_ir_optimized",
                           "yul_a_f_returns_optimized"])
@@ -180,6 +180,25 @@ class DriverTests(unittest.TestCase):
         self.assertEqual([(f["kind"], f["status"]) for f in report["failures"]],
                          [("case", "mismatch")])
         self.assertEqual(report["failures"][0]["theorem"], "yul_a_f_returns_optimized")
+        self.assertEqual(report["totals"]["case_statuses"], {"mismatch": 1})
+
+    def test_the_totals_classify_the_cases_that_are_not_agreements(self) -> None:
+        """An inconclusive is a diagnostic on one side, not a disagreement, and
+        the totals have to say which there are rather than call both a
+        failure."""
+        results = all_agree()
+        results[1] = case("a", "f_returns", driver.IR, "inconclusive",
+                          yul={"diagnostic": "InvalidCompletion"})
+        results[2] = case("a", "f_returns", driver.IR_OPTIMIZED, "inconclusive",
+                          yul={"diagnostic": "InvalidCompletion"})
+        results[3] = case("a", "f_returns", driver.OPTIMIZED, "mismatch",
+                          bytecode=RETURNED, yul={"reverted": "0x"})
+        with tempfile.TemporaryDirectory() as temporary:
+            status, report = FakeRoot(Path(temporary)).run(results, status=1)
+        self.assertEqual(status, 1)
+        self.assertEqual(report["totals"]["case_statuses"],
+                         {"inconclusive": 2, "mismatch": 1})
+        self.assertEqual(report["totals"]["agreements"], 0)
 
     def test_a_missing_result_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
