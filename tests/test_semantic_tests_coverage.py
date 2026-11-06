@@ -409,8 +409,11 @@ class ClassifyTests(unittest.TestCase):
                        [{"declaration": 5, "suffix": "length"}])
         self.assertEqual(coverage.assembly_blockers(own, by_id),
                          [coverage.Blocker("InlineAssembly", "inline assembly", "import")])
-        constant = dict(variable(8, type_identifier="t_uint256"), constant=True)
-        self.assertEqual(coverage.assembly_blockers(assembly([], [{"declaration": 8}]), {8: constant}),
+        # Constants of value type are read before the block; others are not.
+        constant = dict(variable(8, state=True, type_identifier="t_uint256"), constant=True)
+        self.assertEqual(coverage.assembly_blockers(assembly([], [{"declaration": 8}]), {8: constant}), [])
+        string = dict(variable(9, state=True, type_identifier="t_string_memory_ptr"), constant=True)
+        self.assertEqual(coverage.assembly_blockers(assembly([], [{"declaration": 9}]), {9: string}),
                          [coverage.Blocker("InlineAssembly", "inline assembly memory references", "elaboration")])
 
     def test_inline_assembly_halts_in_constructors(self) -> None:

@@ -1043,11 +1043,15 @@ def assembly_blockers(node: dict[str, Any], by_id: dict[int, dict[str, Any]],
     for reference in node.get("externalReferences", []):
         suffix = reference.get("suffix")
         declaration = by_id.get(reference["declaration"], {})
+        value_type = VALUE_TYPE.fullmatch(
+            declaration.get("typeDescriptions", {}).get("typeIdentifier") or "")
         if suffix not in (None, "slot", "offset"):
             blocker("inline assembly", "import")
-        elif suffix is None and (declaration.get("stateVariable", True) or declaration.get("constant", False)
-                                 or not VALUE_TYPE.fullmatch(
-                declaration.get("typeDescriptions", {}).get("typeIdentifier") or "")):
+        elif suffix is None and declaration.get("constant", False):
+            # a constant of value type is read before the block
+            if not value_type:
+                blocker("inline assembly memory references", "elaboration")
+        elif suffix is None and (declaration.get("stateVariable", True) or not value_type):
             blocker("inline assembly memory references", "elaboration")
         elif suffix is not None and not declaration.get("stateVariable", False):
             blocker("inline assembly memory references", "elaboration")
