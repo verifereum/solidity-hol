@@ -4912,6 +4912,263 @@
     {
       "contracts": [
         {
+          "contract": "Ecrecovers",
+          "objects": [
+            {
+              "builtins": {
+                "callvalue": 1,
+                "codecopy": 1,
+                "dataoffset": 1,
+                "datasize": 2,
+                "memoryguard": 1,
+                "mload": 1,
+                "mstore": 1,
+                "return": 1,
+                "revert": 1
+              },
+              "dataSections": 0,
+              "depth": 0,
+              "name": "Ecrecovers_147",
+              "nodeKinds": {
+                "assignment": 1,
+                "block": 5,
+                "expressionStatement": 6,
+                "functionCall": 13,
+                "functionDefinition": 3,
+                "identifier": 2,
+                "if": 1,
+                "literal:number": 5,
+                "literal:string": 3,
+                "variableDeclaration": 1
+              },
+              "role": "creation",
+              "stage": "ir",
+              "subobjects": 1
+            },
+            {
+              "builtins": {
+                "add": 48,
+                "and": 7,
+                "calldataload": 4,
+                "calldatasize": 7,
+                "callvalue": 6,
+                "eq": 5,
+                "gas": 5,
+                "gt": 1,
+                "iszero": 13,
+                "lt": 1,
+                "memoryguard": 1,
+                "mload": 6,
+                "mstore": 19,
+                "mul": 2,
+                "not": 2,
+                "or": 2,
+                "return": 6,
+                "returndatacopy": 1,
+                "returndatasize": 2,
+                "revert": 10,
+                "shl": 1,
+                "shr": 3,
+                "sload": 5,
+                "slt": 5,
+                "sstore": 2,
+                "staticcall": 5,
+                "sub": 18
+              },
+              "dataSections": 1,
+              "depth": 1,
+              "name": "Ecrecovers_147_deployed",
+              "nodeKinds": {
+                "assignment": 98,
+                "block": 142,
+                "case": 6,
+                "default": 1,
+                "expressionStatement": 90,
+                "functionCall": 381,
+                "functionDefinition": 97,
+                "identifier": 392,
+                "if": 23,
+                "leave": 5,
+                "literal:number": 150,
+                "literal:string": 1,
+                "switch": 1,
+                "variableDeclaration": 146
+              },
+              "role": "runtime",
+              "stage": "ir",
+              "subobjects": 0
+            },
+            {
+              "builtins": {
+                "callvalue": 1,
+                "codecopy": 1,
+                "dataoffset": 1,
+                "datasize": 2,
+                "memoryguard": 1,
+                "mload": 1,
+                "mstore": 1,
+                "return": 1,
+                "revert": 1
+              },
+              "dataSections": 0,
+              "depth": 0,
+              "name": "Ecrecovers_147",
+              "nodeKinds": {
+                "assignment": 1,
+                "block": 5,
+                "expressionStatement": 5,
+                "functionCall": 12,
+                "functionDefinition": 2,
+                "identifier": 2,
+                "if": 1,
+                "literal:number": 5,
+                "literal:string": 3,
+                "variableDeclaration": 1
+              },
+              "role": "creation",
+              "stage": "ir-optimized-off",
+              "subobjects": 1
+            },
+            {
+              "builtins": {
+                "add": 48,
+                "and": 7,
+                "calldataload": 4,
+                "calldatasize": 7,
+                "callvalue": 6,
+                "eq": 5,
+                "gas": 5,
+                "gt": 1,
+                "iszero": 13,
+                "lt": 1,
+                "memoryguard": 1,
+                "mload": 6,
+                "mstore": 19,
+                "mul": 2,
+                "not": 3,
+                "or": 2,
+                "return": 6,
+                "returndatacopy": 1,
+                "returndatasize": 2,
+                "revert": 9,
+                "shl": 6,
+                "shr": 3,
+                "sload": 5,
+                "slt": 5,
+                "sstore": 2,
+                "staticcall": 5,
+                "sub": 21
+              },
+              "dataSections": 1,
+              "depth": 1,
+              "name": "Ecrecovers_147_deployed",
+              "nodeKinds": {
+                "assignment": 98,
+                "block": 128,
+                "case": 6,
+                "default": 1,
+                "expressionStatement": 89,
+                "functionCall": 389,
+                "functionDefinition": 96,
+                "identifier": 391,
+                "if": 23,
+                "leave": 5,
+                "literal:number": 156,
+                "literal:string": 1,
+                "switch": 1,
+                "variableDeclaration": 145
+              },
+              "role": "runtime",
+              "stage": "ir-optimized-off",
+              "subobjects": 0
+            },
+            {
+              "builtins": {
+                "callvalue": 1,
+                "codecopy": 1,
+                "dataoffset": 1,
+                "datasize": 1,
+                "memoryguard": 1,
+                "mstore": 1,
+                "return": 1,
+                "revert": 1
+              },
+              "dataSections": 0,
+              "depth": 0,
+              "name": "Ecrecovers_147",
+              "nodeKinds": {
+                "block": 3,
+                "expressionStatement": 4,
+                "functionCall": 8,
+                "identifier": 5,
+                "if": 1,
+                "literal:number": 4,
+                "literal:string": 2,
+                "variableDeclaration": 2
+              },
+              "role": "creation",
+              "stage": "ir-optimized-on",
+              "subobjects": 1
+            },
+            {
+              "builtins": {
+                "add": 23,
+                "and": 11,
+                "calldataload": 14,
+                "calldatasize": 7,
+                "callvalue": 6,
+                "eq": 3,
+                "gas": 5,
+                "gt": 2,
+                "iszero": 11,
+                "lt": 1,
+                "memoryguard": 1,
+                "mload": 21,
+                "mstore": 34,
+                "not": 6,
+                "or": 1,
+                "return": 6,
+                "returndatacopy": 5,
+                "returndatasize": 10,
+                "revert": 23,
+                "shl": 11,
+                "shr": 1,
+                "sload": 5,
+                "slt": 6,
+                "sstore": 2,
+                "staticcall": 5,
+                "sub": 10
+              },
+              "dataSections": 1,
+              "depth": 1,
+              "name": "Ecrecovers_147_deployed",
+              "nodeKinds": {
+                "assignment": 4,
+                "block": 35,
+                "case": 6,
+                "expressionStatement": 70,
+                "functionCall": 237,
+                "functionDefinition": 3,
+                "identifier": 97,
+                "if": 24,
+                "literal:number": 197,
+                "literal:string": 1,
+                "switch": 1,
+                "variableDeclaration": 41
+              },
+              "role": "runtime",
+              "stage": "ir-optimized-on",
+              "subobjects": 0
+            }
+          ]
+        }
+      ],
+      "sha256": "ffbfd6288efd2f7a23fbf6c01ede1deaa4f3abc966d805471dfb0a2155afb619",
+      "source": "testdata/differential/ecrecovers.sol"
+    },
+    {
+      "contracts": [
+        {
           "contract": "Counter",
           "objects": [
             {
@@ -20144,6 +20401,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -20188,7 +20446,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 3163,
+          "runtime": 3211,
           "subobject": 0
         },
         "address": {
@@ -20226,6 +20484,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -20269,7 +20528,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 473,
+          "runtime": 480,
           "subobject": 0
         },
         "basefee": {
@@ -20346,6 +20605,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -20386,7 +20646,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 354,
+          "runtime": 358,
           "subobject": 0
         },
         "calldatasize": {
@@ -20407,6 +20667,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -20448,7 +20709,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 749,
+          "runtime": 756,
           "subobject": 0
         },
         "caller": {
@@ -20468,7 +20729,7 @@
           "subobject": 0
         },
         "callvalue": {
-          "creation": 84,
+          "creation": 85,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -20486,6 +20747,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -20530,7 +20792,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 641,
+          "runtime": 647,
           "subobject": 0
         },
         "chainid": {
@@ -20542,7 +20804,7 @@
           "subobject": 0
         },
         "codecopy": {
-          "creation": 97,
+          "creation": 98,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -20560,6 +20822,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -20633,7 +20896,7 @@
           "subobject": 0
         },
         "dataoffset": {
-          "creation": 83,
+          "creation": 84,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -20651,6 +20914,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -20699,7 +20963,7 @@
           "subobject": 0
         },
         "datasize": {
-          "creation": 180,
+          "creation": 182,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -20717,6 +20981,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -20826,6 +21091,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -20866,7 +21132,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 324,
+          "runtime": 329,
           "subobject": 0
         },
         "exp": {
@@ -20893,13 +21159,14 @@
             "testdata/differential/conditionals.sol",
             "testdata/differential/contract_types.sol",
             "testdata/differential/dynamic_bytes.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/external.sol",
             "testdata/differential/imports.sol",
             "testdata/differential/named_arguments.sol",
             "testdata/differential/storage_array_values.sol"
           ],
-          "runtime": 35,
+          "runtime": 40,
           "subobject": 0
         },
         "gaslimit": {
@@ -20935,6 +21202,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -20977,7 +21245,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 447,
+          "runtime": 448,
           "subobject": 0
         },
         "iszero": {
@@ -20999,6 +21267,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -21041,7 +21310,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 766,
+          "runtime": 779,
           "subobject": 0
         },
         "keccak256": {
@@ -21176,6 +21445,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -21217,7 +21487,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 481,
+          "runtime": 482,
           "subobject": 0
         },
         "mcopy": {
@@ -21243,7 +21513,7 @@
           "subobject": 0
         },
         "memoryguard": {
-          "creation": 83,
+          "creation": 84,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -21261,6 +21531,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -21305,11 +21576,11 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 80,
+          "runtime": 81,
           "subobject": 0
         },
         "mload": {
-          "creation": 135,
+          "creation": 136,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -21327,6 +21598,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -21371,7 +21643,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 247,
+          "runtime": 253,
           "subobject": 0
         },
         "mod": {
@@ -21399,7 +21671,7 @@
           "subobject": 0
         },
         "mstore": {
-          "creation": 201,
+          "creation": 202,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -21417,6 +21689,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -21461,7 +21734,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 1314,
+          "runtime": 1333,
           "subobject": 0
         },
         "mstore8": {
@@ -21494,6 +21767,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/hashes.sol",
@@ -21525,7 +21799,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 389,
+          "runtime": 391,
           "subobject": 0
         },
         "not": {
@@ -21544,6 +21818,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -21585,7 +21860,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 169,
+          "runtime": 171,
           "subobject": 0
         },
         "number": {
@@ -21614,6 +21889,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -21656,7 +21932,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 153,
+          "runtime": 155,
           "subobject": 0
         },
         "origin": {
@@ -21668,7 +21944,7 @@
           "subobject": 0
         },
         "return": {
-          "creation": 83,
+          "creation": 84,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -21686,6 +21962,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -21730,7 +22007,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 643,
+          "runtime": 649,
           "subobject": 0
         },
         "returndatacopy": {
@@ -21740,13 +22017,14 @@
             "testdata/differential/conditionals.sol",
             "testdata/differential/contract_types.sol",
             "testdata/differential/dynamic_bytes.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/external.sol",
             "testdata/differential/imports.sol",
             "testdata/differential/named_arguments.sol",
             "testdata/differential/storage_array_values.sol"
           ],
-          "runtime": 21,
+          "runtime": 22,
           "subobject": 0
         },
         "returndatasize": {
@@ -21756,17 +22034,18 @@
             "testdata/differential/conditionals.sol",
             "testdata/differential/contract_types.sol",
             "testdata/differential/dynamic_bytes.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/external.sol",
             "testdata/differential/imports.sol",
             "testdata/differential/named_arguments.sol",
             "testdata/differential/storage_array_values.sol"
           ],
-          "runtime": 76,
+          "runtime": 78,
           "subobject": 0
         },
         "revert": {
-          "creation": 166,
+          "creation": 167,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -21784,6 +22063,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -21828,7 +22108,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 706,
+          "runtime": 716,
           "subobject": 0
         },
         "sar": {
@@ -21892,6 +22172,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -21929,7 +22210,7 @@
             "testdata/frontend/evaluation_order.sol",
             "testdata/frontend/storage_references.sol"
           ],
-          "runtime": 97,
+          "runtime": 98,
           "subobject": 0
         },
         "shr": {
@@ -21951,6 +22232,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -21995,7 +22277,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 200,
+          "runtime": 203,
           "subobject": 0
         },
         "signextend": {
@@ -22037,6 +22319,7 @@
             "testdata/differential/contract_types.sol",
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -22073,7 +22356,7 @@
             "testdata/frontend/evaluation_order.sol",
             "testdata/frontend/storage_references.sol"
           ],
-          "runtime": 394,
+          "runtime": 399,
           "subobject": 0
         },
         "slt": {
@@ -22095,6 +22378,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -22136,7 +22420,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 364,
+          "runtime": 369,
           "subobject": 0
         },
         "smod": {
@@ -22161,6 +22445,7 @@
             "testdata/differential/contract_types.sol",
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -22195,7 +22480,7 @@
             "testdata/frontend/evaluation_order.sol",
             "testdata/frontend/storage_references.sol"
           ],
-          "runtime": 224,
+          "runtime": 226,
           "subobject": 0
         },
         "staticcall": {
@@ -22204,12 +22489,13 @@
             "testdata/differential/calldata_arrays.sol",
             "testdata/differential/contract_types.sol",
             "testdata/differential/dynamic_bytes.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/external.sol",
             "testdata/differential/imports.sol",
             "testdata/differential/storage_array_values.sol"
           ],
-          "runtime": 21,
+          "runtime": 26,
           "subobject": 0
         },
         "stop": {
@@ -22245,6 +22531,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -22286,7 +22573,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 1360,
+          "runtime": 1378,
           "subobject": 0
         },
         "timestamp": {
@@ -22308,7 +22595,7 @@
       },
       "nodeKinds": {
         "assignment": {
-          "creation": 585,
+          "creation": 586,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -22326,6 +22613,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -22370,11 +22658,11 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 8221,
+          "runtime": 8319,
           "subobject": 0
         },
         "block": {
-          "creation": 1148,
+          "creation": 1153,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -22392,6 +22680,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -22436,7 +22725,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 11433,
+          "runtime": 11575,
           "subobject": 0
         },
         "break": {
@@ -22474,6 +22763,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -22514,7 +22804,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 758,
+          "runtime": 764,
           "subobject": 0
         },
         "continue": {
@@ -22545,6 +22835,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -22585,11 +22876,11 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 132,
+          "runtime": 133,
           "subobject": 0
         },
         "expressionStatement": {
-          "creation": 993,
+          "creation": 999,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -22607,6 +22898,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -22651,7 +22943,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 7325,
+          "runtime": 7415,
           "subobject": 0
         },
         "for": {
@@ -22684,7 +22976,7 @@
           "subobject": 0
         },
         "functionCall": {
-          "creation": 2919,
+          "creation": 2932,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -22702,6 +22994,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -22746,11 +23039,11 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 30399,
+          "runtime": 30780,
           "subobject": 0
         },
         "functionDefinition": {
-          "creation": 828,
+          "creation": 831,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -22768,6 +23061,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -22812,11 +23106,11 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 7273,
+          "runtime": 7370,
           "subobject": 0
         },
         "identifier": {
-          "creation": 1948,
+          "creation": 1950,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -22834,6 +23128,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -22878,11 +23173,11 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 32422,
+          "runtime": 32814,
           "subobject": 0
         },
         "if": {
-          "creation": 193,
+          "creation": 194,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -22900,6 +23195,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -22944,7 +23240,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 2181,
+          "runtime": 2204,
           "subobject": 0
         },
         "leave": {
@@ -22964,6 +23260,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -23004,11 +23301,11 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 551,
+          "runtime": 556,
           "subobject": 0
         },
         "literal:number": {
-          "creation": 1174,
+          "creation": 1179,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -23026,6 +23323,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -23070,11 +23368,11 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 11467,
+          "runtime": 11617,
           "subobject": 0
         },
         "literal:string": {
-          "creation": 288,
+          "creation": 291,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -23092,6 +23390,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -23136,7 +23435,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 73,
+          "runtime": 74,
           "subobject": 0
         },
         "switch": {
@@ -23157,6 +23456,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -23197,11 +23497,11 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 158,
+          "runtime": 159,
           "subobject": 0
         },
         "variableDeclaration": {
-          "creation": 664,
+          "creation": 665,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -23219,6 +23519,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -23263,7 +23564,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 14365,
+          "runtime": 14511,
           "subobject": 0
         }
       },
@@ -23287,6 +23588,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -23331,7 +23633,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 83,
+          "runtime": 84,
           "subobject": 0
         },
         "datacopy": {
@@ -23341,7 +23643,7 @@
           "subobject": 0
         },
         "dataoffset": {
-          "creation": 83,
+          "creation": 84,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -23359,6 +23661,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -23407,7 +23710,7 @@
           "subobject": 0
         },
         "datasize": {
-          "creation": 180,
+          "creation": 182,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -23425,6 +23728,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -23473,7 +23777,7 @@
           "subobject": 0
         },
         "subobject": {
-          "creation": 83,
+          "creation": 84,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -23491,6 +23795,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -23568,6 +23873,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -23612,7 +23918,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 3148,
+          "runtime": 3196,
           "subobject": 0
         },
         "address": {
@@ -23650,6 +23956,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -23693,7 +24000,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 470,
+          "runtime": 477,
           "subobject": 0
         },
         "basefee": {
@@ -23770,6 +24077,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -23810,7 +24118,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 354,
+          "runtime": 358,
           "subobject": 0
         },
         "calldatasize": {
@@ -23831,6 +24139,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -23872,7 +24181,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 749,
+          "runtime": 756,
           "subobject": 0
         },
         "caller": {
@@ -23892,7 +24201,7 @@
           "subobject": 0
         },
         "callvalue": {
-          "creation": 84,
+          "creation": 85,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -23910,6 +24219,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -23954,7 +24264,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 641,
+          "runtime": 647,
           "subobject": 0
         },
         "chainid": {
@@ -23966,7 +24276,7 @@
           "subobject": 0
         },
         "codecopy": {
-          "creation": 97,
+          "creation": 98,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -23984,6 +24294,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -24057,7 +24368,7 @@
           "subobject": 0
         },
         "dataoffset": {
-          "creation": 83,
+          "creation": 84,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -24075,6 +24386,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -24123,7 +24435,7 @@
           "subobject": 0
         },
         "datasize": {
-          "creation": 180,
+          "creation": 182,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -24141,6 +24453,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -24247,6 +24560,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -24287,7 +24601,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 316,
+          "runtime": 321,
           "subobject": 0
         },
         "exp": {
@@ -24314,13 +24628,14 @@
             "testdata/differential/conditionals.sol",
             "testdata/differential/contract_types.sol",
             "testdata/differential/dynamic_bytes.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/external.sol",
             "testdata/differential/imports.sol",
             "testdata/differential/named_arguments.sol",
             "testdata/differential/storage_array_values.sol"
           ],
-          "runtime": 35,
+          "runtime": 40,
           "subobject": 0
         },
         "gaslimit": {
@@ -24356,6 +24671,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -24398,7 +24714,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 447,
+          "runtime": 448,
           "subobject": 0
         },
         "iszero": {
@@ -24420,6 +24736,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -24462,7 +24779,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 758,
+          "runtime": 771,
           "subobject": 0
         },
         "keccak256": {
@@ -24580,6 +24897,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -24621,7 +24939,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 481,
+          "runtime": 482,
           "subobject": 0
         },
         "mcopy": {
@@ -24647,7 +24965,7 @@
           "subobject": 0
         },
         "memoryguard": {
-          "creation": 83,
+          "creation": 84,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -24665,6 +24983,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -24709,11 +25028,11 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 80,
+          "runtime": 81,
           "subobject": 0
         },
         "mload": {
-          "creation": 135,
+          "creation": 136,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -24731,6 +25050,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -24775,7 +25095,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 228,
+          "runtime": 234,
           "subobject": 0
         },
         "mod": {
@@ -24798,7 +25118,7 @@
           "subobject": 0
         },
         "mstore": {
-          "creation": 195,
+          "creation": 196,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -24816,6 +25136,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -24860,7 +25181,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 1297,
+          "runtime": 1316,
           "subobject": 0
         },
         "mstore8": {
@@ -24893,6 +25214,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/hashes.sol",
@@ -24924,7 +25246,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 387,
+          "runtime": 389,
           "subobject": 0
         },
         "not": {
@@ -24946,6 +25268,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -24988,7 +25311,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 244,
+          "runtime": 247,
           "subobject": 0
         },
         "number": {
@@ -25017,6 +25340,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -25059,7 +25383,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 153,
+          "runtime": 155,
           "subobject": 0
         },
         "origin": {
@@ -25083,7 +25407,7 @@
           "subobject": 0
         },
         "return": {
-          "creation": 83,
+          "creation": 84,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -25101,6 +25425,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -25145,7 +25470,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 643,
+          "runtime": 649,
           "subobject": 0
         },
         "returndatacopy": {
@@ -25155,13 +25480,14 @@
             "testdata/differential/conditionals.sol",
             "testdata/differential/contract_types.sol",
             "testdata/differential/dynamic_bytes.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/external.sol",
             "testdata/differential/imports.sol",
             "testdata/differential/named_arguments.sol",
             "testdata/differential/storage_array_values.sol"
           ],
-          "runtime": 21,
+          "runtime": 22,
           "subobject": 0
         },
         "returndatasize": {
@@ -25171,17 +25497,18 @@
             "testdata/differential/conditionals.sol",
             "testdata/differential/contract_types.sol",
             "testdata/differential/dynamic_bytes.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/external.sol",
             "testdata/differential/imports.sol",
             "testdata/differential/named_arguments.sol",
             "testdata/differential/storage_array_values.sol"
           ],
-          "runtime": 76,
+          "runtime": 78,
           "subobject": 0
         },
         "revert": {
-          "creation": 152,
+          "creation": 153,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -25199,6 +25526,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -25243,7 +25571,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 654,
+          "runtime": 663,
           "subobject": 0
         },
         "sar": {
@@ -25310,6 +25638,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -25353,7 +25682,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 408,
+          "runtime": 414,
           "subobject": 0
         },
         "shr": {
@@ -25375,6 +25704,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -25418,7 +25748,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 183,
+          "runtime": 186,
           "subobject": 0
         },
         "signextend": {
@@ -25460,6 +25790,7 @@
             "testdata/differential/contract_types.sol",
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -25496,7 +25827,7 @@
             "testdata/frontend/evaluation_order.sol",
             "testdata/frontend/storage_references.sol"
           ],
-          "runtime": 393,
+          "runtime": 398,
           "subobject": 0
         },
         "slt": {
@@ -25518,6 +25849,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -25559,7 +25891,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 364,
+          "runtime": 369,
           "subobject": 0
         },
         "smod": {
@@ -25584,6 +25916,7 @@
             "testdata/differential/contract_types.sol",
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -25618,7 +25951,7 @@
             "testdata/frontend/evaluation_order.sol",
             "testdata/frontend/storage_references.sol"
           ],
-          "runtime": 223,
+          "runtime": 225,
           "subobject": 0
         },
         "staticcall": {
@@ -25627,12 +25960,13 @@
             "testdata/differential/calldata_arrays.sol",
             "testdata/differential/contract_types.sol",
             "testdata/differential/dynamic_bytes.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/external.sol",
             "testdata/differential/imports.sol",
             "testdata/differential/storage_array_values.sol"
           ],
-          "runtime": 21,
+          "runtime": 26,
           "subobject": 0
         },
         "stop": {
@@ -25668,6 +26002,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -25709,7 +26044,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 1398,
+          "runtime": 1419,
           "subobject": 0
         },
         "timestamp": {
@@ -25731,7 +26066,7 @@
       },
       "nodeKinds": {
         "assignment": {
-          "creation": 585,
+          "creation": 586,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -25749,6 +26084,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -25793,11 +26129,11 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 8129,
+          "runtime": 8227,
           "subobject": 0
         },
         "block": {
-          "creation": 1098,
+          "creation": 1103,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -25815,6 +26151,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -25859,7 +26196,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 10890,
+          "runtime": 11018,
           "subobject": 0
         },
         "break": {
@@ -25897,6 +26234,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -25937,7 +26275,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 758,
+          "runtime": 764,
           "subobject": 0
         },
         "continue": {
@@ -25968,6 +26306,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -26008,11 +26347,11 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 132,
+          "runtime": 133,
           "subobject": 0
         },
         "expressionStatement": {
-          "creation": 881,
+          "creation": 886,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -26030,6 +26369,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -26074,7 +26414,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 7263,
+          "runtime": 7352,
           "subobject": 0
         },
         "for": {
@@ -26107,7 +26447,7 @@
           "subobject": 0
         },
         "functionCall": {
-          "creation": 2920,
+          "creation": 2932,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -26125,6 +26465,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -26169,11 +26510,11 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 30593,
+          "runtime": 30982,
           "subobject": 0
         },
         "functionDefinition": {
-          "creation": 713,
+          "creation": 715,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -26191,6 +26532,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -26235,11 +26577,11 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 7146,
+          "runtime": 7242,
           "subobject": 0
         },
         "identifier": {
-          "creation": 1908,
+          "creation": 1910,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -26257,6 +26599,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -26301,11 +26644,11 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 31891,
+          "runtime": 32282,
           "subobject": 0
         },
         "if": {
-          "creation": 193,
+          "creation": 194,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -26323,6 +26666,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -26367,7 +26711,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 2181,
+          "runtime": 2204,
           "subobject": 0
         },
         "leave": {
@@ -26387,6 +26731,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -26427,11 +26772,11 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 551,
+          "runtime": 556,
           "subobject": 0
         },
         "literal:number": {
-          "creation": 1226,
+          "creation": 1231,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -26449,6 +26794,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -26493,11 +26839,11 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 11521,
+          "runtime": 11677,
           "subobject": 0
         },
         "literal:string": {
-          "creation": 288,
+          "creation": 291,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -26515,6 +26861,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -26559,7 +26906,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 57,
+          "runtime": 58,
           "subobject": 0
         },
         "switch": {
@@ -26580,6 +26927,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -26620,11 +26968,11 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 158,
+          "runtime": 159,
           "subobject": 0
         },
         "variableDeclaration": {
-          "creation": 620,
+          "creation": 621,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -26642,6 +26990,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -26686,7 +27035,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 13816,
+          "runtime": 13961,
           "subobject": 0
         }
       },
@@ -26710,6 +27059,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -26754,7 +27104,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 83,
+          "runtime": 84,
           "subobject": 0
         },
         "datacopy": {
@@ -26764,7 +27114,7 @@
           "subobject": 0
         },
         "dataoffset": {
-          "creation": 83,
+          "creation": 84,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -26782,6 +27132,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -26830,7 +27181,7 @@
           "subobject": 0
         },
         "datasize": {
-          "creation": 180,
+          "creation": 182,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -26848,6 +27199,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -26896,7 +27248,7 @@
           "subobject": 0
         },
         "subobject": {
-          "creation": 83,
+          "creation": 84,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -26914,6 +27266,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -26991,6 +27344,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -27034,7 +27388,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 2886,
+          "runtime": 2909,
           "subobject": 0
         },
         "address": {
@@ -27071,6 +27425,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -27108,7 +27463,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 948,
+          "runtime": 959,
           "subobject": 0
         },
         "basefee": {
@@ -27183,6 +27538,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -27223,7 +27579,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 559,
+          "runtime": 573,
           "subobject": 0
         },
         "calldatasize": {
@@ -27244,6 +27600,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -27285,7 +27642,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 853,
+          "runtime": 860,
           "subobject": 0
         },
         "caller": {
@@ -27305,7 +27662,7 @@
           "subobject": 0
         },
         "callvalue": {
-          "creation": 84,
+          "creation": 85,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -27323,6 +27680,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -27367,7 +27725,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 641,
+          "runtime": 647,
           "subobject": 0
         },
         "chainid": {
@@ -27379,7 +27737,7 @@
           "subobject": 0
         },
         "codecopy": {
-          "creation": 97,
+          "creation": 98,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -27397,6 +27755,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -27470,7 +27829,7 @@
           "subobject": 0
         },
         "dataoffset": {
-          "creation": 83,
+          "creation": 84,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -27488,6 +27847,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -27536,7 +27896,7 @@
           "subobject": 0
         },
         "datasize": {
-          "creation": 97,
+          "creation": 98,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -27554,6 +27914,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -27644,6 +28005,7 @@
             "testdata/differential/control.sol",
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -27683,7 +28045,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 308,
+          "runtime": 311,
           "subobject": 0
         },
         "exp": {
@@ -27710,13 +28072,14 @@
             "testdata/differential/conditionals.sol",
             "testdata/differential/contract_types.sol",
             "testdata/differential/dynamic_bytes.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/external.sol",
             "testdata/differential/imports.sol",
             "testdata/differential/named_arguments.sol",
             "testdata/differential/storage_array_values.sol"
           ],
-          "runtime": 35,
+          "runtime": 40,
           "subobject": 0
         },
         "gaslimit": {
@@ -27752,6 +28115,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -27793,7 +28157,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 467,
+          "runtime": 469,
           "subobject": 0
         },
         "iszero": {
@@ -27815,6 +28179,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -27856,7 +28221,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 923,
+          "runtime": 934,
           "subobject": 0
         },
         "keccak256": {
@@ -27973,6 +28338,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -28014,7 +28380,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 478,
+          "runtime": 479,
           "subobject": 0
         },
         "mcopy": {
@@ -28040,7 +28406,7 @@
           "subobject": 0
         },
         "memoryguard": {
-          "creation": 83,
+          "creation": 84,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -28058,6 +28424,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -28102,7 +28469,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 63,
+          "runtime": 64,
           "subobject": 0
         },
         "mload": {
@@ -28124,6 +28491,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -28162,7 +28530,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 1077,
+          "runtime": 1098,
           "subobject": 0
         },
         "mod": {
@@ -28177,7 +28545,7 @@
           "subobject": 0
         },
         "mstore": {
-          "creation": 251,
+          "creation": 252,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -28195,6 +28563,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -28239,7 +28608,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 3006,
+          "runtime": 3040,
           "subobject": 0
         },
         "mstore8": {
@@ -28302,6 +28671,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -28343,7 +28713,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 1013,
+          "runtime": 1019,
           "subobject": 0
         },
         "number": {
@@ -28371,6 +28741,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/external.sol",
@@ -28404,7 +28775,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 219,
+          "runtime": 220,
           "subobject": 0
         },
         "origin": {
@@ -28429,7 +28800,7 @@
           "subobject": 0
         },
         "return": {
-          "creation": 83,
+          "creation": 84,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -28447,6 +28818,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -28491,7 +28863,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 623,
+          "runtime": 629,
           "subobject": 0
         },
         "returndatacopy": {
@@ -28501,13 +28873,14 @@
             "testdata/differential/conditionals.sol",
             "testdata/differential/contract_types.sol",
             "testdata/differential/dynamic_bytes.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/external.sol",
             "testdata/differential/imports.sol",
             "testdata/differential/named_arguments.sol",
             "testdata/differential/storage_array_values.sol"
           ],
-          "runtime": 45,
+          "runtime": 50,
           "subobject": 0
         },
         "returndatasize": {
@@ -28517,17 +28890,18 @@
             "testdata/differential/conditionals.sol",
             "testdata/differential/contract_types.sol",
             "testdata/differential/dynamic_bytes.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/external.sol",
             "testdata/differential/imports.sol",
             "testdata/differential/named_arguments.sol",
             "testdata/differential/storage_array_values.sol"
           ],
-          "runtime": 118,
+          "runtime": 128,
           "subobject": 0
         },
         "revert": {
-          "creation": 178,
+          "creation": 179,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -28545,6 +28919,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -28589,7 +28964,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 2258,
+          "runtime": 2281,
           "subobject": 0
         },
         "sar": {
@@ -28655,6 +29030,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -28697,7 +29073,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 1266,
+          "runtime": 1277,
           "subobject": 0
         },
         "shr": {
@@ -28718,6 +29094,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -28758,7 +29135,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 275,
+          "runtime": 276,
           "subobject": 0
         },
         "signextend": {
@@ -28798,6 +29175,7 @@
             "testdata/differential/contract_types.sol",
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -28832,7 +29210,7 @@
             "testdata/frontend/evaluation_order.sol",
             "testdata/frontend/storage_references.sol"
           ],
-          "runtime": 728,
+          "runtime": 733,
           "subobject": 0
         },
         "slt": {
@@ -28854,6 +29232,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -28895,7 +29274,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 677,
+          "runtime": 683,
           "subobject": 0
         },
         "smod": {
@@ -28920,6 +29299,7 @@
             "testdata/differential/contract_types.sol",
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -28954,7 +29334,7 @@
             "testdata/frontend/evaluation_order.sol",
             "testdata/frontend/storage_references.sol"
           ],
-          "runtime": 421,
+          "runtime": 423,
           "subobject": 0
         },
         "staticcall": {
@@ -28963,12 +29343,13 @@
             "testdata/differential/calldata_arrays.sol",
             "testdata/differential/contract_types.sol",
             "testdata/differential/dynamic_bytes.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/external.sol",
             "testdata/differential/imports.sol",
             "testdata/differential/storage_array_values.sol"
           ],
-          "runtime": 21,
+          "runtime": 26,
           "subobject": 0
         },
         "stop": {
@@ -29001,6 +29382,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -29035,7 +29417,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 424,
+          "runtime": 434,
           "subobject": 0
         },
         "timestamp": {
@@ -29073,6 +29455,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/external.sol",
@@ -29113,11 +29496,11 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 1664,
+          "runtime": 1668,
           "subobject": 0
         },
         "block": {
-          "creation": 426,
+          "creation": 429,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -29135,6 +29518,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -29179,7 +29563,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 4537,
+          "runtime": 4572,
           "subobject": 0
         },
         "break": {
@@ -29215,6 +29599,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -29252,7 +29637,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 755,
+          "runtime": 761,
           "subobject": 0
         },
         "continue": {
@@ -29287,7 +29672,7 @@
           "subobject": 0
         },
         "expressionStatement": {
-          "creation": 708,
+          "creation": 712,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -29305,6 +29690,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -29349,7 +29735,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 6969,
+          "runtime": 7039,
           "subobject": 0
         },
         "for": {
@@ -29382,7 +29768,7 @@
           "subobject": 0
         },
         "functionCall": {
-          "creation": 1914,
+          "creation": 1922,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -29400,6 +29786,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -29444,7 +29831,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 22667,
+          "runtime": 22904,
           "subobject": 0
         },
         "functionDefinition": {
@@ -29465,6 +29852,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/external.sol",
@@ -29499,11 +29887,11 @@
             "testdata/frontend/pure_core.sol",
             "testdata/frontend/storage_references.sol"
           ],
-          "runtime": 472,
+          "runtime": 475,
           "subobject": 0
         },
         "identifier": {
-          "creation": 1106,
+          "creation": 1111,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -29521,6 +29909,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -29565,11 +29954,11 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 11155,
+          "runtime": 11252,
           "subobject": 0
         },
         "if": {
-          "creation": 207,
+          "creation": 208,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -29587,6 +29976,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -29631,7 +30021,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 2566,
+          "runtime": 2590,
           "subobject": 0
         },
         "leave": {
@@ -29653,7 +30043,7 @@
           "subobject": 0
         },
         "literal:number": {
-          "creation": 1418,
+          "creation": 1422,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -29671,6 +30061,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -29715,11 +30106,11 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 19133,
+          "runtime": 19330,
           "subobject": 0
         },
         "literal:string": {
-          "creation": 205,
+          "creation": 207,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -29737,6 +30128,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -29781,7 +30173,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 57,
+          "runtime": 58,
           "subobject": 0
         },
         "switch": {
@@ -29802,6 +30194,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -29839,11 +30232,11 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 150,
+          "runtime": 151,
           "subobject": 0
         },
         "variableDeclaration": {
-          "creation": 384,
+          "creation": 386,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -29861,6 +30254,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -29905,7 +30299,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 4127,
+          "runtime": 4168,
           "subobject": 0
         }
       },
@@ -29929,6 +30323,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -29973,7 +30368,7 @@
             "testdata/frontend/storage_references.sol",
             "testdata/frontend/types.sol"
           ],
-          "runtime": 83,
+          "runtime": 84,
           "subobject": 0
         },
         "datacopy": {
@@ -29983,7 +30378,7 @@
           "subobject": 0
         },
         "dataoffset": {
-          "creation": 83,
+          "creation": 84,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -30001,6 +30396,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -30049,7 +30445,7 @@
           "subobject": 0
         },
         "datasize": {
-          "creation": 97,
+          "creation": 98,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -30067,6 +30463,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
@@ -30115,7 +30512,7 @@
           "subobject": 0
         },
         "subobject": {
-          "creation": 83,
+          "creation": 84,
           "fixtures": [
             "testdata/differential/abi_encoding.sol",
             "testdata/differential/assembly_constants.sol",
@@ -30133,6 +30530,7 @@
             "testdata/differential/dynamic_bytes.sol",
             "testdata/differential/dynamic_bytes_peer.sol",
             "testdata/differential/dynamic_storage_arrays.sol",
+            "testdata/differential/ecrecovers.sol",
             "testdata/differential/encode_calls.sol",
             "testdata/differential/enums.sol",
             "testdata/differential/errors.sol",
