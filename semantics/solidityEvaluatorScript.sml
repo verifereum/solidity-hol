@@ -780,7 +780,9 @@ End
 
 (* The code with each name in sub read as its word, as the compiler puts the
  * values of x.slot, x.offset and constants in the code. A Yul function's
- * parameters and results may reuse a name for its body; a let may not. *)
+ * parameters and results may reuse a name for its body; a let may not.
+ * Nested function definitions aren't imported, so a body's narrowed sub never
+ * reaches an inner function, where the compiler would see the block's names. *)
 Definition yul_substitute_expr_def:
   (yul_substitute_expr sub (YulLit l) = YulLit l) ∧
   (yul_substitute_expr sub (YulName x) =
