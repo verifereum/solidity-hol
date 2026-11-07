@@ -35,6 +35,7 @@ val () = holbuild_extra_deps [
   "../testdata/differential/expected/abi_encoding.json",
   "../testdata/differential/expected/encode_calls.json",
   "../testdata/differential/expected/ecrecovers.json",
+  "../testdata/differential/expected/concats.json",
   "../testdata/differential/expected/interface_ids.json",
   "../testdata/differential/expected/named_arguments.json",
   "../testdata/differential/expected/struct_getters.json",

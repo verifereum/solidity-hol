@@ -273,6 +273,11 @@ sequence as its contents. Arrays and structs as arguments, a selector that
 is not a `bytes4` value (a literal selector included), and a signature that is
 not a plain string literal are rejected.
 
+`bytes.concat(...)` is `abi.encodePacked(...)` of its arguments, and
+`string.concat(...)` is too, as a new memory `string`; the compiler takes
+only byte sequences, `bytesN` values and literals for `bytes.concat`, and
+only strings and string literals for `string.concat`.
+
 `abi.encodeCall(f, (a, b))` gives `f`'s selector followed by the standard ABI
 encoding of the arguments, each converted to its parameter's type as an
 internal call's argument is; a single argument may stand without parentheses.
