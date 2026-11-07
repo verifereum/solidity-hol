@@ -1425,9 +1425,9 @@ def special_forms(reached: dict[int, dict[str, Any]],
               .startswith(("t_function_bytesconcat_", "t_function_stringconcat_"))):
             # bytes.concat and string.concat: the importer reads them as
             # abi.encodePacked, whose arguments the compiler has restricted
-            # to byte sequences and fixed-size bytes.
-            callee = node["expression"]
-            unread.update({callee["id"], callee["expression"]["id"]})
+            # to byte sequences and fixed-size bytes, and does not read the
+            # type name, parenthesized or not.
+            unread.update(n["id"] for n in nodes(node["expression"]))
         elif kind == "MemberAccess" and node.get("referencedDeclaration") is None:
             base = node["expression"]
             if base["nodeType"] == "Identifier" and base.get("referencedDeclaration", 0) < 0:

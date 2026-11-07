@@ -109,6 +109,11 @@ class BuiltinCoverageTests(unittest.TestCase):
                 "typeDescriptions": {"typeIdentifier": "t_bytes_memory_ptr"}, "expression": callee}}
 
         self.assertEqual(coverage.scan({"t.sol": unit([function(4, [statement(member)])])}), {})
+        # (bytes).concat(): the type name is not read.
+        base = member["expression"]
+        member["expression"] = {"nodeType": "TupleExpression", "id": 11, "isInlineArray": False,
+                                "components": [base], "typeDescriptions": base["typeDescriptions"]}
+        self.assertEqual(coverage.scan({"t.sol": unit([function(4, [statement(member)])])}), {})
         # (bytes.concat)(): the compiler gives the parenthesized callee the same type.
         parenthesized = {"nodeType": "TupleExpression", "id": 10, "isInlineArray": False,
                          "components": [member], "typeDescriptions": concat_type}
