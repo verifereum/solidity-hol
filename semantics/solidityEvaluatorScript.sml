@@ -861,7 +861,7 @@ Definition assembly_world_def:
 End
 
 (* Writes a referenced local back from the block's final scopes; a location
- * reference has nothing to write. *)
+ * or constant reference has nothing to write. *)
 Definition assembly_write_one_def:
   assembly_write_one (name, r) scopes (yscopes : (string |-> bytes32) list) =
     case r of
