@@ -49,7 +49,7 @@ The scan disagrees with the HOL run on 4 tests, listed at the end.
 | function members (selector, address, …) | `MemberAccess`, `TupleExpression`, `VariableDeclaration` | 105 | 0 | 8 |
 | abi.* functions | `MemberAccess` | 100 | 25 | 62 |
 | function types | `FunctionTypeName` | 96 | 0 | 87 |
-| inline assembly memory references | `InlineAssembly` | 87 | 8 | 0 |
+| inline assembly memory references | `InlineAssembly` | 80 | 8 | 0 |
 | contract creation (new C) | `FunctionCall` | 78 | 0 | 49 |
 | operator delete | `UnaryOperation` | 75 | 13 | 0 |
 | free functions | `FunctionDefinition` | 73 | 10 | 31 |
@@ -67,7 +67,7 @@ The scan disagrees with the HOL run on 4 tests, listed at the end.
 | aggregate array mutation | `MemberAccess` | 37 | 8 | 0 |
 | mappings | `IndexAccess`, `TupleExpression`, `VariableDeclaration` | 33 | 9 | 0 |
 | inline assembly | `InlineAssembly` | 32 | 11 | 22 |
-| literals of non-integer types | `Assignment`, `BinaryOperation`, `FunctionCall`, `Literal`, `Return`, `VariableDeclaration`, `VariableDeclarationStatement` | 32 | 10 | 0 |
+| literals of non-integer types | `Assignment`, `BinaryOperation`, `FunctionCall`, `Literal`, `Return`, `VariableDeclaration`, `VariableDeclarationStatement` | 32 | 11 | 0 |
 | named arguments | `FunctionCall` | 32 | 5 | 26 |
 | external calls to getters | `MemberAccess` | 30 | 1 | 4 |
 | bytes.concat and string.concat | `MemberAccess`, `TupleExpression` | 30 | 0 | 14 |
@@ -136,18 +136,18 @@ Supporting the features in this order admits the most rejected tests at each ste
 | 3 | address members (balance, call, transfer, …) | 62 |
 | 4 | transient storage | 80 |
 | 5 | operator delete | 102 |
-| 6 | literals of non-integer types | 119 |
-| 7 | bytes push and pop | 137 |
-| 8 | inline arrays | 153 |
-| 9 | conditional expressions | 167 |
-| 10 | aggregate array mutation | 180 |
-| 11 | library calls and contract-name members | 193 |
-| 12 | require with a custom error | 206 |
-| 13 | struct values and copying | 217 |
-| 14 | structs | 245 |
-| 15 | local reference bindings | 280 |
-| 16 | arrays | 304 |
-| 17 | array values | 339 |
+| 6 | literals of non-integer types | 122 |
+| 7 | bytes push and pop | 140 |
+| 8 | inline arrays | 156 |
+| 9 | conditional expressions | 170 |
+| 10 | aggregate array mutation | 183 |
+| 11 | library calls and contract-name members | 196 |
+| 12 | require with a custom error | 209 |
+| 13 | struct values and copying | 220 |
+| 14 | structs | 248 |
+| 15 | local reference bindings | 283 |
+| 16 | arrays | 307 |
+| 17 | array values | 342 |
 | 18 | inline assembly memory references | 365 |
 | 19 | inline assembly memory outside the scratch space | 391 |
 | 20 | named arguments | 410 |

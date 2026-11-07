@@ -110,7 +110,7 @@
         "InlineAssembly"
       ],
       "only_blocker": 8,
-      "tests": 87
+      "tests": 80
     },
     {
       "feature": "contract creation (new C)",
@@ -292,7 +292,7 @@
         "VariableDeclaration",
         "VariableDeclarationStatement"
       ],
-      "only_blocker": 10,
+      "only_blocker": 11,
       "tests": 32
     },
     {
@@ -841,51 +841,51 @@
       "feature": "operator delete"
     },
     {
-      "admitted": 119,
+      "admitted": 122,
       "feature": "literals of non-integer types"
     },
     {
-      "admitted": 137,
+      "admitted": 140,
       "feature": "bytes push and pop"
     },
     {
-      "admitted": 153,
+      "admitted": 156,
       "feature": "inline arrays"
     },
     {
-      "admitted": 167,
+      "admitted": 170,
       "feature": "conditional expressions"
     },
     {
-      "admitted": 180,
+      "admitted": 183,
       "feature": "aggregate array mutation"
     },
     {
-      "admitted": 193,
+      "admitted": 196,
       "feature": "library calls and contract-name members"
     },
     {
-      "admitted": 206,
+      "admitted": 209,
       "feature": "require with a custom error"
     },
     {
-      "admitted": 217,
+      "admitted": 220,
       "feature": "struct values and copying"
     },
     {
-      "admitted": 245,
+      "admitted": 248,
       "feature": "structs"
     },
     {
-      "admitted": 280,
+      "admitted": 283,
       "feature": "local reference bindings"
     },
     {
-      "admitted": 304,
+      "admitted": 307,
       "feature": "arrays"
     },
     {
-      "admitted": 339,
+      "admitted": 342,
       "feature": "array values"
     },
     {
@@ -5346,7 +5346,6 @@
     {
       "category": "source-rejected",
       "features": [
-        "inline assembly memory references",
         "literals of non-integer types"
       ],
       "first": null,
@@ -5358,7 +5357,6 @@
       "category": "import-rejected",
       "features": [
         "constants",
-        "inline assembly memory references",
         "literals of non-integer types"
       ],
       "first": "constants",
@@ -7262,7 +7260,6 @@
       "features": [
         "conditional expressions",
         "inline assembly",
-        "inline assembly memory references",
         "source units without exactly one contract"
       ],
       "first": "inline assembly",
@@ -7275,7 +7272,6 @@
       "features": [
         "conditional expressions",
         "inline assembly",
-        "inline assembly memory references",
         "source units without exactly one contract"
       ],
       "first": "inline assembly",
@@ -7289,7 +7285,6 @@
         "conditional expressions",
         "free functions",
         "inline assembly",
-        "inline assembly memory references",
         "source units without exactly one contract"
       ],
       "first": "inline assembly",
@@ -9623,7 +9618,6 @@
     {
       "category": "source-rejected",
       "features": [
-        "inline assembly memory references",
         "literals of non-integer types",
         "string literals as fixed-size bytes"
       ],
@@ -9635,7 +9629,6 @@
     {
       "category": "source-rejected",
       "features": [
-        "inline assembly memory references",
         "literals of non-integer types",
         "string literals as fixed-size bytes"
       ],
