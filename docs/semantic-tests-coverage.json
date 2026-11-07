@@ -3,11 +3,11 @@
     "admitted": 579,
     "compile-failure": 0,
     "elaboration-rejected": 73,
-    "import-rejected": 582,
+    "import-rejected": 581,
     "invalid-core": 0,
     "malformed-input": 0,
     "skipped": 100,
-    "source-rejected": 336
+    "source-rejected": 337
   },
   "features": [
     {
@@ -55,15 +55,6 @@
       "tests": 124
     },
     {
-      "feature": "address members (balance, call, transfer, \u2026)",
-      "first_rejection": 25,
-      "node_types": [
-        "MemberAccess"
-      ],
-      "only_blocker": 16,
-      "tests": 108
-    },
-    {
       "feature": "struct values and copying",
       "first_rejection": 0,
       "node_types": [
@@ -73,6 +64,15 @@
       ],
       "only_blocker": 2,
       "tests": 108
+    },
+    {
+      "feature": "address members (balance, call, transfer, \u2026)",
+      "first_rejection": 26,
+      "node_types": [
+        "MemberAccess"
+      ],
+      "only_blocker": 16,
+      "tests": 106
     },
     {
       "feature": "function members (selector, address, \u2026)",
@@ -132,15 +132,15 @@
     },
     {
       "feature": "abi.* functions",
-      "first_rejection": 10,
+      "first_rejection": 8,
       "node_types": [
         "FunctionCall",
         "Identifier",
         "IndexRangeAccess",
         "MemberAccess"
       ],
-      "only_blocker": 16,
-      "tests": 70
+      "only_blocker": 17,
+      "tests": 68
     },
     {
       "feature": "array values",
@@ -234,7 +234,7 @@
         "VariableDeclarationStatement"
       ],
       "only_blocker": 21,
-      "tests": 38
+      "tests": 39
     },
     {
       "feature": "aggregate array mutation",
@@ -309,15 +309,6 @@
       "tests": 29
     },
     {
-      "feature": "tuples of literals",
-      "first_rejection": 0,
-      "node_types": [
-        "TupleExpression"
-      ],
-      "only_blocker": 5,
-      "tests": 28
-    },
-    {
       "feature": "library calls and contract-name members",
       "first_rejection": 0,
       "node_types": [
@@ -325,7 +316,16 @@
         "MemberAccess"
       ],
       "only_blocker": 14,
-      "tests": 27
+      "tests": 25
+    },
+    {
+      "feature": "tuples of literals",
+      "first_rejection": 0,
+      "node_types": [
+        "TupleExpression"
+      ],
+      "only_blocker": 5,
+      "tests": 24
     },
     {
       "feature": "members of elementary type names",
@@ -840,67 +840,67 @@
       "feature": "address members (balance, call, transfer, \u2026)"
     },
     {
-      "admitted": 97,
+      "admitted": 98,
       "feature": "abi.* functions"
     },
     {
-      "admitted": 114,
+      "admitted": 115,
       "feature": "literals of non-integer types"
     },
     {
-      "admitted": 132,
+      "admitted": 133,
       "feature": "bytes push and pop"
     },
     {
-      "admitted": 149,
+      "admitted": 150,
       "feature": "require with a custom error"
     },
     {
-      "admitted": 165,
+      "admitted": 166,
       "feature": "inline arrays"
     },
     {
-      "admitted": 180,
+      "admitted": 181,
       "feature": "aggregate array mutation"
     },
     {
-      "admitted": 194,
+      "admitted": 195,
       "feature": "library calls and contract-name members"
     },
     {
-      "admitted": 205,
+      "admitted": 206,
       "feature": "struct values and copying"
     },
     {
-      "admitted": 236,
+      "admitted": 237,
       "feature": "structs"
     },
     {
-      "admitted": 272,
+      "admitted": 273,
       "feature": "local reference bindings"
     },
     {
-      "admitted": 296,
+      "admitted": 297,
       "feature": "arrays"
     },
     {
-      "admitted": 331,
+      "admitted": 332,
       "feature": "array values"
     },
     {
-      "admitted": 359,
+      "admitted": 360,
       "feature": "inline assembly memory references"
     },
     {
-      "admitted": 385,
+      "admitted": 386,
       "feature": "inline assembly memory outside the scratch space"
     },
     {
-      "admitted": 402,
+      "admitted": 403,
       "feature": "inline assembly"
     },
     {
-      "admitted": 415,
+      "admitted": 416,
       "feature": "free functions"
     }
   ],
@@ -1095,13 +1095,12 @@
       "features": [
         "abi.* functions",
         "address members (balance, call, transfer, \u2026)",
-        "library calls and contract-name members",
         "members of elementary type names",
         "source units without exactly one contract",
         "type names as values"
       ],
-      "first": "abi.* functions",
-      "reason": "abicoder/abi_encode_call_declaration_v2.sol: FunctionCall 53: unsupported abi.encodeCall",
+      "first": "address members (balance, call, transfer, \u2026)",
+      "reason": "abicoder/abi_encode_call_declaration_v2.sol: MemberAccess 47: unsupported built-in member",
       "scan_agrees": true,
       "test": "abicoder/abi_encode_call_declaration_v2.sol"
     },
@@ -1111,8 +1110,7 @@
         "abi.* functions",
         "address members (balance, call, transfer, \u2026)",
         "function members (selector, address, \u2026)",
-        "function types",
-        "tuples of literals"
+        "function types"
       ],
       "first": "function types",
       "reason": "abicoder/abi_encode_call_is_consistent_v2.sol: FunctionTypeName 11: unsupported type name FunctionTypeName",
@@ -1136,25 +1134,21 @@
       "test": "abicoder/abi_encode_call_memory_v2.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "source-rejected",
       "features": [
-        "abi.* functions",
-        "address members (balance, call, transfer, \u2026)",
-        "tuples of literals"
+        "abi.* functions"
       ],
-      "first": "abi.* functions",
-      "reason": "abicoder/abi_encode_call_special_args_v2.sol: FunctionCall 48: unsupported abi.encodeCall",
+      "first": null,
+      "reason": "abicoder/abi_encode_call_special_args_v2.sol: valid_src_unit failed (source validation/subset restriction)",
       "scan_agrees": true,
       "test": "abicoder/abi_encode_call_special_args_v2.sol"
     },
     {
       "category": "import-rejected",
       "features": [
-        "abi.* functions",
-        "address members (balance, call, transfer, \u2026)",
         "array slices",
         "literals of non-integer types",
-        "tuples of literals"
+        "string literals as fixed-size bytes"
       ],
       "first": "array slices",
       "reason": "abicoder/abi_encode_call_uint_bytes.sol: IndexRangeAccess 9: unsupported expression IndexRangeAccess",
@@ -1172,7 +1166,6 @@
         "memory arrays (new T[](n))",
         "struct values and copying",
         "structs",
-        "tuples of literals",
         "user-defined value types"
       ],
       "first": "user-defined value types",
@@ -3912,8 +3905,6 @@
     {
       "category": "import-rejected",
       "features": [
-        "abi.* functions",
-        "library calls and contract-name members",
         "operator delete",
         "structs"
       ],
