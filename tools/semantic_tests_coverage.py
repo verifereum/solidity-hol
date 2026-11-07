@@ -379,18 +379,21 @@ def imported(asts: dict[str, Any], by_id: dict[int, dict[str, Any]]) -> list[dic
             seen.add(node["id"])
             for _, signature in signatures(node, by_id):
                 add(signature)
-            target = by_id.get(node.get("referencedDeclaration"))
-            if (target is not None and target["nodeType"] == "StructDefinition"
-                    and by_id.get(target.get("scope"), {}).get("nodeType") == "SourceUnit"):
-                add(target)
-            elif (target is not None and target["id"] in members
-                  and target["nodeType"] != "ErrorDefinition" and node["id"] not in unreachable):
-                add(target)
-                # The using directives of a library whose functions run.
-                if target["nodeType"] == "FunctionDefinition":
-                    for directive in by_id[target["scope"]]["nodes"]:
-                        if directive["nodeType"] == "UsingForDirective":
-                            add(directive)
+            # Inline assembly refers to declarations through its external references.
+            referenced = [node.get("referencedDeclaration")] + [
+                reference["declaration"] for reference in node.get("externalReferences", [])]
+            for target in filter(None, map(by_id.get, referenced)):
+                if (target["nodeType"] == "StructDefinition"
+                        and by_id.get(target.get("scope"), {}).get("nodeType") == "SourceUnit"):
+                    add(target)
+                elif (target["id"] in members and target["nodeType"] != "ErrorDefinition"
+                      and node["id"] not in unreachable):
+                    add(target)
+                    # The using directives of a library whose functions run.
+                    if target["nodeType"] == "FunctionDefinition":
+                        for directive in by_id[target["scope"]]["nodes"]:
+                            if directive["nodeType"] == "UsingForDirective":
+                                add(directive)
     return roots
 
 

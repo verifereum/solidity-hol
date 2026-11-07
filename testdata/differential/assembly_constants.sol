@@ -37,6 +37,7 @@ contract AssemblyConstants {
             }
             function shadowed(FIVE) -> SEVEN {
                 SEVEN := add(FIVE, 1)
+                SEVEN := add(SEVEN, 1)
             }
             let k := SEVEN
             r := scaled(v)

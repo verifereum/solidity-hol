@@ -724,6 +724,15 @@ class ClassifyTests(unittest.TestCase):
         by_id = {n["id"]: n for n in coverage.nodes(ast)}
         self.assertIn(struct, coverage.imported({"t.sol": ast}, by_id))
 
+    def test_library_constants_only_assembly_refers_to_are_imported(self) -> None:
+        constant = dict(variable(51, state=True), constant=True)
+        ast = unit([function(4, [assembly([], [{"declaration": 51}])])])
+        ast["nodes"].append({"nodeType": "ContractDefinition", "id": 50, "contractKind": "library",
+                             "abstract": False, "baseContracts": [],
+                             "linearizedBaseContracts": [50], "nodes": [constant]})
+        by_id = {n["id"]: n for n in coverage.nodes(ast)}
+        self.assertIn(constant, coverage.imported({"t.sol": ast}, by_id))
+
     def test_memory_and_calldata_arrays_of_elementary_leaves_decode(self) -> None:
         self.assertTrue(coverage.decodes("t_array$_t_uint8_$dyn_memory_ptr"))
         self.assertTrue(coverage.decodes("t_array$_t_array$_t_bytes_memory_ptr_$2_memory_ptr_$dyn_memory_ptr"))
