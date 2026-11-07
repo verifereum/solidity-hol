@@ -291,6 +291,7 @@ fun is_external_call callee =
 
 (* bytes.concat or string.concat, as a callee: kind is "bytes" or "string". *)
 fun is_concat kind callee =
+  node_type callee = "MemberAccess" andalso
   String.isPrefix ("t_function_" ^ kind ^ "concat_")
     (string_field (field callee "typeDescriptions") "typeIdentifier")
 

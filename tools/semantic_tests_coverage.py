@@ -1420,6 +1420,7 @@ def special_forms(reached: dict[int, dict[str, Any]],
                 if not abi_argument(argument, member == "encodePacked"):
                     block(argument, "abi.* functions", "elaboration")
         elif (kind == "FunctionCall" and node["kind"] == "functionCall"
+              and node["expression"]["nodeType"] == "MemberAccess"
               and (node["expression"]["typeDescriptions"].get("typeIdentifier") or "")
               .startswith(("t_function_bytesconcat_", "t_function_stringconcat_"))):
             # bytes.concat and string.concat: the importer reads them as
