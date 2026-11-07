@@ -1,9 +1,9 @@
 {
   "counts": {
-    "admitted": 579,
+    "admitted": 582,
     "compile-failure": 0,
-    "elaboration-rejected": 73,
-    "import-rejected": 581,
+    "elaboration-rejected": 75,
+    "import-rejected": 576,
     "invalid-core": 0,
     "malformed-input": 0,
     "skipped": 100,
@@ -246,6 +246,21 @@
       "tests": 37
     },
     {
+      "feature": "literals of non-integer types",
+      "first_rejection": 0,
+      "node_types": [
+        "Assignment",
+        "BinaryOperation",
+        "FunctionCall",
+        "Literal",
+        "Return",
+        "VariableDeclaration",
+        "VariableDeclarationStatement"
+      ],
+      "only_blocker": 12,
+      "tests": 33
+    },
+    {
       "feature": "mappings",
       "first_rejection": 0,
       "node_types": [
@@ -261,21 +276,6 @@
       "first_rejection": 22,
       "node_types": [
         "InlineAssembly"
-      ],
-      "only_blocker": 11,
-      "tests": 32
-    },
-    {
-      "feature": "literals of non-integer types",
-      "first_rejection": 0,
-      "node_types": [
-        "Assignment",
-        "BinaryOperation",
-        "FunctionCall",
-        "Literal",
-        "Return",
-        "VariableDeclaration",
-        "VariableDeclarationStatement"
       ],
       "only_blocker": 11,
       "tests": 32
@@ -455,15 +455,6 @@
       "tests": 15
     },
     {
-      "feature": "hash and signature built-ins",
-      "first_rejection": 11,
-      "node_types": [
-        "Identifier"
-      ],
-      "only_blocker": 9,
-      "tests": 12
-    },
-    {
       "feature": "built-in erc7201",
       "first_rejection": 10,
       "node_types": [
@@ -545,6 +536,15 @@
       ],
       "only_blocker": 0,
       "tests": 8
+    },
+    {
+      "feature": "hash and signature built-ins",
+      "first_rejection": 6,
+      "node_types": [
+        "Identifier"
+      ],
+      "only_blocker": 6,
+      "tests": 7
     },
     {
       "feature": "using for",
@@ -836,71 +836,71 @@
       "feature": "operator delete"
     },
     {
-      "admitted": 80,
+      "admitted": 81,
       "feature": "literals of non-integer types"
     },
     {
-      "admitted": 98,
+      "admitted": 99,
       "feature": "address members (balance, call, transfer, \u2026)"
     },
     {
-      "admitted": 118,
+      "admitted": 119,
       "feature": "abi.* functions"
     },
     {
-      "admitted": 136,
+      "admitted": 137,
       "feature": "bytes push and pop"
     },
     {
-      "admitted": 153,
+      "admitted": 154,
       "feature": "require with a custom error"
     },
     {
-      "admitted": 169,
+      "admitted": 170,
       "feature": "inline arrays"
     },
     {
-      "admitted": 184,
+      "admitted": 185,
       "feature": "aggregate array mutation"
     },
     {
-      "admitted": 198,
+      "admitted": 199,
       "feature": "library calls and contract-name members"
     },
     {
-      "admitted": 209,
+      "admitted": 210,
       "feature": "struct values and copying"
     },
     {
-      "admitted": 240,
+      "admitted": 241,
       "feature": "structs"
     },
     {
-      "admitted": 276,
+      "admitted": 277,
       "feature": "local reference bindings"
     },
     {
-      "admitted": 300,
+      "admitted": 301,
       "feature": "arrays"
     },
     {
-      "admitted": 335,
+      "admitted": 336,
       "feature": "array values"
     },
     {
-      "admitted": 360,
+      "admitted": 361,
       "feature": "inline assembly memory references"
     },
     {
-      "admitted": 386,
+      "admitted": 388,
       "feature": "inline assembly memory outside the scratch space"
     },
     {
-      "admitted": 403,
+      "admitted": 405,
       "feature": "inline assembly"
     },
     {
-      "admitted": 416,
+      "admitted": 418,
       "feature": "free functions"
     }
   ],
@@ -5928,54 +5928,47 @@
       "test": "deployedCodeExclusion/virtual_function_deployed.sol"
     },
     {
-      "category": "import-rejected",
-      "features": [
-        "hash and signature built-ins"
-      ],
-      "first": "hash and signature built-ins",
-      "reason": "ecrecover/ecrecover.sol: Identifier 13: unsupported built-in declaration ~6",
+      "category": "admitted",
+      "features": [],
+      "first": null,
+      "reason": null,
       "scan_agrees": true,
       "test": "ecrecover/ecrecover.sol"
     },
     {
-      "category": "import-rejected",
-      "features": [
-        "hash and signature built-ins"
-      ],
-      "first": "hash and signature built-ins",
-      "reason": "ecrecover/ecrecover_abiV2.sol: Identifier 14: unsupported built-in declaration ~6",
+      "category": "admitted",
+      "features": [],
+      "first": null,
+      "reason": null,
       "scan_agrees": true,
       "test": "ecrecover/ecrecover_abiV2.sol"
     },
     {
-      "category": "import-rejected",
-      "features": [
-        "hash and signature built-ins"
-      ],
-      "first": "hash and signature built-ins",
-      "reason": "ecrecover/failing_ecrecover_invalid_input.sol: Identifier 5: unsupported built-in declaration ~6",
+      "category": "admitted",
+      "features": [],
+      "first": null,
+      "reason": null,
       "scan_agrees": true,
       "test": "ecrecover/failing_ecrecover_invalid_input.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
-        "hash and signature built-ins",
-        "inline assembly memory outside the scratch space"
+        "inline assembly memory outside the scratch space",
+        "literals of non-integer types"
       ],
-      "first": "hash and signature built-ins",
-      "reason": "ecrecover/failing_ecrecover_invalid_input_asm.sol: Identifier 6: unsupported built-in declaration ~6",
+      "first": null,
+      "reason": "ecrecover/failing_ecrecover_invalid_input_asm.sol: elaborate_unit returned NONE (unsupported lowering)",
       "scan_agrees": true,
       "test": "ecrecover/failing_ecrecover_invalid_input_asm.sol"
     },
     {
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "features": [
-        "hash and signature built-ins",
         "literals of non-integer types"
       ],
-      "first": "hash and signature built-ins",
-      "reason": "ecrecover/failing_ecrecover_invalid_input_proper.sol: Identifier 44: unsupported built-in declaration ~6",
+      "first": null,
+      "reason": "ecrecover/failing_ecrecover_invalid_input_proper.sol: elaborate_unit returned NONE (unsupported lowering)",
       "scan_agrees": true,
       "test": "ecrecover/failing_ecrecover_invalid_input_proper.sol"
     },

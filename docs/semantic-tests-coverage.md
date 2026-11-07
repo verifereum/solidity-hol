@@ -22,9 +22,9 @@ tools/semantic_tests_coverage.py ../solidity-tests --solc /path/to/solc
 
 | outcome | tests |
 | --- | ---: |
-| admitted | 579 |
-| elaboration-rejected | 73 |
-| import-rejected | 581 |
+| admitted | 582 |
+| elaboration-rejected | 75 |
+| import-rejected | 576 |
 | compile-failure | 0 |
 | malformed-input | 0 |
 | source-rejected | 337 |
@@ -63,9 +63,9 @@ The scan disagrees with the HOL run on 4 tests, listed at the end.
 | transient storage | `VariableDeclaration` | 41 | 19 | 0 |
 | string literals as fixed-size bytes | `Assignment`, `BinaryOperation`, `EmitStatement`, `FunctionCall`, `Return`, `VariableDeclaration`, `VariableDeclarationStatement` | 39 | 21 | 0 |
 | aggregate array mutation | `MemberAccess` | 37 | 10 | 0 |
+| literals of non-integer types | `Assignment`, `BinaryOperation`, `FunctionCall`, `Literal`, `Return`, `VariableDeclaration`, `VariableDeclarationStatement` | 33 | 12 | 0 |
 | mappings | `IndexAccess`, `TupleExpression`, `VariableDeclaration` | 33 | 9 | 0 |
 | inline assembly | `InlineAssembly` | 32 | 11 | 22 |
-| literals of non-integer types | `Assignment`, `BinaryOperation`, `FunctionCall`, `Literal`, `Return`, `VariableDeclaration`, `VariableDeclarationStatement` | 32 | 11 | 0 |
 | external calls to getters | `MemberAccess` | 30 | 1 | 4 |
 | bytes.concat and string.concat | `MemberAccess`, `TupleExpression` | 30 | 0 | 14 |
 | using for with functions | `UsingForDirective` | 29 | 0 | 27 |
@@ -84,7 +84,6 @@ The scan disagrees with the HOL run on 4 tests, listed at the end.
 | conditional expressions | `Conditional` | 16 | 0 | 0 |
 | constants | `VariableDeclaration` | 15 | 7 | 9 |
 | named arguments | `FunctionCall` | 15 | 0 | 12 |
-| hash and signature built-ins | `Identifier` | 12 | 9 | 11 |
 | built-in erc7201 | `Identifier` | 12 | 1 | 10 |
 | event array parameters | `VariableDeclaration` | 11 | 6 | 0 |
 | literal subdenominations (ether, days, …) | `Literal` | 11 | 6 | 9 |
@@ -94,6 +93,7 @@ The scan disagrees with the HOL run on 4 tests, listed at the end.
 | fixed-size bytes members and indexing | `IndexAccess`, `MemberAccess` | 10 | 2 | 0 |
 | events named through a contract or library | `MemberAccess` | 8 | 4 | 6 |
 | imports | `MemberAccess`, `TupleExpression` | 8 | 0 | 0 |
+| hash and signature built-ins | `Identifier` | 7 | 6 | 6 |
 | using for | `MemberAccess` | 7 | 0 | 0 |
 | msg/block/tx globals | `MemberAccess` | 6 | 5 | 6 |
 | virtual modifiers | `ModifierDefinition` | 6 | 5 | 5 |
@@ -134,23 +134,23 @@ Supporting the features in this order admits the most rejected tests at each ste
 | 1 | string literals as fixed-size bytes | 21 |
 | 2 | transient storage | 40 |
 | 3 | operator delete | 62 |
-| 4 | literals of non-integer types | 80 |
-| 5 | address members (balance, call, transfer, …) | 98 |
-| 6 | abi.* functions | 118 |
-| 7 | bytes push and pop | 136 |
-| 8 | require with a custom error | 153 |
-| 9 | inline arrays | 169 |
-| 10 | aggregate array mutation | 184 |
-| 11 | library calls and contract-name members | 198 |
-| 12 | struct values and copying | 209 |
-| 13 | structs | 240 |
-| 14 | local reference bindings | 276 |
-| 15 | arrays | 300 |
-| 16 | array values | 335 |
-| 17 | inline assembly memory references | 360 |
-| 18 | inline assembly memory outside the scratch space | 386 |
-| 19 | inline assembly | 403 |
-| 20 | free functions | 416 |
+| 4 | literals of non-integer types | 81 |
+| 5 | address members (balance, call, transfer, …) | 99 |
+| 6 | abi.* functions | 119 |
+| 7 | bytes push and pop | 137 |
+| 8 | require with a custom error | 154 |
+| 9 | inline arrays | 170 |
+| 10 | aggregate array mutation | 185 |
+| 11 | library calls and contract-name members | 199 |
+| 12 | struct values and copying | 210 |
+| 13 | structs | 241 |
+| 14 | local reference bindings | 277 |
+| 15 | arrays | 301 |
+| 16 | array values | 336 |
+| 17 | inline assembly memory references | 361 |
+| 18 | inline assembly memory outside the scratch space | 388 |
+| 19 | inline assembly | 405 |
+| 20 | free functions | 418 |
 
 ## Skipped and compile failures
 
@@ -334,6 +334,9 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `conversions/calldata_bytes_to_memory.sol`
 - `conversions/calldata_bytes_to_memory_reencode.sol`
 - `conversions/string_to_bytes.sol`
+- `ecrecover/ecrecover.sol`
+- `ecrecover/ecrecover_abiV2.sol`
+- `ecrecover/failing_ecrecover_invalid_input.sol`
 - `enums/constructing_enums_from_ints.sol`
 - `enums/enum_explicit_overflow.sol`
 - `enums/using_contract_enums_with_explicit_contract_name.sol`
@@ -1111,6 +1114,8 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `deployedCodeExclusion/library_function.sol`: deployedCodeExclusion/library_function.sol: elaborate_unit returned NONE (unsupported lowering)
 - `deployedCodeExclusion/super_function.sol`: deployedCodeExclusion/super_function.sol: elaborate_unit returned NONE (unsupported lowering)
 - `deployedCodeExclusion/virtual_function.sol`: deployedCodeExclusion/virtual_function.sol: elaborate_unit returned NONE (unsupported lowering)
+- `ecrecover/failing_ecrecover_invalid_input_asm.sol`: ecrecover/failing_ecrecover_invalid_input_asm.sol: elaborate_unit returned NONE (unsupported lowering)
+- `ecrecover/failing_ecrecover_invalid_input_proper.sol`: ecrecover/failing_ecrecover_invalid_input_proper.sol: elaborate_unit returned NONE (unsupported lowering)
 - `enums/invalid_enum_logged.sol`: enums/invalid_enum_logged.sol: elaborate_unit returned NONE (unsupported lowering)
 - `errors/error_throw_from_module_via_member_access.sol`: A.sol: elaborate_unit returned NONE (unsupported lowering)
 - `errors/panic_via_import.sol`: s1.sol: elaborate_unit returned NONE (unsupported lowering)
