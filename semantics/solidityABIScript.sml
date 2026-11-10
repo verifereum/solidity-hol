@@ -620,7 +620,8 @@ Definition materialize_value_def:
              let id = st.next_heap_id + 1 in
              let obj = <| object_type := ty; object_length := n;
                           object_cells := FEMPTY;
-                          object_address := 128 + st.memory_allocated |> in
+                          object_address := 128 + st.memory_allocated;
+                          object_padded := T |> in
              let st1 = st with <| heap := st.heap |+ (id, obj); next_heap_id := id;
                           memory_allocated := st.memory_allocated + 32 * n |> in
              (case materialize_fields env (MAP SND fields) 0 vs FEMPTY st1 of
