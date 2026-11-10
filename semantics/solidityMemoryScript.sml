@@ -13,11 +13,12 @@ Definition byte_cells_def:
 End
 
 Definition allocate_bytes_def:
-  allocate_bytes ty bs (st : source_state) =
+  allocate_bytes padded ty bs (st : source_state) =
     let id = st.next_heap_id + 1 in
     let obj = <| object_type := ty; object_length := LENGTH bs;
                  object_cells := byte_cells bs;
-                 object_address := 128 + st.memory_allocated |> in
+                 object_address := 128 + st.memory_allocated;
+                 object_padded := padded |> in
     (ReferenceValue (MemoryReference (HeapId id) 0 ty),
      st with <| heap := st.heap |+ (id, obj); next_heap_id := id;
                memory_allocated := st.memory_allocated +
@@ -165,7 +166,8 @@ Definition allocate_object_def:
     let id = st.next_heap_id + 1 in
     let obj = <| object_type := ty; object_length := length;
                  object_cells := FEMPTY;
-                 object_address := 128 + st.memory_allocated |> in
+                 object_address := 128 + st.memory_allocated;
+                 object_padded := T |> in
     SOME (id, st with <| heap := st.heap |+ (id, obj); next_heap_id := id;
                          memory_allocated := st.memory_allocated + size |>)
 End
@@ -454,7 +456,7 @@ val () = cv_auto_trans memory_cell_def;
 (* How cv's precondition presents a heap object record. *)
 Theorem heap_object_literal:
   <| object_type := a; object_length := b; object_cells := c;
-     object_address := d |> = heap_object a b c d
+     object_address := d; object_padded := e |> = heap_object a b c d e
 Proof
   simp[solidityStateTheory.heap_object_component_equality]
 QED

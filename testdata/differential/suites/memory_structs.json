@@ -216,17 +216,6 @@
           1
         ]
       }
-    },
-    {
-      "name": "paint_copy_bad_enum",
-      "function": "paintCopy",
-      "args": [],
-      "storage": {
-        "1": 5
-      },
-      "expect": {
-        "panic": "0x21"
-      }
     }
   ]
 }

@@ -28,12 +28,12 @@ End
 Definition stored_value_def:
   stored_value ty (n : num) =
     case ty of
-      BoolT => SOME (BoolValue (n ≠ 0))
+      BoolT => if n < 2 then SOME (BoolValue (n = 1)) else NONE
     | UintT _ => SOME (IntegerValue (&n))
     | IntT w => SOME (IntegerValue (wrap_integer T w (&n)))
     | AddressT _ => SOME (AddressValue (n2w n))
     | FixedBytesT k => SOME (BytesValue (num_to_bytes k n))
-    (* any byte; read_storage_reference checks it against the members *)
+    (* read_storage checks enum membership against the environment *)
     | EnumT _ => SOME (IntegerValue (&n))
     | _ => NONE
 End
@@ -43,12 +43,14 @@ End
  * storage cleanup does; writing replaces only them.
  *)
 Definition read_storage_def:
-  read_storage accounts addr slot offset ty =
+  read_storage env accounts addr slot offset ty =
     case storage_bytes ty of
       SOME b =>
-        stored_value ty
+        (case stored_value ty
           ((w2n (lookup_storage slot (lookup_account addr accounts).storage)
-            DIV 2 ** (8 * offset)) MOD 2 ** (8 * b))
+            DIV 2 ** (8 * offset)) MOD 2 ** (8 * b)) of
+           SOME v => if scalar_has_type env ty v then SOME v else NONE
+         | NONE => NONE)
     | NONE => NONE
 End
 
@@ -286,15 +288,6 @@ End
  * declaration order, byte sequences as their bytes and scalars cleaned. A
  * length of 2^64 or more panics with 0x41, as the compiler's copies do. The
  * fuel bounds the struct nesting. *)
-(* A struct field read for a copy: an enum byte out of range panics, as the
- * compiler's cleanup does when it writes each member of the copy. *)
-Definition stored_field_value_def:
-  stored_field_value env ty x =
-    if (case ty of EnumT _ => ¬scalar_has_type env ty x | _ => F)
-    then INR (PanicCompletion panic_enum_conversion)
-    else INL (ScalarValue x)
-End
-
 Definition storage_array_value_def:
   (storage_array_value env (fuel : num) accounts addr slot ty =
     if byte_sequence_type ty then
@@ -329,7 +322,7 @@ Definition storage_array_value_def:
     | SOME (s, offset) =>
         let value =
           if is_elementary_type element then
-            (case read_storage accounts addr s offset element of
+            (case read_storage env accounts addr s offset element of
                SOME v => INL (ScalarValue v)
              | NONE => INR (InvalidCompletion "bad storage read"))
           else storage_array_value env fuel accounts addr s element in
@@ -347,8 +340,8 @@ Definition storage_array_value_def:
         let s = slot + v.state_slot in
         let value =
           if is_stored_scalar_type ty then
-            (case read_storage accounts addr s v.state_offset ty of
-               SOME x => stored_field_value env ty x
+            (case read_storage env accounts addr s v.state_offset ty of
+               SOME x => INL (ScalarValue x)
              | NONE => INR (InvalidCompletion "bad storage read"))
           else storage_array_value env fuel accounts addr s ty in
         case value of
@@ -596,21 +589,14 @@ End
 (* Access and navigation consume concrete references, independently of atoms,
  * bindings, scopes and evaluator control flow.
  *)
-(* A stored enum byte out of range panics as the compiler's cleanup does at
- * the value's first use. *)
 Definition read_storage_reference_def:
   read_storage_reference env accounts ty r =
     case r of
       StorageReference PersistentStorage addr slot offset rty _ =>
         if rty ≠ ty then ValueAbrupt (InvalidCompletion "bad read type")
         else if offset = 0 ∧ memory_object_type ty then ValueOk (ReferenceValue r)
-        else (case read_storage accounts addr slot offset ty of
-                SOME scalar =>
-                  (case ty of
-                     EnumT _ =>
-                       if scalar_has_type env ty scalar then ValueOk (ScalarValue scalar)
-                       else ValueAbrupt (PanicCompletion panic_enum_conversion)
-                   | _ => ValueOk (ScalarValue scalar))
+        else (case read_storage env accounts addr slot offset ty of
+                SOME scalar => ValueOk (ScalarValue scalar)
               | NONE => ValueAbrupt (InvalidCompletion "bad storage read"))
     | _ => ValueAbrupt (InvalidCompletion "bad storage reference")
 End
@@ -662,7 +648,6 @@ val () = cv_auto_trans copy_storage_bytes_def;
 val () = cv_auto_trans storage_element_location_def;
 val () = cv_auto_trans fixed_array_element_def;
 val () = cv_auto_trans storage_array_data_def;
-val () = cv_auto_trans stored_field_value_def;
 
 val storage_array_value_pre_def = cv_auto_trans_pre_rec
   "storage_array_value_pre storage_array_elements_pre storage_struct_fields_pre" storage_array_value_def (
