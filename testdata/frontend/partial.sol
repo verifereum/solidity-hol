@@ -30,6 +30,13 @@ library Hooks {
     }
 }
 
+// A recursive struct: the core holds no recursive struct in memory, so the
+// functions with one in memory are unsupported.
+struct Node {
+    uint8 v;
+    Node[] kids;
+}
+
 contract Partial is Mid {
     uint256 public total;
 
@@ -76,6 +83,11 @@ contract Partial is Mid {
     function hookCount() public pure returns (uint8) {
         Hooks.Box memory b;
         return b.hook.n;
+    }
+
+    function nodeValue() public pure returns (uint8) {
+        Node memory n;
+        return n.v;
     }
 
     fallback() external {

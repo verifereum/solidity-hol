@@ -281,11 +281,13 @@ Definition storage_array_data_def:
             mapping_slot [] slot)
 End
 
-(* The value of a storage array, as a copy reads it: arrays as the tuple of
- * their elements, byte sequences as their bytes and scalars cleaned. A length
- * of 2^64 or more panics with 0x41, as the compiler's copies do. *)
+(* The value of a storage array or struct, as a copy reads it: arrays as the
+ * tuple of their elements, structs as the tuple of their fields in
+ * declaration order, byte sequences as their bytes and scalars cleaned. A
+ * length of 2^64 or more panics with 0x41, as the compiler's copies do. The
+ * fuel bounds the struct nesting. *)
 Definition storage_array_value_def:
-  (storage_array_value env accounts addr slot ty =
+  (storage_array_value env (fuel : num) accounts addr slot ty =
     if byte_sequence_type ty then
       (case storage_byte_length accounts addr slot of
          INR c => INR c
@@ -298,11 +300,20 @@ Definition storage_array_value_def:
         (case storage_array_data accounts addr slot ty of
            (length, data) =>
              if 2 ** 64 ≤ length then INR (PanicCompletion 65) else
-             case storage_array_elements env accounts addr data element 0 length of
+             case storage_array_elements env fuel accounts addr data element 0 length of
                INL vs => INL (TupleValue vs)
              | INR c => INR c)
+    | StructT s =>
+        (case (lookup_struct env s, lookup_struct_layout env s) of
+           (SOME fields, SOME layout) =>
+             if fuel = 0 then INR (InvalidCompletion "struct nesting") else
+             (case storage_struct_fields env (fuel - 1) accounts addr slot
+                     layout.struct_fields fields of
+                INL vs => INL (TupleValue vs)
+              | INR c => INR c)
+         | _ => INR (InvalidCompletion "missing struct layout"))
     | _ => INR (InvalidCompletion "bad storage array type")) ∧
-  (storage_array_elements env accounts addr data element i n =
+  (storage_array_elements env fuel accounts addr data element i n =
     if n = 0 then INL [] else
     case storage_element_location env data element i of
       NONE => INR (InvalidCompletion "bad array element type")
@@ -312,26 +323,48 @@ Definition storage_array_value_def:
             (case read_storage accounts addr s offset element of
                SOME v => INL (ScalarValue v)
              | NONE => INR (InvalidCompletion "bad storage read"))
-          else storage_array_value env accounts addr s element in
+          else storage_array_value env fuel accounts addr s element in
         case value of
           INR c => INR c
         | INL v =>
-            case storage_array_elements env accounts addr data element (i + 1) (n - 1) of
+            case storage_array_elements env fuel accounts addr data element (i + 1) (n - 1) of
               INL vs => INL (v :: vs)
+            | INR c => INR c) ∧
+  (storage_struct_fields env fuel accounts addr slot layout [] = INL []) ∧
+  (storage_struct_fields env fuel accounts addr slot layout ((f, ty) :: fields) =
+    case ALOOKUP (MAP (λv. (v.state_id, v)) layout) f of
+      NONE => INR (InvalidCompletion "missing field layout")
+    | SOME v =>
+        let s = slot + v.state_slot in
+        let value =
+          if is_stored_scalar_type ty then
+            (case read_storage accounts addr s v.state_offset ty of
+               SOME x => INL (ScalarValue x)
+             | NONE => INR (InvalidCompletion "bad storage read"))
+          else storage_array_value env fuel accounts addr s ty in
+        case value of
+          INR c => INR c
+        | INL x =>
+            case storage_struct_fields env fuel accounts addr slot layout fields of
+              INL xs => INL (x :: xs)
             | INR c => INR c)
 Termination
-  WF_REL_TAC ‘inv_image ($< LEX $<) (λx. case x of
-    INL (env, accounts, addr, slot, ty) => (sol_type_size ty, 0)
-  | INR (env, accounts, addr, data, element, i, n) => (sol_type_size element, n + 1))’ >>
-  rw[solidityASTTheory.sol_type_size_def]
+  WF_REL_TAC ‘inv_image ($< LEX $< LEX $<) (λx. case x of
+    INL (env, fuel, accounts, addr, slot, ty) => (fuel, sol_type_size ty, 0)
+  | INR (INL (env, fuel, accounts, addr, data, element, i, n)) =>
+      (fuel, sol_type_size element, n + 1)
+  | INR (INR (env, fuel, accounts, addr, slot, layout, fields)) =>
+      (fuel, list_size (sol_type_size o SND) fields, 1))’ >>
+  rw[solidityASTTheory.sol_type_size_def, listTheory.list_size_def]
 End
 
-(* Storage a storage array or byte sequence occupies, cleared as the
- * compiler's delete does: the length, every element, and a long byte
- * sequence's data. A dynamic length of 2^64 or more cannot be cleared within
- * any gas limit. *)
+(* Storage a storage array, struct or byte sequence occupies, cleared as the
+ * compiler's delete does: the length, every element, a long byte sequence's
+ * data, and each field of a struct but a mapping, a scalar field's bytes
+ * alone. A dynamic length of 2^64 or more cannot be cleared within any gas
+ * limit. The fuel bounds the struct nesting. *)
 Definition clear_storage_value_def:
-  (clear_storage_value env accounts addr slot ty =
+  (clear_storage_value env (fuel : num) accounts addr slot ty =
     if byte_sequence_type ty then
       (case storage_byte_length accounts addr slot of
          INR c => INR c
@@ -353,22 +386,50 @@ Definition clear_storage_value_def:
                (case fixed_storage_slots env (ArrayT element (SOME length)) of
                   SOME slots => INL (clear_byte_slots slots accounts1 addr data)
                 | NONE => INL accounts1)
-             else clear_storage_elements env accounts1 addr data element 0 length)
+             else clear_storage_elements env fuel accounts1 addr data element 0 length)
+    | StructT s =>
+        (case (lookup_struct env s, lookup_struct_layout env s) of
+           (SOME fields, SOME layout) =>
+             if fuel = 0 then INR (InvalidCompletion "struct nesting") else
+             clear_storage_fields env (fuel - 1) accounts addr slot layout.struct_fields fields
+         | _ => INR (InvalidCompletion "missing struct layout"))
     | _ => INR (InvalidCompletion "bad storage array type")) ∧
-  (clear_storage_elements env accounts addr data element i n =
+  (clear_storage_elements env fuel accounts addr data element i n =
     if n = 0 then INL accounts else
     case storage_element_location env data element i of
       NONE => INR (InvalidCompletion "bad array element type")
     | SOME (s, _) =>
-        case clear_storage_value env accounts addr s element of
+        case clear_storage_value env fuel accounts addr s element of
           INR c => INR c
         | INL accounts' =>
-            clear_storage_elements env accounts' addr data element (i + 1) (n - 1))
+            clear_storage_elements env fuel accounts' addr data element (i + 1) (n - 1)) ∧
+  (clear_storage_fields env fuel accounts addr slot layout [] = INL accounts) ∧
+  (clear_storage_fields env fuel accounts addr slot layout ((f, ty) :: fields) =
+    case ALOOKUP (MAP (λv. (v.state_id, v)) layout) f of
+      NONE => INR (InvalidCompletion "missing field layout")
+    | SOME v =>
+        let s = slot + v.state_slot in
+        let cleared =
+          if is_stored_scalar_type ty then
+            (* the zero number, whatever the scalar's type *)
+            (case write_storage accounts addr s v.state_offset ty (IntegerValue 0) of
+               SOME accounts' => INL accounts'
+             | NONE => INR (InvalidCompletion "bad storage write"))
+          else case ty of
+            MappingT _ _ => INL accounts
+          | _ => clear_storage_value env fuel accounts addr s ty in
+        case cleared of
+          INR c => INR c
+        | INL accounts' =>
+            clear_storage_fields env fuel accounts' addr slot layout fields)
 Termination
-  WF_REL_TAC ‘inv_image ($< LEX $<) (λx. case x of
-    INL (env, accounts, addr, slot, ty) => (sol_type_size ty, 0)
-  | INR (env, accounts, addr, data, element, i, n) => (sol_type_size element, n + 1))’ >>
-  rw[solidityASTTheory.sol_type_size_def]
+  WF_REL_TAC ‘inv_image ($< LEX $< LEX $<) (λx. case x of
+    INL (env, fuel, accounts, addr, slot, ty) => (fuel, sol_type_size ty, 0)
+  | INR (INL (env, fuel, accounts, addr, data, element, i, n)) =>
+      (fuel, sol_type_size element, n + 1)
+  | INR (INR (env, fuel, accounts, addr, slot, layout, fields)) =>
+      (fuel, list_size (sol_type_size o SND) fields, 1))’ >>
+  rw[solidityASTTheory.sol_type_size_def, listTheory.list_size_def]
 End
 
 (* Writes the value of a src array into cleared storage of type dst, each
@@ -376,9 +437,13 @@ End
  * slots may hold stale data, which the compiler's copy overwrites: the slots
  * of scalar elements are zeroed first, as the compiler writes each packed
  * slot as a whole word built from zero, and each nested array or byte
- * sequence is first cleared, as resizing it does. *)
+ * sequence is first cleared, as resizing it does. A struct is written field
+ * by field, as the compiler's copy does: each scalar field in place, leaving
+ * the rest of its slot, and each array or byte sequence field cleared first;
+ * mapping fields are left as they are. The fuel bounds the clears' struct
+ * nesting. *)
 Definition store_storage_value_def:
-  (store_storage_value env accounts addr slot src dst v =
+  (store_storage_value env fuel accounts addr slot src dst v =
     if byte_sequence_type dst then
       (case v of
          ScalarValue (BytesValue bs) =>
@@ -405,10 +470,15 @@ Definition store_storage_value_def:
                SOME slots => clear_byte_slots slots accounts1 addr data
              | NONE => accounts1)
           else accounts1 in
-        store_storage_elements env accounts2 addr data e e' 0 vs
+        store_storage_elements env fuel accounts2 addr data e e' 0 vs
+    | (StructT _, StructT s, TupleValue vs) =>
+        (case (lookup_struct env s, lookup_struct_layout env s) of
+           (SOME fields, SOME layout) =>
+             store_storage_fields env fuel accounts addr slot layout.struct_fields fields vs
+         | _ => INR (InvalidCompletion "missing struct layout"))
     | _ => INR (InvalidCompletion "bad stored array")) ∧
-  (store_storage_elements env accounts addr data src dst i [] = INL accounts) ∧
-  (store_storage_elements env accounts addr data src dst i (v :: vs) =
+  (store_storage_elements env fuel accounts addr data src dst i [] = INL accounts) ∧
+  (store_storage_elements env fuel accounts addr data src dst i (v :: vs) =
     case storage_element_location env data dst i of
       NONE => INR (InvalidCompletion "bad array element type")
     | SOME (s, offset) =>
@@ -424,17 +494,47 @@ Definition store_storage_value_def:
                   | _ => INR (InvalidCompletion "bad element conversion"))
              | _ => INR (InvalidCompletion "bad stored element"))
           else
-            (case clear_storage_value env accounts addr s dst of
+            (case clear_storage_value env fuel accounts addr s dst of
                INR c => INR c
-             | INL cleared => store_storage_value env cleared addr s src dst v) in
+             | INL cleared => store_storage_value env fuel cleared addr s src dst v) in
         case stored of
           INR c => INR c
         | INL accounts' =>
-            store_storage_elements env accounts' addr data src dst (i + 1) vs)
+            store_storage_elements env fuel accounts' addr data src dst (i + 1) vs) ∧
+  (store_storage_fields env fuel accounts addr slot layout [] vs = INL accounts) ∧
+  (store_storage_fields env fuel accounts addr slot layout ((f, ty) :: fields) [] =
+    INR (InvalidCompletion "bad stored struct")) ∧
+  (store_storage_fields env fuel accounts addr slot layout ((f, ty) :: fields) (v :: vs) =
+    case ALOOKUP (MAP (λv. (v.state_id, v)) layout) f of
+      NONE => INR (InvalidCompletion "missing field layout")
+    | SOME l =>
+        let s = slot + l.state_slot in
+        let stored =
+          if is_stored_scalar_type ty then
+            (case v of
+               ScalarValue x =>
+                 (case write_storage accounts addr s l.state_offset ty x of
+                    SOME accounts' => INL accounts'
+                  | NONE => INR (InvalidCompletion "bad storage write"))
+             | _ => INR (InvalidCompletion "bad stored field"))
+          else case ty of
+            MappingT _ _ => INL accounts
+          | StructT _ => store_storage_value env fuel accounts addr s ty ty v
+          | _ =>
+            (case clear_storage_value env fuel accounts addr s ty of
+               INR c => INR c
+             | INL cleared => store_storage_value env fuel cleared addr s ty ty v) in
+        case stored of
+          INR c => INR c
+        | INL accounts' =>
+            store_storage_fields env fuel accounts' addr slot layout fields vs)
 Termination
   WF_REL_TAC ‘measure (λx. case x of
-    INL (env, accounts, addr, slot, src, dst, v) => runtime_value_size v
-  | INR (env, accounts, addr, data, src, dst, i, vs) => list_size runtime_value_size vs)’ >>
+    INL (env, fuel, accounts, addr, slot, src, dst, v) => runtime_value_size v
+  | INR (INL (env, fuel, accounts, addr, data, src, dst, i, vs)) =>
+      list_size runtime_value_size vs
+  | INR (INR (env, fuel, accounts, addr, slot, layout, fields, vs)) =>
+      list_size runtime_value_size vs)’ >>
   rw[solidityCoreTheory.runtime_value_size_def, listTheory.list_size_def]
 End
 
@@ -446,9 +546,10 @@ Definition copy_to_storage_def:
     case dst of
       StorageReference PersistentStorage addr slot 0 ty _ =>
         if static then INR (InvalidCompletion "array copy in static frame") else
-        (case clear_storage_value env accounts addr slot ty of
+        let fuel = LENGTH env.type_declarations in
+        (case clear_storage_value env fuel accounts addr slot ty of
            INR c => INR c
-         | INL cleared => store_storage_value env cleared addr slot src ty v)
+         | INL cleared => store_storage_value env fuel cleared addr slot src ty v)
     | _ => INR (InvalidCompletion "bad storage array reference")
 End
 
@@ -554,52 +655,65 @@ val () = cv_auto_trans fixed_array_element_def;
 val () = cv_auto_trans storage_array_data_def;
 
 val storage_array_value_pre_def = cv_auto_trans_pre_rec
-  "storage_array_value_pre storage_array_elements_pre" storage_array_value_def (
-  WF_REL_TAC ‘inv_image ($< LEX $<) (λx. case x of
-    INL (env, accounts, addr, slot, ty) => (cv_size ty, 0)
-  | INR (env, accounts, addr, data, element, i, n) => (cv_size element, cv$c2n n + 1))’ >>
+  "storage_array_value_pre storage_array_elements_pre storage_struct_fields_pre" storage_array_value_def (
+  WF_REL_TAC ‘inv_image ($< LEX $< LEX $<) (λx. case x of
+    INL (env, fuel, accounts, addr, slot, ty) => (cv$c2n fuel, cv_size ty, 0)
+  | INR (INL (env, fuel, accounts, addr, data, element, i, n)) =>
+      (cv$c2n fuel, cv_size element, cv$c2n n + 1)
+  | INR (INR (env, fuel, accounts, addr, slot, layout, fields)) =>
+      (cv$c2n fuel, cv_size fields, 1))’ >>
   cv_termination_tac
 );
 
 Theorem storage_array_value_pre[cv_pre]:
-  (∀env accounts addr slot ty. storage_array_value_pre env accounts addr slot ty) ∧
-  (∀env accounts addr data element i n.
-     storage_array_elements_pre env accounts addr data element i n)
+  (∀env fuel accounts addr slot ty. storage_array_value_pre env fuel accounts addr slot ty) ∧
+  (∀env fuel accounts addr data element i n.
+     storage_array_elements_pre env fuel accounts addr data element i n) ∧
+  (∀env fuel accounts addr slot layout fields.
+     storage_struct_fields_pre env fuel accounts addr slot layout fields)
 Proof
   ho_match_mp_tac storage_array_value_ind >> rpt strip_tac >>
   simp[Once storage_array_value_pre_def] >> rw[] >> gvs[]
 QED
 
 val clear_storage_value_pre_def = cv_auto_trans_pre_rec
-  "clear_storage_value_pre clear_storage_elements_pre" clear_storage_value_def (
-  WF_REL_TAC ‘inv_image ($< LEX $<) (λx. case x of
-    INL (env, accounts, addr, slot, ty) => (cv_size ty, 0)
-  | INR (env, accounts, addr, data, element, i, n) => (cv_size element, cv$c2n n + 1))’ >>
+  "clear_storage_value_pre clear_storage_elements_pre clear_storage_fields_pre" clear_storage_value_def (
+  WF_REL_TAC ‘inv_image ($< LEX $< LEX $<) (λx. case x of
+    INL (env, fuel, accounts, addr, slot, ty) => (cv$c2n fuel, cv_size ty, 0)
+  | INR (INL (env, fuel, accounts, addr, data, element, i, n)) =>
+      (cv$c2n fuel, cv_size element, cv$c2n n + 1)
+  | INR (INR (env, fuel, accounts, addr, slot, layout, fields)) =>
+      (cv$c2n fuel, cv_size fields, 1))’ >>
   cv_termination_tac
 );
 
 Theorem clear_storage_value_pre[cv_pre]:
-  (∀env accounts addr slot ty. clear_storage_value_pre env accounts addr slot ty) ∧
-  (∀env accounts addr data element i n.
-     clear_storage_elements_pre env accounts addr data element i n)
+  (∀env fuel accounts addr slot ty. clear_storage_value_pre env fuel accounts addr slot ty) ∧
+  (∀env fuel accounts addr data element i n.
+     clear_storage_elements_pre env fuel accounts addr data element i n) ∧
+  (∀env fuel accounts addr slot layout fields.
+     clear_storage_fields_pre env fuel accounts addr slot layout fields)
 Proof
   ho_match_mp_tac clear_storage_value_ind >> rpt strip_tac >>
   simp[Once clear_storage_value_pre_def] >> rw[] >> gvs[]
 QED
 
 val store_storage_value_pre_def = cv_auto_trans_pre_rec
-  "store_storage_value_pre store_storage_elements_pre" store_storage_value_def (
+  "store_storage_value_pre store_storage_elements_pre store_storage_fields_pre" store_storage_value_def (
   WF_REL_TAC ‘measure (λx. case x of
-    INL (env, accounts, addr, slot, src, dst, v) => cv_size v
-  | INR (env, accounts, addr, data, src, dst, i, vs) => cv_size vs)’ >>
+    INL (env, fuel, accounts, addr, slot, src, dst, v) => cv_size v
+  | INR (INL (env, fuel, accounts, addr, data, src, dst, i, vs)) => cv_size vs
+  | INR (INR (env, fuel, accounts, addr, slot, layout, fields, vs)) => cv_size vs)’ >>
   cv_termination_tac
 );
 
 Theorem store_storage_value_pre[cv_pre]:
-  (∀env accounts addr slot src dst v.
-     store_storage_value_pre env accounts addr slot src dst v) ∧
-  (∀env accounts addr data src dst i vs.
-     store_storage_elements_pre env accounts addr data src dst i vs)
+  (∀env fuel accounts addr slot src dst v.
+     store_storage_value_pre env fuel accounts addr slot src dst v) ∧
+  (∀env fuel accounts addr data src dst i vs.
+     store_storage_elements_pre env fuel accounts addr data src dst i vs) ∧
+  (∀env fuel accounts addr slot layout fields vs.
+     store_storage_fields_pre env fuel accounts addr slot layout fields vs)
 Proof
   ho_match_mp_tac store_storage_value_ind >> rpt strip_tac >>
   simp[Once store_storage_value_pre_def] >> rw[] >> gvs[]

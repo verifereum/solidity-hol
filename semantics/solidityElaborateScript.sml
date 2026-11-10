@@ -158,6 +158,7 @@ Definition expr_id_def:
   (expr_id (SrcExternalCall info _ _ _ _ _) = info.node_id) ∧
   (expr_id (SrcTypeMember info _ _ _) = info.node_id) ∧
   (expr_id (SrcNew info _ _ _) = info.node_id) ∧
+  (expr_id (SrcStructConstructor info _ _ _ _) = info.node_id) ∧
   (expr_id (SrcEnumValue info _ _ _) = info.node_id) ∧
   (expr_id (SrcKeccak256 info _ _ _) = info.node_id) ∧
   (expr_id (SrcModular info _ _ _ _) = info.node_id) ∧
@@ -240,6 +241,9 @@ Definition coerce_def:
             if loc = MemoryLoc ∨ element' ≠ ArrayT e l
             then INR "type conversion between these types"
             else INL (bind_value n ty (CopyToMemoryOperation a), n + 1)
+        | (LocatedT StorageLoc (StructT s), LocatedT MemoryLoc element') =>
+            if element' ≠ StructT s then INR "type conversion between these types"
+            else INL (bind_value n ty (CopyToMemoryOperation a), n + 1)
         | (LocatedT loc element, LocatedT MemoryLoc element') =>
             if loc = MemoryLoc ∨ element ≠ element' ∨ ¬byte_sequence_type element
             then INR "type conversion between these types"
@@ -298,19 +302,22 @@ Definition assign_local_def:
 End
 
 (* A destination is a local binding, an already evaluated concrete reference,
- * or an element of a memory array (the array, its index and the element's
- * type), captured when written. Its prelude evaluates the location; reads and
+ * an element of a memory array (the array, its index and the element's
+ * type) or a field of a memory struct (the struct, the field and its type),
+ * captured when written. Its prelude evaluates the location; reads and
  * writes share this representation.
  *)
 Datatype:
   destination = LocalDestination num sol_type | ReferenceDestination core_atom sol_type
               | ElementDestination core_atom core_atom sol_type
+              | FieldDestination core_atom ast_id sol_type
 End
 
 Definition destination_type_def:
   (destination_type (LocalDestination _ ty) = ty) ∧
   (destination_type (ReferenceDestination _ ty) = ty) ∧
-  (destination_type (ElementDestination _ _ ty) = ty)
+  (destination_type (ElementDestination _ _ ty) = ty) ∧
+  (destination_type (FieldDestination _ _ ty) = ty)
 End
 
 (* The variable an identifier annotated with tid names, of that type. *)
@@ -347,13 +354,18 @@ Definition read_destination_def:
   (read_destination n (ReferenceDestination ref ty) =
     (bind_value n (read_value_type ty) (ReadOperation ty ref), n + 1)) ∧
   (read_destination n (ElementDestination array index ty) =
-    (bind_value n ty (ArrayIndexOperation array index), n + 1))
+    (bind_value n ty (ArrayIndexOperation array index), n + 1)) ∧
+  (read_destination n (FieldDestination s f ty) =
+    (bind_value n ty (FieldOperation s f), n + 1))
 End
 
 Definition write_destination_def:
   (write_destination t (LocalDestination x ty) a = assign_local t x ty a) ∧
   (write_destination t (ElementDestination array index ty) a =
     [CaptureReferenceFieldStmt (AstId t) array (IndexNavigation index);
+     store_target t ty a]) ∧
+  (write_destination t (FieldDestination s f ty) a =
+    [CaptureReferenceFieldStmt (AstId t) s (FieldNavigation f);
      store_target t ty a]) ∧
   (write_destination (t : num) (ReferenceDestination ref ty) a =
     [CaptureValueStmt (AstId t) ref; WriteScalarStmt (AstId t) ty a])
@@ -487,6 +499,7 @@ Definition expr_assigns_def:
   (expr_assigns (SrcTypeConversion _ _ e _) ⇔ expr_assigns e) ∧
   (expr_assigns (SrcExternalCall _ _ _ operands _ _) ⇔ exprs_assign operands) ∧
   (expr_assigns (SrcNew _ _ e _) ⇔ expr_assigns e) ∧
+  (expr_assigns (SrcStructConstructor _ _ args _ _) ⇔ exprs_assign args) ∧
   (expr_assigns (SrcKeccak256 _ _ e _) ⇔ expr_assigns e) ∧
   (expr_assigns (SrcModular _ _ _ args _) ⇔ exprs_assign args) ∧
   (expr_assigns (SrcAddressCodeLength _ _ e _) ⇔ expr_assigns e) ∧
@@ -767,6 +780,69 @@ Definition internal_call_ok_def:
     decode_type_identifier tid = SOME (call_value_type rets)
 End
 
+(* An elaborated member access root that is a memory struct: its prelude,
+ * atom and struct id. A separate definition, so elab_expr's fallback to
+ * elab_location is one case, not one per other root type. *)
+Definition memory_struct_root_def:
+  memory_struct_root (r : ((core_stmt list # core_atom # elab_type) # num) +
+                           (num # string) list) =
+    case r of
+      INL ((ss, ref, ElabType (LocatedT MemoryLoc (StructT (AstId id)))), n1) =>
+        SOME ((ss, ref, id), n1)
+    | _ => NONE
+End
+
+Definition elab_type_declarations_def:
+  elab_type_declarations enums structs =
+    OPTION_MAP (λds. MAP (λ(id, members). (AstId id, EnumDeclaration members)) enums ++ ds)
+    (all_some (MAP (λs.
+      OPTION_MAP (λfields. (AstId s.struct_info.node_id, StructDeclaration fields))
+        (all_some (MAP (λv. OPTION_MAP (λty. (AstId v.var_info.node_id, ty))
+                           (field_variable_type v)) s.struct_members))) structs))
+End
+
+(* Whether a binding of type ty is one the core accepts: a memory type's
+ * structs are declared, not recursive and hold no mapping. *)
+Definition memory_binding_ok_def:
+  memory_binding_ok enums structs ty ⇔
+    case ty of
+      LocatedT MemoryLoc element =>
+        (case elab_type_declarations enums structs of
+           SOME decls =>
+             memory_type_ok <| procedures := []; state_variables := []; immutables := [];
+                               struct_layouts := []; type_declarations := decls |>
+               (LENGTH decls) element
+         | NONE => F)
+    | _ => T
+End
+
+(* A struct's members with their types, in declaration order. *)
+Definition struct_field_types_def:
+  (struct_field_types [] = SOME []) ∧
+  (struct_field_types ((v : src_variable) :: vs) =
+    case (field_variable_type v, struct_field_types vs) of
+      (SOME ty, SOME fields) => SOME ((v.var_info.node_id, ty) :: fields)
+    | _ => NONE)
+End
+
+(* The values a struct constructor's arguments are converted to: each field's
+ * value in memory. *)
+Definition field_values_def:
+  (field_values [] = []) ∧
+  (field_values ((_, ty) :: fields) =
+    ValueOf (element_type MemoryLoc ty) :: field_values fields)
+End
+
+(* Writes of the values as to the fields of the memory struct s, in order;
+ * n numbers the captured targets. *)
+Definition field_writes_def:
+  (field_writes n s ((f, ty) :: fields) (a :: as) =
+    let (ws, n1) = field_writes (n + 1) s fields as in
+    ([CaptureReferenceFieldStmt (AstId n) s (FieldNavigation (AstId f));
+      store_target n (element_type MemoryLoc ty) a] ++ ws, n1)) ∧
+  (field_writes n s _ _ = ([], n))
+End
+
 (* A call's argument values, evaluated in the call's order, in its
  * parameters' order: order gives, for each parameter, the position of its
  * argument (argument_order_ok). The values are those of the call's
@@ -856,14 +932,24 @@ Definition elab_expr_def:
                if d = 1 then INL (([], ConstantAtom (IntegerValue i), ElabLiteral), n)
                else INL (([], ConstantAtom (BoolValue F), ElabRational), n)
            | _ => INR [(info.node_id, "unsupported literal")])
-    | SrcMemberAccess info _ _ _ =>
-        (case elab_location ctx n expression of
-           INL ((ss, ref, ty), n1) =>
-             if is_stored_scalar_type ty ∨ memory_object_type ty then
-               let (rs, a) = bind_value n1 (read_value_type ty) (ReadOperation ty ref) in
-               INL ((ss ++ rs, a, ElabType (read_value_type ty)), n1 + 1)
-             else INR [(info.node_id, "read of a value of this type")]
-         | INR bs => INR bs)
+    | SrcMemberAccess info root_expr member_id tid =>
+        (case memory_struct_root (elab_expr ctx n root_expr) of
+           SOME ((ss, ref, id), n1) =>
+             (case source_struct_field ctx.structs id member_id of
+                SOME fty =>
+                  let ety = element_type MemoryLoc fty in
+                  ensure (source_type_matches ety tid) (info.node_id, "type annotation mismatch")
+                  (let (rs, a) = bind_value n1 ety (FieldOperation ref (AstId member_id)) in
+                   INL ((ss ++ rs, a, ElabType ety), n1 + 1))
+              | NONE => INR [(info.node_id, "unknown struct member")])
+         | NONE =>
+           case elab_location ctx n expression of
+             INL ((ss, ref, ty), n1) =>
+               if is_stored_scalar_type ty ∨ memory_object_type ty then
+                 let (rs, a) = bind_value n1 (read_value_type ty) (ReadOperation ty ref) in
+                 INL ((ss ++ rs, a, ElabType (read_value_type ty)), n1 + 1)
+               else INR [(info.node_id, "read of a value of this type")]
+           | INR bs => INR bs)
     | SrcIndexAccess info root_expr index tid =>
         (case elab_expr ctx n root_expr of
            INL ((ss, ref, ElabType (LocatedT loc BytesT)), n1) =>
@@ -1226,6 +1312,29 @@ Definition elab_expr_def:
                    | INL _ => INR [(info.node_id, "unsupported external call")]
                    | INR bs => INR bs)
               | _ => INR [(info.node_id, "unsupported external call")]))
+    (* S(args): the arguments in the call's order, then the struct is
+       allocated, and each field converted and written in declaration order *)
+    | SrcStructConstructor info id args order tid =>
+        let sty = LocatedT MemoryLoc (StructT (AstId id)) in
+        (case OPTION_BIND (source_struct_members ctx.structs id) struct_field_types of
+           NONE => INR [(info.node_id, "unsupported struct constructor")]
+         | SOME fields =>
+           ensure (source_type_matches sty tid ∧ LENGTH args = LENGTH fields ∧
+                   argument_order_ok order (LENGTH args) ∧
+                   memory_binding_ok ctx.enums ctx.structs sty)
+             (info.node_id, "unsupported struct constructor")
+           (case elab_arg_values ctx n args of
+              INL ((ss, vs), n1) =>
+                (case (arrange order vs, arrange order (expr_ids args)) of
+                   (SOME vs', SOME ids) =>
+                     let (cs, a) = bind_value n1 sty (StructOperation (AstId id)) in
+                     (case convert_operands (n1 + 1) info.node_id ids (field_values fields) vs' of
+                        INL (css, _, as, n2) =>
+                          let (ws, n3) = field_writes n2 a fields as in
+                          INL ((ss ++ cs ++ css ++ ws, a, ElabType sty), n3)
+                      | INR bs => INR bs)
+                 | _ => INR [(info.node_id, "argument order")])
+            | INR bs => INR bs))
     (* new T(n) of a byte sequence or dynamic memory array type *)
     | SrcNew info tn e tid =>
         (case elab_expr ctx n e of
@@ -1274,7 +1383,9 @@ Definition elab_expr_def:
                 INL ((st, at, vt), n3) =>
                   (case identifier_type tid of
                      SOME ty =>
-                       if ¬(case ty of LocatedT loc _ => loc = MemoryLoc
+                       (* a memory struct's default would allocate one *)
+                       if ¬(case ty of LocatedT loc (StructT _) => F
+                                     | LocatedT loc _ => loc = MemoryLoc
                                      | _ => is_stored_scalar_type ty)
                        then reject (info.node_id, "unsupported conditional type")
                               (elab_expr ctx n f) else
@@ -1672,6 +1783,23 @@ Definition elab_expr_def:
                INL ((ss, ref, ty), n1) =>
                  INL ((ss, ReferenceDestination ref ty), n1)
              | INR bs => INR bs)
+    | SrcMemberAccess info root_expr member_id tid =>
+          (case memory_struct_root (elab_expr ctx n root_expr) of
+             SOME ((ss, ref, id), n1) =>
+               let (captured, n2) =
+                 snapshot n1 ref (ElabType (LocatedT MemoryLoc (StructT (AstId id)))) in
+               let (saved, ref') = captured in
+               (case source_struct_field ctx.structs id member_id of
+                  SOME fty =>
+                    let ety = element_type MemoryLoc fty in
+                    ensure (source_type_matches ety tid) (info.node_id, "type annotation mismatch")
+                    (INL ((ss ++ saved, FieldDestination ref' (AstId member_id) ety), n2))
+                | NONE => INR [(info.node_id, "unknown struct member")])
+           | NONE =>
+             case elab_location ctx n e of
+               INL ((ss, ref, ty), n1) =>
+                 INL ((ss, ReferenceDestination ref ty), n1)
+             | INR bs => INR bs)
     | _ =>
         case elab_location ctx n e of
           INL ((ss, ref, ty), n1) =>
@@ -1723,7 +1851,10 @@ Definition declaration_ok_def:
   declaration_ok ctx assigned decls ⇔
     decls ≠ [] ∧
     assigned = MAP (OPTION_MAP (λ(v : src_variable). v.var_info.node_id)) decls ∧
-    EVERY (λd. case d of NONE => T | SOME v => v.var_scope = ctx.scope) decls
+    EVERY (λd. case d of NONE => T | SOME v => v.var_scope = ctx.scope) decls ∧
+    EVERY (λd. case OPTION_BIND d variable_type of
+                 SOME ty => memory_binding_ok ctx.enums ctx.structs ty
+               | NONE => T) decls
 End
 
 (* The variables of a declaration statement, defined from its values, which
@@ -2229,28 +2360,36 @@ Definition elab_modifier_args_def:
   (elab_modifier_args ctx n id _ _ = INR [(id, "modifier argument count")])
 End
 
-(* A static memory array return variable starts as a zeroed array, allocated
- * on entry. *)
+(* A static memory array or memory struct return variable starts as a zeroed
+ * one, allocated on entry. *)
+Definition allocated_return_def:
+  (allocated_return (LocatedT MemoryLoc (ArrayT element (SOME k))) =
+    SOME (ArrayT element (SOME k))) ∧
+  (allocated_return (LocatedT MemoryLoc (StructT s)) = SOME (StructT s)) ∧
+  (allocated_return _ = NONE)
+End
+
 Definition return_defaults_def:
   (return_defaults n [] = ([], n)) ∧
   (return_defaults n ((x, ty) :: rs) =
-    case ty of
-      LocatedT MemoryLoc (ArrayT element (SOME k)) =>
+    case allocated_return ty of
+      SOME element =>
         let (ss, n1) = return_defaults (n + 2) rs in
-          (DefineStmt (AstId n) (SingleType ty)
-             (DefaultMemoryOperation (ArrayT element (SOME k))) ::
+          (DefineStmt (AstId n) (SingleType ty) (DefaultMemoryOperation element) ::
            assign_local (n + 1) x ty (BoundAtom (AstId n)) ++ ss, n1)
-    | _ => return_defaults n rs)
+    | NONE => return_defaults n rs)
 End
 
-(* The compiler allocates a static memory return array once and passes it
- * through a function's modifiers, so a body run twice by `_; _;` sees its
- * first run's writes. Procedures here start from fresh return values, so
- * modified functions with such returns are rejected. *)
+(* The compiler allocates a static memory return array or a memory return
+ * struct once and passes it through a function's modifiers, so a body run
+ * twice by `_; _;` sees its first run's writes. Procedures here start from
+ * fresh return values, so modified functions with such returns are
+ * rejected. *)
 Definition static_memory_returns_def:
   (static_memory_returns [] ⇔ F) ∧
   (static_memory_returns ((x, ty) :: rs) ⇔
-    (case ty of LocatedT MemoryLoc (ArrayT _ (SOME _)) => T | _ => F) ∨
+    (case ty of LocatedT MemoryLoc (ArrayT _ (SOME _)) => T
+              | LocatedT MemoryLoc (StructT _) => T | _ => F) ∨
     static_memory_returns rs)
 End
 
@@ -2373,8 +2512,14 @@ Definition elab_function_def:
           (f.fn_info.node_id, "super call of an unsupported function")
         (ensure (f.fn_kind ≠ FallbackKind ∨ (f.fn_parameters = [] ∧ f.fn_returns = []))
            (f.fn_info.node_id, "fallback with parameters or returns")
+        (ensure ((f.fn_selector = NONE ∧ f.fn_kind ≠ ConstructorKind) ∨
+                 EVERY (λ(_, ty). struct_free ty) (ps ++ rs))
+           (f.fn_info.node_id, "struct parameter or return of an external function")
+        (ensure (EVERY (λ(_, ty). memory_binding_ok c.contract_enums c.contract_structs ty)
+                   (ps ++ rs))
+           (f.fn_info.node_id, "unsupported memory struct type")
         (elab_levels (function_ctx ctx library f supers (ps ++ rs) rs info.node_id)
-          modifiers ps rs f.fn_info.node_id n f.fn_modifiers ss))
+          modifiers ps rs f.fn_info.node_id n f.fn_modifiers ss))))
     | (SOME _, SOME _, SrcBlock _ _, NONE) =>
         INR [(f.fn_info.node_id, "unresolved super call")]
     | (SOME _, SOME _, _, _) => INR [(f.fn_info.node_id, "function body not a block")]
@@ -2417,15 +2562,6 @@ Definition core_state_variables_def:
                  state_offset := e.storage_offset |> :: cvs)
     | NONE => NONE) ∧
   (core_state_variables _ _ = NONE)
-End
-
-Definition elab_type_declarations_def:
-  elab_type_declarations enums structs =
-    OPTION_MAP (λds. MAP (λ(id, members). (AstId id, EnumDeclaration members)) enums ++ ds)
-    (all_some (MAP (λs.
-      OPTION_MAP (λfields. (AstId s.struct_info.node_id, StructDeclaration fields))
-        (all_some (MAP (λv. OPTION_MAP (λty. (AstId v.var_info.node_id, ty))
-                           (field_variable_type v)) s.struct_members))) structs))
 End
 
 Definition elab_struct_layouts_def:
@@ -3073,6 +3209,12 @@ QED
 val () = cv_auto_trans selector_encoding_def;
 val () = cv_auto_trans abi_encoding_def;
 val () = cv_auto_trans arrange_def;
+val () = cv_auto_trans elab_type_declarations_def;
+val () = cv_auto_trans memory_binding_ok_def;
+val () = cv_auto_trans memory_struct_root_def;
+val () = cv_auto_trans struct_field_types_def;
+val () = cv_auto_trans field_values_def;
+val () = cv_auto_trans field_writes_def;
 
 val elab_expr_pre_def = cv_auto_trans_pre_rec
   "elab_expr_pre elab_args_pre elab_values_pre elab_components_pre elab_location_pre elab_destination_pre elab_arg_values_pre"
@@ -3191,7 +3333,15 @@ Proof
 QED
 val () = cv_auto_trans return_writes_def;
 val () = cv_auto_trans placeholder_call_def;
-val () = cv_auto_trans return_defaults_def;
+val return_defaults_pre_def =
+  cv_auto_trans_pre "return_defaults_pre" return_defaults_def;
+
+Theorem return_defaults_pre[cv_pre,local]:
+  ∀rs n. return_defaults_pre n rs
+Proof
+  Induct >> simp[Once return_defaults_pre_def]
+QED
+
 val () = cv_auto_trans static_memory_returns_def;
 val () = cv_auto_trans flag_def;
 val () = cv_auto_trans set_flag_def;
@@ -3284,7 +3434,6 @@ val () = cv_auto_trans elab_function_def;
 val () = cv_auto_trans contract_ctx_def;
 val () = cv_auto_trans elab_functions_def;
 val () = cv_auto_trans core_state_variables_def;
-val () = cv_auto_trans elab_type_declarations_def;
 val () = cv_auto_trans elab_struct_layouts_def;
 val () = cv_auto_trans getter_location_def;
 val () = cv_auto_trans getter_result_def;

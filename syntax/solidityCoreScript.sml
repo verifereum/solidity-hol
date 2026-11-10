@@ -83,8 +83,8 @@ Datatype:
 End
 
 (* BindTarget includes local variables and temporaries. ReferenceFieldTarget
- * is an element of a memory array (its heap object, index and element type):
- * a write stores a scalar or rebinds a reference, never copies contents.
+ * is an element of a memory array or a field of a memory struct (its heap
+ * object, cell index and type): a write stores a scalar or rebinds a reference, never copies contents.
  *)
 Datatype:
   captured_target
@@ -112,8 +112,12 @@ End
  * ty. AllocateMemoryOperation ty n: new ty(n), a zeroed byte sequence or
  * dynamic array of length n. ArrayIndexOperation a i: element i of the memory
  * or calldata array a. CopyToMemoryOperation a: a new memory copy of the
- * calldata array a. Keccak256Operation a: the Keccak-256 hash of the memory
- * byte sequence a, as bytes32. EcrecoverOperation h v r s: ecrecover(h, v, r,
+ * calldata or storage array or struct a. StructOperation s: a new memory
+ * struct of the declaration s, a word per field, as a constructor allocates
+ * it before converting and writing each field. FieldOperation a f: field f of
+ * the memory struct a.
+ * Keccak256Operation a: the Keccak-256 hash of the memory byte sequence a, as
+ * bytes32. EcrecoverOperation h v r s: ecrecover(h, v, r,
  * s), the address the signature (v, r, s) of the bytes32 hash h recovers, or
  * address(0) if it is invalid; v is a uint8 and r and s are bytes32.
  * AbiDecodeOperation types a: abi.decode(a, (types)) of the memory bytes a
@@ -147,6 +151,8 @@ Datatype:
   | ByteIndexOperation core_atom core_atom
   | ArrayIndexOperation core_atom core_atom
   | CopyToMemoryOperation core_atom
+  | StructOperation ast_id
+  | FieldOperation core_atom ast_id
   | ArrayLengthOperation core_atom
   | Keccak256Operation core_atom
   | EcrecoverOperation core_atom core_atom core_atom core_atom

@@ -182,6 +182,9 @@ Datatype:
   | SrcExternalCall node_info src_external bool (src_expr list) (num list) string
   | SrcTypeMember node_info string src_type_name string
   | SrcNew node_info src_type_name src_expr string
+  (* S(args), the struct S's constructor: the arguments in the call's order,
+   * then for each member the index of its argument when they are named *)
+  | SrcStructConstructor node_info num (src_expr list) (num list) string
   | SrcEnumValue node_info src_type_name num string
   | SrcKeccak256 node_info node_info src_expr string
   | SrcModular node_info node_info core_operator (src_expr list) string
@@ -505,6 +508,52 @@ Definition decode_located_array_def:
     | [] => NONE
 End
 
+(* Struct names are display metadata; declaration IDs determine identity.
+ * Keep every other character, including location/pointer suffixes. *)
+Definition canonical_storage_identifier_def:
+  (canonical_storage_identifier (mode : num) (skip : num) [] = []) ∧
+  (canonical_storage_identifier mode skip (c :: cs) =
+    if skip ≠ 0 then canonical_storage_identifier mode (skip - 1) cs
+    else if mode = 1 then
+      if c = #"_" ∧ isPREFIX "$" cs ∧ ¬isPREFIX "$$" cs then
+        "_$" ++ canonical_storage_identifier 0 1 cs
+      else canonical_storage_identifier 1 0 cs
+    else if mode = 2 then
+      if c = #")" then ")" ++ canonical_storage_identifier 0 0 cs
+      else canonical_storage_identifier 2 0 cs
+    else if isPREFIX "t_struct$_" (c :: cs) then
+      "t_struct$_" ++ canonical_storage_identifier 1 9 cs
+    else if isPREFIX "t_struct(" (c :: cs) then
+      "t_struct(" ++ canonical_storage_identifier 2 8 cs
+    else c :: canonical_storage_identifier 0 0 cs)
+End
+
+(* The struct of a canonical typeIdentifier c "t_struct$__$<id>" ++ sfx. *)
+Definition struct_with_suffix_def:
+  struct_with_suffix sfx c =
+    if isPREFIX "t_struct$__$" c ∧ isPREFIX (REVERSE sfx) (REVERSE c) ∧
+       12 + LENGTH sfx < LENGTH c
+    then OPTION_MAP (λid. StructT (AstId id))
+           (fromDecString (TAKE (LENGTH c - (12 + LENGTH sfx)) (DROP 12 c)))
+    else NONE
+End
+
+(* A struct's typeIdentifier: unlocated in storage, as storage arrays are, or
+ * a pointer to one in a location. *)
+Definition decode_struct_identifier_def:
+  decode_struct_identifier s =
+    let c = canonical_storage_identifier 0 0 s in
+    case struct_with_suffix "_storage_ptr" c of
+      SOME ty => SOME (LocatedT StorageLoc ty)
+    | NONE =>
+    case struct_with_suffix "_memory_ptr" c of
+      SOME ty => SOME (LocatedT MemoryLoc ty)
+    | NONE =>
+    case struct_with_suffix "_calldata_ptr" c of
+      SOME ty => SOME (LocatedT CalldataLoc ty)
+    | NONE => struct_with_suffix "_storage" c
+End
+
 Definition decode_elementary_identifier_def:
   decode_elementary_identifier s =
     if isPREFIX "t_array$_" s then
@@ -528,6 +577,7 @@ Definition decode_elementary_identifier_def:
     else if s = "t_address_payable" then SOME (AddressT PayableAddress)
     else if isPREFIX "t_enum_" s then
       OPTION_MAP (λid. EnumT (AstId id)) (fromDecString (DROP 7 s))
+    else if isPREFIX "t_struct$_" s then decode_struct_identifier s
     else if isPREFIX "t_" s ∧ s ≠ "t_uint" ∧ s ≠ "t_int" then
       elementary_type (DROP 2 s)
     else NONE
@@ -658,11 +708,22 @@ Proof
   metis_tac[normalize_type_name_shape]
 QED
 
+Theorem decode_struct_identifier_valid[local]:
+  decode_struct_identifier s = SOME ty ⇒ valid_type_shape ty
+Proof
+  ‘∀sfx c ty. struct_with_suffix sfx c = SOME ty ⇒ ∃id. ty = StructT id’
+    by rw[struct_with_suffix_def, optionTheory.OPTION_MAP_EQ_SOME] >>
+  rw[decode_struct_identifier_def, AllCaseEqs()] >> res_tac >>
+  gvs[valid_type_shape_def, outer_location_free_def, location_shape_ok_def,
+      is_reference_type_def, contains_mapping_def]
+QED
+
 Theorem decode_elementary_identifier_valid:
   decode_elementary_identifier s = SOME ty ⇒ valid_type_shape ty
 Proof
   rw[decode_elementary_identifier_def, decode_located_array_def, AllCaseEqs()] >>
   imp_res_tac elementary_type_valid >>
+  imp_res_tac decode_struct_identifier_valid >>
   gvs[valid_type_shape_def, outer_location_free_def, location_shape_ok_def,
       is_reference_type_def, contains_mapping_def]
 QED
@@ -753,26 +814,6 @@ Definition storage_layout_identifier_def:
   (storage_layout_identifier ty = storage_type_identifier ty)
 End
 
-(* Struct names are display metadata; declaration IDs determine identity.
- * Keep every other character, including location/pointer suffixes. *)
-Definition canonical_storage_identifier_def:
-  (canonical_storage_identifier (mode : num) (skip : num) [] = []) ∧
-  (canonical_storage_identifier mode skip (c :: cs) =
-    if skip ≠ 0 then canonical_storage_identifier mode (skip - 1) cs
-    else if mode = 1 then
-      if c = #"_" ∧ isPREFIX "$" cs ∧ ¬isPREFIX "$$" cs then
-        "_$" ++ canonical_storage_identifier 0 1 cs
-      else canonical_storage_identifier 1 0 cs
-    else if mode = 2 then
-      if c = #")" then ")" ++ canonical_storage_identifier 0 0 cs
-      else canonical_storage_identifier 2 0 cs
-    else if isPREFIX "t_struct$_" (c :: cs) then
-      "t_struct$_" ++ canonical_storage_identifier 1 9 cs
-    else if isPREFIX "t_struct(" (c :: cs) then
-      "t_struct(" ++ canonical_storage_identifier 2 8 cs
-    else c :: canonical_storage_identifier 0 0 cs)
-End
-
 (* Memory and calldata types: an array's elements are values or pointers in
  * the same location. *)
 Definition located_type_identifier_def:
@@ -781,6 +822,8 @@ Definition located_type_identifier_def:
     (case length of SOME n => toString n | NONE => "dyn") ++ location_suffix loc) ∧
   (located_type_identifier loc BytesT = "t_bytes" ++ location_suffix loc) ∧
   (located_type_identifier loc StringT = "t_string" ++ location_suffix loc) ∧
+  (located_type_identifier loc (StructT (AstId id)) =
+    "t_struct$__$" ++ toString id ++ location_suffix loc) ∧
   (located_type_identifier loc ty = storage_type_identifier ty)
 End
 
@@ -794,15 +837,16 @@ Definition source_type_matches_def:
 End
 
 (* A parameter, return or local variable: an elementary value type in the
- * default location, a byte sequence in any location or a memory array,
- * agreeing with its typeIdentifier.
+ * default location, a byte sequence in any location or a memory array or
+ * struct, agreeing with its typeIdentifier.
  *)
 Definition variable_type_def:
   variable_type (v : src_variable) =
     case normalize_type_name v.var_type_name of
       SOME ty =>
         if byte_sequence_type ty ∨
-           (IS_SOME v.var_location ∧ case ty of ArrayT _ _ => T | _ => F) then
+           (IS_SOME v.var_location ∧
+            case ty of ArrayT _ _ => T | StructT _ => T | _ => F) then
           case v.var_location of
             SOME loc =>
               if located_value_type (LocatedT loc ty) ∧
@@ -937,6 +981,7 @@ Definition expr_ids_def:
     info.node_id :: exprs_ids operands) ∧
   (expr_ids (SrcNew info tn e _) =
     info.node_id :: type_name_ids tn ++ expr_ids e) ∧
+  (expr_ids (SrcStructConstructor info _ args _ _) = info.node_id :: exprs_ids args) ∧
   (expr_ids (SrcUnsupportedExpr info _ es) = info.node_id :: exprs_ids es) ∧
   (component_ids [] = []) ∧
   (component_ids (NONE :: cs) = component_ids cs) ∧

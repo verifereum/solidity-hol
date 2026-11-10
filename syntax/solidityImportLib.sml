@@ -568,7 +568,8 @@ fun argument_order call id skip =
         val params =
           List.drop
             (JSONUtil.arrayMap (fn p => string_field p "name")
-               (field (field d "parameters") "parameters"), skip)
+               (if node_type d = "StructDefinition" then field d "members"
+                else field (field d "parameters") "parameters"), skip)
         val indexed = ListPair.zip (List.tabulate (length names, fn i => i), names)
         fun index p =
           case List.find (fn (_, n) => n = p) indexed of
@@ -1042,6 +1043,12 @@ fun expr v = guarded (fn e => [ExprChild e]) unsupported_expr (fn v => within v 
                 con "SrcTypeConversion"
                   [info v, type_name (field callee "typeName"), hd args,
                    type_id v]))
+        | "structConstructorCall" =>
+            let val s = int_field callee "referencedDeclaration" in
+              con "SrcStructConstructor"
+                [info v, mk_num s, listSyntax.mk_list (args, expr_ty),
+                 argument_order v s 0, type_id v]
+            end
         | kind => fail (describe v ^ ": unsupported call kind " ^ kind)
       end
   | other =>
@@ -2033,7 +2040,7 @@ fun import_unit units v contracts = within v (fn v =>
         List.mapPartial
           (fn d => if List.exists (fn k => k = node_type d)
                         ["FunctionDefinition", "EventDefinition", "ErrorDefinition",
-                         "VariableDeclaration"]
+                         "VariableDeclaration", "StructDefinition"]
                    then SOME (int_field d "id", d) else NONE)
           (List.concat (map (fn u => JSONUtil.arrayMap I (field u "nodes")) units) @
            List.concat (map (fn (_, c) => JSONUtil.arrayMap I (field c "nodes")) declared))

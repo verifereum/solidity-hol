@@ -230,14 +230,47 @@ Definition byte_sequence_value_type_def:
     | _ => F
 End
 
-(* What a memory reference denotes: a byte sequence, or an array whose
- * elements are elementary values or, as pointers, other memory objects. *)
+(* What a memory reference denotes: a byte sequence, a struct, or an array
+ * whose elements are elementary values or, as pointers, other memory objects.
+ * A struct's fields are checked against its declaration by memory_type_ok. *)
 Definition memory_object_type_def:
   (memory_object_type (ArrayT element length) ⇔
     valid_array_length length ∧
     ((is_elementary_type element ∧ valid_type_shape element) ∨
      memory_object_type element)) ∧
+  (memory_object_type (StructT _) ⇔ T) ∧
   (memory_object_type ty ⇔ byte_sequence_type ty)
+End
+
+(* The structs a memory object type reaches are declared, and each field is a
+ * stored scalar or, as a pointer, a memory object: no mapping or function
+ * type. The fuel bounds the struct nesting, so a recursive struct fails. *)
+Definition memory_type_ok_def:
+  (memory_type_ok env (n : num) (ArrayT element _) ⇔ memory_type_ok env n element) ∧
+  (memory_type_ok env n (StructT id) ⇔
+    if n = 0 then F else
+    case lookup_struct env id of
+      SOME fields => memory_fields_ok env (n - 1) (MAP SND fields)
+    | NONE => F) ∧
+  (memory_type_ok env n _ ⇔ T) ∧
+  (memory_fields_ok env n [] ⇔ T) ∧
+  (memory_fields_ok env n (ty :: tys) ⇔
+    (is_stored_scalar_type ty ∨ (memory_object_type ty ∧ memory_type_ok env n ty)) ∧
+    memory_fields_ok env n tys)
+Termination
+  WF_REL_TAC ‘inv_image ($< LEX $<) (λx. case x of
+    INL (env, n, ty) => (n, sol_type_size ty)
+  | INR (env, n, tys) => (n, list_size sol_type_size tys))’ >>
+  rw[list_size_def]
+End
+
+(* Whether a type reaches no struct, through array elements: the ABI values
+ * the core encodes and decodes. *)
+Definition struct_free_def:
+  (struct_free (StructT _) ⇔ F) ∧
+  (struct_free (ArrayT ty _) ⇔ struct_free ty) ∧
+  (struct_free (LocatedT _ ty) ⇔ struct_free ty) ∧
+  (struct_free _ ⇔ T)
 End
 
 (* Whether an encoding of the type has a fixed size, with no offsets. *)
@@ -271,25 +304,34 @@ Definition located_value_type_def:
     | _ => F
 End
 
-(* The type of an element of a memory or calldata array: a value, or a
- * reference in the array's location. *)
+(* The type of an element of a memory or calldata array, or of a field of a
+ * memory struct: a value, or a reference in the object's location. *)
 Definition element_type_def:
   element_type loc element =
-    if is_elementary_type element then element else LocatedT loc element
+    if is_stored_scalar_type element then element else LocatedT loc element
 End
 
 (* ABI values contain scalars (an enum as a uint8), byte sequences in
- * memory/calldata and memory arrays; storage pointers never cross an ABI
- * boundary. *)
+ * memory/calldata and memory arrays without structs; storage pointers never
+ * cross an ABI boundary. *)
 Definition abi_value_type_def:
   abi_value_type ty ⇔
     is_stored_scalar_type ty ∨
-    (located_value_type ty ∧
+    (located_value_type ty ∧ struct_free ty ∧
      case ty of LocatedT StorageLoc _ => F | _ => T)
 End
 
+(* A located binding's structs are declared: a storage one's with a layout,
+ * a memory one's as memory_type_ok checks. *)
 Definition core_binding_type_def:
-  core_binding_type env ty ⇔ core_scalar_type env ty ∨ located_value_type ty
+  core_binding_type env ty ⇔
+    core_scalar_type env ty ∨
+    (located_value_type ty ∧
+     case ty of
+       LocatedT StorageLoc element => storage_type_ok env element
+     | LocatedT MemoryLoc element =>
+         memory_type_ok env (LENGTH env.type_declarations) element
+     | _ => T)
 End
 
 (* ProductType is reserved for tuples and multiple returns: never singleton. *)
@@ -730,7 +772,23 @@ Definition wf_core_operation_def:
       (BoundAtom x, SingleType (LocatedT MemoryLoc ty)) =>
         (ALOOKUP ctx.bindings x = SOME (SingleType (LocatedT CalldataLoc ty)) ∨
          ALOOKUP ctx.bindings x = SOME (SingleType (LocatedT StorageLoc ty))) ∧
-        located_value_type (LocatedT MemoryLoc ty) ∧ (case ty of ArrayT _ _ => T | _ => F)
+        located_value_type (LocatedT MemoryLoc ty) ∧ (case ty of ArrayT _ _ => T | StructT _ => T | _ => F)
+    | _ => F) ∧
+  (wf_core_operation env ctx annotation (StructOperation s) ⇔
+    annotation = SingleType (LocatedT MemoryLoc (StructT s)) ∧
+    IS_SOME (lookup_struct env s)) ∧
+  (wf_core_operation env ctx annotation (FieldOperation a f) ⇔
+    case a of
+      BoundAtom x =>
+        (case ALOOKUP ctx.bindings x of
+           SOME (SingleType (LocatedT MemoryLoc (StructT s))) =>
+             (case lookup_struct env s of
+                SOME fields =>
+                  (case ALOOKUP fields f of
+                     SOME ty => annotation = SingleType (element_type MemoryLoc ty)
+                   | NONE => F)
+              | NONE => F)
+         | _ => F)
     | _ => F) ∧
   (wf_core_operation env ctx annotation (Keccak256Operation a) ⇔
     annotation = SingleType (FixedBytesT 32) ∧
@@ -1257,6 +1315,23 @@ Definition check_core_stmts_def:
              else NONE
          | _ => NONE)
     | _ => NONE) ∧
+  (check_core_stmts env ctx (CaptureReferenceFieldStmt t a (FieldNavigation f) :: ss) =
+    case a of
+      BoundAtom x =>
+        (case ALOOKUP ctx.bindings x of
+           SOME (SingleType (LocatedT MemoryLoc (StructT s))) =>
+             (case lookup_struct env s of
+                SOME fields =>
+                  (case ALOOKUP fields f of
+                     SOME ty =>
+                       if fresh_core_id ctx t
+                       then check_core_stmts env
+                              (capture_core_target t (element_type MemoryLoc ty) ctx) ss
+                       else NONE
+                   | NONE => NONE)
+              | NONE => NONE)
+         | _ => NONE)
+    | _ => NONE) ∧
   (check_core_stmts env ctx (CaptureReferenceFieldStmt t a (IndexNavigation i) :: ss) =
     case a of
       BoundAtom x =>
@@ -1549,6 +1624,12 @@ QED
 (* The checked preparation boundary executes the complete checker through cv. *)
 val () = cv_auto_trans core_program_environment_def;
 val () = cv_auto_trans_rec mapping_reachable_def (
+  WF_REL_TAC ‘inv_image ($< LEX $<) (λx. case x of
+    INL (env, n, ty) => (cv$c2n n, cv_size ty)
+  | INR (env, n, tys) => (cv$c2n n, cv_size tys))’ >>
+  cv_termination_tac
+);
+val () = cv_auto_trans_rec memory_type_ok_def (
   WF_REL_TAC ‘inv_image ($< LEX $<) (λx. case x of
     INL (env, n, ty) => (cv$c2n n, cv_size ty)
   | INR (env, n, tys) => (cv$c2n n, cv_size tys))’ >>

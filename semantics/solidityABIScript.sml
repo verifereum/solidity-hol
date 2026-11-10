@@ -493,23 +493,33 @@ Definition copy_calldata_array_def:
 End
 
 (* The memory a value of type ty takes once materialized: each array's
- * elements and length word, and each byte sequence's length and data. *)
+ * elements and length word, each struct's fields, and each byte sequence's
+ * length and data. *)
 Definition memory_value_size_def:
-  (memory_value_size ty v =
+  (memory_value_size env ty v =
     case (ty, v) of
       (ArrayT element length, TupleValue vs) =>
         (if length = NONE then 32 else 0) + 32 * LENGTH vs +
-        memory_values_size element vs
+        memory_values_size env element vs
+    | (StructT s, TupleValue vs) =>
+        32 * LENGTH vs +
+        (case lookup_struct env s of
+           SOME fields => memory_fields_size env (MAP SND fields) vs
+         | NONE => 0)
     | (_, ScalarValue (BytesValue bs)) =>
         if byte_sequence_type ty then 32 + 32 * ((LENGTH bs + 31) DIV 32) else 0
     | _ => 0) ∧
-  (memory_values_size element [] = 0) ∧
-  (memory_values_size element (v :: vs) =
-    memory_value_size element v + memory_values_size element vs)
+  (memory_values_size env element [] = 0) ∧
+  (memory_values_size env element (v :: vs) =
+    memory_value_size env element v + memory_values_size env element vs) ∧
+  (memory_fields_size env (ty :: tys) (v :: vs) =
+    memory_value_size env ty v + memory_fields_size env tys vs) ∧
+  (memory_fields_size env _ _ = 0)
 Termination
   WF_REL_TAC ‘measure (λx. case x of
-    INL (ty, v) => runtime_value_size v
-  | INR (element, vs) => list_size runtime_value_size vs)’ >>
+    INL (env, ty, v) => runtime_value_size v
+  | INR (INL (env, element, vs)) => list_size runtime_value_size vs
+  | INR (INR (env, tys, vs)) => list_size runtime_value_size vs)’ >>
   rw[solidityCoreTheory.runtime_value_size_def, listTheory.list_size_def]
 End
 
@@ -519,13 +529,15 @@ End
 Definition array_copy_value_def:
   array_copy_value env (st : source_state) ty r =
     case r of
-      MemoryReference _ _ _ => memory_array_value st ty (ReferenceValue r)
+      MemoryReference _ _ _ =>
+        memory_array_value env (LENGTH env.type_declarations) st ty (ReferenceValue r)
     | CalldataReference data n rty =>
         if rty ≠ ty then INR (InvalidCompletion "bad calldata array reference")
         else calldata_value st.frame.call_data ty data n
     | StorageReference PersistentStorage addr slot 0 rty _ =>
         if rty ≠ ty then INR (InvalidCompletion "bad storage array reference")
-        else storage_array_value env st.world.accounts addr slot ty
+        else storage_array_value env (LENGTH env.type_declarations)
+               st.world.accounts addr slot ty
     | _ => INR (InvalidCompletion "bad array reference")
 End
 
@@ -582,9 +594,9 @@ Definition decode_arguments_def:
 End
 
 (* A decoded memory value as heap objects, allocated in decoding order: an
- * array before its elements. *)
+ * array or struct before its elements or fields. *)
 Definition materialize_value_def:
-  (materialize_value ty v (st : source_state) =
+  (materialize_value env ty v (st : source_state) =
     case (ty, v) of
       (ArrayT element length, TupleValue vs) =>
         let n = LENGTH vs in
@@ -595,43 +607,67 @@ Definition materialize_value_def:
         let st1 = st with <| heap := st.heap |+ (id, obj); next_heap_id := id;
                      memory_allocated := st.memory_allocated +
                        (if length = NONE then 32 else 0) + 32 * n |> in
-        (case materialize_values element 0 vs FEMPTY st1 of
+        (case materialize_values env element 0 vs FEMPTY st1 of
            SOME (cells, st2) =>
              SOME (ReferenceValue (MemoryReference (HeapId id) 0 ty),
                    st2 with heap := st2.heap |+ (id, obj with object_cells := cells))
+         | NONE => NONE)
+    | (StructT s, TupleValue vs) =>
+        (case lookup_struct env s of
+           SOME fields =>
+             let n = LENGTH vs in
+             let id = st.next_heap_id + 1 in
+             let obj = <| object_type := ty; object_length := n;
+                          object_cells := FEMPTY;
+                          object_address := 128 + st.memory_allocated |> in
+             let st1 = st with <| heap := st.heap |+ (id, obj); next_heap_id := id;
+                          memory_allocated := st.memory_allocated + 32 * n |> in
+             (case materialize_fields env (MAP SND fields) 0 vs FEMPTY st1 of
+                SOME (cells, st2) =>
+                  SOME (ReferenceValue (MemoryReference (HeapId id) 0 ty),
+                        st2 with heap := st2.heap |+ (id, obj with object_cells := cells))
+              | NONE => NONE)
          | NONE => NONE)
     | (_, ScalarValue (BytesValue bs)) =>
         if byte_sequence_type ty then SOME (allocate_bytes ty bs st)
         else SOME (v, st)
     | (_, ScalarValue _) => SOME (v, st)
     | _ => NONE) ∧
-  (materialize_values element i [] cells st = SOME (cells, st)) ∧
-  (materialize_values element i (v :: vs) cells st =
-    case materialize_value element v st of
+  (materialize_values env element i [] cells st = SOME (cells, st)) ∧
+  (materialize_values env element i (v :: vs) cells st =
+    case materialize_value env element v st of
       SOME (value, st1) =>
-        materialize_values element (i + 1) vs (cells |+ (i, value)) st1
-    | NONE => NONE)
+        materialize_values env element (i + 1) vs (cells |+ (i, value)) st1
+    | NONE => NONE) ∧
+  (materialize_fields env [] i [] cells st = SOME (cells, st)) ∧
+  (materialize_fields env (ty :: tys) i (v :: vs) cells st =
+    case materialize_value env ty v st of
+      SOME (value, st1) =>
+        materialize_fields env tys (i + 1) vs (cells |+ (i, value)) st1
+    | NONE => NONE) ∧
+  (materialize_fields env _ i _ cells st = NONE)
 Termination
   WF_REL_TAC ‘measure (λx. case x of
-    INL (ty, v, st) => runtime_value_size v
-  | INR (element, i, vs, cells, st) => list_size runtime_value_size vs)’ >>
+    INL (env, ty, v, st) => runtime_value_size v
+  | INR (INL (env, element, i, vs, cells, st)) => list_size runtime_value_size vs
+  | INR (INR (env, tys, i, vs, cells, st)) => list_size runtime_value_size vs)’ >>
   rw[solidityCoreTheory.runtime_value_size_def, listTheory.list_size_def]
 End
 
 (* Decoded memory payloads become heap objects before a procedure sees them.
  * Calldata payloads retain slices into the frame's original call_data. *)
 Definition materialize_arguments_def:
-  (materialize_arguments [] [] st = SOME ([], st)) ∧
-  (materialize_arguments (ty :: tys) (v :: vs) st =
+  (materialize_arguments env [] [] st = SOME ([], st)) ∧
+  (materialize_arguments env (ty :: tys) (v :: vs) st =
     case (case ty of
-            LocatedT MemoryLoc element => materialize_value element v st
+            LocatedT MemoryLoc element => materialize_value env element v st
           | _ => SOME (v, st)) of
       SOME (value, st1) =>
-        (case materialize_arguments tys vs st1 of
+        (case materialize_arguments env tys vs st1 of
            SOME (values, st2) => SOME (value :: values, st2)
          | NONE => NONE)
     | NONE => NONE) ∧
-  (materialize_arguments _ _ _ = NONE)
+  (materialize_arguments _ _ _ _ = NONE)
 End
 
 (* Revert data of Panic(uint256), selector 0x4e487b71. *)
@@ -782,16 +818,18 @@ Proof
 QED
 val () = cv_auto_trans copy_calldata_array_def;
 val memory_value_size_pre_def = cv_auto_trans_pre_rec
-  "memory_value_size_pre memory_values_size_pre" memory_value_size_def (
+  "memory_value_size_pre memory_values_size_pre memory_fields_size_pre" memory_value_size_def (
   WF_REL_TAC ‘measure (λx. case x of
-    INL (ty, v) => cv_size v
-  | INR (element, vs) => cv_size vs)’ >>
+    INL (env, ty, v) => cv_size v
+  | INR (INL (env, element, vs)) => cv_size vs
+  | INR (INR (env, tys, vs)) => cv_size vs)’ >>
   cv_termination_tac
 );
 
 Theorem memory_value_size_pre[cv_pre]:
-  (∀ty v. memory_value_size_pre ty v) ∧
-  (∀element vs. memory_values_size_pre element vs)
+  (∀env ty v. memory_value_size_pre env ty v) ∧
+  (∀env element vs. memory_values_size_pre env element vs) ∧
+  (∀env tys vs. memory_fields_size_pre env tys vs)
 Proof
   ho_match_mp_tac memory_value_size_ind >> rpt strip_tac >>
   simp[Once memory_value_size_pre_def] >> rw[] >> gvs[]
@@ -801,16 +839,18 @@ val () = cv_auto_trans array_copy_value_def;
 val () = cv_auto_trans decode_abi_argument_def;
 val () = cv_auto_trans decode_abi_arguments_def;
 val () = cv_auto_trans decode_arguments_def;
-val materialize_value_pre_def = cv_auto_trans_pre_rec "materialize_value_pre materialize_values_pre" materialize_value_def (
+val materialize_value_pre_def = cv_auto_trans_pre_rec "materialize_value_pre materialize_values_pre materialize_fields_pre" materialize_value_def (
   WF_REL_TAC ‘measure (λx. case x of
-    INL (ty, v, st) => cv_size v
-  | INR (element, i, vs, cells, st) => cv_size vs)’ >>
+    INL (env, ty, v, st) => cv_size v
+  | INR (INL (env, element, i, vs, cells, st)) => cv_size vs
+  | INR (INR (env, tys, i, vs, cells, st)) => cv_size vs)’ >>
   cv_termination_tac
 );
 
 Theorem materialize_value_pre[cv_pre]:
-  (∀ty v st. materialize_value_pre ty v st) ∧
-  (∀element i vs cells st. materialize_values_pre element i vs cells st)
+  (∀env ty v st. materialize_value_pre env ty v st) ∧
+  (∀env element i vs cells st. materialize_values_pre env element i vs cells st) ∧
+  (∀env tys i vs cells st. materialize_fields_pre env tys i vs cells st)
 Proof
   ho_match_mp_tac materialize_value_ind >> rpt strip_tac >>
   simp[Once materialize_value_pre_def] >> rw[] >> gvs[] >>
@@ -822,7 +862,7 @@ val materialize_arguments_pre_def =
   cv_auto_trans_pre "materialize_arguments_pre" materialize_arguments_def;
 
 Theorem materialize_arguments_pre[cv_pre]:
-  ∀tys vs st. materialize_arguments_pre tys vs st
+  ∀env tys vs st. materialize_arguments_pre env tys vs st
 Proof
   ho_match_mp_tac materialize_arguments_ind >> rpt strip_tac >>
   simp[Once materialize_arguments_pre_def] >> rw[] >> fs[]
