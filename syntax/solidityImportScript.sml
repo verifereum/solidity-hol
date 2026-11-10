@@ -650,14 +650,15 @@ Definition tuple_component_def:
 End
 
 (* The components of a tuple identifier from its `$`-separated fields,
- * rejoining an array's fields: "_t_array" opens an array and a dimension,
- * the one field without a leading "_", closes one. *)
+ * rejoining an array's or a struct's fields: "_t_array" or "_t_struct"
+ * opens one, and the field without a leading "_" (a dimension, or a struct's
+ * id and location) closes it. *)
 Definition tuple_identifier_components_def:
   (tuple_identifier_components (depth : num) acc [] =
     if depth = 0 ∧ acc = "" then SOME [] else NONE) ∧
   (tuple_identifier_components depth acc (f :: fs) =
     let component = if acc = "" then f else acc ++ "$" ++ f in
-    let depth' = if f = "_t_array" then depth + 1
+    let depth' = if f = "_t_array" ∨ f = "_t_struct" then depth + 1
                  else if isPREFIX "_" f then depth else depth - 1 in
     if depth' = 0 then
       case tuple_identifier_components 0 "" fs of
