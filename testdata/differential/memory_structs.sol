@@ -26,7 +26,15 @@ contract MemoryStructs {
         uint16 b;
     }
 
+    enum Color { Red, Green }
+
+    struct Paint {
+        Color c;
+        uint8 n;
+    }
+
     Packed packed;
+    Paint paint;
 
     function positional(uint64 x, int32 y) public pure returns (uint64, int32) {
         Point memory p = Point(x, y);
@@ -85,6 +93,11 @@ contract MemoryStructs {
         Packed memory p = packed;
         packed.a = a;
         return (p.a, packed.a);
+    }
+
+    function paintCopy() public view returns (uint8) {
+        Paint memory p = paint;
+        return p.n;
     }
 
     function passing(uint64 x) public pure returns (uint64, uint64) {

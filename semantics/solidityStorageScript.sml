@@ -286,6 +286,15 @@ End
  * declaration order, byte sequences as their bytes and scalars cleaned. A
  * length of 2^64 or more panics with 0x41, as the compiler's copies do. The
  * fuel bounds the struct nesting. *)
+(* A struct field read for a copy: an enum byte out of range panics, as the
+ * compiler's cleanup does when it writes each member of the copy. *)
+Definition stored_field_value_def:
+  stored_field_value env ty x =
+    if (case ty of EnumT _ => ¬scalar_has_type env ty x | _ => F)
+    then INR (PanicCompletion panic_enum_conversion)
+    else INL (ScalarValue x)
+End
+
 Definition storage_array_value_def:
   (storage_array_value env (fuel : num) accounts addr slot ty =
     if byte_sequence_type ty then
@@ -339,7 +348,7 @@ Definition storage_array_value_def:
         let value =
           if is_stored_scalar_type ty then
             (case read_storage accounts addr s v.state_offset ty of
-               SOME x => INL (ScalarValue x)
+               SOME x => stored_field_value env ty x
              | NONE => INR (InvalidCompletion "bad storage read"))
           else storage_array_value env fuel accounts addr s ty in
         case value of
@@ -653,6 +662,7 @@ val () = cv_auto_trans copy_storage_bytes_def;
 val () = cv_auto_trans storage_element_location_def;
 val () = cv_auto_trans fixed_array_element_def;
 val () = cv_auto_trans storage_array_data_def;
+val () = cv_auto_trans stored_field_value_def;
 
 val storage_array_value_pre_def = cv_auto_trans_pre_rec
   "storage_array_value_pre storage_array_elements_pre storage_struct_fields_pre" storage_array_value_def (
