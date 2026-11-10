@@ -123,4 +123,30 @@ contract MemoryStructs {
         Line memory l = Line(Point(1, 2), Point(3, 4), t, "abc", ws, pr);
         return (l.data.length, l.pair[0] + l.tag, l.ws[1]);
     }
+
+    // A conditional joins struct references without allocating: writes
+    // through the result reach the chosen operand.
+    function scalarJoin(bool c) public pure returns (uint256, uint64, uint64) {
+        Point memory a = Point(1, 2);
+        Point memory b = Point(3, 4);
+        uint256 beforePointer;
+        assembly { beforePointer := mload(0x40) }
+        Point memory r = c ? a : b;
+        uint256 afterPointer;
+        assembly { afterPointer := mload(0x40) }
+        r.x = 9;
+        return (afterPointer - beforePointer, a.x, b.x);
+    }
+
+    function tupleJoin(bool c) public pure returns (uint256, uint64, uint64, uint256) {
+        Point memory a = Point(1, 2);
+        Point memory b = Point(3, 4);
+        uint256 beforePointer;
+        assembly { beforePointer := mload(0x40) }
+        (Point memory r, uint256 tag) = c ? (a, uint256(1)) : (b, uint256(2));
+        uint256 afterPointer;
+        assembly { afterPointer := mload(0x40) }
+        r.x = 9;
+        return (afterPointer - beforePointer, a.x, b.x, tag);
+    }
 }

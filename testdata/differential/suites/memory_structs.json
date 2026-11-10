@@ -216,6 +216,68 @@
           1
         ]
       }
+    },
+    {
+      "name": "scalar_join_true",
+      "function": "scalarJoin",
+      "args": [
+        true
+      ],
+      "storage": {},
+      "expect": {
+        "return": [
+          0,
+          9,
+          3
+        ]
+      }
+    },
+    {
+      "name": "scalar_join_false",
+      "function": "scalarJoin",
+      "args": [
+        false
+      ],
+      "storage": {},
+      "expect": {
+        "return": [
+          0,
+          1,
+          9
+        ]
+      }
+    },
+    {
+      "name": "tuple_join_true",
+      "function": "tupleJoin",
+      "args": [
+        true
+      ],
+      "storage": {},
+      "expect": {
+        "return": [
+          0,
+          9,
+          3,
+          1
+        ]
+      }
+    },
+    {
+      "name": "tuple_join_false",
+      "function": "tupleJoin",
+      "args": [
+        false
+      ],
+      "storage": {},
+      "expect": {
+        "return": [
+          0,
+          1,
+          9,
+          2
+        ]
+      }
     }
   ]
 }
