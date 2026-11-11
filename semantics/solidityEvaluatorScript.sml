@@ -477,10 +477,8 @@ Definition write_target_def:
         (case update_binding x v st.scopes of
            SOME scopes => SOME (st with scopes := scopes)
          | NONE => NONE)
-    | (SOME (ValueTarget (MemoryReference h i (FixedBytesT 1))), SOME (ScalarValue s)) =>
-        write_memory_byte (MemoryReference h i (FixedBytesT 1)) s st
-    | (SOME (ValueTarget (MemoryReference (HeapId id) i _)), SOME v) =>
-        write_memory_element id i v st
+    | (SOME (ValueTarget (MemoryReference h i ty)), SOME v) =>
+        write_memory_reference (MemoryReference h i ty) v st
     | (SOME (ReferenceFieldTarget (HeapId id) i _), SOME v) =>
         write_memory_element id i v st
     | (SOME (ValueTarget (ImmutableReference x)), SOME (ScalarValue s)) =>
