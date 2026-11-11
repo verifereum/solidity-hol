@@ -167,7 +167,7 @@ Datatype:
   | AbiEncodeOperation (core_atom option) (sol_type list) (core_atom list)
   | AbiEncodePackedOperation (sol_type list) (core_atom list)
   | AbiDecodeOperation (sol_type list) core_atom
-  | ArrayPushOperation core_atom (core_atom option)
+  | ArrayPushOperation core_atom
   | ArrayPopOperation core_atom
   | InternalCallOperation ast_id (core_atom list)
   | ExternalCallOperation external_kind (byte list) (sol_type list)

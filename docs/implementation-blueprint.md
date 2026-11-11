@@ -58,6 +58,18 @@ atoms or change scopes. `solidityEvaluator` owns atom evaluation, bindings,
 captured targets, frame checks and control flow. Its static-frame write rejection
 is deliberate and remains `InvalidCompletion`.
 
+Storage array growth appends a location with `ArrayPushOperation`. A
+`push(value)` then uses ordinary assignment to that location, sharing scalar
+writes and aggregate content copies. Length and element access use the array's
+data location and element layout. Memory allocation recursively creates the
+element's default value.
+
+Array pop clears the last element before reducing the length. One typed
+storage clear handles packed scalar offsets, struct fields, nested arrays and
+byte sequences; mappings retain their entries. Runtime-recursive storage
+structs use the evaluator's fuel in addition to the declaration-depth bound.
+An exhausted traversal reports fuel exhaustion.
+
 ## Evaluator interfaces and validation
 
 The evaluator exposes unconditional block, loop and call equations in

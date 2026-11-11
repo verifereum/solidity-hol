@@ -475,7 +475,7 @@ End
  * Update length before the value write, including in the presence of slot
  * collisions; pop clears the scalar before updating length. *)
 Definition push_storage_array_def:
-  push_storage_array env x annotation a value (st : source_state) gas =
+  push_storage_array env x annotation a (st : source_state) gas =
     if st.frame.static_context then
       abrupt_result (InvalidCompletion "array push in static frame") st gas
     else case eval_atom st.scopes a of
@@ -491,29 +491,18 @@ Definition push_storage_array_def:
              (case write_storage st.world.accounts addr slot 0 (UintT 256)
                      (IntegerValue (&(old_length + 1))) of
                 SOME accounts =>
-                  let updated =
-                    case value of
-                      NONE => SOME accounts
-                    | SOME v =>
-                        (case eval_atom st.scopes v of
-                           SOME (ScalarValue s) =>
-                             write_storage accounts addr data_slot offset element s
-                         | _ => NONE) in
-                  (case updated of
-                     SOME accounts' =>
-                       normal_result
-                         (define_binding x annotation
-                           (ReferenceValue (StorageReference PersistentStorage addr
-                              data_slot offset element layout))
-                           (st with world := st.world with accounts := accounts')) gas
-                   | NONE => abrupt_result (InvalidCompletion "bad array push value") st gas)
+                  normal_result
+                    (define_binding x annotation
+                      (ReferenceValue (StorageReference PersistentStorage addr
+                         data_slot offset element layout))
+                      (st with world := st.world with accounts := accounts)) gas
               | NONE => abrupt_result (InvalidCompletion "bad array length write") st gas)
          | _ => abrupt_result (InvalidCompletion "bad array push element") st gas)
     | _ => abrupt_result (InvalidCompletion "bad dynamic array reference") st gas
 End
 
 Definition pop_storage_array_def:
-  pop_storage_array env x annotation a (st : source_state) gas =
+  pop_storage_array n env x annotation a (st : source_state) gas =
     if st.frame.static_context then
       abrupt_result (InvalidCompletion "array pop in static frame") st gas
     else case eval_atom st.scopes a of
@@ -522,12 +511,13 @@ Definition pop_storage_array_def:
         let old_length = w2n (lookup_storage slot
               (lookup_account addr st.world.accounts).storage) in
         if old_length = 0 then abrupt_result (PanicCompletion 49) st gas else
-        (case (fixed_array_element env addr (mapping_slot [] slot) element
-                 old_length layout (&(old_length - 1)), default_scalar env element) of
-           (ValueOk (ReferenceValue
-             (StorageReference PersistentStorage _ data_slot offset _ _)), SOME scalar_zero) =>
-             (case write_storage st.world.accounts addr data_slot offset element scalar_zero of
-                SOME accounts =>
+        (case fixed_array_element env addr (mapping_slot [] slot) element
+                 old_length layout (&(old_length - 1)) of
+           ValueOk (ReferenceValue
+             (StorageReference PersistentStorage _ data_slot offset _ _)) =>
+             (case clear_storage_value env (n + LENGTH env.type_declarations)
+                     st.world.accounts addr data_slot offset element of
+                INL accounts =>
                   (case write_storage accounts addr slot 0 (UintT 256)
                           (IntegerValue (&(old_length - 1))) of
                      SOME accounts' =>
@@ -535,7 +525,7 @@ Definition pop_storage_array_def:
                          (define_binding x annotation (TupleValue [])
                            (st with world := st.world with accounts := accounts')) gas
                    | NONE => abrupt_result (InvalidCompletion "bad array length write") st gas)
-              | NONE => abrupt_result (InvalidCompletion "bad array element clear") st gas)
+              | INR c => abrupt_result c st gas)
          | _ => abrupt_result (InvalidCompletion "bad array pop element") st gas)
     | _ => abrupt_result (InvalidCompletion "bad dynamic array reference") st gas
 End
@@ -799,7 +789,7 @@ End
 
 (* Every statement except internal calls, if and while. *)
 Definition simple_stmt_def:
-  simple_stmt env s st gas =
+  simple_stmt n env s st gas =
     case s of
       DefineStmt x ty (BytesLiteralOperation element bs) =>
         let (v, st') = allocate_bytes T element bs st in
@@ -858,10 +848,10 @@ Definition simple_stmt_def:
         abi_encode env x ty selector tys args st gas
     | DefineStmt x ty (AbiEncodePackedOperation tys args) =>
         abi_encode_packed x ty tys args st gas
-    | DefineStmt x ty (ArrayPushOperation a value) =>
-        push_storage_array env x ty a value st gas
+    | DefineStmt x ty (ArrayPushOperation a) =>
+        push_storage_array env x ty a st gas
     | DefineStmt x ty (ArrayPopOperation a) =>
-        pop_storage_array env x ty a st gas
+        pop_storage_array n env x ty a st gas
     | DefineStmt x ty (ExternalCallOperation kind selector params rets target
                          value g args) =>
         call_external env x ty kind selector params rets target value g args st gas
@@ -1447,7 +1437,7 @@ Definition eval_block_def:
     eval_loop n env prelude c body st gas) ∧
   (eval_stmt n env (AssemblyStmt code refs) st gas =
     eval_assembly n env code refs st gas) ∧
-  (eval_stmt n env s st gas = simple_stmt env s st gas) ∧
+  (eval_stmt n env s st gas = simple_stmt n env s st gas) ∧
   (* One iteration in a pushed scope; fuel is spent on the back edge. *)
   (eval_loop n env prelude c body st gas =
     let r1 = eval_block n env prelude (push_scope st) gas in

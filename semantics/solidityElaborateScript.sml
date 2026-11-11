@@ -732,7 +732,7 @@ Definition abi_argument_def:
         (case ty of
            LocatedT _ element =>
              if byte_sequence_type element ∨
-                (¬packed ∧ memory_object_type element ∧ struct_free element)
+                (¬packed ∧ memory_object_type element ∧ abi_object_type element)
              then INL (LocatedT MemoryLoc element, a)
              else INR "abi encoding of this type"
          | _ => INR "abi encoding of this type")
@@ -857,19 +857,6 @@ Definition index_value_ok_def:
       ElabType (UintT _) => T
     | ElabLiteral => (case a of ConstantAtom (IntegerValue i) => 0 ≤ i | _ => F)
     | _ => F
-End
-
-(* An element dynamic storage arrays push and pop. *)
-Definition push_element_ok_def:
-  push_element_ok element ⇔
-    case element of EnumT _ => T | _ => elementary_storage_type_ok element
-End
-
-(* An element dynamic storage arrays push with no value: also a struct,
- * whose new element is the storage it now covers. *)
-Definition empty_push_element_ok_def:
-  empty_push_element_ok element ⇔
-    case element of StructT _ => T | _ => push_element_ok element
 End
 
 (* A call of an internal function or a super call, annotated with tid: as
@@ -1437,9 +1424,7 @@ Definition elab_expr_def:
            SrcArrayMember _ member root_expr _ =>
              (case elab_location ctx n root_expr of
                 INL ((ss, ref, ArrayT element NONE), n1) =>
-                  if order ≠ [] ∨
-                     ¬(if member = "push" ∧ args = [] then empty_push_element_ok element
-                       else push_element_ok element)
+                  if order ≠ []
                   then INR [(info.node_id, "unsupported array member call")] else
                   if member = "push" then
                     (case args of
@@ -1451,18 +1436,24 @@ Definition elab_expr_def:
                          let (rs, a) = bind_value (n1 + 1) ty
                                          (ReadOperation element target) in
                          INL ((ss ++ [DefineStmt (AstId n1) (ReferenceType element)
-                                        (ArrayPushOperation ref NONE)] ++ rs,
+                                        (ArrayPushOperation ref)] ++ rs,
                                a, ElabType ty), n1 + 2)
                      | [arg] =>
                          ensure (tid = "t_tuple$__$") (info.node_id, "type annotation mismatch")
-                         (case elab_expr ctx n1 arg of
+                         (let array_ty = ArrayT element NONE in
+                          let (saved, array) = bind_value n1 (LocatedT StorageLoc array_ty)
+                            (ReadOperation array_ty ref) in
+                          case elab_expr ctx (n1 + 1) arg of
                             INL ((sa, a, vt), n2) =>
-                              (case coerce n2 element a vt of
-                                 INL ((cs, a'), n3) =>
-                                   INL ((ss ++ sa ++ cs ++
-                                           [DefineStmt (AstId n3) (ReferenceType element)
-                                              (ArrayPushOperation ref (SOME a'))],
-                                         ConstantAtom (BoolValue F), ElabTuple []), n3 + 1)
+                              let target = ReferenceDestination (BoundAtom (AstId n2)) element in
+                              if ¬copy_target_ok ctx.enums ctx.structs target
+                              then INR [(info.node_id, "storage copy of this type")] else
+                              (case plain_assignment (n2 + 1) target a vt of
+                                 INL ((cs, _, _), n3) =>
+                                   INL ((ss ++ saved ++ sa ++
+                                           [DefineStmt (AstId n2) (ReferenceType element)
+                                              (ArrayPushOperation array)] ++ cs,
+                                         ConstantAtom (BoolValue F), ElabTuple []), n3)
                                | INR why => INR [(expr_id arg, why)])
                           | INR bs => INR bs)
                      | _ => INR [(info.node_id, "unsupported array member call")])
@@ -1523,7 +1514,7 @@ Definition elab_expr_def:
                    argument_order_ok order (LENGTH params) ∧
                    decode_type_identifier tid = SOME (call_value_type rets) ∧
                    EVERY (λty. case ty of EnumT _ => F | _ => T) rets ∧
-                   EVERY struct_free (params ++ rets)
+                   EVERY abi_value_type (params ++ rets)
                 then INL (params, rets) else INR (info.node_id, "unsupported external call")
             | _ => INR (info.node_id, "unsupported external call")) in
          case (shape, elab_arg_values ctx n operands) of
@@ -2055,11 +2046,11 @@ Definition elab_expr_def:
     | SrcFunctionCall info (SrcArrayMember _ member root_expr _) [] [] tid =>
         (case elab_location ctx n root_expr of
            INL ((ss, ref, ArrayT element NONE), n1) =>
-             if ¬(member = "push" ∧ empty_push_element_ok element ∧
+             if ¬(member = "push" ∧
                   source_type_matches element tid)
              then INR [(info.node_id, "unsupported array member call")] else
              INL ((ss ++ [DefineStmt (AstId n1) (ReferenceType element)
-                            (ArrayPushOperation ref NONE)],
+                            (ArrayPushOperation ref)],
                    BoundAtom (AstId n1), element), n1 + 1)
          | INL _ => INR [(info.node_id, "unsupported array member call")]
          | INR bs => INR bs)
@@ -2621,7 +2612,7 @@ Definition elab_stmts_def:
            then INR (info.node_id, "emit does not match the event") else
            (case all_some (MAP event_parameter e.event_parameters) of
               SOME ps =>
-                if EVERY (struct_free o FST) ps then INL (e, ps)
+                if EVERY (abi_value_type o FST) ps then INL (e, ps)
                 else INR (info.node_id, "unsupported event parameter type")
             | NONE => INR (info.node_id, "unsupported event parameter type"))) in
     case (event, elab_arg_values ctx n args) of
@@ -2892,7 +2883,7 @@ Definition elab_function_def:
         (ensure ((f.fn_selector = NONE ∧ f.fn_kind ≠ ConstructorKind) ∨
                  EVERY (λ(_, ty). case ty of
                                     LocatedT StorageLoc _ => T
-                                  | _ => struct_free ty) (ps ++ rs))
+                                  | _ => abi_value_type ty) (ps ++ rs))
            (f.fn_info.node_id, "struct parameter or return of an external function")
         (ensure (EVERY (λ(_, ty). memory_binding_ok c.contract_enums c.contract_structs ty)
                    (ps ++ rs))

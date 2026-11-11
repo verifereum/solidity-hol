@@ -245,7 +245,7 @@ End
 Definition memory_object_type_def:
   (memory_object_type (ArrayT element length) ⇔
     valid_array_length length ∧
-    ((is_elementary_type element ∧ valid_type_shape element) ∨
+    ((is_stored_scalar_type element ∧ valid_type_shape element) ∨
      memory_object_type element)) ∧
   (memory_object_type (StructT _) ⇔ T) ∧
   (memory_object_type ty ⇔ byte_sequence_type ty)
@@ -261,6 +261,7 @@ Definition memory_type_ok_def:
     case lookup_struct env id of
       SOME fields => memory_fields_ok env (n - 1) (MAP SND fields)
     | NONE => F) ∧
+  (memory_type_ok env n (EnumT id) ⇔ IS_SOME (lookup_enum env id)) ∧
   (memory_type_ok env n _ ⇔ T) ∧
   (memory_fields_ok env n [] ⇔ T) ∧
   (memory_fields_ok env n (ty :: tys) ⇔
@@ -308,7 +309,9 @@ Definition calldata_object_type_def:
     (is_elementary_type element ∧ valid_type_shape element) ∨
     calldata_object_type element) ∧
   (calldata_object_type (ArrayT element (SOME n)) ⇔
-    memory_object_type (ArrayT element (SOME n)) ∧ static_object_type element) ∧
+    valid_array_length (SOME n) ∧ static_object_type element ∧
+    ((is_elementary_type element ∧ valid_type_shape element) ∨
+     calldata_object_type element)) ∧
   (calldata_object_type ty ⇔ byte_sequence_type ty)
 End
 
@@ -331,14 +334,25 @@ Definition element_type_def:
     if is_stored_scalar_type element then element else LocatedT loc element
 End
 
-(* ABI values contain scalars (an enum as a uint8), byte sequences in
- * memory/calldata and memory arrays without structs; storage pointers never
- * cross an ABI boundary. *)
+(* Object types supported by the ABI reader: bytes or arrays with elementary
+ * leaves. Declared aggregate and enum leaves need environment-aware decoding. *)
+Definition abi_object_type_def:
+  (abi_object_type (ArrayT element length) ⇔
+    valid_array_length length ∧
+    ((is_elementary_type element ∧ valid_type_shape element) ∨
+     abi_object_type element)) ∧
+  (abi_object_type ty ⇔ byte_sequence_type ty)
+End
+
+(* ABI values contain scalars (an enum as a uint8) or supported objects in
+ * memory/calldata; storage pointers never cross an ABI boundary. *)
 Definition abi_value_type_def:
   abi_value_type ty ⇔
     is_stored_scalar_type ty ∨
-    (located_value_type ty ∧ struct_free ty ∧
-     case ty of LocatedT StorageLoc _ => F | _ => T)
+    (located_value_type ty ∧
+     case ty of LocatedT StorageLoc _ => F
+              | LocatedT _ element => abi_object_type element
+              | _ => F)
 End
 
 (* A located binding's structs are declared: a storage one's with a layout,
@@ -891,18 +905,13 @@ Definition wf_core_operation_def:
          | SOME (ReferenceType (ArrayT _ NONE)) => T
          | _ => F)
     | _ => F) ∧
-  (wf_core_operation env ctx annotation (ArrayPushOperation a value) ⇔
+  (wf_core_operation env ctx annotation (ArrayPushOperation a) ⇔
     case a of
       BoundAtom x =>
         (case storage_base (ALOOKUP ctx.bindings x) of
            SOME (ArrayT element NONE) =>
              storage_type_ok env element ∧
-             annotation = ReferenceType element ∧
-             (case value of
-                NONE => T
-              | SOME v =>
-                  IS_SOME (storage_bytes element) ∧
-                  wf_core_atom env ctx (SingleType element) v)
+             annotation = ReferenceType element
          | _ => F)
     | _ => F) ∧
   (wf_core_operation env ctx annotation (ArrayPopOperation a) ⇔
@@ -911,7 +920,7 @@ Definition wf_core_operation_def:
       BoundAtom x =>
         (case storage_base (ALOOKUP ctx.bindings x) of
            SOME (ArrayT element NONE) =>
-             storage_type_ok env element ∧ IS_SOME (storage_bytes element)
+             storage_type_ok env element
          | _ => F)
     | _ => F) ∧
   (wf_core_operation env ctx annotation (InternalCallOperation f args) ⇔

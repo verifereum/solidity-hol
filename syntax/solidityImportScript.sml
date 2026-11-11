@@ -570,7 +570,9 @@ End
  * decode_struct_identifier gives it). *)
 Definition array_element_def:
   array_element loc name =
-    if isPREFIX "t_struct$_" name then
+    if isPREFIX "t_enum_" name then
+      OPTION_MAP (λid. EnumT (AstId id)) (fromDecString (DROP 7 name))
+    else if isPREFIX "t_struct$_" name then
       case decode_struct_identifier name of
         SOME (LocatedT loc' (StructT id)) =>
           if loc' = loc ∧ loc ≠ StorageLoc then SOME (StructT id) else NONE

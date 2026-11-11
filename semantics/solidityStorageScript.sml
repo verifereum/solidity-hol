@@ -376,8 +376,13 @@ End
  * alone. A dynamic length of 2^64 or more cannot be cleared within any gas
  * limit. The fuel bounds the struct nesting. *)
 Definition clear_storage_value_def:
-  (clear_storage_value env (fuel : num) accounts addr slot ty =
-    if byte_sequence_type ty then
+  (clear_storage_value env (fuel : num) accounts addr slot offset ty =
+    if is_stored_scalar_type ty then
+      (case write_storage accounts addr slot offset ty (IntegerValue 0) of
+         SOME accounts' => INL accounts'
+       | NONE => INR (InvalidCompletion "bad storage clear"))
+    else if offset ≠ 0 then INR (InvalidCompletion "unaligned storage clear")
+    else if byte_sequence_type ty then
       (case storage_byte_length accounts addr slot of
          INR c => INR c
        | INL length =>
@@ -394,7 +399,7 @@ Definition clear_storage_value_def:
              if 2 ** 64 ≤ length then INR FuelExhausted else
              let accounts1 = if l = NONE then set_storage_word accounts addr slot 0w
                              else accounts in
-             if is_elementary_type element then
+             if is_stored_scalar_type element then
                (case fixed_storage_slots env (ArrayT element (SOME length)) of
                   SOME slots => INL (clear_byte_slots slots accounts1 addr data)
                 | NONE => INL accounts1)
@@ -402,16 +407,17 @@ Definition clear_storage_value_def:
     | StructT s =>
         (case (lookup_struct env s, lookup_struct_layout env s) of
            (SOME fields, SOME layout) =>
-             if fuel = 0 then INR (InvalidCompletion "struct nesting") else
+             if fuel = 0 then INR FuelExhausted else
              clear_storage_fields env (fuel - 1) accounts addr slot layout.struct_fields fields
          | _ => INR (InvalidCompletion "missing struct layout"))
-    | _ => INR (InvalidCompletion "bad storage array type")) ∧
+    | MappingT _ _ => INL accounts
+    | _ => INR (InvalidCompletion "bad storage clear type")) ∧
   (clear_storage_elements env fuel accounts addr data element i n =
     if n = 0 then INL accounts else
     case storage_element_location env data element i of
       NONE => INR (InvalidCompletion "bad array element type")
-    | SOME (s, _) =>
-        case clear_storage_value env fuel accounts addr s element of
+    | SOME (s, offset) =>
+        case clear_storage_value env fuel accounts addr s offset element of
           INR c => INR c
         | INL accounts' =>
             clear_storage_elements env fuel accounts' addr data element (i + 1) (n - 1)) ∧
@@ -421,28 +427,47 @@ Definition clear_storage_value_def:
       NONE => INR (InvalidCompletion "missing field layout")
     | SOME v =>
         let s = slot + v.state_slot in
-        let cleared =
-          if is_stored_scalar_type ty then
-            (* the zero number, whatever the scalar's type *)
-            (case write_storage accounts addr s v.state_offset ty (IntegerValue 0) of
-               SOME accounts' => INL accounts'
-             | NONE => INR (InvalidCompletion "bad storage write"))
-          else case ty of
-            MappingT _ _ => INL accounts
-          | _ => clear_storage_value env fuel accounts addr s ty in
+        let cleared = clear_storage_value env fuel accounts addr s v.state_offset ty in
         case cleared of
           INR c => INR c
         | INL accounts' =>
             clear_storage_fields env fuel accounts' addr slot layout fields)
 Termination
   WF_REL_TAC ‘inv_image ($< LEX $< LEX $<) (λx. case x of
-    INL (env, fuel, accounts, addr, slot, ty) => (fuel, sol_type_size ty, 0)
+    INL (env, fuel, accounts, addr, slot, offset, ty) => (fuel, sol_type_size ty, 0)
   | INR (INL (env, fuel, accounts, addr, data, element, i, n)) =>
       (fuel, sol_type_size element, n + 1)
   | INR (INR (env, fuel, accounts, addr, slot, layout, fields)) =>
       (fuel, list_size (sol_type_size o SND) fields, 1))’ >>
   rw[solidityASTTheory.sol_type_size_def, listTheory.list_size_def]
 End
+
+Theorem clear_storage_fuel_stable:
+  (∀env fuel accounts addr slot offset ty m.
+     clear_storage_value env fuel accounts addr slot offset ty ≠ INR FuelExhausted ∧
+     fuel ≤ m ⇒
+     clear_storage_value env m accounts addr slot offset ty =
+       clear_storage_value env fuel accounts addr slot offset ty) ∧
+  (∀env fuel accounts addr data element i n m.
+     clear_storage_elements env fuel accounts addr data element i n ≠ INR FuelExhausted ∧
+     fuel ≤ m ⇒
+     clear_storage_elements env m accounts addr data element i n =
+       clear_storage_elements env fuel accounts addr data element i n) ∧
+  (∀env fuel accounts addr slot layout fields m.
+     clear_storage_fields env fuel accounts addr slot layout fields ≠ INR FuelExhausted ∧
+     fuel ≤ m ⇒
+     clear_storage_fields env m accounts addr slot layout fields =
+       clear_storage_fields env fuel accounts addr slot layout fields)
+Proof
+  ho_match_mp_tac clear_storage_value_ind >> rpt strip_tac >>
+  qpat_x_assum ‘_ ≠ INR FuelExhausted’ mp_tac
+  >~ [‘clear_storage_value env m accounts addr slot offset ty = _’] >-
+   (Cases_on ‘ty’ >> once_rewrite_tac[clear_storage_value_def] >>
+    simp[byte_sequence_type_def] >> rw[] >> gvs[AllCaseEqs()] >>
+    metis_tac[DECIDE “(fuel:num) ≤ m ⇒ fuel - 1 ≤ m - 1”])
+  >> once_rewrite_tac[clear_storage_value_def] >> rw[] >>
+  gvs[AllCaseEqs()] >> metis_tac[]
+QED
 
 (* Writes the value of a src array into cleared storage of type dst, each
  * scalar converted as an implicit conversion does. Past the cleared length,
@@ -506,7 +531,7 @@ Definition store_storage_value_def:
                   | _ => INR (InvalidCompletion "bad element conversion"))
              | _ => INR (InvalidCompletion "bad stored element"))
           else
-            (case clear_storage_value env fuel accounts addr s dst of
+            (case clear_storage_value env fuel accounts addr s offset dst of
                INR c => INR c
              | INL cleared => store_storage_value env fuel cleared addr s src dst v) in
         case stored of
@@ -533,7 +558,7 @@ Definition store_storage_value_def:
             MappingT _ _ => INL accounts
           | StructT _ => store_storage_value env fuel accounts addr s ty ty v
           | _ =>
-            (case clear_storage_value env fuel accounts addr s ty of
+            (case clear_storage_value env fuel accounts addr s 0 ty of
                INR c => INR c
              | INL cleared => store_storage_value env fuel cleared addr s ty ty v) in
         case stored of
@@ -559,7 +584,7 @@ Definition copy_to_storage_def:
       StorageReference PersistentStorage addr slot 0 ty _ =>
         if static then INR (InvalidCompletion "array copy in static frame") else
         let fuel = LENGTH env.type_declarations in
-        (case clear_storage_value env fuel accounts addr slot ty of
+        (case clear_storage_value env fuel accounts addr slot 0 ty of
            INR c => INR c
          | INL cleared => store_storage_value env fuel cleared addr slot src ty v)
     | _ => INR (InvalidCompletion "bad storage array reference")
@@ -690,7 +715,7 @@ QED
 val clear_storage_value_pre_def = cv_auto_trans_pre_rec
   "clear_storage_value_pre clear_storage_elements_pre clear_storage_fields_pre" clear_storage_value_def (
   WF_REL_TAC ‘inv_image ($< LEX $< LEX $<) (λx. case x of
-    INL (env, fuel, accounts, addr, slot, ty) => (cv$c2n fuel, cv_size ty, 0)
+    INL (env, fuel, accounts, addr, slot, offset, ty) => (cv$c2n fuel, cv_size ty, 0)
   | INR (INL (env, fuel, accounts, addr, data, element, i, n)) =>
       (cv$c2n fuel, cv_size element, cv$c2n n + 1)
   | INR (INR (env, fuel, accounts, addr, slot, layout, fields)) =>
@@ -699,7 +724,7 @@ val clear_storage_value_pre_def = cv_auto_trans_pre_rec
 );
 
 Theorem clear_storage_value_pre[cv_pre]:
-  (∀env fuel accounts addr slot ty. clear_storage_value_pre env fuel accounts addr slot ty) ∧
+  (∀env fuel accounts addr slot offset ty. clear_storage_value_pre env fuel accounts addr slot offset ty) ∧
   (∀env fuel accounts addr data element i n.
      clear_storage_elements_pre env fuel accounts addr data element i n) ∧
   (∀env fuel accounts addr slot layout fields.
