@@ -645,8 +645,7 @@ Theorem asm_memory_reads:
     (ReturnCompletion [ScalarValue (IntegerValue 0xc0)], SOME [1w; 2w; 3w]) ∧
   run_asm_bytes [YulExprStmt (YulBuiltin YMStore [ylit 0x40w; ylit 0x100w])]
     [1w; 2w; 3w] =
-    (InvalidCompletion "assembly wrote memory outside the scratch space and byte sequence data",
-     SOME [1w; 2w; 3w]) ∧
+    (ReturnCompletion [ScalarValue (IntegerValue 0)], SOME [1w; 2w; 3w]) ∧
   run_asm_bytes [YulAssign ["r"] (YulBuiltin YMLoad [yadd (YulName "b") (ylit 0x60w)])]
     [1w; 2w; 3w] =
     (InvalidCompletion "assembly read memory it was not given", SOME [1w; 2w; 3w]) ∧
@@ -824,6 +823,203 @@ Proof
   CONV_TAC cv_eval
 QED
 
+(* Allocation. run_asm_alloc ty1 ty2 code runs code with memory locals "a"
+ * of type ty1 and "b" of type ty2, both at first the shared empty object
+ * (0x60), and "c", a uint256[] holding [5] at 0x80, so the free memory
+ * pointer starts at 0xc0; it returns a and b. It gives the completion, the
+ * object each returned reference names, as (id, address, padded, cells),
+ * cells read as uint256 for arrays and as bytes1 for byte sequences, and the
+ * memory allocated after. *)
+Definition asm_alloc_proc_def:
+  asm_alloc_proc ty1 ty2 code = <|
+    procedure_id := AstId 140;
+    parameters := [(AstId 143, LocatedT MemoryLoc (ArrayT (UintT 256) NONE))];
+    return_bindings := [(AstId 141, LocatedT MemoryLoc ty1);
+                        (AstId 142, LocatedT MemoryLoc ty2)];
+    body := [AssemblyStmt code [("a", AssemblyMemory (AstId 141) ty1);
+                                ("b", AssemblyMemory (AstId 142) ty2);
+                                ("c", AssemblyMemory (AstId 143) (ArrayT (UintT 256) NONE))];
+             ReturnStmt [BoundAtom (AstId 141); BoundAtom (AstId 142)]]
+  |>
+End
+
+Definition asm_alloc_object_def:
+  asm_alloc_object (st : source_state) v =
+    case v of
+      ReferenceValue (MemoryReference (HeapId id) 0 _) =>
+        (case FLOOKUP st.heap id of
+           SOME obj =>
+             SOME (id, obj.object_address, obj.object_padded,
+                   MAP (memory_cell obj (if byte_sequence_type obj.object_type
+                                         then FixedBytesT 1 else UintT 256))
+                       (COUNT_LIST obj.object_length))
+         | NONE => NONE)
+    | _ => NONE
+End
+
+Definition run_asm_alloc_def:
+  run_asm_alloc ty1 ty2 code =
+    let c = ArrayT (UintT 256) NONE in
+    let obj = <| object_type := c; object_length := 1;
+                 object_cells := FEMPTY |+ (0, ScalarValue (IntegerValue 5));
+                 object_address := 0x80; object_padded := T |> in
+    let st = initial_state with <|
+               heap := FEMPTY |+ (1, obj); next_heap_id := 1;
+               memory_allocated := 0x40 |> in
+    let env = core_program_environment <|
+      unsupported_procedures := []; procedures := [asm_alloc_proc ty1 ty2 code];
+      struct_layouts := []; type_declarations := [];
+      state_variables := []; immutables := [];
+      entry_procedure := AstId 140;
+      external_functions := []; receive_procedure := NONE;
+      fallback_procedure := NONE; creation_procedure := NONE |> in
+    let r = invoke_source 20 env (AstId 140)
+              [ReferenceValue (MemoryReference (HeapId 1) 0 c)] st [] in
+    (r.completion,
+     (case r.completion of
+        ReturnCompletion vs => MAP (asm_alloc_object r.state) vs
+      | _ => []),
+     r.state.memory_allocated)
+End
+
+val () = cv_auto_trans asm_alloc_object_def;
+val () = cv_auto_trans run_asm_alloc_def;
+
+Overload ymstore = “λp v. YulExprStmt (YulBuiltin YMStore [p; v])”
+Overload yname = “YulName”
+Overload uarr = “ArrayT (UintT 256) NONE”
+
+(* OpenZeppelin's _asSingletonArrays: two one-element arrays from the free
+ * memory pointer, which then points past them. *)
+Definition singletons_def:
+  singletons top =
+    [YulAssign ["a"] (YulBuiltin YMLoad [ylit 0x40w]);
+     ymstore (yname "a") (ylit 1w);
+     ymstore (yadd (yname "a") (ylit 0x20w)) (ylit 7w);
+     YulAssign ["b"] (yadd (yname "a") (ylit 0x40w));
+     ymstore (yname "b") (ylit 1w);
+     ymstore (yadd (yname "b") (ylit 0x20w)) (ylit 9w);
+     ymstore (ylit 0x40w) (yadd (yname "b") top)]
+End
+
+(* Uniswap v4's callHook, with three bytes written as the return data copy
+ * would: the padding is left unwritten unless the block zeroes it. *)
+Definition hook_bytes_def:
+  hook_bytes pad =
+    [YulAssign ["a"] (YulBuiltin YMLoad [ylit 0x40w]);
+     ymstore (ylit 0x40w) (yadd (yname "a") (ylit 0x40w));
+     ymstore (yname "a") (ylit 3w)] ++
+    (if pad then [ymstore (yadd (yname "a") (ylit 0x20w)) (ylit 0w)] else []) ++
+    [YulExprStmt (YulBuiltin YMStore8 [yadd (yname "a") (ylit 0x20w); ylit 1w]);
+     YulExprStmt (YulBuiltin YMStore8 [yadd (yname "a") (ylit 0x21w); ylit 2w]);
+     YulExprStmt (YulBuiltin YMStore8 [yadd (yname "a") (ylit 0x22w); ylit 3w])]
+End
+
+val () = cv_auto_trans singletons_def;
+val () = cv_auto_trans hook_bytes_def;
+
+Definition u256s_def:
+  u256s ns = MAP (λn. ScalarValue (IntegerValue (&n))) ns
+End
+
+Definition bytes1s_def:
+  bytes1s bs = MAP (λb. ScalarValue (BytesValue [b])) bs
+End
+
+val () = cv_auto_trans u256s_def;
+val () = cv_auto_trans bytes1s_def;
+
+Definition mref_def:
+  mref id ty = ReferenceValue (MemoryReference (HeapId id) 0 ty)
+End
+
+val () = cv_auto_trans mref_def;
+
+(* Objects a block allocates between the free memory pointer it started with
+ * and the one it leaves become new heap objects of the locals' types, and
+ * later allocations start past them; a local left where it was keeps its
+ * object. A byte sequence is padded only if the block zeroed its padding. *)
+Theorem asm_memory_alloc:
+  run_asm_alloc uarr uarr (singletons (ylit 0x40w)) =
+    (ReturnCompletion [mref 2 uarr; mref 3 uarr],
+     [SOME (2, 0xc0, T, u256s [7]); SOME (3, 0x100, T, u256s [9])], 0xc0) ∧
+  run_asm_alloc BytesT uarr (hook_bytes F) =
+    (ReturnCompletion [mref 2 BytesT; mref 0 uarr],
+     [SOME (2, 0xc0, F, bytes1s [1w; 2w; 3w]); NONE], 0x80) ∧
+  run_asm_alloc BytesT uarr (hook_bytes T) =
+    (ReturnCompletion [mref 2 BytesT; mref 0 uarr],
+     [SOME (2, 0xc0, T, bytes1s [1w; 2w; 3w]); NONE], 0x80) ∧
+  (* the pointer raised with nothing left there *)
+  run_asm_alloc uarr uarr [ymstore (ylit 0x40w) (ylit 0x200w)] =
+    (ReturnCompletion [mref 0 uarr; mref 0 uarr], [NONE; NONE], 0x180) ∧
+  (* two locals at one object of their type share it *)
+  run_asm_alloc uarr uarr
+    [YulAssign ["a"] (YulBuiltin YMLoad [ylit 0x40w]);
+     YulAssign ["b"] (yname "a");
+     ymstore (yname "a") (ylit 0w);
+     ymstore (ylit 0x40w) (yadd (yname "a") (ylit 0x20w))] =
+    (ReturnCompletion [mref 2 uarr; mref 2 uarr],
+     [SOME (2, 0xc0, T, []); SOME (2, 0xc0, T, [])], 0x60)
+Proof
+  CONV_TAC cv_eval
+QED
+
+(* What fails closed: a pointer lowered or past 2^64; an object not inside
+ * the memory the block allocated, or whose length word or elements it did
+ * not write; an element that doesn't round-trip; locals of different types
+ * at one address, or at overlapping objects; and a local moved to an
+ * existing object, of its type or another. *)
+Theorem asm_memory_alloc_invalid:
+  FST (run_asm_alloc uarr uarr [ymstore (ylit 0x40w) (ylit 0xa0w)]) =
+    InvalidCompletion "assembly lowered the free memory pointer or raised it past 2^64" ∧
+  FST (run_asm_alloc uarr uarr
+         [ymstore (ylit 0x40w) (YulBuiltin YShl [ylit 64w; ylit 1w])]) =
+    InvalidCompletion "assembly lowered the free memory pointer or raised it past 2^64" ∧
+  (* the pointer not raised past the second array *)
+  FST (run_asm_alloc uarr uarr (singletons (ylit 0x20w))) =
+    InvalidCompletion "assembly write-back failed" ∧
+  (* no length word *)
+  FST (run_asm_alloc uarr uarr
+         [YulAssign ["a"] (YulBuiltin YMLoad [ylit 0x40w]);
+          ymstore (ylit 0x40w) (yadd (yname "a") (ylit 0x40w))]) =
+    InvalidCompletion "assembly write-back failed" ∧
+  (* an element left unwritten *)
+  FST (run_asm_alloc uarr uarr
+         [YulAssign ["a"] (YulBuiltin YMLoad [ylit 0x40w]);
+          ymstore (yname "a") (ylit 1w);
+          ymstore (ylit 0x40w) (yadd (yname "a") (ylit 0x40w))]) =
+    InvalidCompletion "assembly write-back failed" ∧
+  (* a uint8 element of 256 *)
+  FST (run_asm_alloc (ArrayT (UintT 8) NONE) uarr
+         [YulAssign ["a"] (YulBuiltin YMLoad [ylit 0x40w]);
+          ymstore (yname "a") (ylit 1w);
+          ymstore (yadd (yname "a") (ylit 0x20w)) (ylit 256w);
+          ymstore (ylit 0x40w) (yadd (yname "a") (ylit 0x40w))]) =
+    InvalidCompletion "assembly write-back failed" ∧
+  (* bytes and uint256[] at one address *)
+  FST (run_asm_alloc BytesT uarr
+         [YulAssign ["a"] (YulBuiltin YMLoad [ylit 0x40w]);
+          YulAssign ["b"] (yname "a");
+          ymstore (yname "a") (ylit 0w);
+          ymstore (ylit 0x40w) (yadd (yname "a") (ylit 0x20w))]) =
+    InvalidCompletion "assembly write-back failed" ∧
+  (* b starts inside a's element *)
+  FST (run_asm_alloc uarr uarr
+         [YulAssign ["a"] (YulBuiltin YMLoad [ylit 0x40w]);
+          ymstore (yname "a") (ylit 1w);
+          YulAssign ["b"] (yadd (yname "a") (ylit 0x20w));
+          ymstore (yname "b") (ylit 0w);
+          ymstore (ylit 0x40w) (yadd (yname "a") (ylit 0x40w))]) =
+    InvalidCompletion "assembly write-back failed" ∧
+  (* aliasing c, and retyping it *)
+  FST (run_asm_alloc uarr uarr [YulAssign ["a"] (yname "c")]) =
+    InvalidCompletion "assembly write-back failed" ∧
+  FST (run_asm_alloc BytesT uarr [YulAssign ["a"] (yname "c")]) =
+    InvalidCompletion "assembly write-back failed"
+Proof
+  CONV_TAC cv_eval
+QED
+
 (* Padding. When the compiler's memory need not hold zeros past b's last
  * byte, the block is not given those bytes: a read of b's data word fails
  * closed, while its data bytes alone may be read. A block that writes the
@@ -878,8 +1074,8 @@ Proof
 QED
 
 (* What assembly_memory_ok admits: scratch written then read, the free
- * memory pointer read, and writes above the scratch space only in a block
- * that halts. *)
+ * memory pointer read and written as a word, and other writes above the
+ * scratch space only in a block that halts. *)
 Theorem asm_memory_rule:
   assembly_memory_ok
     [YulExprStmt (YulBuiltin YMStore [ylit 0w; YulName "x"]);
@@ -891,7 +1087,9 @@ Theorem asm_memory_rule:
   ¬assembly_memory_ok
     [YulExprStmt (YulBuiltin YMStore [ylit 1w; YulName "x"]);
      YulExprStmt (YulBuiltin YLog0 [ylit 0w; ylit 64w])] ∧
-  ¬assembly_memory_ok [YulExprStmt (YulBuiltin YMStore [ylit 64w; YulName "x"])] ∧
+  assembly_memory_ok [YulExprStmt (YulBuiltin YMStore [ylit 64w; YulName "x"])] ∧
+  ¬assembly_memory_ok [YulExprStmt (YulBuiltin YMStore [ylit 65w; YulName "x"])] ∧
+  ¬assembly_memory_ok [YulExprStmt (YulBuiltin YMStore8 [ylit 64w; YulName "x"])] ∧
   assembly_memory_ok
     [YulExprStmt (YulBuiltin YMStore [ylit 128w; YulName "x"]);
      YulExprStmt (YulBuiltin YReturn [ylit 128w; ylit 32w])] ∧
@@ -900,8 +1098,7 @@ Theorem asm_memory_rule:
   assembly_memory_ok
     [YulExprStmt (YulBuiltin YMStore8 [yadd (YulName "b") (ylit 32w); ylit 1w]);
      YulAssign ["x"] (YulBuiltin YMLoad [YulName "b"])] ∧
-  assembly_memory_ok [YulExprStmt (YulBuiltin YLog0 [ylit 128w; ylit 0w])] ∧
-  ¬assembly_memory_ok [YulExprStmt (YulBuiltin YMStore [ylit 64w; YulName "b"])]
+  assembly_memory_ok [YulExprStmt (YulBuiltin YLog0 [ylit 128w; ylit 0w])]
 Proof
   EVAL_TAC
 QED
@@ -1250,19 +1447,6 @@ Theorem asm_return_data_padding:
     ReturnCompletion [ScalarValue (IntegerValue 0x010203)]
 Proof
   CONV_TAC cv_eval
-QED
-
-(* A memory reference may not be assigned, except where a Yul function's
- * parameter or result reuses its name. *)
-Theorem asm_memory_assign_rule:
-  ¬assembly_assigns_ok ["b"] [YulAssign ["b"] (ylit 0w)] ∧
-  ¬assembly_assigns_ok ["b"] [YulIf (ylit 1w) [YulAssign ["x"; "b"] (YulApply "f" [])]] ∧
-  assembly_assigns_ok ["b"] [YulFunction "f" ["b"] [] [YulAssign ["b"] (ylit 0w)]] ∧
-  assembly_assigns_ok ["b"] [YulFunction "f" [] ["b"] [YulAssign ["b"] (ylit 0w)]] ∧
-  ¬assembly_assigns_ok ["b"] [YulFunction "f" ["x"] [] [YulAssign ["b"] (ylit 0w)]] ∧
-  assembly_assigns_ok ["b"] [YulAssign ["x"] (YulName "b")]
-Proof
-  EVAL_TAC
 QED
 
 Definition transient_counter_run_def:
