@@ -373,7 +373,9 @@ Definition read_destination_def:
        (if ty = BytesT then ByteIndexOperation array index
         else ArrayIndexOperation array index), n + 1)) ∧
   (read_destination n (FieldDestination s f ty) =
-    (bind_value n ty (FieldOperation s f), n + 1))
+    let (rs, a) = bind_value (n + 1) ty (ReadOperation ty (BoundAtom (AstId n))) in
+    ((DefineStmt (AstId n) (ReferenceType ty) (NavigateOperation ty s (FieldNavigation f)) ::
+      rs, a), n + 2))
 End
 
 Definition capture_destination_def:
@@ -1178,8 +1180,11 @@ Definition elab_expr_def:
                 SOME fty =>
                   let ety = element_type MemoryLoc fty in
                   ensure (source_type_matches ety tid) (info.node_id, "type annotation mismatch")
-                  (let (rs, a) = bind_value n1 ety (FieldOperation ref (AstId member_id)) in
-                   INL ((ss ++ rs, a, ElabType ety), n1 + 1))
+                  (let (rs, a) = bind_value (n1 + 1) ety
+                                   (ReadOperation ety (BoundAtom (AstId n1))) in
+                   INL ((ss ++ DefineStmt (AstId n1) (ReferenceType ety)
+                                 (NavigateOperation ety ref (FieldNavigation (AstId member_id))) ::
+                               rs, a, ElabType ety), n1 + 2))
               | NONE => INR [(info.node_id, "unknown struct member")])
          | NONE =>
            case elab_location ctx n expression of
@@ -1601,7 +1606,9 @@ Definition elab_expr_def:
               INL ((ss, vs), n1) =>
                 (case (arrange order vs, arrange order (expr_ids args)) of
                    (SOME vs', SOME ids) =>
-                     let (cs, a) = bind_value n1 sty (StructOperation (AstId id)) in
+                     let (cs, a) = bind_value n1 sty
+                       (AllocateMemoryOperation (StructT (AstId id))
+                          (ConstantAtom (IntegerValue (&LENGTH fields)))) in
                      (case convert_operands (n1 + 1) info.node_id ids (field_values fields) vs' of
                         INL (css, _, as, n2) =>
                           let (ws, n3) = field_writes n2 a fields as in

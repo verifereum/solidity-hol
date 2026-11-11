@@ -290,13 +290,6 @@ Definition eval_operation_def:
                   INL (_, _, _, v) => ValueOk v
                 | INR c => ValueAbrupt c)
          | _ => ValueAbrupt (InvalidCompletion "bad array index operands"))
-    | FieldOperation a f =>
-        (case eval_atom st.scopes a of
-           SOME (ReferenceValue r) =>
-             (case memory_struct_field env st r f of
-                INL (_, _, _, v) => ValueOk v
-              | INR c => ValueAbrupt c)
-         | _ => ValueAbrupt (InvalidCompletion "bad struct field operand"))
     | CalldataSliceOperation a start end_bound =>
         (case (eval_atom st.scopes a, eval_atom st.scopes start) of
            (SOME (ReferenceValue (CalldataReference offset length ty)),
@@ -361,7 +354,12 @@ Definition eval_operation_def:
          | _ => ValueAbrupt (InvalidCompletion "bad array reference"))
     | NavigateOperation ty root_expr (FieldNavigation member_id) =>
         (case eval_atom st.scopes root_expr of
-           SOME (ReferenceValue r) => navigate_storage_field env r member_id
+           SOME (ReferenceValue (MemoryReference h offset rty)) =>
+             (case memory_struct_field env st (MemoryReference h offset rty) member_id of
+                INL (id, k, fty, _) =>
+                  ValueOk (ReferenceValue (MemoryReference (HeapId id) k fty))
+              | INR c => ValueAbrupt c)
+         | SOME (ReferenceValue r) => navigate_storage_field env r member_id
          | _ => ValueAbrupt (InvalidCompletion "bad struct reference"))
     | NavigateOperation ty root_expr (IndexNavigation index) =>
         (case (eval_atom st.scopes root_expr, eval_atom st.scopes index) of
@@ -479,8 +477,10 @@ Definition write_target_def:
         (case update_binding x v st.scopes of
            SOME scopes => SOME (st with scopes := scopes)
          | NONE => NONE)
-    | (SOME (ValueTarget (MemoryReference h i ty)), SOME (ScalarValue s)) =>
-        write_memory_byte (MemoryReference h i ty) s st
+    | (SOME (ValueTarget (MemoryReference h i (FixedBytesT 1))), SOME (ScalarValue s)) =>
+        write_memory_byte (MemoryReference h i (FixedBytesT 1)) s st
+    | (SOME (ValueTarget (MemoryReference (HeapId id) i _)), SOME v) =>
+        write_memory_element id i v st
     | (SOME (ReferenceFieldTarget (HeapId id) i _), SOME v) =>
         write_memory_element id i v st
     | (SOME (ValueTarget (ImmutableReference x)), SOME (ScalarValue s)) =>
@@ -852,9 +852,23 @@ Definition simple_stmt_def:
                let (v, st') = allocate_bytes T element (REPLICATE (Num n) 0w) st in
                normal_result (define_binding x ty v st') gas
              else
-               (case zero_object env (LENGTH env.type_declarations) element (Num n) st of
-                  INL (v, st') => normal_result (define_binding x ty v st') gas
-                | INR c => abrupt_result c st gas)
+               (case element of
+                  StructT s =>
+                    (case lookup_struct env s of
+                       SOME fields =>
+                         if Num n ≠ LENGTH fields then
+                           abrupt_result (InvalidCompletion "bad struct allocation") st gas
+                         else
+                           (case allocate_object element (Num n) (32 * Num n) st of
+                              SOME (id, st1) =>
+                                normal_result (define_binding x ty
+                                  (ReferenceValue (MemoryReference (HeapId id) 0 element)) st1) gas
+                            | NONE => abrupt_result (PanicCompletion 65) st gas)
+                     | NONE => abrupt_result (InvalidCompletion "unknown struct") st gas)
+                | _ =>
+                  case zero_object env (LENGTH env.type_declarations) element (Num n) st of
+                    INL (v, st') => normal_result (define_binding x ty v st') gas
+                  | INR c => abrupt_result c st gas)
          | _ => abrupt_result (InvalidCompletion "bad allocation length") st gas)
     | DefineStmt x ty (CopyToMemoryOperation a) =>
         (case eval_atom st.scopes a of
@@ -878,15 +892,6 @@ Definition simple_stmt_def:
                      | NONE => abrupt_result (InvalidCompletion "bad storage array copy") st gas)
               | INR c => abrupt_result c st gas)
          | _ => abrupt_result (InvalidCompletion "bad array copy") st gas)
-    | DefineStmt x ty (StructOperation s) =>
-        (case lookup_struct env s of
-           SOME fields =>
-             (case allocate_object (StructT s) (LENGTH fields) (32 * LENGTH fields) st of
-                SOME (id, st1) =>
-                  normal_result (define_binding x ty
-                    (ReferenceValue (MemoryReference (HeapId id) 0 (StructT s))) st1) gas
-              | NONE => abrupt_result (PanicCompletion 65) st gas)
-         | NONE => abrupt_result (InvalidCompletion "unknown struct") st gas)
     | DefineStmt x ty (AbiEncodeOperation selector tys args) =>
         abi_encode env x ty selector tys args st gas
     | DefineStmt x ty (AbiEncodePackedOperation tys args) =>

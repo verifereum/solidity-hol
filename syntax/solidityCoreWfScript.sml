@@ -379,7 +379,12 @@ End
 Definition wf_core_value_type_def:
   (wf_core_value_type env (SingleType ty) ⇔
     core_binding_type env ty) ∧
-  (wf_core_value_type env (ReferenceType ty) ⇔ storage_type_ok env ty) ∧
+  (* a captured storage lvalue, or a navigated memory struct field: a
+   * reference field is located in memory *)
+  (wf_core_value_type env (ReferenceType ty) ⇔
+    case ty of
+      LocatedT MemoryLoc _ => core_binding_type env ty
+    | _ => storage_type_ok env ty) ∧
   (wf_core_value_type env (ProductType tys) ⇔
     LENGTH tys ≠ 1 ∧ wf_core_value_types env tys) ∧
   (wf_core_value_types env [] ⇔ T) ∧
@@ -759,22 +764,36 @@ Definition wf_core_operation_def:
       SOME ty => annotation = ReferenceType ty
     | NONE => F) ∧
   (wf_core_operation env ctx annotation (ReadOperation ty a) ⇔
-    (if storage_object_type ty then
-       annotation = SingleType (LocatedT StorageLoc ty)
-     else annotation = SingleType ty ∧ core_scalar_type env ty ∧
-          IS_SOME (storage_bytes ty)) ∧
+    (case ty of
+       LocatedT MemoryLoc ty' =>
+         annotation = SingleType ty ∧ memory_object_type ty'
+     | _ =>
+       if storage_object_type ty then
+         annotation = SingleType (LocatedT StorageLoc ty)
+       else annotation = SingleType ty ∧ core_scalar_type env ty ∧
+            IS_SOME (storage_bytes ty)) ∧
     wf_core_atom env ctx (ReferenceType ty) a) ∧
+  (* A field of a storage struct, or of a memory struct as its element type. *)
   (wf_core_operation env ctx annotation
      (NavigateOperation ty base (FieldNavigation field)) ⇔
     annotation = ReferenceType ty ∧
     case base of
       BoundAtom x =>
-        (case storage_base (ALOOKUP ctx.bindings x) of
-           SOME (StructT id) =>
+        (case ALOOKUP ctx.bindings x of
+           SOME (SingleType (LocatedT MemoryLoc (StructT id))) =>
              (case lookup_struct env id of
-                SOME fields => ALOOKUP fields field = SOME ty
+                SOME fields =>
+                  (case ALOOKUP fields field of
+                     SOME fty => ty = element_type MemoryLoc fty
+                   | NONE => F)
               | NONE => F)
-         | _ => F)
+         | b =>
+           case storage_base b of
+             SOME (StructT id) =>
+               (case lookup_struct env id of
+                  SOME fields => ALOOKUP fields field = SOME ty
+                | NONE => F)
+           | _ => F)
     | _ => F) ∧
   (wf_core_operation env ctx annotation
      (NavigateOperation ty base (IndexNavigation index)) ⇔
@@ -801,7 +820,13 @@ Definition wf_core_operation_def:
   (wf_core_operation env ctx annotation (AllocateMemoryOperation ty length) ⇔
     annotation = SingleType (LocatedT MemoryLoc ty) ∧
     (byte_sequence_type ty ∨
-     (memory_object_type ty ∧ case ty of ArrayT _ NONE => T | _ => F)) ∧
+     (memory_object_type ty ∧ case ty of ArrayT _ NONE => T | _ => F) ∨
+     (case ty of
+        StructT s =>
+          (case lookup_struct env s of
+             SOME fields => length = ConstantAtom (IntegerValue (&LENGTH fields))
+           | NONE => F)
+      | _ => F)) ∧
     wf_core_atom env ctx (SingleType (UintT 256)) length) ∧
   (wf_core_operation env ctx annotation (BytesToFixedOperation k a) ⇔
     valid_fixed_bytes_width k ∧ annotation = SingleType (FixedBytesT k) ∧
@@ -840,22 +865,6 @@ Definition wf_core_operation_def:
         (ALOOKUP ctx.bindings x = SOME (SingleType (LocatedT CalldataLoc ty)) ∨
          ALOOKUP ctx.bindings x = SOME (SingleType (LocatedT StorageLoc ty))) ∧
         located_value_type (LocatedT MemoryLoc ty) ∧ (case ty of ArrayT _ _ => T | StructT _ => T | _ => F)
-    | _ => F) ∧
-  (wf_core_operation env ctx annotation (StructOperation s) ⇔
-    annotation = SingleType (LocatedT MemoryLoc (StructT s)) ∧
-    IS_SOME (lookup_struct env s)) ∧
-  (wf_core_operation env ctx annotation (FieldOperation a f) ⇔
-    case a of
-      BoundAtom x =>
-        (case ALOOKUP ctx.bindings x of
-           SOME (SingleType (LocatedT MemoryLoc (StructT s))) =>
-             (case lookup_struct env s of
-                SOME fields =>
-                  (case ALOOKUP fields f of
-                     SOME ty => annotation = SingleType (element_type MemoryLoc ty)
-                   | NONE => F)
-              | NONE => F)
-         | _ => F)
     | _ => F) ∧
   (wf_core_operation env ctx annotation (Keccak256Operation a) ⇔
     annotation = SingleType (FixedBytesT 32) ∧
