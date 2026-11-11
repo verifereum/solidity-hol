@@ -285,4 +285,16 @@ contract ArrayOperations {
         rows.pop();
     }
 
+    function copyInTuple() public returns (uint256 n, Color first, uint256 x) {
+        colors.push(Color.Green);
+        colors.push(Color.Blue);
+        Color[] memory dest;
+        (dest, x) = (colors, 7);
+        colors[0] = Color.Red;
+        n = dest.length;
+        first = dest[0];
+        colors.pop();
+        colors.pop();
+    }
+
 }
