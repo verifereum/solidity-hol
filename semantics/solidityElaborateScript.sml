@@ -248,19 +248,15 @@ Definition coerce_def:
       ElabType src =>
         if src = ty then INL (([], a), n)
         else (case (src, ty) of
-          (LocatedT loc (ArrayT e l), LocatedT MemoryLoc element') =>
-            if loc = MemoryLoc ∨ element' ≠ ArrayT e l
+          (LocatedT loc element, LocatedT MemoryLoc element') =>
+            if loc = MemoryLoc ∨ element ≠ element' ∨ ¬memory_object_type element
             then INR "type conversion between these types"
+            else if byte_sequence_type element then
+              let (ls, len) = bind_value n (UintT 256) (ArrayLengthOperation a) in
+              let (ds, dst) = bind_value (n + 1) ty (AllocateMemoryOperation element len) in
+              INL ((ls ++ ds ++ [CopyContentsStmt src ty a dst], dst), n + 2)
             else INL (bind_value n ty (CopyToMemoryOperation a), n + 1)
-        | (LocatedT StorageLoc (StructT s), LocatedT MemoryLoc element') =>
-            if element' ≠ StructT s then INR "type conversion between these types"
-            else INL (bind_value n ty (CopyToMemoryOperation a), n + 1)
-        | (LocatedT loc element, LocatedT MemoryLoc element') =>
-            if loc = MemoryLoc ∨ element ≠ element' ∨ ¬byte_sequence_type element
-            then INR "type conversion between these types"
-            else let (ls, len) = bind_value n (UintT 256) (ArrayLengthOperation a) in
-                 let (ds, dst) = bind_value (n + 1) ty (AllocateMemoryOperation element len) in
-                 INL ((ls ++ ds ++ [CopyContentsStmt src ty a dst], dst), n + 2)
+        | (LocatedT _ _, LocatedT _ _) => INR "type conversion between these types"
         | _ => INL (bind_value n ty (ConvertOperation ty a), n + 1))
     | ElabBytesLiteral =>
         (case (ty, a) of
@@ -1096,6 +1092,16 @@ Definition call_target_def:
     | _ => INR (expr_id e, "unsupported callee")
 End
 
+(* Forming an attached function evaluates and converts its receiver before
+ * the call's other arguments. The importer retains solc's attached marker. *)
+Definition early_call_arguments_def:
+  early_call_arguments e =
+    case e of
+      SrcFunctionCall _ (SrcIdentifier _ _ _ tid) _ _ _ =>
+        if MEM "attached_to" (separated_fields #"$" "" tid) then 1n else 0
+    | _ => 0
+End
+
 (* The call of callee with the arguments r elaborates to. *)
 Definition bind_call_def:
   bind_call (callee : src_function) rets r =
@@ -1478,17 +1484,18 @@ Definition elab_expr_def:
          | _ =>
              (case call_target ctx expression of
                 INL (callee, params, rets) =>
-                  bind_call callee rets (elab_args ctx n info.node_id order params args)
+                  bind_call callee rets
+                    (elab_args ctx n info.node_id (early_call_arguments expression) order params args)
               | INR b => reject b (elab_arg_values ctx n args)))
     | SrcSuperCall info r args order tid =>
         (case call_target ctx expression of
            INL (callee, params, rets) =>
-             bind_call callee rets (elab_args ctx n info.node_id order params args)
+             bind_call callee rets (elab_args ctx n info.node_id 0 order params args)
          | INR b => reject b (elab_arg_values ctx n args))
     | SrcBaseCall info _ args order _ =>
         (case call_target ctx expression of
            INL (callee, params, rets) =>
-             bind_call callee rets (elab_args ctx n info.node_id order params args)
+             bind_call callee rets (elab_args ctx n info.node_id 0 order params args)
          | INR b => reject b (elab_arg_values ctx n args))
     | SrcBuiltinCall info _ builtin condition message tid =>
         if ¬(builtin_shape builtin condition message ∧ tid = "t_tuple$__$") then
@@ -1906,19 +1913,45 @@ Definition elab_expr_def:
              INR (bs ++ type_name_blockers (info.node_id, "unsupported type name") tn))
     | SrcUnsupportedExpr info msg es =>
         INR ((info.node_id, msg) :: blockers (elab_arg_values ctx n es))) ∧
-  (* Capture every argument before any location conversion copies contents. *)
-  (* Arguments are evaluated in the call's order and passed in the
-     parameters' (arrange); id is the call's. *)
-  (elab_args ctx n (id : num) order tys es =
-    case elab_arg_values ctx n es of
-      INL ((ss, vs), n1) =>
-        (case (arrange order vs, arrange order (expr_ids es)) of
-           (SOME vs', SOME ids) =>
-             (case convert_operands n1 id ids (values_of tys) vs' of
-                INL (cs, _, as, n2) => INL ((ss ++ cs, as), n2)
-              | INR bs => INR bs)
-         | _ => INR [(id, "argument order")])
-    | INR bs => INR bs) ∧
+  (* The early prefix belongs to forming the callee. Remaining arguments
+   * are all evaluated before conversion, in source order, then arranged in
+   * parameter order. Both schedules use assignment's coerce. *)
+  (elab_args ctx n (id : num) early order tys es =
+    if early = 0 then
+      case elab_arg_values ctx n es of
+        INL ((ss, vs), n1) =>
+          (case (arrange order vs, arrange order (expr_ids es)) of
+             (SOME vs', SOME ids) =>
+               (case convert_operands n1 id ids (values_of tys) vs' of
+                  INL (cs, _, as, n2) => INL ((ss ++ cs, as), n2)
+                | INR bs => INR bs)
+           | _ => INR [(id, "argument order")])
+      | INR bs => INR bs
+    else
+      case es of
+        [] => INR [(id, "value count mismatch")]
+      | e :: rest =>
+        case tys of
+          [] => INR [(id, "value count mismatch")]
+        | ty :: ts =>
+          if order ≠ [] ∧ (HD order ≠ 0 ∨ MEM 0 (TL order))
+          then INR [(id, "argument order")] else
+          (case elab_expr ctx n e of
+             INL ((ss, a, vt), n1) =>
+               (case coerce n1 ty a vt of
+                  INL ((cs, a'), n2) =>
+                    let (captured, next) =
+                      if exprs_assign rest then snapshot n2 a' (ElabType ty)
+                      else (([], a'), n2) in
+                    let (saved, value) = captured in
+                    (case elab_args ctx next id (early - 1)
+                            (MAP PRE (TL order)) ts rest of
+                       INL ((ss', as), n3) =>
+                         INL ((ss ++ cs ++ saved ++ ss', value :: as), n3)
+                     | INR bs => INR bs)
+                | INR why => INR ((expr_id e, why) ::
+                                    blockers (elab_arg_values ctx n rest)))
+           | INR bs => INR (bs ++ blockers (elab_arg_values ctx n rest)))) ∧
   (* Multiple values: tuple expressions, and calls with several returns. *)
   (elab_values ctx n e =
     case e of
@@ -2067,19 +2100,20 @@ Definition elab_expr_def:
         (case call_target ctx e of
            INL (callee, params, rets) =>
              call_location info.node_id
-               (bind_call callee rets (elab_args ctx n info.node_id order params args))
+               (bind_call callee rets
+                 (elab_args ctx n info.node_id (early_call_arguments e) order params args))
          | INR b => reject b (elab_arg_values ctx n args))
     | SrcSuperCall info _ args order _ =>
         (case call_target ctx e of
            INL (callee, params, rets) =>
              call_location info.node_id
-               (bind_call callee rets (elab_args ctx n info.node_id order params args))
+               (bind_call callee rets (elab_args ctx n info.node_id 0 order params args))
          | INR b => reject b (elab_arg_values ctx n args))
     | SrcBaseCall info _ args order _ =>
         (case call_target ctx e of
            INL (callee, params, rets) =>
              call_location info.node_id
-               (bind_call callee rets (elab_args ctx n info.node_id order params args))
+               (bind_call callee rets (elab_args ctx n info.node_id 0 order params args))
          | INR b => reject b (elab_arg_values ctx n args))
     | SrcUnsupportedExpr info msg es =>
         INR ((info.node_id, msg) :: blockers (elab_arg_values ctx n es))
@@ -2175,7 +2209,7 @@ Definition elab_expr_def:
 Termination
   qexists_tac ‘measure (λx. case x of
      INL (ctx, n, e) => 4 * src_expr_size e + 2
-   | INR (INL (ctx, n, id, order, tys, es)) => 4 * list_size src_expr_size es + 1
+   | INR (INL (ctx, n, id, early, order, tys, es)) => 4 * list_size src_expr_size es + 1
    | INR (INR (INL (ctx, n, e))) => 4 * src_expr_size e + 3
    | INR (INR (INR (INL (ctx, n, cs)))) =>
        4 * list_size (option_size src_expr_size) cs
@@ -2648,7 +2682,7 @@ Definition elab_stmts_def:
            LENGTH args ≠ LENGTH params ∨ ¬argument_order_ok order (LENGTH args)
         then reject (info.node_id, "revert does not match the error")
                (elab_arg_values ctx n args) else
-        case elab_args ctx n info.node_id order params args of
+        case elab_args ctx n info.node_id 0 order params args of
           INL ((ss, as), n1) =>
             INL ((ss ++ [RevertErrorStmt err.error_selector params as], ctx), n1)
         | INR bs => INR bs) ∧
@@ -2722,7 +2756,7 @@ End
 Definition elab_modifier_args_def:
   (elab_modifier_args ctx n (id : num) [] [] = INL ([], n)) ∧
   (elab_modifier_args ctx n id ((x, ty) :: ps) (e :: es) =
-    case elab_args ctx n (expr_id e) [] [ty] [e] of
+    case elab_args ctx n (expr_id e) 0 [] [ty] [e] of
       INL ((ss, as), n1) =>
         (case elab_modifier_args ctx n1 id ps es of
            INL (ss', n2) =>
@@ -3158,7 +3192,7 @@ Definition elab_base_arguments_def:
   (elab_base_arguments ctx fs n ((x, b, args) :: rest) =
     case (constructor_parameters x fs, constructor_parameters b fs) of
       (SOME xps, SOME bps) =>
-        (case elab_args (ctx with variables := xps) n b [] (MAP SND bps) args of
+        (case elab_args (ctx with variables := xps) n b 0 [] (MAP SND bps) args of
            INL ((ss, atoms), n1) =>
              (case elab_base_arguments ctx fs n1 rest of
                 INL (ss', n2) => INL (ss ++ define_parameters bps atoms ++ ss', n2)
@@ -3605,6 +3639,7 @@ val () = cv_auto_trans field_values_def;
 val () = cv_auto_trans field_writes_def;
 val () = cv_auto_trans checked_callee_def;
 val () = cv_auto_trans call_target_def;
+val () = cv_auto_trans early_call_arguments_def;
 val () = cv_auto_trans bind_call_def;
 val () = cv_auto_trans call_location_def;
 
@@ -3619,7 +3654,7 @@ val elab_expr_pre_def = cv_auto_trans_pre_rec
   elab_expr_def (
   WF_REL_TAC ‘measure (λx. case x of
      INL (ctx, n, e) => 4 * cv_size e + 2
-   | INR (INL (ctx, n, id, order, tys, es)) => 4 * cv_size es + 1
+   | INR (INL (ctx, n, id, early, order, tys, es)) => 4 * cv_size es + 1
    | INR (INR (INL (ctx, n, e))) => 4 * cv_size e + 3
    | INR (INR (INR (INL (ctx, n, cs)))) => 4 * cv_size cs
    | INR (INR (INR (INR (INL (ctx, n, e))))) => 4 * cv_size e + 1
@@ -3632,8 +3667,8 @@ val elab_expr_pre_def = cv_auto_trans_pre_rec
 Theorem elab_pre_bounded[local]:
   !b.
   (!ctx n e. 4 * src_expr_size e + 2 < b ==> elab_expr_pre ctx n e) /\
-  (!ctx n id order tys es. 4 * list_size src_expr_size es + 1 < b ==>
-     elab_args_pre ctx n id order tys es) /\
+  (!ctx n id early order tys es. 4 * list_size src_expr_size es + 1 < b ==>
+     elab_args_pre ctx n id early order tys es) /\
   (!ctx n e. 4 * src_expr_size e + 3 < b ==> elab_values_pre ctx n e) /\
   (!ctx n cs. 4 * list_size (option_size src_expr_size) cs < b ==>
      elab_components_pre ctx n cs) /\
@@ -3655,7 +3690,7 @@ Proof
     (PURE_ONCE_REWRITE_TAC [elab_expr_pre_def] >>
      rpt conj_tac >> rpt gen_tac >> disch_then SUBST_ALL_TAC >>
      simp[solidityImportTheory.src_expr_size_def])
-  >~ [‘elab_args_pre ctx n id order tys es’] >-
+  >~ [‘elab_args_pre ctx n id early order tys es’] >-
     (Cases_on ‘es’ >> simp_tac std_ss [Once elab_expr_pre_def] >>
      simp[listTheory.list_size_def])
   >~ [‘elab_arg_values_pre ctx n es’] >-
@@ -3673,7 +3708,7 @@ QED
 
 Theorem elab_expr_pre[cv_pre,local]:
   (∀ctx n v. elab_expr_pre ctx n v) ∧
-  (∀ctx n id order tys es. elab_args_pre ctx n id order tys es) ∧
+  (∀ctx n id early order tys es. elab_args_pre ctx n id early order tys es) ∧
   (∀ctx n e. elab_values_pre ctx n e) ∧
   (∀ctx n cs. elab_components_pre ctx n cs) ∧
   (∀ctx n e. elab_location_pre ctx n e) ∧
