@@ -762,11 +762,14 @@ Definition wf_core_operation_def:
       SOME ty => annotation = ReferenceType ty
     | NONE => F) ∧
   (wf_core_operation env ctx annotation (ReadOperation ty a) ⇔
-    (if storage_object_type ty then
-       annotation = SingleType (LocatedT StorageLoc ty)
-     else annotation = SingleType ty ∧ core_scalar_type env ty ∧
-          IS_SOME (storage_bytes ty)) ∧
-    wf_core_atom env ctx (ReferenceType ty) a) ∧
+    if storage_object_type ty then
+      annotation = SingleType (LocatedT StorageLoc ty) ∧
+      (case a of
+         BoundAtom x => storage_base (ALOOKUP ctx.bindings x) = SOME ty
+       | _ => F)
+    else annotation = SingleType ty ∧ core_scalar_type env ty ∧
+         IS_SOME (storage_bytes ty) ∧
+         wf_core_atom env ctx (ReferenceType ty) a) ∧
   (wf_core_operation env ctx annotation
      (NavigateOperation ty base (FieldNavigation field)) ⇔
     annotation = ReferenceType ty ∧
