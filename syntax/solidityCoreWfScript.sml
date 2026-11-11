@@ -1506,7 +1506,8 @@ Definition check_core_stmts_def:
               located_value_type src ∧ located_value_type dst ∧
               memory_object_type ty ∧ memory_object_type ty' ∧
               loc = StorageLoc ∧ storage_copy_type ty ty' ∧
-              ¬mapping_reachable env (LENGTH env.type_declarations) ty'
+              memory_type_ok env (LENGTH env.type_declarations) ty ∧
+              memory_type_ok env (LENGTH env.type_declarations) ty'
         | _ => F) ∧
        wf_core_atom env ctx (SingleType src) a ∧
        wf_core_atom env ctx (SingleType dst) b

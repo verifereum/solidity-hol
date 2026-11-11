@@ -31,7 +31,8 @@ library Hooks {
 }
 
 // A recursive struct: the core holds no recursive struct in memory, so the
-// functions with one in memory are unsupported.
+// functions with one in memory, or that copy one in storage, are
+// unsupported.
 struct Node {
     uint8 v;
     Node[] kids;
@@ -60,6 +61,8 @@ library Roles {
 
 contract Partial is Mid {
     uint256 public total;
+    Node tree;
+    Node otherTree;
 
     event Paired(Pair p);
 
@@ -111,6 +114,14 @@ contract Partial is Mid {
     function nodeValue() public pure returns (uint8) {
         Node memory n;
         return n.v;
+    }
+
+    function nodeCount() public pure returns (uint256) {
+        return new Node[](2).length;
+    }
+
+    function copyTree() public {
+        tree = otherTree;
     }
 
     function encodePair() public pure returns (bytes memory) {

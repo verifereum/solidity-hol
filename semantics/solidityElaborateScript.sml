@@ -921,6 +921,17 @@ Definition memory_binding_ok_def:
     | _ => T
 End
 
+(* A storage copy into a reference target holds a type the memory checks
+ * admit: its structs are declared, not recursive and reach no mapping, so
+ * the member-wise copy terminates. Other targets copy nothing. *)
+Definition copy_target_ok_def:
+  copy_target_ok enums structs target ⇔
+    case target of
+      ReferenceDestination _ ty =>
+        ¬memory_object_type ty ∨ memory_binding_ok enums structs (LocatedT MemoryLoc ty)
+    | _ => T
+End
+
 (* A struct's members with their types, in declaration order. *)
 Definition struct_field_types_def:
   (struct_field_types [] = SOME []) ∧
@@ -1352,6 +1363,11 @@ Definition elab_expr_def:
                   let (ss, vs', n2) = snapshot_values n1 vs in
                   (case elab_destinations ctx n2 cs of
                      INL ((ls, targets), n3) =>
+                       if ¬EVERY (λc. case c of
+                                        SOME (_, target) =>
+                                          copy_target_ok ctx.enums ctx.structs target
+                                      | NONE => T) targets
+                       then INR [(info.node_id, "storage copy of this type")] else
                        (case tuple_writes n3 linfo.node_id targets vs' of
                           INL (ws, n4) =>
                             INL ((sr ++ ss ++ ls ++ ws, ConstantAtom (BoolValue F),
@@ -1370,6 +1386,8 @@ Definition elab_expr_def:
                      INL ((ls, target), n3) =>
                        let ty = destination_type target in
                        if op = NONE then
+                         if ¬copy_target_ok ctx.enums ctx.structs target
+                         then INR [(info.node_id, "storage copy of this type")] else
                          (case plain_assignment n3 target ar' vr of
                             INL ((cr, a, value_ty), n4) =>
                               if annotation_matches tid (ElabType value_ty) then
@@ -1555,6 +1573,7 @@ Definition elab_expr_def:
                 SOME ty =>
                   if ¬((byte_sequence_type ty ∨
                         (memory_object_type ty ∧ case ty of ArrayT _ NONE => T | _ => F)) ∧
+                       memory_binding_ok ctx.enums ctx.structs (LocatedT MemoryLoc ty) ∧
                        index_value_ok a vt ∧
                        source_type_matches (LocatedT MemoryLoc ty) tid)
                   then INR [(info.node_id, "unsupported new expression")] else
@@ -1589,6 +1608,8 @@ Definition elab_expr_def:
     | SrcConditional info c t f tid =>
         (case decode_type_identifier tid of
            SOME (SrcTupleType tys) =>
+             if ¬EVERY (memory_binding_ok ctx.enums ctx.structs) tys
+             then INR [(info.node_id, "unsupported conditional type")] else
              (case elab_expr ctx n c of
                 INL ((sc, cond, ElabType BoolT), n1) =>
                   (case elab_values ctx n1 t of
@@ -1625,7 +1646,8 @@ Definition elab_expr_def:
                   (case identifier_type tid of
                      SOME ty =>
                        if ¬(case ty of LocatedT loc _ => loc = MemoryLoc
-                                     | _ => is_stored_scalar_type ty)
+                                     | _ => is_stored_scalar_type ty) ∨
+                          ¬memory_binding_ok ctx.enums ctx.structs ty
                        then reject (info.node_id, "unsupported conditional type")
                               (elab_expr ctx n f) else
                        (case join_operation ty of
@@ -3576,6 +3598,7 @@ val () = cv_auto_trans decoded_types_match_def;
 val () = cv_auto_trans arrange_def;
 val () = cv_auto_trans elab_type_declarations_def;
 val () = cv_auto_trans memory_binding_ok_def;
+val () = cv_auto_trans copy_target_ok_def;
 val () = cv_auto_trans memory_struct_root_def;
 val () = cv_auto_trans struct_field_types_def;
 val () = cv_auto_trans field_values_def;

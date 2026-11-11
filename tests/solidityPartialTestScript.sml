@@ -30,8 +30,9 @@ val prepared = #prepared (solidityPrepareLib.prepare_artifact
  * pointer fails to elaborate, since its assembly assigns a bytes local.
  * hookCount's struct has a function-typed member, so the struct is left out
  * and hookCount's local does not elaborate, while the unit still imports.
- * nodeValue's local is a recursive struct in memory, which the core does not
- * hold. encodePair, emitPair and putPair take a memory struct across an ABI
+ * nodeValue's local and nodeCount's new array hold a recursive struct in
+ * memory, which the core does not hold, and copyTree copies one in storage.
+ * encodePair, emitPair and putPair take a memory struct across an ABI
  * boundary, which the core does not model. Roles.Grant has an enum-keyed mapping, so the storage local of
  * grantCount does not elaborate. *)
 val outcomes = map (fn {name, reason, ...} => (name, reason)) (#functions prepared);
@@ -70,6 +71,10 @@ val () =
      length (reasons "hookCount") = 1 andalso
      List.all elaboration_failure (reasons "nodeValue") andalso
      length (reasons "nodeValue") = 1 andalso
+     List.all elaboration_failure (reasons "nodeCount") andalso
+     length (reasons "nodeCount") = 1 andalso
+     List.all elaboration_failure (reasons "copyTree") andalso
+     length (reasons "copyTree") = 1 andalso
      List.all elaboration_failure (reasons "encodePair") andalso
      length (reasons "encodePair") = 1 andalso
      List.all elaboration_failure (reasons "emitPair") andalso
@@ -78,7 +83,7 @@ val () =
      length (reasons "putPair") = 1 andalso
      List.all elaboration_failure (reasons "grantCount") andalso
      length (reasons "grantCount") = 1 andalso
-     length outcomes = 15
+     length outcomes = 17
   then ()
   else raise Fail ("unexpected function outcomes: " ^
     String.concatWith "; " (map (fn (n, r) => n ^ " " ^
