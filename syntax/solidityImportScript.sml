@@ -595,7 +595,7 @@ Definition decode_located_array_def:
                 SOME element =>
                   (case array_dimensions loc element dimensions of
                      SOME ty =>
-                       if located_value_type (LocatedT loc ty) ∧
+                       if located_object_shape loc ty ∧
                           valid_type_shape (LocatedT loc ty)
                        then SOME (LocatedT loc ty) else NONE
                    | NONE => NONE)
@@ -917,7 +917,7 @@ Definition variable_type_def:
             case ty of MappingT _ _ => T | _ => F) then
           case v.var_location of
             SOME loc =>
-              if located_value_type (LocatedT loc ty) ∧
+              if located_object_shape loc ty ∧
                  source_type_matches (LocatedT loc ty) v.var_type_id then
                 SOME (LocatedT loc ty) else NONE
           | NONE => NONE
@@ -941,7 +941,7 @@ Definition event_variable_type_def:
   event_variable_type (v : src_variable) =
     case normalize_type_name v.var_type_name of
       SOME ty =>
-        if memory_object_type ty then
+        if located_object_shape MemoryLoc ty then
           if v.var_location = NONE ∧
              source_type_matches (LocatedT MemoryLoc ty) v.var_type_id then
             SOME (LocatedT MemoryLoc ty) else NONE
