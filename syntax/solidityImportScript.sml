@@ -496,29 +496,6 @@ Definition array_base_def:
     else NONE
 End
 
-(* A memory, calldata or storage array type identifier, nested to any depth. *)
-Definition decode_located_array_def:
-  decode_located_array loc s =
-    case separated_fields #"$" "" s of
-      f :: fs =>
-        if f ≠ "t_array" then NONE else
-        let k = array_prefix_fields fs in
-        (case DROP k fs of
-           b :: dimensions =>
-             if LENGTH dimensions ≠ k + 1 ∨ LENGTH b < 2 ∨ ¬isPREFIX "_" b ∨
-                ¬isPREFIX "_" (REVERSE b) then NONE else
-             (case array_base loc (TAKE (LENGTH b - 2) (DROP 1 b)) of
-                SOME element =>
-                  (case array_dimensions loc element dimensions of
-                     SOME ty =>
-                       if located_value_type (LocatedT loc ty) ∧
-                          valid_type_shape (LocatedT loc ty)
-                       then SOME (LocatedT loc ty) else NONE
-                   | NONE => NONE)
-              | NONE => NONE)
-         | [] => NONE)
-    | [] => NONE
-End
 
 (* Struct names are display metadata; declaration IDs determine identity.
  * Keep every other character, including location/pointer suffixes. *)
@@ -564,6 +541,55 @@ Definition decode_struct_identifier_def:
     case struct_with_suffix "_calldata_ptr" c of
       SOME ty => SOME (LocatedT CalldataLoc ty)
     | NONE => struct_with_suffix "_storage" c
+End
+
+(* An array identifier's base and the dimension fields after it. A struct
+ * base spans fields, from "_t_struct" to its id and location: the first
+ * field without a leading "_". *)
+Definition array_base_split_def:
+  (array_base_split acc [] = NONE) ∧
+  (array_base_split acc (f :: fs) =
+    let b = if acc = "" then f else acc ++ "$" ++ f in
+    if b ≠ "_t_struct" ∧ (acc = "" ∨ ¬isPREFIX "_" f) then SOME (b, fs)
+    else array_base_split b fs)
+End
+
+(* The element type an array base names: an elementary type or byte
+ * sequence, or a struct in the array's location (unlocated in storage, as
+ * decode_struct_identifier gives it). *)
+Definition array_element_def:
+  array_element loc name =
+    if isPREFIX "t_struct$_" name then
+      case decode_struct_identifier name of
+        SOME (LocatedT loc' (StructT id)) =>
+          if loc' = loc ∧ loc ≠ StorageLoc then SOME (StructT id) else NONE
+      | SOME (StructT id) => if loc = StorageLoc then SOME (StructT id) else NONE
+      | _ => NONE
+    else array_base loc name
+End
+
+(* A memory, calldata or storage array type identifier, nested to any depth. *)
+Definition decode_located_array_def:
+  decode_located_array loc s =
+    case separated_fields #"$" "" s of
+      f :: fs =>
+        if f ≠ "t_array" then NONE else
+        let k = array_prefix_fields fs in
+        (case array_base_split "" (DROP k fs) of
+           SOME (b, dimensions) =>
+             if LENGTH dimensions ≠ k + 1 ∨ LENGTH b < 2 ∨ ¬isPREFIX "_" b ∨
+                ¬isPREFIX "_" (REVERSE b) then NONE else
+             (case array_element loc (TAKE (LENGTH b - 2) (DROP 1 b)) of
+                SOME element =>
+                  (case array_dimensions loc element dimensions of
+                     SOME ty =>
+                       if located_value_type (LocatedT loc ty) ∧
+                          valid_type_shape (LocatedT loc ty)
+                       then SOME (LocatedT loc ty) else NONE
+                   | NONE => NONE)
+              | NONE => NONE)
+         | NONE => NONE)
+    | [] => NONE
 End
 
 Definition decode_elementary_identifier_def:
