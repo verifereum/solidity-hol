@@ -277,4 +277,12 @@ contract ArrayOperations {
         pairRows.pop();
     }
 
+
+    function emptyNestedCopy() public returns (uint256 n) {
+        uint16[] memory a = new uint16[](0);
+        rows.push(a);
+        n = rows[0].length;
+        rows.pop();
+    }
+
 }

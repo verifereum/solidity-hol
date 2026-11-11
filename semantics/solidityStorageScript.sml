@@ -528,11 +528,9 @@ Definition store_storage_value_def:
                              else accounts in
              let resized =
                if is_stored_scalar_type e' then
-                 (case (fixed_storage_slots env (ArrayT e' (SOME old_length)),
-                        fixed_storage_slots env (ArrayT e' (SOME length))) of
-                    (SOME old_slots, SOME new_slots) =>
-                      INL (clear_byte_slots (MAX old_slots new_slots) accounts1 addr data)
-                  | _ => INR (InvalidCompletion "bad array element type"))
+                 (case fixed_storage_slots env (ArrayT e' (SOME (MAX old_length length))) of
+                    SOME slots => INL (clear_byte_slots slots accounts1 addr data)
+                  | NONE => INL accounts1)
                else clear_storage_elements env fuel accounts1 addr data e'
                       length (old_length - length) in
              case resized of
