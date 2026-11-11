@@ -65,7 +65,9 @@ data location and element layout. Memory allocation recursively creates the
 element's default value. Pop recursively clears the removed element before
 reducing the length. Struct clearing zeros scalar field slots and preserves
 mapping entries; struct assignment preserves scalar-slot padding. Direct
-scalar clearing preserves neighboring packed bytes.
+scalar clearing preserves neighboring packed bytes. Aggregate array copies
+resize in place and clear removed elements, preserving padding in retained
+struct elements.
 
 Array pop clears the last element before reducing the length. One typed
 storage clear handles packed scalar offsets, struct fields, nested arrays and

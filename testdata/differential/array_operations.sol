@@ -40,6 +40,7 @@ contract ArrayOperations {
     uint256 effects;
     Pair[] otherPairs;
     Color[][] enumRows;
+    Pair[][] pairRows;
 
     function structPush(uint64 x, uint64 y) public returns (uint256, uint64, uint64) {
         pairs.push(Pair(x, y));
@@ -255,4 +256,25 @@ contract ArrayOperations {
     function emptyPop() public {
         pairs.pop();
     }
+
+    function structArrayCopyPadding() public returns (uint256 word) {
+        Pair[] memory a = new Pair[](1);
+        a[0] = Pair(3, 4);
+        pairs = a;
+        assembly { mstore(0, pairs.slot) word := sload(keccak256(0, 32)) }
+        pairs.pop();
+    }
+
+    function nestedStructArrayCopyPadding() public returns (uint256 word) {
+        Pair[] memory a = new Pair[](1);
+        a[0] = Pair(3, 4);
+        pairRows.push(a);
+        assembly {
+            mstore(0, pairRows.slot)
+            mstore(0, keccak256(0, 32))
+            word := sload(keccak256(0, 32))
+        }
+        pairRows.pop();
+    }
+
 }

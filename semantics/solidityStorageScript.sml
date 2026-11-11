@@ -179,31 +179,37 @@ Definition store_byte_chunks_def:
       addr (slot + 1w) (DROP 32 bs))
 End
 
+(* Replace a byte sequence, clearing only obsolete long-data slots. *)
+Definition replace_storage_bytes_def:
+  replace_storage_bytes accounts addr slot (bs : byte list) static =
+    if 2 ** 64 ≤ LENGTH bs then INR (PanicCompletion 65)
+    else (case storage_byte_length accounts addr slot of
+      INR c => INR c
+    | INL old_length =>
+        if static then INR (InvalidCompletion "byte copy in static frame") else
+        let length = LENGTH bs in
+        let old_slots = if old_length < 32 then 0 else (old_length + 31) DIV 32 in
+        let new_slots = if length < 32 then 0 else (length + 31) DIV 32 in
+        let data_slot = mapping_slot [] slot in
+        let cleared = clear_byte_slots (old_slots - new_slots) accounts addr
+                        (data_slot + n2w new_slots) in
+        if length < 32 then
+          INL (set_storage_word cleared addr slot
+            (n2w (num_of_be_bytes (bs ++ REPLICATE (31 - length) 0w ++
+                [n2w (2 * length)]))))
+        else
+          INL (set_storage_word
+            (store_byte_chunks new_slots cleared addr data_slot bs)
+            addr slot (n2w (2 * length + 1))))
+End
+
 (* Memory and calldata sources are independent of the destination storage. *)
 Definition store_storage_bytes_def:
   store_storage_bytes accounts r (bs : byte list) static =
     case r of
       StorageReference PersistentStorage addr slot 0 ty _ =>
         if ¬byte_sequence_type ty then INR (InvalidCompletion "not storage bytes")
-        else if 2 ** 64 ≤ LENGTH bs then INR (PanicCompletion 65)
-        else (case storage_byte_length accounts addr slot of
-          INR c => INR c
-        | INL old_length =>
-            if static then INR (InvalidCompletion "byte copy in static frame") else
-            let length = LENGTH bs in
-            let old_slots = if old_length < 32 then 0 else (old_length + 31) DIV 32 in
-            let new_slots = if length < 32 then 0 else (length + 31) DIV 32 in
-            let data_slot = mapping_slot [] slot in
-            let cleared = clear_byte_slots (old_slots - new_slots) accounts addr
-                            (data_slot + n2w new_slots) in
-            if length < 32 then
-              INL (set_storage_word cleared addr slot
-                (n2w (num_of_be_bytes (bs ++ REPLICATE (31 - length) 0w ++
-                    [n2w (2 * length)]))))
-            else
-              INL (set_storage_word
-                (store_byte_chunks new_slots cleared addr data_slot bs)
-                addr slot (n2w (2 * length + 1))))
+        else replace_storage_bytes accounts addr slot bs static
     | _ => INR (InvalidCompletion "not storage bytes")
 End
 
@@ -373,7 +379,8 @@ End
 (* Storage a storage array, struct or byte sequence occupies, cleared as the
  * compiler's delete does: the length, every element, a long byte sequence's
  * data, and each field of a struct but a mapping. Struct scalar fields
- * clear their whole slots; a directly targeted scalar clears only its bytes. A dynamic length of 2^64 or more cannot be cleared within any gas
+ * clear their whole slots; a directly targeted scalar clears only its bytes.
+ * A dynamic length of 2^64 or more cannot be cleared within any gas
  * limit. The fuel bounds the struct nesting. *)
 Definition clear_storage_value_def:
   (clear_storage_value env (fuel : num) accounts addr slot offset ty =
@@ -462,83 +469,76 @@ Theorem clear_storage_fuel_stable:
        clear_storage_fields env fuel accounts addr slot layout fields)
 Proof
   ho_match_mp_tac clear_storage_value_ind >> rpt strip_tac >>
-  qpat_x_assum `_ <> INR FuelExhausted` mp_tac
-  >~ [`clear_storage_value env m accounts addr slot offset ty = _`] >-
-   (Cases_on `is_stored_scalar_type ty`
+  qpat_x_assum ‘_ <> INR FuelExhausted’ mp_tac
+  >~ [‘clear_storage_value env m accounts addr slot offset ty = _’] >-
+   (Cases_on ‘is_stored_scalar_type ty’
     >- (once_rewrite_tac[clear_storage_value_def] >> simp[]) >>
-    Cases_on `offset <> 0`
+    Cases_on ‘offset <> 0’
     >- (once_rewrite_tac[clear_storage_value_def] >> simp[]) >>
-    Cases_on `byte_sequence_type ty`
+    Cases_on ‘byte_sequence_type ty’
     >- (once_rewrite_tac[clear_storage_value_def] >> simp[]) >>
-    Cases_on `ty` >> once_rewrite_tac[clear_storage_value_def] >>
+    Cases_on ‘ty’ >> once_rewrite_tac[clear_storage_value_def] >>
     simp[]
-    >~ [`ArrayT element len`] >-
-     (Cases_on `storage_array_data accounts addr slot (ArrayT element len)` >>
-      gvs[] >> Cases_on `2 ** 64 <= q` >> simp[] >>
-      Cases_on `is_stored_scalar_type element` >> simp[] >>
+    >~ [‘ArrayT element len’] >-
+     (Cases_on ‘storage_array_data accounts addr slot (ArrayT element len)’ >>
+      gvs[] >> Cases_on ‘2 ** 64 <= q’ >> simp[] >>
+      Cases_on ‘is_stored_scalar_type element’ >> simp[] >>
       metis_tac[]) >>
-    Cases_on `lookup_struct env a` >> simp[] >>
-    Cases_on `lookup_struct_layout env a` >> simp[] >>
-    Cases_on `m = 0` >> simp[] >>
-    `m' <> 0 /\ m - 1 <= m' - 1` by decide_tac >>
+    Cases_on ‘lookup_struct env a’ >> simp[] >>
+    Cases_on ‘lookup_struct_layout env a’ >> simp[] >>
+    Cases_on ‘m = 0’ >> simp[] >>
+    ‘m' <> 0 /\ m - 1 <= m' - 1’ by decide_tac >>
     gvs[] >> metis_tac[])
-  >~ [`clear_storage_elements env m accounts addr data element i n = _`] >-
-   (Cases_on `n = 0`
+  >~ [‘clear_storage_elements env m accounts addr data element i n = _’] >-
+   (Cases_on ‘n = 0’
     >- (once_rewrite_tac[clear_storage_value_def] >> simp[]) >>
-    Cases_on `storage_element_location env data element i`
+    Cases_on ‘storage_element_location env data element i’
     >- (once_rewrite_tac[clear_storage_value_def] >> simp[]) >>
-    rename1 `storage_element_location env data element i = SOME loc` >>
-    PairCases_on `loc` >>
+    rename1 ‘storage_element_location env data element i = SOME loc’ >>
+    PairCases_on ‘loc’ >>
     once_rewrite_tac[clear_storage_value_def] >> simp[] >>
-    Cases_on `clear_storage_value env m accounts addr loc0 loc1 element` >>
+    Cases_on ‘clear_storage_value env m accounts addr loc0 loc1 element’ >>
     simp[]) >>
   once_rewrite_tac[clear_storage_value_def] >> simp[] >>
-  Cases_on `ALOOKUP (MAP (\v. (v.state_id, v)) layout) f` >> simp[] >>
-  Cases_on `is_stored_scalar_type ty` >> gvs[] >>
-  Cases_on `clear_storage_value env fuel accounts addr
-              (slot + x.state_slot) x.state_offset ty` >>
+  Cases_on ‘ALOOKUP (MAP (\v. (v.state_id, v)) layout) f’ >> simp[] >>
+  Cases_on ‘is_stored_scalar_type ty’ >> gvs[] >>
+  Cases_on ‘clear_storage_value env fuel accounts addr
+              (slot + x.state_slot) x.state_offset ty’ >>
   gvs[]
 QED
 
-(* Writes the value of a src array into cleared storage of type dst, each
- * scalar converted as an implicit conversion does. Past the cleared length,
- * slots may hold stale data, which the compiler's copy overwrites: the slots
- * of scalar elements are zeroed first, as the compiler writes each packed
- * slot as a whole word built from zero, and each nested array or byte
- * sequence is first cleared, as resizing it does. A struct is written field
- * by field, as the compiler's copy does: each scalar field in place, leaving
- * the rest of its slot, and each array or byte sequence field cleared first;
- * mapping fields are left as they are. The fuel bounds the clears' struct
- * nesting. *)
+(* Replace storage contents using each element's layout: scalar arrays write
+ * complete packed slots; aggregate arrays clear only removed elements, and
+ * retained structs overwrite members while preserving scalar-slot padding.
+ * The fuel bounds recursive clearing. *)
 Definition store_storage_value_def:
   (store_storage_value env fuel accounts addr slot src dst v =
     if byte_sequence_type dst then
       (case v of
-         ScalarValue (BytesValue bs) =>
-           let length = LENGTH bs in
-           if length < 32 then
-             INL (set_storage_word accounts addr slot
-               (n2w (num_of_be_bytes (bs ++ REPLICATE (31 - length) 0w ++
-                  [n2w (2 * length)]))))
-           else
-             INL (set_storage_word
-               (store_byte_chunks ((length + 31) DIV 32) accounts addr
-                  (mapping_slot [] slot) bs)
-               addr slot (n2w (2 * length + 1)))
+         ScalarValue (BytesValue bs) => replace_storage_bytes accounts addr slot bs F
        | _ => INR (InvalidCompletion "bad stored byte sequence"))
     else case (src, dst, v) of
       (ArrayT e _, ArrayT e' l, TupleValue vs) =>
-        let accounts1 = if l = NONE then
-                          set_storage_word accounts addr slot (n2w (LENGTH vs))
-                        else accounts in
-        let data = if l = NONE then mapping_slot [] slot else slot in
-        let accounts2 =
-          if is_stored_scalar_type e' then
-            (case fixed_storage_slots env (ArrayT e' (SOME (LENGTH vs))) of
-               SOME slots => clear_byte_slots slots accounts1 addr data
-             | NONE => accounts1)
-          else accounts1 in
-        store_storage_elements env fuel accounts2 addr data e e' 0 vs
+        (case storage_array_data accounts addr slot (ArrayT e' l) of
+           (old_length, data) =>
+             if 2 ** 64 ≤ old_length then INR FuelExhausted else
+             let length = LENGTH vs in
+             let accounts1 = if l = NONE then
+                               set_storage_word accounts addr slot (n2w length)
+                             else accounts in
+             let resized =
+               if is_stored_scalar_type e' then
+                 (case (fixed_storage_slots env (ArrayT e' (SOME old_length)),
+                        fixed_storage_slots env (ArrayT e' (SOME length))) of
+                    (SOME old_slots, SOME new_slots) =>
+                      INL (clear_byte_slots (MAX old_slots new_slots) accounts1 addr data)
+                  | _ => INR (InvalidCompletion "bad array element type"))
+               else clear_storage_elements env fuel accounts1 addr data e'
+                      length (old_length - length) in
+             case resized of
+               INR c => INR c
+             | INL accounts2 =>
+                 store_storage_elements env fuel accounts2 addr data e e' 0 vs)
     | (StructT _, StructT s, TupleValue vs) =>
         (case (lookup_struct env s, lookup_struct_layout env s) of
            (SOME fields, SOME layout) =>
@@ -561,12 +561,7 @@ Definition store_storage_value_def:
                        | NONE => INR (InvalidCompletion "bad storage write"))
                   | _ => INR (InvalidCompletion "bad element conversion"))
              | _ => INR (InvalidCompletion "bad stored element"))
-          else case dst of
-            StructT _ => store_storage_value env fuel accounts addr s src dst v
-          | _ =>
-            (case clear_storage_value env fuel accounts addr s offset dst of
-               INR c => INR c
-             | INL cleared => store_storage_value env fuel cleared addr s src dst v) in
+          else store_storage_value env fuel accounts addr s src dst v in
         case stored of
           INR c => INR c
         | INL accounts' =>
@@ -589,11 +584,7 @@ Definition store_storage_value_def:
              | _ => INR (InvalidCompletion "bad stored field"))
           else case ty of
             MappingT _ _ => INL accounts
-          | StructT _ => store_storage_value env fuel accounts addr s ty ty v
-          | _ =>
-            (case clear_storage_value env fuel accounts addr s 0 ty of
-               INR c => INR c
-             | INL cleared => store_storage_value env fuel cleared addr s ty ty v) in
+          | _ => store_storage_value env fuel accounts addr s ty ty v in
         case stored of
           INR c => INR c
         | INL accounts' =>
@@ -616,13 +607,7 @@ Definition copy_to_storage_def:
     case dst of
       StorageReference PersistentStorage addr slot 0 ty _ =>
         if static then INR (InvalidCompletion "array copy in static frame") else
-        let fuel = LENGTH env.type_declarations in
-        (case ty of
-           StructT _ => store_storage_value env fuel accounts addr slot src ty v
-         | _ =>
-             case clear_storage_value env fuel accounts addr slot 0 ty of
-               INR c => INR c
-             | INL cleared => store_storage_value env fuel cleared addr slot src ty v)
+        store_storage_value env (LENGTH env.type_declarations) accounts addr slot src ty v
     | _ => INR (InvalidCompletion "bad storage array reference")
 End
 
@@ -719,6 +704,7 @@ val () = cv_auto_trans storage_byte_contents_def;
 val () = cv_auto_trans set_storage_word_def;
 val () = cv_auto_trans clear_byte_slots_def;
 val () = cv_auto_trans store_byte_chunks_def;
+val () = cv_auto_trans replace_storage_bytes_def;
 val () = cv_auto_trans store_storage_bytes_def;
 val () = cv_auto_trans copy_storage_byte_chunks_def;
 val () = cv_auto_trans copy_storage_bytes_def;
