@@ -1935,8 +1935,13 @@ Definition elab_expr_def:
         case tys of
           [] => INR [(id, "value count mismatch")]
         | ty :: ts =>
-          if order ≠ [] ∧ (HD order ≠ 0 ∨ MEM 0 (TL order))
-          then INR [(id, "argument order")] else
+          let suffix_order =
+            case order of
+              [] => SOME []
+            | i :: is => if i = 0 ∧ ¬MEM 0 is then SOME (MAP PRE is) else NONE in
+          case suffix_order of
+            NONE => INR [(id, "argument order")]
+          | SOME remaining =>
           (case elab_expr ctx n e of
              INL ((ss, a, vt), n1) =>
                (case coerce n1 ty a vt of
@@ -1946,7 +1951,7 @@ Definition elab_expr_def:
                       else (([], a'), n2) in
                     let (saved, value) = captured in
                     (case elab_args ctx next id (early - 1)
-                            (MAP PRE (TL order)) ts rest of
+                            remaining ts rest of
                        INL ((ss', as), n3) =>
                          INL ((ss ++ cs ++ saved ++ ss', value :: as), n3)
                      | INR bs => INR bs)
