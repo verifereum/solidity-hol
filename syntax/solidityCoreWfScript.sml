@@ -3,9 +3,10 @@
  *
  * Admitted: scalar/convert/tuple/internal-call definitions, reads of state
  * variables, capture of locals and state variables and scalar writes to them,
- * and structured control flow. Bindings hold elementary types, enums and
- * user-defined value types, plus located memory and calldata byte sequences.
- * Function values are deferred together with indirect calls; contract types
+ * and structured control flow. Bindings hold elementary types, enums,
+ * user-defined value types and internal function values, plus located memory
+ * and calldata byte sequences; calls through function values are admitted.
+ * External function values are deferred; contract types
  * are deferred until contract metadata (payability, bases) is in the
  * environment. Typed storage references support struct fields, mappings and
  * arrays, with scalar leaf reads/captures. Aggregate copies and external calls
@@ -146,10 +147,21 @@ Definition is_function_type_def[simp]:
   (is_function_type _ ⇔ F)
 End
 
-(* Stage 2 bindings, parameters and returns are non-function value types. *)
+(* A function type's admitted shape: an internal function, not payable,
+ * whose parameters and returns are non-function value types. Other types pass.
+ *)
+Definition function_type_ok_def:
+  (function_type_ok (FunctionT kind m ps rs) ⇔
+    kind = InternalFn ∧ m ≠ PayableMut ∧
+    EVERY (λty. is_value_type ty ∧ ¬is_function_type ty) (ps ++ rs)) ∧
+  (function_type_ok _ ⇔ T)
+End
+
+(* Stage 2 bindings, parameters and returns are value types: an internal
+ * function type only as function_type_ok admits it. *)
 Definition core_scalar_type_def:
   core_scalar_type env ty ⇔
-    is_value_type ty ∧ ¬is_function_type ty ∧ valid_type_shape ty ∧
+    is_value_type ty ∧ function_type_ok ty ∧ valid_type_shape ty ∧
     declared_type_ok env ty
 End
 
@@ -229,26 +241,45 @@ Definition storage_type_ok_def:
   (storage_type_ok env ty ⇔ elementary_storage_type_ok ty)
 End
 
-(* Located byte sequences are values; captured lvalues use ReferenceType. *)
-
-
-Definition byte_sequence_value_type_def:
-  byte_sequence_value_type ty ⇔
-    case ty of
-      LocatedT loc element => byte_sequence_type element
-    | _ => F
+(* Whether a type reaches no struct, through array elements: the ABI values
+ * the core encodes and decodes. *)
+Definition struct_free_def:
+  (struct_free (StructT _) ⇔ F) ∧
+  (struct_free (ArrayT ty _) ⇔ struct_free ty) ∧
+  (struct_free (LocatedT _ ty) ⇔ struct_free ty) ∧
+  (struct_free _ ⇔ T)
 End
 
-(* What a memory reference denotes: a byte sequence, a struct, or an array
- * whose elements are elementary values or, as pointers, other memory objects.
- * A struct's fields are checked against its declaration by memory_type_ok. *)
-Definition memory_object_type_def:
-  (memory_object_type (ArrayT element length) ⇔
+(* Whether an encoding of the type has a fixed size, with no offsets. *)
+Definition static_object_type_def:
+  (static_object_type (ArrayT element (SOME n)) ⇔ static_object_type element) ∧
+  (static_object_type (ArrayT element NONE) ⇔ F) ∧
+  (static_object_type ty ⇔ ¬byte_sequence_type ty)
+End
+
+(* The objects a reference in each data location may denote. Storage holds
+ * byte sequences, arrays, mappings and structs; their shape against the
+ * environment is storage_type_ok's. Memory and calldata hold byte sequences
+ * and arrays whose elements are elementary values or, as pointers, other
+ * objects in the same location; memory also holds structs, whose fields
+ * memory_type_ok checks. A calldata array of fixed length is read in
+ * place from its ABI encoding, so its elements are static and every dynamic
+ * object is reached through an offset and a length. Array elements are
+ * unlocated: element_type adds the location on access. *)
+Definition located_object_shape_def:
+  (located_object_shape StorageLoc ty ⇔
+    case ty of
+      ArrayT _ _ => T
+    | MappingT _ _ => T
+    | StructT _ => T
+    | _ => byte_sequence_type ty) ∧
+  (located_object_shape loc (ArrayT element length) ⇔
     valid_array_length length ∧
     ((is_elementary_type element ∧ valid_type_shape element) ∨
-     memory_object_type element)) ∧
-  (memory_object_type (StructT _) ⇔ T) ∧
-  (memory_object_type ty ⇔ byte_sequence_type ty)
+     located_object_shape loc element) ∧
+    (loc = CalldataLoc ∧ IS_SOME length ⇒ static_object_type element)) ∧
+  (located_object_shape MemoryLoc (StructT _) ⇔ T) ∧
+  (located_object_shape loc ty ⇔ byte_sequence_type ty)
 End
 
 (* The structs a memory object type reaches are declared, and each field is a
@@ -264,7 +295,7 @@ Definition memory_type_ok_def:
   (memory_type_ok env n _ ⇔ T) ∧
   (memory_fields_ok env n [] ⇔ T) ∧
   (memory_fields_ok env n (ty :: tys) ⇔
-    (is_stored_scalar_type ty ∨ (memory_object_type ty ∧ memory_type_ok env n ty)) ∧
+    (is_stored_scalar_type ty ∨ (located_object_shape MemoryLoc ty ∧ memory_type_ok env n ty)) ∧
     memory_fields_ok env n tys)
 Termination
   WF_REL_TAC ‘inv_image ($< LEX $<) (λx. case x of
@@ -273,66 +304,18 @@ Termination
   rw[list_size_def]
 End
 
-(* Whether a type reaches no struct, through array elements: the ABI values
- * the core encodes and decodes. *)
-Definition struct_free_def:
-  (struct_free (StructT _) ⇔ F) ∧
-  (struct_free (ArrayT ty _) ⇔ struct_free ty) ∧
-  (struct_free (LocatedT _ ty) ⇔ struct_free ty) ∧
-  (struct_free _ ⇔ T)
+(* A located type that is well formed in env: its object shape, in storage
+ * its layout, and in memory its structs' fields. *)
+Definition located_type_ok_def:
+  located_type_ok env loc ty ⇔
+    located_object_shape loc ty ∧ (loc = StorageLoc ⇒ storage_type_ok env ty) ∧
+    (loc = MemoryLoc ⇒ memory_type_ok env (LENGTH env.type_declarations) ty)
 End
 
-(* Storage copies also admit enum leaves; memory and calldata retain their
- * own array element boundaries. *)
-Definition storage_copy_object_type_def:
-  (storage_copy_object_type (ArrayT element length) ⇔
-    valid_array_length length ∧
-    ((is_stored_scalar_type element ∧ valid_type_shape element) ∨
-     storage_copy_object_type element)) ∧
-  (storage_copy_object_type (StructT _) ⇔ T) ∧
-  (storage_copy_object_type ty ⇔ byte_sequence_type ty)
-End
-
-(* What a storage pointer denotes: a byte sequence, an array, a mapping or a
- * struct. Its shape is checked against the environment by storage_type_ok. *)
-Definition storage_object_type_def:
-  storage_object_type ty ⇔
-    case ty of
-      ArrayT _ _ => T
-    | MappingT _ _ => T
-    | StructT _ => T
-    | _ => byte_sequence_type ty
-End
-
-(* Whether an encoding of the type has a fixed size, with no offsets. *)
-Definition static_object_type_def:
-  (static_object_type (ArrayT element (SOME n)) ⇔ static_object_type element) ∧
-  (static_object_type (ArrayT element NONE) ⇔ F) ∧
-  (static_object_type ty ⇔ ¬byte_sequence_type ty)
-End
-
-(* What a calldata reference denotes: a byte sequence, or an array read in
- * place from its ABI encoding. A fixed-size array's elements are static, so
- * every dynamic object is reached through an offset and a length. *)
-Definition calldata_object_type_def:
-  (calldata_object_type (ArrayT element NONE) ⇔
-    (is_elementary_type element ∧ valid_type_shape element) ∨
-    calldata_object_type element) ∧
-  (calldata_object_type (ArrayT element (SOME n)) ⇔
-    memory_object_type (ArrayT element (SOME n)) ∧ static_object_type element) ∧
-  (calldata_object_type ty ⇔ byte_sequence_type ty)
-End
-
-(* Located values: byte sequences in any location, memory and calldata arrays,
- * and storage pointers. *)
+(* Located values: references to an object in a data location. *)
 Definition located_value_type_def:
-  located_value_type ty ⇔
-    case ty of
-      LocatedT MemoryLoc element => memory_object_type element
-    | LocatedT CalldataLoc element => calldata_object_type element
-    | LocatedT StorageLoc element => storage_object_type element
-    | LocatedT loc element => byte_sequence_type element
-    | _ => F
+  (located_value_type (LocatedT loc ty) ⇔ located_object_shape loc ty) ∧
+  (located_value_type _ ⇔ F)
 End
 
 (* The type of an element of a memory or calldata array, or of a field of a
@@ -352,17 +335,10 @@ Definition abi_value_type_def:
      case ty of LocatedT StorageLoc _ => F | _ => T)
 End
 
-(* A located binding's structs are declared: a storage one's with a layout,
- * a memory one's as memory_type_ok checks. Calldata structs are not modelled. *)
 Definition core_binding_type_def:
   core_binding_type env ty ⇔
     core_scalar_type env ty ∨
-    (located_value_type ty ∧
-     case ty of
-       LocatedT StorageLoc element => storage_type_ok env element
-     | LocatedT MemoryLoc element =>
-         memory_type_ok env (LENGTH env.type_declarations) element
-     | _ => struct_free ty)
+    case ty of LocatedT loc element => located_type_ok env loc element | _ => F
 End
 
 (* The storage type a binding can be navigated through: a captured lvalue or a
@@ -429,11 +405,21 @@ Definition elementary_scalar_has_type_def:
   (elementary_scalar_has_type _ _ ⇔ F)
 End
 
-(* Function types never reach this relation: core_scalar_type excludes them. *)
+(* An internal function value names a procedure with the type's parameter
+ * and return types, or is the zero value. *)
 Definition scalar_has_type_def:
   scalar_has_type env ty s ⇔
     case ty of
-      EnumT id =>
+      FunctionT InternalFn _ ps rs =>
+        (case s of
+           InternalFunctionValue NONE => T
+         | InternalFunctionValue (SOME f) =>
+             (case lookup_procedure env f of
+                SOME p =>
+                  MAP SND p.parameters = ps ∧ MAP SND p.return_bindings = rs
+              | NONE => F)
+         | _ => F)
+    | EnumT id =>
         (case (lookup_enum env id, s) of
            (SOME members, IntegerValue i) => 0 ≤ i ∧ i < &members
          | _ => F)
@@ -457,13 +443,13 @@ Definition value_has_type_def:
     (case storage_bytes ty of SOME b => offset + b ≤ 32 | NONE => offset = 0)) ∧
   (value_has_type env (SingleType (LocatedT CalldataLoc ty))
      (ReferenceValue (CalldataReference _ _ rty)) ⇔
-    ty = rty ∧ calldata_object_type ty) ∧
+    ty = rty ∧ located_type_ok env CalldataLoc ty) ∧
   (value_has_type env (SingleType (LocatedT MemoryLoc ty))
      (ReferenceValue (MemoryReference _ 0 rty)) ⇔
-    ty = rty ∧ memory_object_type ty) ∧
+    ty = rty ∧ located_type_ok env MemoryLoc ty) ∧
   (value_has_type env (SingleType (LocatedT StorageLoc ty))
      (ReferenceValue (StorageReference PersistentStorage _ _ 0 rty _)) ⇔
-    ty = rty ∧ storage_object_type ty ∧ storage_type_ok env ty) ∧
+    ty = rty ∧ located_type_ok env StorageLoc ty) ∧
   (value_has_type env (ProductType tys) (TupleValue vs) ⇔
     values_have_types env tys vs) ∧
   (value_has_type env _ _ ⇔ F) ∧
@@ -522,7 +508,7 @@ Definition wf_abi_atom_def:
            BoundAtom x =>
              (case ALOOKUP ctx.bindings x of
                 SOME (SingleType (LocatedT loc actual)) =>
-                  actual = ArrayT element length ∧ located_value_type (LocatedT loc actual)
+                  actual = ArrayT element length ∧ located_type_ok env loc actual
               | _ => F)
          | _ => F)
     | LocatedT _ element =>
@@ -611,6 +597,13 @@ Definition scalar_operator_signature_def:
     | BoolNotOp => if ty = BoolT then SOME ([ty], ty) else NONE
 End
 
+(* An internal function converts implicitly to one with the same parameters
+ * and returns that promises less: pure to view to non-payable. *)
+Definition function_mutability_convertible_def:
+  function_mutability_convertible m m' ⇔
+    m = m' ∨ m = PureMut ∨ m' = NonpayableMut
+End
+
 (* Explicit elementary conversions as solc admits them, including the identity
  * used for moves and default initialization. A payable address converts to
  * integers and fixed bytes only through a non-payable address. Contract types
@@ -636,6 +629,8 @@ Definition elementary_convertible_def:
     | (EnumT _, UintT _) => T
     | (UintT _, EnumT _) => T
     | (IntT _, EnumT _) => T
+    | (FunctionT InternalFn m ps rs, FunctionT InternalFn m' ps' rs') =>
+        function_mutability_convertible m m' ∧ ps = ps' ∧ rs = rs'
     | _ => F
 End
 
@@ -666,25 +661,39 @@ Definition implicitly_convertible_def:
     | (IntT m, IntT n) => m ≤ n
     | (FixedBytesT m, FixedBytesT n) => m ≤ n
     | (AddressT PayableAddress, AddressT NonpayableAddress) => T
+    | (FunctionT InternalFn m ps rs, FunctionT InternalFn m' ps' rs') =>
+        function_mutability_convertible m m' ∧ ps = ps' ∧ rs = rs'
     | _ => F
 End
 
-(* The arrays an assignment copies into a storage array of type dst: the
- * same shape, a fixed-size dimension also into a dynamic one or a longer
- * fixed-size one, with leaves implicitly convertible. *)
-Definition storage_copy_type_def:
-  storage_copy_type src dst ⇔
-    case (src, dst) of
-      (ArrayT e l, ArrayT e' l') =>
+(* The objects whose contents a copy moves from one location into another
+ * object: an object of the same type into memory, or a byte sequence or
+ * array into storage, of the same shape, a fixed-size dimension also into a
+ * dynamic one or a longer fixed-size one, with leaves implicitly convertible
+ * scalars, byte sequences or structs of the same declaration. A struct's
+ * fields copy member-wise; the copy check bounds them with memory_type_ok. *)
+Definition copy_convertible_def:
+  copy_convertible (src_loc, src) (dst_loc, dst) ⇔
+    if dst_loc = MemoryLoc then
+      src_loc ≠ MemoryLoc ∧ src = dst ∧
+      located_object_shape src_loc src ∧ located_object_shape MemoryLoc dst
+    else case (src, dst_loc, dst) of
+      (ArrayT e l, StorageLoc, ArrayT e' l') =>
+        located_object_shape src_loc src ∧
+        valid_array_length l ∧ valid_array_length l' ∧
         (case (l, l') of
            (_, NONE) => T
          | (SOME n, SOME m) => n ≤ m
-         | _ => F) ∧ storage_copy_type e e'
-    | (ArrayT _ _, _) => F
-    | (_, ArrayT _ _) => F
-    | _ => implicitly_convertible src dst
+         | _ => F) ∧
+        ((is_stored_scalar_type e ∧ valid_type_shape e ∧
+          is_stored_scalar_type e' ∧ valid_type_shape e' ∧
+          implicitly_convertible e e') ∨
+         copy_convertible (src_loc, e) (StorageLoc, e'))
+    | (StructT s, StorageLoc, StructT s') =>
+        s = s' ∧ located_object_shape src_loc src
+    | _ => byte_sequence_type src ∧ src = dst ∧ dst_loc ≠ CalldataLoc
 Termination
-  WF_REL_TAC ‘measure (sol_type_size o FST)’ >>
+  WF_REL_TAC ‘measure (sol_type_size o SND o FST)’ >>
   rw[solidityASTTheory.sol_type_size_def]
 End
 
@@ -766,13 +775,18 @@ Definition wf_core_operation_def:
   (wf_core_operation env ctx annotation (ReadOperation ty a) ⇔
     (case ty of
        LocatedT MemoryLoc ty' =>
-         annotation = SingleType ty ∧ memory_object_type ty'
+         annotation = SingleType ty ∧ located_type_ok env MemoryLoc ty' ∧
+         wf_core_atom env ctx (ReferenceType ty) a
      | _ =>
-       if storage_object_type ty then
-         annotation = SingleType (LocatedT StorageLoc ty)
-       else annotation = SingleType ty ∧ core_scalar_type env ty ∧
-            IS_SOME (storage_bytes ty)) ∧
-    wf_core_atom env ctx (ReferenceType ty) a) ∧
+       if located_type_ok env StorageLoc ty then
+         annotation = SingleType (LocatedT StorageLoc ty) ∧
+         case a of
+           BoundAtom x => storage_base (ALOOKUP ctx.bindings x) = SOME ty
+         | _ => F
+       else
+         annotation = SingleType ty ∧ core_scalar_type env ty ∧
+         IS_SOME (storage_bytes ty) ∧
+         wf_core_atom env ctx (ReferenceType ty) a)) ∧
   (* A field of a storage struct, or of a memory struct as its element type. *)
   (wf_core_operation env ctx annotation
      (NavigateOperation ty base (FieldNavigation field)) ⇔
@@ -812,21 +826,21 @@ Definition wf_core_operation_def:
            | _ => F)
     | _ => F) ∧
   (wf_core_operation env ctx annotation (DefaultMemoryOperation ty) ⇔
-    memory_object_type ty ∧ annotation = SingleType (LocatedT MemoryLoc ty)) ∧
+    located_type_ok env MemoryLoc ty ∧ annotation = SingleType (LocatedT MemoryLoc ty)) ∧
   (wf_core_operation env ctx annotation (NullMemoryOperation ty) ⇔
-    memory_object_type ty ∧ annotation = SingleType (LocatedT MemoryLoc ty)) ∧
+    located_type_ok env MemoryLoc ty ∧ annotation = SingleType (LocatedT MemoryLoc ty)) ∧
   (wf_core_operation env ctx annotation (BytesLiteralOperation ty _) ⇔
     annotation = SingleType (LocatedT MemoryLoc ty) ∧ byte_sequence_type ty) ∧
   (wf_core_operation env ctx annotation (AllocateMemoryOperation ty length) ⇔
     annotation = SingleType (LocatedT MemoryLoc ty) ∧
-    (byte_sequence_type ty ∨
-     (memory_object_type ty ∧ case ty of ArrayT _ NONE => T | _ => F) ∨
-     (case ty of
-        StructT s =>
-          (case lookup_struct env s of
-             SOME fields => length = ConstantAtom (IntegerValue (&LENGTH fields))
-           | NONE => F)
-      | _ => F)) ∧
+    located_type_ok env MemoryLoc ty ∧
+    (case ty of
+       ArrayT _ NONE => T
+     | StructT s =>
+         (case lookup_struct env s of
+            SOME fields => length = ConstantAtom (IntegerValue (&LENGTH fields))
+          | NONE => F)
+     | _ => byte_sequence_type ty) ∧
     wf_core_atom env ctx (SingleType (UintT 256)) length) ∧
   (wf_core_operation env ctx annotation (BytesToFixedOperation k a) ⇔
     valid_fixed_bytes_width k ∧ annotation = SingleType (FixedBytesT k) ∧
@@ -845,14 +859,14 @@ Definition wf_core_operation_def:
       BoundAtom x =>
         (case ALOOKUP ctx.bindings x of
            SOME (SingleType (LocatedT loc (ArrayT element length))) =>
-             located_value_type (LocatedT loc (ArrayT element length)) ∧
+             located_type_ok env loc (ArrayT element length) ∧
              annotation = SingleType (element_type loc element)
          | _ => F)
     | _ => F) ∧
   (wf_core_operation env ctx annotation (CalldataSliceOperation a start end_bound) ⇔
     case annotation of
       SingleType (LocatedT CalldataLoc ty) =>
-        located_value_type (LocatedT CalldataLoc ty) ∧
+        located_type_ok env CalldataLoc ty ∧
         (ty = BytesT ∨ case ty of ArrayT element NONE => static_object_type element | _ => F) ∧
         wf_core_atom env ctx annotation a ∧
         wf_core_atom env ctx (SingleType (UintT 256)) start ∧
@@ -862,9 +876,11 @@ Definition wf_core_operation_def:
   (wf_core_operation env ctx annotation (CopyToMemoryOperation a) ⇔
     case (a, annotation) of
       (BoundAtom x, SingleType (LocatedT MemoryLoc ty)) =>
-        (ALOOKUP ctx.bindings x = SOME (SingleType (LocatedT CalldataLoc ty)) ∨
-         ALOOKUP ctx.bindings x = SOME (SingleType (LocatedT StorageLoc ty))) ∧
-        located_value_type (LocatedT MemoryLoc ty)
+        located_type_ok env MemoryLoc ty ∧
+        (case ALOOKUP ctx.bindings x of
+           SOME (SingleType (LocatedT loc src)) =>
+             copy_convertible (loc, src) (MemoryLoc, ty)
+         | _ => F)
     | _ => F) ∧
   (wf_core_operation env ctx annotation (Keccak256Operation a) ⇔
     annotation = SingleType (FixedBytesT 32) ∧
@@ -956,6 +972,16 @@ Definition wf_core_operation_def:
         wf_core_atoms env ctx (MAP (λ(_, ty). SingleType ty) p.parameters) args ∧
         annotation = call_result_type (MAP SND p.return_bindings)
     | NONE => F) ∧
+  (* The callee is a bound function value, so its type gives the signature. *)
+  (wf_core_operation env ctx annotation (FunctionValueCallOperation g args) ⇔
+    case g of
+      BoundAtom x =>
+        (case ALOOKUP ctx.bindings x of
+           SOME (SingleType (FunctionT InternalFn _ ps rs)) =>
+             wf_core_atoms env ctx (MAP SingleType ps) args ∧
+             annotation = call_result_type rs
+         | _ => F)
+    | ConstantAtom _ => F) ∧
   (wf_core_operation env ctx annotation (EnvironmentOperation f) ⇔
     annotation = SingleType (environment_type f)) ∧
   (* High-level calls pass elementary values; a view or pure callee is
@@ -1033,6 +1059,16 @@ Definition assembly_value_type_def[simp]:
   (assembly_value_type (AddressT _) ⇔ T) ∧
   (assembly_value_type (FixedBytesT _) ⇔ T) ∧
   (assembly_value_type _ ⇔ F)
+End
+
+(* The memory objects an inline assembly block sees: byte sequences, and
+ * arrays of value types, whose elements it sees as words. *)
+Definition assembly_memory_type_def:
+  assembly_memory_type ty ⇔
+    byte_sequence_type ty ∨
+    case ty of
+      ArrayT element _ => assembly_value_type element
+    | _ => F
 End
 
 (* The builtins an inline assembly block may not use. The source state keeps
@@ -1435,7 +1471,7 @@ Definition assembly_reference_ok_def:
         wf_core_atom env ctx (SingleType ty) a ∧ assembly_value_type ty
     | AssemblyMemory x ty =>
         ALOOKUP ctx.bindings x = SOME (SingleType (LocatedT MemoryLoc ty)) ∧
-        byte_sequence_type ty
+        assembly_memory_type ty
 End
 
 (* The names of a block's memory references. The block reads each as a
@@ -1522,7 +1558,7 @@ Definition check_core_stmts_def:
              else NONE
          | SOME (SingleType (LocatedT MemoryLoc (ArrayT element length))) =>
              if fresh_core_id ctx t ∧
-                memory_object_type (ArrayT element length) ∧
+                located_type_ok env MemoryLoc (ArrayT element length) ∧
                 wf_core_atom env ctx (SingleType (UintT 256)) i
              then check_core_stmts env
                     (capture_core_target t (element_type MemoryLoc element) ctx) ss
@@ -1535,15 +1571,9 @@ Definition check_core_stmts_def:
     then check_core_stmts env ctx ss else NONE) ∧
   (check_core_stmts env ctx (CopyContentsStmt src dst a b :: ss) =
     if (case (src, dst) of
-          (LocatedT _ ty, LocatedT StorageLoc ty') =>
-            if byte_sequence_type ty then
-              byte_sequence_value_type src ∧ ty = ty'
-            else
-              located_value_type src ∧ located_value_type dst ∧
-              storage_copy_object_type ty ∧ storage_copy_object_type ty' ∧
-              storage_copy_type ty ty' ∧
-              memory_type_ok env (LENGTH env.type_declarations) ty ∧
-              memory_type_ok env (LENGTH env.type_declarations) ty'
+          (LocatedT src_loc ty, LocatedT StorageLoc ty') =>
+            copy_convertible (src_loc, ty) (StorageLoc, ty') ∧
+            memory_type_ok env (LENGTH env.type_declarations) ty
         | _ => F) ∧
        wf_core_atom env ctx (SingleType src) a ∧
        wf_core_atom env ctx (SingleType dst) b
@@ -1580,11 +1610,11 @@ Definition check_core_stmts_def:
   (check_core_stmts env ctx (RevertStmt a :: ss) =
     if provisional_revert_payload a then check_core_stmts env ctx ss
     else NONE) ∧
-  (* Error arguments are elementary, as the ABI encoding of revert data
-     requires. *)
+  (* Error arguments are elementary values or declared enums. *)
   (check_core_stmts env ctx (RevertErrorStmt selector params args :: ss) =
     if LENGTH selector = 4 ∧
-       EVERY (λty. is_elementary_type ty ∧ valid_type_shape ty) params ∧
+       EVERY (λty. is_stored_scalar_type ty ∧ valid_type_shape ty ∧
+                   declared_type_ok env ty) params ∧
        wf_core_atoms env ctx (MAP SingleType params) args
     then check_core_stmts env ctx ss else NONE) ∧
   (check_core_stmts env ctx (EmitStmt topic args :: ss) =
@@ -1838,6 +1868,18 @@ val () = cv_auto_trans_rec inline_storage_shape_def (
     INL (env, n, ty) => (cv$c2n n, cv_size ty)
   | INR (env, n, tys) => (cv$c2n n, cv_size tys))’ >> cv_termination_tac
 );
+val copy_convertible_pre_def =
+  cv_auto_trans_pre "copy_convertible_pre" copy_convertible_def;
+
+Theorem copy_convertible_pre[cv_pre]:
+  ∀src dst. copy_convertible_pre src dst
+Proof
+  simp[pairTheory.FORALL_PROD] >>
+  measureInduct_on ‘sol_type_size p_2’ >> rpt gen_tac >>
+  simp[Once copy_convertible_pre_def] >> rw[] >> gvs[] >>
+  first_x_assum irule >> simp[solidityASTTheory.sol_type_size_def]
+QED
+
 val () = cv_auto_trans environment_type_def;
 val () = cv_auto_trans wf_abi_atom_def;
 val () = cv_auto_trans wf_gas_atom_def;
@@ -1871,6 +1913,7 @@ val () = cv_auto_trans call_stmt_ok_def;
 val () = cv_auto_trans assembly_calls_ok_def;
 val () = cv_auto_trans assembly_gas_ok_def;
 val () = cv_auto_trans assembly_value_type_def;
+val () = cv_auto_trans assembly_memory_type_def;
 val () = cv_auto_trans assembly_reference_ok_def;
 val () = cv_auto_trans assembly_memory_names_def;
 val () = cv_auto_trans assembly_assigns_ok_def;
