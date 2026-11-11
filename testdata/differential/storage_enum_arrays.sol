@@ -32,6 +32,4 @@ contract StorageEnumArrays {
 
     function copyToSelf() external { source = source; }
 
-    function copyInTuple() external { (dest, sentinel) = (source, 7); }
-
 }
