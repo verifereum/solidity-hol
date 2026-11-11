@@ -1749,43 +1749,57 @@ fun constant_declaration v = within v (fn v =>
  * constants it refers to, also through each other, come with it, the
  * constants after its own.
  *)
-(* A mapping with an enum key, in the type name v: it imports, but the core
- * has no such mapping type. *)
-fun enum_keyed v =
-  case node_type v of
-    "Mapping" =>
-      String.isPrefix "t_enum$_" (raw_type_id (field v "keyType")) orelse
-      enum_keyed (field v "valueType")
-  | "ArrayTypeName" => enum_keyed (field v "baseType")
-  | _ => false
+(* Whether the source check admits each member of the imported struct tm:
+ * a member can import and still have no core type, such as a mapping with
+ * an enum, string or bytes key. *)
+fun members_representable tm =
+  let
+    val members =
+      case Lib.assoc1 "struct_members" (#2 (TypeBase.dest_record tm)) of
+        SOME (_, ms) => #1 (listSyntax.dest_list ms)
+      | NONE => raise Fail "a struct record without members"
+    val field_type =
+      prim_mk_const {Thy = "solidityImport", Name = "field_variable_type"}
+    fun representable m =
+      optionSyntax.is_some (rhs (concl (cv_transLib.cv_eval (mk_comb (field_type, m)))))
+  in
+    List.all representable members
+  end
 
-(* The structs ss, imported, except one with a member type the core cannot
- * hold (its import records a blocker, or it has an enum-keyed mapping) and
- * those that refer to such a one: they are left out, so a function using
- * one is rejected, not the unit. *)
+(* The structs the type names within v name. *)
+fun struct_references (v as JSON.OBJECT fields) =
+      if JSONUtil.testField "nodeType"
+           (fn JSON.STRING s => s = "UserDefinedTypeName" | _ => false) v andalso
+         String.isPrefix "t_struct$_" (raw_type_id v)
+      then [int_field v "referencedDeclaration"]
+      else List.concat (map (struct_references o #2) fields)
+  | struct_references (JSON.ARRAY vs) = List.concat (map struct_references vs)
+  | struct_references _ = []
+
+(* Whether every struct a type name within v names is among the structs. *)
+fun structs_present structs v =
+  List.all (fn i => List.exists (fn (s, _) => int_field s "id" = i) structs)
+    (struct_references v)
+
+(* The structs ss, each with its import, except one with a member the core
+ * cannot hold (its import records a blocker, or the source check rejects
+ * it) and those that refer to a struct not kept: they are left out, so a
+ * function using one is rejected, not the unit. *)
 fun importable_structs types ss =
   let
-    fun representable s =
-      not (List.exists (fn m => enum_keyed (field m "typeName"))
-             (JSONUtil.arrayMap I (field s "members")))
     val imported =
       List.mapPartial
-        (fn s => case keep (fn s => with_blockers (fn () => struct_declaration types s)) s of
-                   SOME (tm, []) => if representable s then SOME (s, tm) else NONE
+        (fn s => case with_blockers (fn () => keep (struct_declaration types) s) of
+                   (SOME tm, []) => if members_representable tm then SOME (s, tm) else NONE
                  | _ => NONE) ss
     fun close kept =
       let
-        val dropped =
-          List.filter (fn s => not (List.exists (fn (k, _) => int_field k "id" = int_field s "id") kept)) ss
-        val kept' =
-          List.filter (fn (k, _) =>
-            not (List.exists (fn d => List.exists (fn i => i = int_field d "id") (references k))
-                   dropped)) kept
+        val kept' = List.filter (fn (k, _) => structs_present kept (field k "members")) kept
       in
         if length kept' = length kept then kept else close kept'
       end
   in
-    map #2 (close imported)
+    close imported
   end
 
 fun contract external_structs contracts declared v = within v (fn v =>
@@ -1917,11 +1931,20 @@ fun contract external_structs contracts declared v = within v (fn v =>
                   then recover d (fn () => check_using d)
                   else ())
         (!library_directives)
-    (* The file-level and library structs the bases and library members refer
-     * to, also through other structs. *)
+    (* The file-level structs and those of libraries, interfaces and other
+     * contracts that the bases and library members refer to, also through
+     * other structs. A struct's scope joins the libraries, so the source
+     * check admits it. *)
     val library_structs =
       List.filter (fn m => node_type m = "StructDefinition")
-        (map #2 (!library_members))
+        (map #2 (!library_members)) @
+      List.concat
+        (map (fn (_, c) =>
+                if string_field c "contractKind" = "library" orelse
+                   List.exists (fn b => int_field b "id" = int_field c "id") bases
+                then []
+                else List.filter (fn m => node_type m = "StructDefinition") (nodes c))
+           declared)
     fun used picked =
       let
         val ids = List.concat (map references (bases @ used_members @ picked))
@@ -2001,6 +2024,15 @@ fun contract external_structs contracts declared v = within v (fn v =>
                    | NONE => NONE)
           (JSONUtil.arrayMap JSONUtil.asIntInf (field x "linearizedBaseContracts"))
       end
+    val candidate_structs = used_structs @ members_of "StructDefinition" (rev bases)
+    val structs = importable_structs (field layout "types") candidate_structs
+    (* A state variable of a struct left out has no layout in the core, so
+     * it rejects the unit. *)
+    val () =
+      app (fn d => recover d (fn () =>
+             require d (structs_present structs (field d "typeName"))
+               "state variable of a struct the core cannot hold"))
+        state_variables
     (* before the functions, which need the modifiers that failed *)
     val imported_modifiers =
       modifiers (members_of "ModifierDefinition" bases @
@@ -2043,10 +2075,7 @@ fun contract external_structs contracts declared v = within v (fn v =>
         listSyntax.mk_list
           (keep_all storage_entry (JSONUtil.arrayMap I (field layout "storage")),
            storage_entry_ty)),
-       ("contract_structs", listSyntax.mk_list
-          (importable_structs (field layout "types")
-             (used_structs @ members_of "StructDefinition" (rev bases)),
-           struct_ty)),
+       ("contract_structs", listSyntax.mk_list (map #2 structs, struct_ty)),
        ("contract_enums", listSyntax.mk_list
           (map (fn (i, k) => pairSyntax.mk_pair (mk_num i, mk_num (IntInf.fromInt k)))
              (!enum_declarations),
