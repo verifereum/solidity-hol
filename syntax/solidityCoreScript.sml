@@ -110,12 +110,11 @@ End
 
 (* DefaultMemoryOperation ty: the default value of a memory variable of type
  * ty. AllocateMemoryOperation ty n: new ty(n), a zeroed byte sequence or
- * dynamic array of length n. ArrayIndexOperation a i: element i of the memory
+ * dynamic array of length n; for a struct type, a new memory struct of n
+ * fields, a word per field, as a constructor allocates it before converting
+ * and writing each field. ArrayIndexOperation a i: element i of the memory
  * or calldata array a. CopyToMemoryOperation a: a new memory copy of the
- * calldata or storage array or struct a. StructOperation s: a new memory
- * struct of the declaration s, a word per field, as a constructor allocates
- * it before converting and writing each field. FieldOperation a f: field f of
- * the memory struct a.
+ * calldata or storage array or struct a.
  * Keccak256Operation a: the Keccak-256 hash of the memory byte sequence a, as
  * bytes32. EcrecoverOperation h v r s: ecrecover(h, v, r,
  * s), the address the signature (v, r, s) of the bytes32 hash h recovers, or
@@ -152,11 +151,12 @@ Datatype:
   | NullMemoryOperation sol_type
   | BytesLiteralOperation sol_type (byte list)
   | AllocateMemoryOperation sol_type core_atom
+  | BytesToFixedOperation num core_atom
   | ByteIndexOperation core_atom core_atom
   | ArrayIndexOperation core_atom core_atom
+  (* Calldata view [start:end], with an omitted end using the current length. *)
+  | CalldataSliceOperation core_atom core_atom (core_atom option)
   | CopyToMemoryOperation core_atom
-  | StructOperation ast_id
-  | FieldOperation core_atom ast_id
   | ArrayLengthOperation core_atom
   | Keccak256Operation core_atom
   | EcrecoverOperation core_atom core_atom core_atom core_atom

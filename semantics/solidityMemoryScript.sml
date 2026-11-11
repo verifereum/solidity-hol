@@ -70,23 +70,6 @@ Definition reference_bytes_def:
     | _ => NONE
 End
 
-Definition read_memory_reference_def:
-  read_memory_reference (st : source_state) ty r =
-    case r of
-      MemoryReference (HeapId id) offset rty =>
-        if ty ≠ FixedBytesT 1 ∨ rty ≠ ty then
-          ValueAbrupt (InvalidCompletion "bad memory read type")
-        else (case FLOOKUP st.heap id of
-          SOME obj =>
-            if ¬byte_sequence_type obj.object_type ∨ obj.object_length ≤ offset then
-              ValueAbrupt (InvalidCompletion "bad memory byte reference")
-            else (case memory_byte obj offset of
-              SOME b => ValueOk (ScalarValue (BytesValue [b]))
-            | NONE => ValueAbrupt (InvalidCompletion "bad memory byte cell"))
-        | NONE => ValueAbrupt (InvalidCompletion "missing memory object"))
-    | _ => ValueAbrupt (InvalidCompletion "bad memory reference")
-End
-
 Definition navigate_memory_byte_def:
   navigate_memory_byte (st : source_state) r i =
     case r of
@@ -99,21 +82,7 @@ Definition navigate_memory_byte_def:
     | _ => ValueAbrupt (InvalidCompletion "bad memory byte array")
 End
 
-Definition write_memory_byte_def:
-  write_memory_byte r s (st : source_state) =
-    case (r, s) of
-      (MemoryReference (HeapId id) i ty, BytesValue [b]) =>
-        if ty ≠ FixedBytesT 1 then NONE else
-        (case FLOOKUP st.heap id of
-           SOME obj =>
-             if byte_sequence_type obj.object_type ∧ i < obj.object_length then
-               SOME (st with heap := st.heap |+ (id,
-                 obj with object_cells := obj.object_cells |+
-                   (i, ScalarValue (BytesValue [b]))))
-             else NONE
-         | NONE => NONE)
-    | _ => NONE
-End
+
 
 (* Memory arrays: an object of type ArrayT element length holds one cell per
  * element, a value or a pointer to another object, as the compiler's memory
@@ -142,6 +111,33 @@ Definition memory_cell_def:
         case default_elementary element of
           SOME s => ScalarValue s
         | NONE => ReferenceValue (MemoryReference (HeapId 0) 0 element)
+End
+
+(* The component a navigated memory reference denotes: byte offset of a
+ * byte sequence, read as a bytes1, or cell offset of a struct, read as its
+ * field type ty (a reference field located in memory). *)
+Definition read_memory_reference_def:
+  read_memory_reference (st : source_state) ty r =
+    case r of
+      MemoryReference (HeapId id) offset rty =>
+        (case FLOOKUP st.heap id of
+           SOME obj =>
+             (case obj.object_type of
+                StructT _ =>
+                  if (case ty of LocatedT MemoryLoc t => t | t => t) ≠ rty ∨
+                     obj.object_length ≤ offset
+                  then ValueAbrupt (InvalidCompletion "bad memory field reference")
+                  else ValueOk (memory_cell obj rty offset)
+              | _ =>
+                if ty ≠ FixedBytesT 1 ∨ rty ≠ ty then
+                  ValueAbrupt (InvalidCompletion "bad memory read type")
+                else if ¬byte_sequence_type obj.object_type ∨ obj.object_length ≤ offset then
+                  ValueAbrupt (InvalidCompletion "bad memory byte reference")
+                else (case memory_byte obj offset of
+                  SOME b => ValueOk (ScalarValue (BytesValue [b]))
+                | NONE => ValueAbrupt (InvalidCompletion "bad memory byte cell")))
+         | NONE => ValueAbrupt (InvalidCompletion "missing memory object"))
+    | _ => ValueAbrupt (InvalidCompletion "bad memory reference")
 End
 
 (* A new memory object of size bytes with no cells written, after the
@@ -303,6 +299,30 @@ Definition write_memory_element_def:
     | NONE => NONE
 End
 
+(* A write through a navigated memory reference: a struct cell, or a byte of
+ * a byte sequence written as a bytes1. *)
+Definition write_memory_reference_def:
+  write_memory_reference r v (st : source_state) =
+    case r of
+      MemoryReference (HeapId id) i ty =>
+        (case FLOOKUP st.heap id of
+           SOME obj =>
+             (case obj.object_type of
+                StructT _ => write_memory_element id i v st
+              | _ =>
+                (case v of
+                   ScalarValue (BytesValue [b]) =>
+                     if ty = FixedBytesT 1 ∧ byte_sequence_type obj.object_type ∧
+                        i < obj.object_length
+                     then SOME (st with heap := st.heap |+ (id,
+                            obj with object_cells := obj.object_cells |+
+                              (i, ScalarValue (BytesValue [b]))))
+                     else NONE
+                 | _ => NONE))
+         | NONE => NONE)
+    | _ => NONE
+End
+
 (* Byte access and copies propagate malformed storage-header panics. *)
 Definition byte_contents_def:
   byte_contents st r =
@@ -420,12 +440,12 @@ val () = cv_auto_trans memory_byte_def;
 val () = cv_auto_trans heap_bytes_def;
 val () = cv_auto_trans memory_bytes_def;
 val () = cv_auto_trans reference_bytes_def;
-val () = cv_auto_trans read_memory_reference_def;
 val () = cv_auto_trans navigate_memory_byte_def;
-val () = cv_auto_trans write_memory_byte_def;
+
 
 val () = cv_auto_trans default_elementary_def;
 val () = cv_auto_trans memory_cell_def;
+val () = cv_auto_trans read_memory_reference_def;
 (* How cv's precondition presents a heap object record. *)
 Theorem heap_object_literal:
   <| object_type := a; object_length := b; object_cells := c;
@@ -460,6 +480,7 @@ val () = cv_auto_trans memory_array_element_def;
 val () = cv_auto_trans field_position_def;
 val () = cv_auto_trans memory_struct_field_def;
 val () = cv_auto_trans write_memory_element_def;
+val () = cv_auto_trans write_memory_reference_def;
 
 val () = cv_auto_trans byte_contents_def;
 val memory_array_value_pre_def = cv_auto_trans_pre_rec
