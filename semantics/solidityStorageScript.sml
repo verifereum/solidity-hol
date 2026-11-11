@@ -331,7 +331,7 @@ Definition storage_array_value_def:
       NONE => INR (InvalidCompletion "bad array element type")
     | SOME (s, offset) =>
         let value =
-          if is_elementary_type element then
+          if is_stored_scalar_type element then
             (case read_storage env accounts addr s offset element of
                SOME v => INL (ScalarValue v)
              | NONE => INR (InvalidCompletion "bad storage read"))
@@ -372,8 +372,8 @@ End
 
 (* Storage a storage array, struct or byte sequence occupies, cleared as the
  * compiler's delete does: the length, every element, a long byte sequence's
- * data, and each field of a struct but a mapping, a scalar field's bytes
- * alone. A dynamic length of 2^64 or more cannot be cleared within any gas
+ * data, and each field of a struct but a mapping. Struct scalar fields
+ * clear their whole slots; a directly targeted scalar clears only its bytes. A dynamic length of 2^64 or more cannot be cleared within any gas
  * limit. The fuel bounds the struct nesting. *)
 Definition clear_storage_value_def:
   (clear_storage_value env (fuel : num) accounts addr slot offset ty =
@@ -427,7 +427,9 @@ Definition clear_storage_value_def:
       NONE => INR (InvalidCompletion "missing field layout")
     | SOME v =>
         let s = slot + v.state_slot in
-        let cleared = clear_storage_value env fuel accounts addr s v.state_offset ty in
+        let cleared =
+          if is_stored_scalar_type ty then INL (set_storage_word accounts addr s 0w)
+          else clear_storage_value env fuel accounts addr s v.state_offset ty in
         case cleared of
           INR c => INR c
         | INL accounts' =>
@@ -460,13 +462,42 @@ Theorem clear_storage_fuel_stable:
        clear_storage_fields env fuel accounts addr slot layout fields)
 Proof
   ho_match_mp_tac clear_storage_value_ind >> rpt strip_tac >>
-  qpat_x_assum ‘_ ≠ INR FuelExhausted’ mp_tac
-  >~ [‘clear_storage_value env m accounts addr slot offset ty = _’] >-
-   (Cases_on ‘ty’ >> once_rewrite_tac[clear_storage_value_def] >>
-    simp[byte_sequence_type_def] >> rw[] >> gvs[AllCaseEqs()] >>
-    metis_tac[DECIDE “(fuel:num) ≤ m ⇒ fuel - 1 ≤ m - 1”])
-  >> once_rewrite_tac[clear_storage_value_def] >> rw[] >>
-  gvs[AllCaseEqs()] >> metis_tac[]
+  qpat_x_assum `_ <> INR FuelExhausted` mp_tac
+  >~ [`clear_storage_value env m accounts addr slot offset ty = _`] >-
+   (Cases_on `is_stored_scalar_type ty`
+    >- (once_rewrite_tac[clear_storage_value_def] >> simp[]) >>
+    Cases_on `offset <> 0`
+    >- (once_rewrite_tac[clear_storage_value_def] >> simp[]) >>
+    Cases_on `byte_sequence_type ty`
+    >- (once_rewrite_tac[clear_storage_value_def] >> simp[]) >>
+    Cases_on `ty` >> once_rewrite_tac[clear_storage_value_def] >>
+    simp[]
+    >~ [`ArrayT element len`] >-
+     (Cases_on `storage_array_data accounts addr slot (ArrayT element len)` >>
+      gvs[] >> Cases_on `2 ** 64 <= q` >> simp[] >>
+      Cases_on `is_stored_scalar_type element` >> simp[] >>
+      metis_tac[]) >>
+    Cases_on `lookup_struct env a` >> simp[] >>
+    Cases_on `lookup_struct_layout env a` >> simp[] >>
+    Cases_on `m = 0` >> simp[] >>
+    `m' <> 0 /\ m - 1 <= m' - 1` by decide_tac >>
+    gvs[] >> metis_tac[])
+  >~ [`clear_storage_elements env m accounts addr data element i n = _`] >-
+   (Cases_on `n = 0`
+    >- (once_rewrite_tac[clear_storage_value_def] >> simp[]) >>
+    Cases_on `storage_element_location env data element i`
+    >- (once_rewrite_tac[clear_storage_value_def] >> simp[]) >>
+    rename1 `storage_element_location env data element i = SOME loc` >>
+    PairCases_on `loc` >>
+    once_rewrite_tac[clear_storage_value_def] >> simp[] >>
+    Cases_on `clear_storage_value env m accounts addr loc0 loc1 element` >>
+    simp[]) >>
+  once_rewrite_tac[clear_storage_value_def] >> simp[] >>
+  Cases_on `ALOOKUP (MAP (\v. (v.state_id, v)) layout) f` >> simp[] >>
+  Cases_on `is_stored_scalar_type ty` >> gvs[] >>
+  Cases_on `clear_storage_value env fuel accounts addr
+              (slot + x.state_slot) x.state_offset ty` >>
+  gvs[]
 QED
 
 (* Writes the value of a src array into cleared storage of type dst, each
@@ -502,7 +533,7 @@ Definition store_storage_value_def:
                         else accounts in
         let data = if l = NONE then mapping_slot [] slot else slot in
         let accounts2 =
-          if is_elementary_type e' then
+          if is_stored_scalar_type e' then
             (case fixed_storage_slots env (ArrayT e' (SOME (LENGTH vs))) of
                SOME slots => clear_byte_slots slots accounts1 addr data
              | NONE => accounts1)
@@ -520,7 +551,7 @@ Definition store_storage_value_def:
       NONE => INR (InvalidCompletion "bad array element type")
     | SOME (s, offset) =>
         let stored =
-          if is_elementary_type dst then
+          if is_stored_scalar_type dst then
             (case v of
                ScalarValue x =>
                  (case eval_conversion env src dst x of
@@ -530,7 +561,9 @@ Definition store_storage_value_def:
                        | NONE => INR (InvalidCompletion "bad storage write"))
                   | _ => INR (InvalidCompletion "bad element conversion"))
              | _ => INR (InvalidCompletion "bad stored element"))
-          else
+          else case dst of
+            StructT _ => store_storage_value env fuel accounts addr s src dst v
+          | _ =>
             (case clear_storage_value env fuel accounts addr s offset dst of
                INR c => INR c
              | INL cleared => store_storage_value env fuel cleared addr s src dst v) in
@@ -575,18 +608,21 @@ Termination
   rw[solidityCoreTheory.runtime_value_size_def, listTheory.list_size_def]
 End
 
-(* A copy of the value of a src array into the storage array dst refers to:
- * its old contents cleared, then the value written. The value is read before
- * any write, so a copy from the destination itself leaves it unchanged. *)
+(* Copy into storage after reading the source. Arrays and byte sequences
+ * replace their old contents; structs overwrite fields in place, preserving
+ * scalar-slot padding and mappings. *)
 Definition copy_to_storage_def:
   copy_to_storage env accounts src v dst static =
     case dst of
       StorageReference PersistentStorage addr slot 0 ty _ =>
         if static then INR (InvalidCompletion "array copy in static frame") else
         let fuel = LENGTH env.type_declarations in
-        (case clear_storage_value env fuel accounts addr slot 0 ty of
-           INR c => INR c
-         | INL cleared => store_storage_value env fuel cleared addr slot src ty v)
+        (case ty of
+           StructT _ => store_storage_value env fuel accounts addr slot src ty v
+         | _ =>
+             case clear_storage_value env fuel accounts addr slot 0 ty of
+               INR c => INR c
+             | INL cleared => store_storage_value env fuel cleared addr slot src ty v)
     | _ => INR (InvalidCompletion "bad storage array reference")
 End
 
