@@ -35,6 +35,9 @@ contract MemoryStructs {
 
     Packed packed;
     Paint paint;
+    Line line;
+    Line other;
+    Packed[] packs;
 
     function positional(uint64 x, int32 y) public pure returns (uint64, int32) {
         Point memory p = Point(x, y);
@@ -148,5 +151,39 @@ contract MemoryStructs {
         assembly { afterPointer := mload(0x40) }
         r.x = 9;
         return (afterPointer - beforePointer, a.x, b.x, tag);
+    }
+
+    // Whole-struct copies into populated storage: nested structs, bytes and
+    // arrays are replaced and their old contents cleared, scalar members are
+    // written keeping their slot's other bytes.
+    function lineToStorage(uint8 t)
+        public
+        returns (uint8, int32, uint256, uint256, uint16, uint8)
+    {
+        uint16[] memory ws = new uint16[](2);
+        ws[0] = 1;
+        ws[1] = 2;
+        uint8[2] memory pr;
+        pr[0] = 3;
+        pr[1] = 4;
+        line = Line(Point(5, -6), Point(7, 8), t, "hi", ws, pr);
+        return (line.tag, line.a.y, line.data.length, line.ws.length, line.ws[1], line.pair[1]);
+    }
+
+    function lineCopy() public returns (uint256, uint256, uint16) {
+        other = line;
+        return (other.data.length, other.ws.length, other.ws[2]);
+    }
+
+    function lineSelfCopy() public returns (uint256, uint16) {
+        line = line;
+        return (line.data.length, line.ws[0]);
+    }
+
+    function replacePacks(uint8 a) public returns (uint256, uint8, uint16) {
+        Packed[] memory m = new Packed[](1);
+        m[0] = Packed(a, 2);
+        packs = m;
+        return (packs.length, packs[0].a, packs[0].b);
     }
 }
