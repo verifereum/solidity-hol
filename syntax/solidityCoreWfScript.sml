@@ -322,7 +322,7 @@ Definition abi_value_type_def:
 End
 
 (* A located binding's structs are declared: a storage one's with a layout,
- * a memory one's as memory_type_ok checks. *)
+ * a memory one's as memory_type_ok checks. Calldata structs are not modelled. *)
 Definition core_binding_type_def:
   core_binding_type env ty ⇔
     core_scalar_type env ty ∨
@@ -331,7 +331,7 @@ Definition core_binding_type_def:
        LocatedT StorageLoc element => storage_type_ok env element
      | LocatedT MemoryLoc element =>
          memory_type_ok env (LENGTH env.type_declarations) element
-     | _ => T)
+     | _ => struct_free ty)
 End
 
 (* ProductType is reserved for tuples and multiple returns: never singleton. *)
@@ -1435,7 +1435,8 @@ Definition check_core_stmts_def:
               byte_sequence_value_type src ∧ loc ≠ CalldataLoc ∧ ty = ty'
             else
               located_value_type src ∧ located_value_type dst ∧
-              loc = StorageLoc ∧ storage_copy_type ty ty'
+              loc = StorageLoc ∧ storage_copy_type ty ty' ∧
+              ¬mapping_reachable env (LENGTH env.type_declarations) ty'
         | _ => F) ∧
        wf_core_atom env ctx (SingleType src) a ∧
        wf_core_atom env ctx (SingleType dst) b
