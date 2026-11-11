@@ -412,16 +412,16 @@ Definition default_runtime_value_def:
   default_runtime_value env ty =
     case ty of
       LocatedT MemoryLoc element =>
-        if memory_object_type element then
+        if located_type_ok env MemoryLoc element then
           SOME (ReferenceValue (MemoryReference (HeapId 0) 0 element))
         else NONE
     | LocatedT CalldataLoc element =>
-        if calldata_object_type element then
+        if located_type_ok env CalldataLoc element then
           SOME (ReferenceValue (CalldataReference 0
             (case element of ArrayT _ (SOME n) => n | _ => 0) element))
         else NONE
     | LocatedT StorageLoc element =>
-        if storage_object_type element then
+        if located_type_ok env StorageLoc element then
           SOME (ReferenceValue
             (StorageReference PersistentStorage 0w 0w 0 element (LayoutId 0)))
         else NONE
