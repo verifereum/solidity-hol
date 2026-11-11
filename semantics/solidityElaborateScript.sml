@@ -2715,6 +2715,8 @@ End
  * variable, and a library function has no state variables or immutables.
  * A fallback takes no parameters and returns nothing, as the core's does
  * (plain_procedure); the importer marks one that does unsupported.
+ * A function with a selector, or a constructor, takes and returns no struct
+ * values other than storage pointers: their ABI forms are not modelled.
  * When strict, every super call must reach a supported function. A function
  * whose variables fail is elaborated with those that bind, for the blockers
  * of its modifiers and body; a failed return variable marks the return list
@@ -2734,7 +2736,9 @@ Definition elab_function_def:
         (ensure (f.fn_kind ≠ FallbackKind ∨ (f.fn_parameters = [] ∧ f.fn_returns = []))
            (f.fn_info.node_id, "fallback with parameters or returns")
         (ensure ((f.fn_selector = NONE ∧ f.fn_kind ≠ ConstructorKind) ∨
-                 EVERY (λ(_, ty). struct_free ty) (ps ++ rs))
+                 EVERY (λ(_, ty). case ty of
+                                    LocatedT StorageLoc _ => T
+                                  | _ => struct_free ty) (ps ++ rs))
            (f.fn_info.node_id, "struct parameter or return of an external function")
         (ensure (EVERY (λ(_, ty). memory_binding_ok c.contract_enums c.contract_structs ty)
                    (ps ++ rs))
