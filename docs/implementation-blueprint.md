@@ -62,7 +62,10 @@ Storage array growth appends a location with `ArrayPushOperation`. A
 `push(value)` then uses ordinary assignment to that location, sharing scalar
 writes and aggregate content copies. Length and element access use the array's
 data location and element layout. Memory allocation recursively creates the
-element's default value.
+element's default value. Pop recursively clears the removed element before
+reducing the length. Struct clearing zeros scalar field slots and preserves
+mapping entries; struct assignment preserves scalar-slot padding. Direct
+scalar clearing preserves neighboring packed bytes.
 
 Array pop clears the last element before reducing the length. One typed
 storage clear handles packed scalar offsets, struct fields, nested arrays and

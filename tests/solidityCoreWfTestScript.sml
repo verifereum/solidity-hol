@@ -1211,3 +1211,15 @@ Theorem calldata_byte_is_not_a_writable_reference:
 Proof
   EVAL_TAC
 QED
+
+Theorem memory_enum_arrays_keep_abi_boundary:
+  core_binding_type test_env
+    (LocatedT MemoryLoc (ArrayT (EnumT (AstId 900)) NONE)) ∧
+  ¬core_binding_type test_env
+    (LocatedT MemoryLoc (ArrayT (EnumT (AstId 901)) NONE)) ∧
+  ¬abi_value_type (LocatedT MemoryLoc (ArrayT (EnumT (AstId 900)) NONE)) ∧
+  ¬abi_value_type
+    (LocatedT MemoryLoc (ArrayT (ArrayT (EnumT (AstId 900)) NONE) NONE))
+Proof
+  EVAL_TAC
+QED

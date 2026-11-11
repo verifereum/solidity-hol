@@ -39,6 +39,7 @@ contract ArrayOperations {
     uint8[] small;
     uint256 effects;
     Pair[] otherPairs;
+    Color[][] enumRows;
 
     function structPush(uint64 x, uint64 y) public returns (uint256, uint64, uint64) {
         pairs.push(Pair(x, y));
@@ -62,6 +63,15 @@ contract ArrayOperations {
         pairs.pop();
         pairs.pop();
         return (a, b);
+    }
+
+    function structCopyPadding() public returns (uint256 word) {
+        pairs.push(Pair(3, 4));
+        assembly {
+            mstore(0, pairs.slot)
+            word := sload(keccak256(0, 32))
+        }
+        pairs.pop();
     }
 
     function base() internal returns (Pair[] storage) {
@@ -209,6 +219,15 @@ contract ArrayOperations {
         Color last = colors[0];
         colors.pop();
         return (a.length, first, last);
+    }
+
+    function nestedEnumPush() public returns (Color) {
+        Color[] memory a = new Color[](2);
+        a[1] = Color.Blue;
+        enumRows.push(a);
+        Color c = enumRows[0][1];
+        enumRows.pop();
+        return c;
     }
 
     function structMemory(uint256 n, uint256 i) public pure returns (uint256, uint64, uint64) {
