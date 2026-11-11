@@ -37,6 +37,17 @@ struct Node {
     Node[] kids;
 }
 
+// The ABI forms of structs are not modelled: the functions that encode or
+// emit a memory struct, or pass one to an external call, are unsupported.
+struct Pair {
+    uint8 a;
+    uint8 b;
+}
+
+interface IPair {
+    function put(Pair memory p) external;
+}
+
 // A mapping key type the core cannot hold: the struct is left out too.
 library Roles {
     enum Role { A, B }
@@ -49,6 +60,8 @@ library Roles {
 
 contract Partial is Mid {
     uint256 public total;
+
+    event Paired(Pair p);
 
     // dynamic bytes does not elaborate as a bytes16, so the constant has no
     // procedure: its getter and the functions reading it are unsupported
@@ -98,6 +111,18 @@ contract Partial is Mid {
     function nodeValue() public pure returns (uint8) {
         Node memory n;
         return n.v;
+    }
+
+    function encodePair() public pure returns (bytes memory) {
+        return abi.encode(Pair(1, 2));
+    }
+
+    function emitPair() public {
+        emit Paired(Pair(1, 2));
+    }
+
+    function putPair(IPair t) public {
+        t.put(Pair(1, 2));
     }
 
     function grantCount() internal view returns (uint8) {

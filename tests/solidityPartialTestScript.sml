@@ -31,7 +31,8 @@ val prepared = #prepared (solidityPrepareLib.prepare_artifact
  * hookCount's struct has a function-typed member, so the struct is left out
  * and hookCount's local does not elaborate, while the unit still imports.
  * nodeValue's local is a recursive struct in memory, which the core does not
- * hold. Roles.Grant has an enum-keyed mapping, so the storage local of
+ * hold. encodePair, emitPair and putPair take a memory struct across an ABI
+ * boundary, which the core does not model. Roles.Grant has an enum-keyed mapping, so the storage local of
  * grantCount does not elaborate. *)
 val outcomes = map (fn {name, reason, ...} => (name, reason)) (#functions prepared);
 fun reasons name =
@@ -69,9 +70,15 @@ val () =
      length (reasons "hookCount") = 1 andalso
      List.all elaboration_failure (reasons "nodeValue") andalso
      length (reasons "nodeValue") = 1 andalso
+     List.all elaboration_failure (reasons "encodePair") andalso
+     length (reasons "encodePair") = 1 andalso
+     List.all elaboration_failure (reasons "emitPair") andalso
+     length (reasons "emitPair") = 1 andalso
+     List.all elaboration_failure (reasons "putPair") andalso
+     length (reasons "putPair") = 1 andalso
      List.all elaboration_failure (reasons "grantCount") andalso
      length (reasons "grantCount") = 1 andalso
-     length outcomes = 12
+     length outcomes = 15
   then ()
   else raise Fail ("unexpected function outcomes: " ^
     String.concatWith "; " (map (fn (n, r) => n ^ " " ^

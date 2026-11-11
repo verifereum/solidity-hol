@@ -720,9 +720,10 @@ Definition expr_ids_def:
 End
 
 (* An argument of abi.encode*, with the ABI type it is encoded as: a scalar
- * as its type; an unpacked array, byte sequence, or string literal where it is, as the
- * compiler encodes it in place; an integer literal (unpacked only) as its
- * mobile type, whose encoding is that of int256 or uint256. *)
+ * as its type; an unpacked array without structs, byte sequence, or string
+ * literal where it is, as the compiler encodes it in place; an integer
+ * literal (unpacked only) as its mobile type, whose encoding is that of
+ * int256 or uint256. *)
 Definition abi_argument_def:
   abi_argument packed a vt =
     case vt of
@@ -730,7 +731,8 @@ Definition abi_argument_def:
         if is_stored_scalar_type ty then INL (ty, a) else
         (case ty of
            LocatedT _ element =>
-             if byte_sequence_type element ∨ (¬packed ∧ memory_object_type element)
+             if byte_sequence_type element ∨
+                (¬packed ∧ memory_object_type element ∧ struct_free element)
              then INL (LocatedT MemoryLoc element, a)
              else INR "abi encoding of this type"
          | _ => INR "abi encoding of this type")
@@ -789,8 +791,9 @@ End
 
 (* The operation of abi.encode* on the values of its arguments, after any
  * statements converting the arguments: a selector given as an argument is
- * a bytes4, and the other arguments are scalars, arrays or byte sequences
- * (arrays and integer literals only unpacked, as the compiler requires). *)
+ * a bytes4, and the other arguments are scalars, arrays without structs or
+ * byte sequences (arrays and integer literals only unpacked, as the compiler
+ * requires). *)
 Definition selector_encoding_def:
   selector_encoding (i : num) s svt r =
     let selector = (if svt = ElabType (FixedBytesT 4) then []
@@ -1490,7 +1493,8 @@ Definition elab_expr_def:
               | INR bs => INR bs))
     (* The operands are the target, the call options in source order and
        the arguments. Value only for a payable callee, as the compiler
-       requires; calls returning enums are not supported yet. *)
+       requires; calls returning enums, and struct parameters or returns,
+       are not supported yet. *)
     | SrcExternalCall info callee opts operands order tid =>
         (let shape =
            (case (all_some (MAP call_variable_type callee.ext_parameters),
@@ -1500,7 +1504,8 @@ Definition elab_expr_def:
                    LENGTH operands = LENGTH params + 1 + LENGTH opts ∧
                    argument_order_ok order (LENGTH params) ∧
                    decode_type_identifier tid = SOME (call_value_type rets) ∧
-                   EVERY (λty. case ty of EnumT _ => F | _ => T) rets
+                   EVERY (λty. case ty of EnumT _ => F | _ => T) rets ∧
+                   EVERY struct_free (params ++ rets)
                 then INL (params, rets) else INR (info.node_id, "unsupported external call")
             | _ => INR (info.node_id, "unsupported external call")) in
          case (shape, elab_arg_values ctx n operands) of
@@ -2593,8 +2598,10 @@ Definition elab_stmts_def:
               ¬argument_order_ok order (LENGTH args)
            then INR (info.node_id, "emit does not match the event") else
            (case all_some (MAP event_parameter e.event_parameters) of
-              NONE => INR (info.node_id, "unsupported event parameter type")
-            | SOME ps => INL (e, ps))) in
+              SOME ps =>
+                if EVERY (struct_free o FST) ps then INL (e, ps)
+                else INR (info.node_id, "unsupported event parameter type")
+            | NONE => INR (info.node_id, "unsupported event parameter type"))) in
     case (event, elab_arg_values ctx n args) of
       (INR b, r) => reject b r
     | (INL _, INR bs) => INR bs
