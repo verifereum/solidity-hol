@@ -152,8 +152,11 @@ Datatype:
   | NullMemoryOperation sol_type
   | BytesLiteralOperation sol_type (byte list)
   | AllocateMemoryOperation sol_type core_atom
+  | BytesToFixedOperation num core_atom
   | ByteIndexOperation core_atom core_atom
   | ArrayIndexOperation core_atom core_atom
+  (* Calldata view [start:end], with an omitted end using the current length. *)
+  | CalldataSliceOperation core_atom core_atom (core_atom option)
   | CopyToMemoryOperation core_atom
   | StructOperation ast_id
   | FieldOperation core_atom ast_id
