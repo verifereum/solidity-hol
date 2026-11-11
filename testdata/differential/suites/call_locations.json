@@ -5,6 +5,71 @@
   "artifact": "testdata/differential/expected/call_locations.json",
   "cases": [
     {
+      "name": "struct_init_assign_return_copies",
+      "storage": {
+        "0": 1
+      },
+      "function": "structSites",
+      "args": [],
+      "expect": {
+        "return": [
+          2,
+          3,
+          4,
+          1
+        ]
+      }
+    },
+    {
+      "name": "array_init_assign_return_copies",
+      "storage": {
+        "1": 1,
+        "80084422859880547211683076133703299733277748156566366325829078699459944778998": 1
+      },
+      "function": "arraySites",
+      "args": [],
+      "expect": {
+        "return": [
+          2,
+          3,
+          4,
+          1
+        ]
+      }
+    },
+    {
+      "name": "bytes_init_assign_return_copies",
+      "storage": {
+        "2": 452312848583266388373324160190187140051835877600158453279131187530910662658
+      },
+      "function": "bytesSites",
+      "args": [],
+      "expect": {
+        "return": [
+          2,
+          3,
+          4,
+          1
+        ]
+      }
+    },
+    {
+      "name": "string_init_assign_return_copies",
+      "storage": {
+        "3": 47219736118171679016481614208494153725245902603978864281390662590579859259402
+      },
+      "function": "stringSites",
+      "args": [],
+      "expect": {
+        "return": [
+          97,
+          98,
+          99,
+          104
+        ]
+      }
+    },
+    {
       "name": "escaped_name_direct_call",
       "storage": {
         "5": 1

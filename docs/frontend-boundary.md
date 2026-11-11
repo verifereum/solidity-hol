@@ -489,8 +489,10 @@ directives naming a library are accepted, in a contract or at file level,
 since the compiler resolves which function a call names. Every internal or
 library argument uses assignment's type and location conversion: memory
 references alias, storage parameters retain storage pointers, and storage or
-calldata objects passed to memory parameters copy through the existing object
-copy operations. A bound receiver is argument 0, evaluated and converted before
+calldata objects passed to memory parameters copy through `CopyToMemoryOperation`
+and `materialize_value`, including byte sequences. Variable initialization,
+assignment and returns use the same conversion; `CopyContentsStmt` writes
+storage contents. A bound receiver is argument 0, evaluated and converted before
 the other arguments; ordinary calls evaluate all arguments before converting
 them. This matters when later arguments mutate the copied object or rebind the
 receiver variable. Calldata structs remain unsupported until their ABI and copy

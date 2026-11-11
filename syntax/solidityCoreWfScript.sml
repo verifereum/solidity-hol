@@ -813,7 +813,7 @@ Definition wf_core_operation_def:
       (BoundAtom x, SingleType (LocatedT MemoryLoc ty)) =>
         (ALOOKUP ctx.bindings x = SOME (SingleType (LocatedT CalldataLoc ty)) ∨
          ALOOKUP ctx.bindings x = SOME (SingleType (LocatedT StorageLoc ty))) ∧
-        located_value_type (LocatedT MemoryLoc ty) ∧ (case ty of ArrayT _ _ => T | StructT _ => T | _ => F)
+        located_value_type (LocatedT MemoryLoc ty)
     | _ => F) ∧
   (wf_core_operation env ctx annotation (StructOperation s) ⇔
     annotation = SingleType (LocatedT MemoryLoc (StructT s)) ∧
@@ -1499,13 +1499,13 @@ Definition check_core_stmts_def:
     then check_core_stmts env ctx ss else NONE) ∧
   (check_core_stmts env ctx (CopyContentsStmt src dst a b :: ss) =
     if (case (src, dst) of
-          (LocatedT _ ty, LocatedT loc ty') =>
+          (LocatedT _ ty, LocatedT StorageLoc ty') =>
             if byte_sequence_type ty then
-              byte_sequence_value_type src ∧ loc ≠ CalldataLoc ∧ ty = ty'
+              byte_sequence_value_type src ∧ ty = ty'
             else
               located_value_type src ∧ located_value_type dst ∧
               memory_object_type ty ∧ memory_object_type ty' ∧
-              loc = StorageLoc ∧ storage_copy_type ty ty' ∧
+              storage_copy_type ty ty' ∧
               memory_type_ok env (LENGTH env.type_declarations) ty ∧
               memory_type_ok env (LENGTH env.type_declarations) ty'
         | _ => F) ∧

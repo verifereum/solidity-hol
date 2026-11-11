@@ -251,10 +251,6 @@ Definition coerce_def:
           (LocatedT loc element, LocatedT MemoryLoc element') =>
             if loc = MemoryLoc ∨ element ≠ element' ∨ ¬memory_object_type element
             then INR "type conversion between these types"
-            else if byte_sequence_type element then
-              let (ls, len) = bind_value n (UintT 256) (ArrayLengthOperation a) in
-              let (ds, dst) = bind_value (n + 1) ty (AllocateMemoryOperation element len) in
-              INL ((ls ++ ds ++ [CopyContentsStmt src ty a dst], dst), n + 2)
             else INL (bind_value n ty (CopyToMemoryOperation a), n + 1)
         | (LocatedT _ _, LocatedT _ _) => INR "type conversion between these types"
         | _ => INL (bind_value n ty (ConvertOperation ty a), n + 1))

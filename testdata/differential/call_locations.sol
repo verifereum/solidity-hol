@@ -92,6 +92,47 @@ contract CallLocations {
         return self.value;
     }
 
+    function returnItem() internal view returns (Item memory) { return item; }
+    function returnArray() internal view returns (uint256[] memory) { return array; }
+    function returnBytes() internal view returns (bytes memory) { return data; }
+    function returnString() internal view returns (string memory) { return text; }
+
+    function structSites() external view returns (uint256, uint256, uint256, uint256) {
+        Item memory p = item;
+        Item memory q = Item(0);
+        q = item;
+        Item memory r = returnItem();
+        p.value = 2; q.value = 3; r.value = 4;
+        return (p.value, q.value, r.value, item.value);
+    }
+
+    function arraySites() external view returns (uint256, uint256, uint256, uint256) {
+        uint256[] memory p = array;
+        uint256[] memory q = new uint256[](0);
+        q = array;
+        uint256[] memory r = returnArray();
+        p[0] = 2; q[0] = 3; r[0] = 4;
+        return (p[0], q[0], r[0], array[0]);
+    }
+
+    function bytesSites() external view returns (uint256, uint256, uint256, uint256) {
+        bytes memory p = data;
+        bytes memory q = hex"";
+        q = data;
+        bytes memory r = returnBytes();
+        p[0] = 0x02; q[0] = 0x03; r[0] = 0x04;
+        return (uint8(p[0]), uint8(q[0]), uint8(r[0]), uint8(data[0]));
+    }
+
+    function stringSites() external view returns (uint256, uint256, uint256, uint256) {
+        string memory p = text;
+        string memory q = "";
+        q = text;
+        string memory r = returnString();
+        bytes(p)[0] = 0x61; bytes(q)[0] = 0x62; bytes(r)[0] = 0x63;
+        return (uint8(bytes(p)[0]), uint8(bytes(q)[0]), uint8(bytes(r)[0]), uint8(bytes(text)[0]));
+    }
+
     function boundOrder() external returns (uint256) { return item.read(mutate()); }
     function directOrder() external returns (uint256) { return Locations.read(item, mutate()); }
     function internalOrder() external returns (uint256) { return readInternal(item, mutate()); }
