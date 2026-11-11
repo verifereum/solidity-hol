@@ -3640,7 +3640,17 @@ val () = cv_auto_trans field_values_def;
 val () = cv_auto_trans field_writes_def;
 val () = cv_auto_trans checked_callee_def;
 val () = cv_auto_trans call_target_def;
-val () = cv_auto_trans rich_listTheory.IS_SUBLIST;
+
+val sublist_pre_def = cv_auto_trans_pre_rec "sublist_pre"
+  rich_listTheory.IS_SUBLIST
+  (WF_REL_TAC ‘measure (λ(xs,ys). cv_size xs)’ >> cv_termination_tac);
+
+Theorem sublist_pre[cv_pre,local]:
+  ∀xs ys. sublist_pre xs ys
+Proof
+  Induct_on ‘xs’ >> Cases_on ‘ys’ >> simp[Once sublist_pre_def]
+QED
+
 val () = cv_auto_trans early_call_arguments_def;
 val () = cv_auto_trans bind_call_def;
 val () = cv_auto_trans call_location_def;
