@@ -5,6 +5,54 @@
   "artifact": "testdata/differential/expected/call_locations.json",
   "cases": [
     {
+      "name": "escaped_name_direct_call",
+      "storage": {
+        "5": 1
+      },
+      "function": "escapedDirect",
+      "args": [],
+      "expect": {
+        "return": [
+          9
+        ]
+      },
+      "final_storage": {
+        "5": 9
+      }
+    },
+    {
+      "name": "escaped_name_internal_call",
+      "storage": {
+        "5": 1
+      },
+      "function": "escapedInternal",
+      "args": [],
+      "expect": {
+        "return": [
+          9
+        ]
+      },
+      "final_storage": {
+        "5": 9
+      }
+    },
+    {
+      "name": "escaped_name_bound_call",
+      "storage": {
+        "5": 1
+      },
+      "function": "escapedBound",
+      "args": [],
+      "expect": {
+        "return": [
+          1
+        ]
+      },
+      "final_storage": {
+        "5": 9
+      }
+    },
+    {
       "name": "bound_struct_before_mutation",
       "storage": {
         "0": 1

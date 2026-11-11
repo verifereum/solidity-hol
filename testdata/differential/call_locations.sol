@@ -2,6 +2,13 @@
 pragma solidity 0.8.37;
 
 struct Item { uint256 value; }
+struct $attached_to$ { uint256 value; }
+
+library EscapedNames {
+    function read($attached_to$ memory self, uint256) internal pure returns (uint256) {
+        return self.value;
+    }
+}
 
 library Locations {
     function append(uint256 self, uint256 value) internal pure returns (uint256) {
@@ -55,12 +62,28 @@ contract CallLocations {
     using Locations for uint256[];
     using Locations for bytes;
     using Locations for string;
+    using EscapedNames for $attached_to$;
 
     Item item;
     uint256[] array;
     bytes data;
     string text;
     uint256 receiverCalls;
+    $attached_to$ escapedItem;
+
+    function mutateEscaped() internal returns (uint256) { escapedItem.value = 9; return 0; }
+    function readEscaped($attached_to$ memory self, uint256) internal pure returns (uint256) {
+        return self.value;
+    }
+    function escapedDirect() external returns (uint256) {
+        return EscapedNames.read(escapedItem, mutateEscaped());
+    }
+    function escapedInternal() external returns (uint256) {
+        return readEscaped(escapedItem, mutateEscaped());
+    }
+    function escapedBound() external returns (uint256) {
+        return escapedItem.read(mutateEscaped());
+    }
 
     function mutate() internal returns (uint256) { item.value = 9; return 4; }
     function mutateArray() internal returns (uint256) { array[0] = 9; return 0; }

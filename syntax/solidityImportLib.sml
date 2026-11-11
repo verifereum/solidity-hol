@@ -739,7 +739,7 @@ fun is_base_member v =
   not (is_library_member v)
 
 fun is_attached v =
-  String.isSubstring "$attached_to$"
+  String.isSubstring "_$attached_to$_"
     (string_field (field v "typeDescriptions") "typeIdentifier")
 
 (* Expressions *)

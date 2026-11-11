@@ -1093,12 +1093,13 @@ Definition call_target_def:
 End
 
 (* Forming an attached function evaluates and converts its receiver before
- * the call's other arguments. The importer retains solc's attached marker. *)
+ * the call's other arguments. The delimiter distinguishes solc's marker
+ * from a name containing `$attached_to$`, whose dollars are escaped. *)
 Definition early_call_arguments_def:
   early_call_arguments e =
     case e of
       SrcFunctionCall _ (SrcIdentifier _ _ _ tid) _ _ _ =>
-        if MEM "attached_to" (separated_fields #"$" "" tid) then 1n else 0
+        if IS_SUBLIST tid "_$attached_to$_" then 1n else 0
     | _ => 0
 End
 
@@ -3639,6 +3640,7 @@ val () = cv_auto_trans field_values_def;
 val () = cv_auto_trans field_writes_def;
 val () = cv_auto_trans checked_callee_def;
 val () = cv_auto_trans call_target_def;
+val () = cv_auto_trans rich_listTheory.IS_SUBLIST;
 val () = cv_auto_trans early_call_arguments_def;
 val () = cv_auto_trans bind_call_def;
 val () = cv_auto_trans call_location_def;
