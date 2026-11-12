@@ -69,6 +69,5 @@ Theorem enum_array_location_boundary:
   (∀length. ¬located_value_type (LocatedT MemoryLoc (ArrayT (EnumT (AstId 5)) length))) ∧
   (∀length. ¬located_value_type (LocatedT CalldataLoc (ArrayT (EnumT (AstId 5)) length)))
 Proof
-  simp[located_value_type_def, memory_object_type_def, byte_sequence_type_def] >>
-  Cases >> simp[calldata_object_type_def, memory_object_type_def, byte_sequence_type_def]
+  simp[located_value_type_def, located_object_shape_def, byte_sequence_type_def]
 QED

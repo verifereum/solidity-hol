@@ -355,7 +355,7 @@ End
 (* Reading a storage byte sequence, array, mapping or struct yields a reference
  * to it. *)
 Definition read_value_type_def:
-  read_value_type ty = if storage_object_type ty then LocatedT StorageLoc ty else ty
+  read_value_type ty = if located_object_shape StorageLoc ty then LocatedT StorageLoc ty else ty
 End
 
 Definition read_destination_def:
@@ -372,7 +372,7 @@ Definition read_location_def:
   read_location (id : num) result =
     case result of
       INL ((ss, ref, ty), n) =>
-        if is_stored_scalar_type ty ∨ storage_object_type ty then
+        if is_stored_scalar_type ty ∨ located_object_shape StorageLoc ty then
           let (rs, a) = bind_value n (read_value_type ty) (ReadOperation ty ref) in
           INL ((ss ++ rs, a, ElabType (read_value_type ty)), n + 1)
         else INR [(id, "read of a value of this type")]
@@ -392,18 +392,18 @@ Definition write_destination_def:
 End
 
 (* Assigning a storage byte sequence or array copies contents, converting an
- * array's elements as storage_copy_type allows; binding a local storage
+ * array's elements as copy_convertible allows; binding a local storage
  * pointer continues to use the ordinary alias-preserving local assignment. *)
 Definition plain_assignment_def:
   plain_assignment n target a vt =
     case target of
       ReferenceDestination ref ty =>
-        if storage_copy_object_type ty then
+        if copy_convertible (StorageLoc, ty) (StorageLoc, ty) then
           let source =
             case vt of
               ElabBytesLiteral => coerce n (LocatedT MemoryLoc ty) a vt
             | ElabType (LocatedT loc element) =>
-                if storage_copy_type element ty then INL (([], a), n)
+                if copy_convertible (loc, element) (StorageLoc, ty) then INL (([], a), n)
                 else INR "storage copy between these types"
             | _ => INR "storage copy between these types" in
           (case source of
@@ -625,7 +625,7 @@ Definition tuple_write_def:
   tuple_write n (id : num) t target a vt =
     case target of
       ReferenceDestination _ ty =>
-        if memory_object_type ty then
+        if copy_convertible (StorageLoc, ty) (StorageLoc, ty) then
           (case plain_assignment n target a vt of
              INL ((ss, _, _), n1) => INL (ss, n1)
            | INR why => INR [(id, why)])
@@ -736,7 +736,7 @@ Definition abi_argument_def:
         if is_stored_scalar_type ty then INL (ty, a) else
         (case ty of
            LocatedT _ element =>
-             if byte_sequence_type element ∨ (¬packed ∧ memory_object_type element)
+             if byte_sequence_type element ∨ (¬packed ∧ located_object_shape MemoryLoc element)
              then INL (LocatedT MemoryLoc element, a)
              else INR "abi encoding of this type"
          | _ => INR "abi encoding of this type")
@@ -1120,7 +1120,7 @@ Definition elab_expr_def:
            SOME ((ls, target), n1) =>
              let ty = destination_type target in
              if ¬(is_stored_scalar_type ty ∨ is_function_type ty ∨
-                  storage_object_type ty ∨ located_value_type ty)
+                  located_object_shape StorageLoc ty ∨ located_value_type ty)
              then INR [(info.node_id, "read of a value of this type")] else
              let (read, n2) = read_destination n1 target in
              let (ss, a) = read in
@@ -1617,7 +1617,7 @@ Definition elab_expr_def:
              (case normalize_type_name tn of
                 SOME ty =>
                   if ¬((byte_sequence_type ty ∨
-                        (memory_object_type ty ∧ case ty of ArrayT _ NONE => T | _ => F)) ∧
+                        (located_object_shape MemoryLoc ty ∧ case ty of ArrayT _ NONE => T | _ => F)) ∧
                        index_value_ok a vt ∧
                        source_type_matches (LocatedT MemoryLoc ty) tid)
                   then INR [(info.node_id, "unsupported new expression")] else
@@ -2192,7 +2192,8 @@ Definition elab_expr_def:
             let (is, i) = captured in
             (is, ElementDestination ref i ty, n2)
         | ReferenceDestination _ ty =>
-            (if memory_object_type ty then [] else capture_destination n1 target,
+            (if copy_convertible (StorageLoc, ty) (StorageLoc, ty) then []
+             else capture_destination n1 target,
              target, n1 + 1)
         | _ => (capture_destination n1 target, target, n1 + 1) in
         (case elab_destinations ctx next cs of
@@ -2363,7 +2364,7 @@ Definition elab_assembly_reference_def:
                if assembly_memory_type t then INL (([], AssemblyMemory (AstId x) t), n)
                else INR [(id, "assembly reference of this type")]
            | LocatedT CalldataLoc t =>
-               if calldata_object_type t ∧ ¬calldata_slice_type t then
+               if located_object_shape CalldataLoc t ∧ ¬calldata_slice_type t then
                  INL (([], AssemblyCalldataOffset (AstId x)), n)
                else INR [(id, "assembly reference of this type")]
            | _ => INR [(id, "assembly reference of this type")])
