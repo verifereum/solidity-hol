@@ -3849,7 +3849,7 @@ val () = cv_auto_trans checked_callee_def;
 val () = cv_auto_trans call_target_def;
 
 val sublist_pre_def = cv_auto_trans_pre_rec "sublist_pre"
-  rich_listTheory.IS_SUBLIST
+  (INST_TYPE [alpha |-> “:char”] rich_listTheory.IS_SUBLIST)
   (WF_REL_TAC ‘measure (λ(xs,ys). cv_size xs)’ >> cv_termination_tac);
 
 Theorem sublist_pre[cv_pre,local]:
