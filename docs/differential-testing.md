@@ -86,11 +86,19 @@ lists let holbuild schedule them independently and reuse unchanged bytecode
 results after a frontend change. Both runners reuse cached suite verdicts by
 default; `--force` explicitly rebuilds suites. The source runner still accepts
 `--allow-cached` for compatibility.
-Push builds on `main` and `bot/opus/solidity-e2e` save snapshots that their
-feature PRs can restore; PR-only snapshots are scoped to that PR and cannot
-warm sibling PRs. Branch runs have separate concurrency groups so a later
-merge cannot cancel a cache-warming run. Remove the integration-branch push
-trigger when that branch is merged into `main`.
+`--shard-count N --shard-index I` assigns each suite by the first 64 bits
+of its name's SHA-256 digest modulo `N`. Adding a suite therefore does not move
+existing suites between cache lineages. The shards are deterministic, disjoint
+and cover the complete corpus. CI runs eight shards on separate runners, with
+`-j2` inside each runner to stay within its memory limit. For example, the third
+of eight shards can be reproduced locally with:
+
+```sh
+python3 tools/run_differential.py -j2 --shard-count 8 --shard-index 2
+```
+
+Integration pushes save all eight shard snapshots for later PRs; PR and
+merge-queue runs save only shard 0 to bound cache use.
 Source and Yul suite theories declare a `.results.jsonl` extra output beside
 their scripts. holbuild caches and restores it with the theory, so reports
 retain outcomes and stage admissions without an old build log. Missing suite

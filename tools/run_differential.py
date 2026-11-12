@@ -19,6 +19,7 @@ on any failure.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -260,6 +261,23 @@ def load_corpus(path: Path) -> dict[str, Any]:
                 raise CorpusError(f"{what}: unknown fields {sorted(unknown)}")
     return corpus
 
+def suite_shard(name: str, shard_count: int) -> int:
+    digest = hashlib.sha256(name.encode("ascii")).digest()
+    return int.from_bytes(digest[:8], "big") % shard_count
+
+
+def select_shard(corpus: dict[str, Any], shard_count: int,
+                 shard_index: int) -> dict[str, Any]:
+    """Select one stable, disjoint partition of the corpus suites."""
+    selected = sorted(
+        (suite for suite in corpus["suites"]
+         if suite_shard(suite["name"], shard_count) == shard_index),
+        key=lambda suite: suite["name"],
+    )
+    if not selected:
+        raise CorpusError(
+            f"corpus shard {shard_index} of {shard_count} contains no suites")
+    return {**corpus, "suites": selected}
 
 def case_theorem(suite: dict[str, Any], case: dict[str, Any]) -> str:
     return f"{suite['name']}_{case['name']}"
@@ -677,6 +695,10 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
                         help="rewrite the artifacts with --solc instead of checking them")
     parser.add_argument("--holbuild", default="holbuild")
     parser.add_argument("-j", "--jobs", type=int)
+    parser.add_argument("--shard-count", type=int, default=1,
+                        help="partition the sorted suites into this many shards")
+    parser.add_argument("--shard-index", type=int, default=0,
+                        help="run this zero-based corpus shard")
     rebuild = parser.add_mutually_exclusive_group()
     rebuild.add_argument("--force", action="store_true",
                          help="rebuild suite theories instead of using cached verdicts")
@@ -689,6 +711,10 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     args = parser.parse_args(argv)
     if args.regenerate and args.solc is None:
         parser.error("--regenerate needs --solc")
+    if args.shard_count < 1:
+        parser.error("--shard-count must be positive")
+    if not 0 <= args.shard_index < args.shard_count:
+        parser.error("--shard-index must be less than --shard-count")
     return args
 
 
@@ -699,12 +725,17 @@ def main(argv: list[str] | None = None, root: Path = ROOT) -> int:
     except CorpusError as error:
         print(f"invalid corpus: {error}", file=sys.stderr)
         return 1
+    if args.write_theories:
+        theories.write_wrappers(root, theories.wrappers(root, CORPUS, corpus))
+    try:
+        corpus = select_shard(corpus, args.shard_count, args.shard_index)
+    except CorpusError as error:
+        print(f"invalid corpus shard: {error}", file=sys.stderr)
+        return 1
     checks: list[dict[str, str]] = []
     if args.solc is not None:
         checks += reproduce_artifacts(root, corpus, args.solc, args.regenerate)
     checks += check_artifacts(root, corpus)
-    if args.write_theories:
-        theories.write_wrappers(root, theories.wrappers(root, CORPUS, corpus))
     checks.append(check_staging(root, CORPUS, corpus))
     hol = None
     if not args.no_hol:

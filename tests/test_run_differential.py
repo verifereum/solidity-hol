@@ -168,6 +168,9 @@ class CorpusTests(unittest.TestCase):
         checks = driver.check_artifacts(ROOT, loaded)
         checks.append(driver.check_staging(ROOT, driver.CORPUS, loaded))
         self.assertEqual([c for c in checks if c["status"] != "pass"], [])
+        rollup = (ROOT / "tests/solidityDifferentialCorpusScript.sml").read_text(
+            encoding="utf-8")
+        self.assertEqual(rollup, driver.theories.rollup(loaded))
 
     def test_rejects_duplicate_cases(self) -> None:
         case = {"name": "f", "function": "f", "args": [], "expect": {"panic": 17}}
@@ -434,6 +437,37 @@ class DriverTests(unittest.TestCase):
         self.assertFalse(driver.parse_args([]).force)
         self.assertFalse(driver.parse_args(["--allow-cached"]).force)
         self.assertTrue(driver.parse_args(["--force"]).force)
+
+    def test_shards_are_stable_disjoint_and_complete(self) -> None:
+        suites = [{**corpus()["suites"][0], "name": name}
+                  for name in ("echo", "alpha", "delta", "bravo", "charlie")]
+        data = {**corpus(), "suites": suites}
+        shards = [driver.select_shard(data, 3, index)["suites"] for index in range(3)]
+        names = [[suite["name"] for suite in shard] for shard in shards]
+        self.assertEqual(names, [["charlie"], ["bravo", "delta"], ["alpha", "echo"]])
+        self.assertEqual(sorted(name for shard in names for name in shard),
+                         sorted(suite["name"] for suite in suites))
+
+        expanded = {**data, "suites": suites + [
+            {**corpus()["suites"][0], "name": "aardvark"},
+        ]}
+        assignments = {name: index for index, shard in enumerate(names) for name in shard}
+        expanded_assignments = {
+            suite["name"]: index
+            for index in range(3)
+            for suite in driver.select_shard(expanded, 3, index)["suites"]
+        }
+        self.assertEqual({name: expanded_assignments[name] for name in assignments},
+                         assignments)
+
+    def test_rejects_invalid_or_empty_shards(self) -> None:
+        for argv in (["--shard-count", "0"],
+                     ["--shard-count", "2", "--shard-index", "2"],
+                     ["--shard-index", "-1"]):
+            with self.subTest(argv=argv), self.assertRaises(SystemExit):
+                driver.parse_args(argv)
+        with self.assertRaisesRegex(driver.CorpusError, "contains no suites"):
+            driver.select_shard(corpus(), 2, 1)
 
     def test_agreement_passes(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
