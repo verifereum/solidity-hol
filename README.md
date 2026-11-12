@@ -77,10 +77,14 @@ memory array of value types (its length word if it is dynamic, then a word
 per element, read back on exit only if each element's word round-trips): it
 reads and writes back the value-type locals it names, reads state variables'
 slots and offsets and storage pointer locals' slots and offsets (assigning a
-pointer's `x.slot` points it at that slot of the executing account), integer,
-`bool` and fixed-bytes constants as literals in its code, as the compiler
-puts them, so its Yul functions see them too, and reads and may assign the
-addresses of the memory `bytes`, `string` and array locals it names. Code
+pointer's `x.slot` points it at that slot of the executing account), calldata
+references' offsets and lengths (`x.offset` and `x.length`, a static array's
+plain name; assigning them rebinds the reference, which must stay within the
+calldata), integer, `bool` and fixed-bytes constants as literals in its code,
+as the compiler puts them, so its Yul functions see them too (a function's
+parameters and results may reuse such a name in its body), and reads and may
+assign the addresses of the memory `bytes`, `string` and array locals it
+names. Code
 that can reach the block's normal exit may write at a literal address only in
 the scratch space and the free memory pointer (an `if` or `switch` body or a Yul function's body that ends
 in `return`, `revert` or `stop` may write anywhere), and a literal address and
