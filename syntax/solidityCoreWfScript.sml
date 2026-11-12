@@ -325,6 +325,18 @@ Definition element_type_def:
     if is_stored_scalar_type element then element else LocatedT loc element
 End
 
+(* Indexed values share their element type independently of their layout. *)
+Definition indexed_element_type_def:
+  indexed_element_type ty =
+    case ty of
+      FixedBytesT k => if valid_fixed_bytes_width k then SOME (FixedBytesT 1) else NONE
+    | LocatedT loc BytesT =>
+        if located_value_type ty then SOME (FixedBytesT 1) else NONE
+    | LocatedT loc (ArrayT element length) =>
+        if located_value_type ty then SOME (element_type loc element) else NONE
+    | _ => NONE
+End
+
 (* ABI values contain scalars (an enum as a uint8), byte sequences in
  * memory/calldata and memory arrays without structs; storage pointers never
  * cross an ABI boundary. *)
@@ -361,6 +373,7 @@ Definition wf_core_value_type_def:
     case ty of
       LocatedT MemoryLoc _ => core_binding_type env ty
     | _ => storage_type_ok env ty) ∧
+  (wf_core_value_type env RevertDataType ⇔ T) ∧
   (wf_core_value_type env (ProductType tys) ⇔
     LENGTH tys ≠ 1 ∧ wf_core_value_types env tys) ∧
   (wf_core_value_types env [] ⇔ T) ∧
@@ -434,6 +447,7 @@ End
  * are not typed until reference/layout environments exist.
  *)
 Definition value_has_type_def:
+  (value_has_type env RevertDataType (ScalarValue (BytesValue _)) ⇔ T) ∧
   (value_has_type env (SingleType ty) (ScalarValue s) ⇔
     scalar_has_type env ty s) ∧
   (value_has_type env (ReferenceType ty)
@@ -734,6 +748,13 @@ Definition reference_convertible_def:
     | _ => F
 End
 
+(* A catch binding's source type; raw returndata has a separate core type. *)
+Definition catch_parameter_type_def:
+  (catch_parameter_type ErrorCatch = LocatedT MemoryLoc StringT) ∧
+  (catch_parameter_type PanicCatch = UintT 256) ∧
+  (catch_parameter_type GenericCatch = LocatedT MemoryLoc BytesT)
+End
+
 Definition wf_core_operation_def:
   (wf_core_operation env ctx annotation
      (ScalarOperation ty mode op args) ⇔
@@ -847,21 +868,18 @@ Definition wf_core_operation_def:
     (wf_core_atom env ctx (SingleType (LocatedT CalldataLoc BytesT)) a ∨
      wf_core_atom env ctx (SingleType (LocatedT MemoryLoc BytesT)) a ∨
      wf_core_atom env ctx (SingleType (LocatedT StorageLoc BytesT)) a)) ∧
-  (wf_core_operation env ctx annotation (ByteIndexOperation a index) ⇔
-    annotation = SingleType (FixedBytesT 1) ∧
-    (wf_core_atom env ctx (SingleType (LocatedT CalldataLoc BytesT)) a ∨
-     wf_core_atom env ctx (SingleType (LocatedT MemoryLoc BytesT)) a ∨
-     wf_core_atom env ctx (SingleType (LocatedT StorageLoc BytesT)) a) ∧
-    wf_core_atom env ctx (SingleType (UintT 256)) index) ∧
   (wf_core_operation env ctx annotation (ArrayIndexOperation a index) ⇔
     wf_core_atom env ctx (SingleType (UintT 256)) index ∧
     case a of
       BoundAtom x =>
         (case ALOOKUP ctx.bindings x of
-           SOME (SingleType (LocatedT loc (ArrayT element length))) =>
-             located_type_ok env loc (ArrayT element length) ∧
-             annotation = SingleType (element_type loc element)
+           SOME (SingleType ty) =>
+             (case indexed_element_type ty of
+                SOME element => annotation = SingleType element
+              | NONE => F)
          | _ => F)
+    | ConstantAtom (BytesValue bs) =>
+        valid_fixed_bytes_width (LENGTH bs) ∧ annotation = SingleType (FixedBytesT 1)
     | _ => F) ∧
   (wf_core_operation env ctx annotation (CalldataSliceOperation a start end_bound) ⇔
     case annotation of
@@ -933,6 +951,13 @@ Definition wf_core_operation_def:
     annotation = call_result_type tys ∧
     (wf_core_atom env ctx (SingleType (LocatedT MemoryLoc BytesT)) a ∨
      wf_core_atom env ctx (SingleType (LocatedT CalldataLoc BytesT)) a)) ∧
+  (wf_core_operation env ctx annotation (TryDecodeErrorOperation kind a) ⇔
+    kind ≠ GenericCatch ∧
+    annotation = call_result_type [BoolT; catch_parameter_type kind] ∧
+    wf_core_atom env ctx RevertDataType a) ∧
+  (wf_core_operation env ctx annotation (MaterializeRevertDataOperation a) ⇔
+    annotation = SingleType (LocatedT MemoryLoc BytesT) ∧
+    wf_core_atom env ctx RevertDataType a) ∧
   (wf_core_operation env ctx annotation (ArrayLengthOperation a) ⇔
     annotation = SingleType (UintT 256) ∧
     case a of
@@ -1010,7 +1035,7 @@ Definition wf_core_operation_def:
     wf_gas_atom env ctx gas ∧
     LIST_REL (wf_abi_atom env ctx) params args ∧
     annotation = ProductType
-      (MAP SingleType (BoolT :: rets ++ [LocatedT MemoryLoc BytesT]))) ∧
+      (MAP SingleType (BoolT :: rets) ++ [RevertDataType])) ∧
   (wf_core_operation env ctx annotation (TransferOperation target value) ⇔
     annotation = ProductType [] ∧
     wf_core_atom env ctx (SingleType (AddressT PayableAddress)) target ∧
@@ -1135,10 +1160,11 @@ End
  * sequences (bytes and string) and nothing else, so at a literal address it
  * may read only the free memory pointer and what it wrote itself earlier on
  * the same path; and code that can reach the block's normal exit may write at
- * a literal address only in the scratch space [0, 0x40). A read is covered by
- * the (start, length) ranges written at literal addresses before it: by
- * earlier statements of its statement list or an enclosing one, and by the
- * arguments to its right, which run first. A range is an mstore's word, a
+ * a literal address only in the scratch space [0, 0x40), and mstore a new
+ * free memory pointer at 0x40, which assembly_result checks. A read is
+ * covered by the (start, length) ranges written at literal addresses before
+ * it: by earlier statements of its statement list or an enclosing one, and by
+ * the arguments to its right, which run first. A range is an mstore's word, a
  * call's output region or a returndatacopy's, of which less may be written
  * (the runtime check then fails the read closed). A statement list that
  * halts (block_halts), as a whole block, an if or switch body or a Yul
@@ -1198,7 +1224,8 @@ Definition builtin_memory_ok_def:
     case (b, es) of
       (YMLoad, [p]) =>
         memory_read_ok ws p (YulLit (LitNumber 32w))
-    | (YMStore, [p; _]) => memory_write_ok halts p (SOME 32)
+    | (YMStore, [p; _]) =>
+        memory_write_ok halts p (SOME 32) ∨ yul_lit p = SOME 0x40
     | (YMStore8, [p; _]) => memory_write_ok halts p (SOME 1)
     | (YMCopy, [d; p; l]) =>
         memory_write_ok halts d (yul_lit l) ∧ memory_read_ok ws p l
@@ -1451,6 +1478,24 @@ Definition assembly_gas_ok_def:
   assembly_gas_ok code ⇔ call_stmts_ok T code
 End
 
+(* A calldata reference type whose offset and length a block may read and
+ * assign: a byte sequence or a dynamic array. *)
+Definition calldata_slice_type_def:
+  calldata_slice_type ty ⇔
+    case ty of
+      ArrayT _ NONE => T
+    | _ => byte_sequence_type ty
+End
+
+(* The calldata type of a local holding a calldata reference. *)
+Definition calldata_binding_def:
+  calldata_binding ctx x =
+    case ALOOKUP ctx.bindings x of
+      SOME (SingleType (LocatedT CalldataLoc ty)) =>
+        if located_object_shape CalldataLoc ty then SOME ty else NONE
+    | _ => NONE
+End
+
 Definition storage_pointer_binding_def:
   storage_pointer_binding ctx x ⇔
     case ALOOKUP ctx.bindings x of
@@ -1467,42 +1512,16 @@ Definition assembly_reference_ok_def:
     | AssemblyOffset x => IS_SOME (lookup_state_variable env x)
     | AssemblyPointerSlot x => storage_pointer_binding ctx x
     | AssemblyPointerOffset x => storage_pointer_binding ctx x
+    | AssemblyCalldataOffset x => IS_SOME (calldata_binding ctx x)
+    | AssemblyCalldataLength x =>
+        (case calldata_binding ctx x of
+           SOME ty => calldata_slice_type ty
+         | NONE => F)
     | AssemblyConstant a ty =>
         wf_core_atom env ctx (SingleType ty) a ∧ assembly_value_type ty
     | AssemblyMemory x ty =>
         ALOOKUP ctx.bindings x = SOME (SingleType (LocatedT MemoryLoc ty)) ∧
         assembly_memory_type ty
-End
-
-(* The names of a block's memory references. The block reads each as a
- * literal address, so it may not assign one; a Yul function's parameters and
- * results may reuse such a name for its body. *)
-Definition assembly_memory_names_def:
-  (assembly_memory_names [] = []) ∧
-  (assembly_memory_names ((name, r) :: refs) =
-    case r of
-      AssemblyMemory _ _ => name :: assembly_memory_names refs
-    | _ => assembly_memory_names refs)
-End
-
-Definition assembly_assigns_ok_def:
-  (assembly_assign_ok xs (YulBlock ss) ⇔ assembly_assigns_ok xs ss) ∧
-  (assembly_assign_ok xs (YulFunction _ params results body) ⇔
-    assembly_assigns_ok (FILTER (λx. ¬MEM x (params ++ results)) xs) body) ∧
-  (assembly_assign_ok xs (YulAssign ys _) ⇔ EVERY (λy. ¬MEM y xs) ys) ∧
-  (assembly_assign_ok xs (YulIf _ body) ⇔ assembly_assigns_ok xs body) ∧
-  (assembly_assign_ok xs (YulSwitch _ cases default) ⇔
-    assembly_cases_assigns_ok xs cases ∧ assembly_assigns_ok xs default) ∧
-  (assembly_assign_ok xs (YulFor pre _ post body) ⇔
-    assembly_assigns_ok xs pre ∧ assembly_assigns_ok xs post ∧
-    assembly_assigns_ok xs body) ∧
-  (assembly_assign_ok xs _ ⇔ T) ∧
-  (assembly_assigns_ok xs [] ⇔ T) ∧
-  (assembly_assigns_ok xs (s :: ss) ⇔
-    assembly_assign_ok xs s ∧ assembly_assigns_ok xs ss) ∧
-  (assembly_cases_assigns_ok xs [] ⇔ T) ∧
-  (assembly_cases_assigns_ok xs ((_, body) :: cases) ⇔
-    assembly_assigns_ok xs body ∧ assembly_cases_assigns_ok xs cases)
 End
 
 Definition check_core_stmts_def:
@@ -1608,14 +1627,14 @@ Definition check_core_stmts_def:
   (check_core_stmts env ctx (PanicStmt code :: ss) =
     check_core_stmts env ctx ss) ∧
   (check_core_stmts env ctx (RevertStmt a :: ss) =
-    if provisional_revert_payload a then check_core_stmts env ctx ss
+    if provisional_revert_payload a ∨ wf_core_atom env ctx RevertDataType a
+    then check_core_stmts env ctx ss
     else NONE) ∧
-  (* Error arguments are elementary values or declared enums. *)
+  (* Revert data uses the same in-place ABI serialization as calls. *)
   (check_core_stmts env ctx (RevertErrorStmt selector params args :: ss) =
     if LENGTH selector = 4 ∧
-       EVERY (λty. is_stored_scalar_type ty ∧ valid_type_shape ty ∧
-                   declared_type_ok env ty) params ∧
-       wf_core_atoms env ctx (MAP SingleType params) args
+       EVERY (λty. abi_value_type ty ∧ valid_type_shape ty ∧ declared_type_ok env ty) params ∧
+       LIST_REL (wf_abi_atom env ctx) params args
     then check_core_stmts env ctx ss else NONE) ∧
   (check_core_stmts env ctx (EmitStmt topic args :: ss) =
     case emit_indexed_count env ctx args of
@@ -1627,8 +1646,7 @@ Definition check_core_stmts_def:
     if assembly_stmts_ok assembly_unsupported code ∧ assembly_memory_ok code ∧
        assembly_gas_ok code ∧
        ALL_DISTINCT (MAP FST refs) ∧
-       EVERY (assembly_reference_ok env ctx) (MAP SND refs) ∧
-       assembly_assigns_ok (assembly_memory_names refs) code
+       EVERY (assembly_reference_ok env ctx) (MAP SND refs)
     then check_core_stmts env ctx ss else NONE) ∧
   (check_core_stmts env ctx (_ :: _) = NONE)
 Termination
@@ -1882,6 +1900,7 @@ QED
 
 val () = cv_auto_trans environment_type_def;
 val () = cv_auto_trans wf_abi_atom_def;
+val () = cv_auto_trans catch_parameter_type_def;
 val () = cv_auto_trans wf_gas_atom_def;
 val () = cv_auto_trans (SPEC_ALL wf_core_operation_def);
 val () = cv_auto_trans emit_indexed_count_def;
@@ -1914,9 +1933,9 @@ val () = cv_auto_trans assembly_calls_ok_def;
 val () = cv_auto_trans assembly_gas_ok_def;
 val () = cv_auto_trans assembly_value_type_def;
 val () = cv_auto_trans assembly_memory_type_def;
+val () = cv_auto_trans calldata_slice_type_def;
+val () = cv_auto_trans calldata_binding_def;
 val () = cv_auto_trans assembly_reference_ok_def;
-val () = cv_auto_trans assembly_memory_names_def;
-val () = cv_auto_trans assembly_assigns_ok_def;
 val () = cv_auto_trans fresh_core_id_def;
 val () = cv_auto_trans bind_core_id_def;
 val () = cv_auto_trans capture_core_target_def;

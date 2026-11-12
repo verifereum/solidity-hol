@@ -1,5 +1,6 @@
-(* These calls are admitted source programs, but their non-canonical values
- * must fail closed. Compiler outcomes are checked independently by the ancestor;
+(* These calls are admitted source programs, but their non-canonical values,
+ * and calldata references an assembly block leaves past the calldata, must
+ * fail closed. Compiler outcomes are checked independently by the ancestor;
  * an InvalidCompletion is never counted as differential agreement. *)
 Theory solidityDirtyBitsTest
 Ancestors solidityDifferential solidityDirtyBitsBytecodeTest
@@ -11,6 +12,8 @@ Ancestors solidityDifferential solidityDirtyBitsBytecodeTest
   solidityDifferentialCorpus_dirty_bits
   solidityDifferentialCorpus_udvt
   solidityDifferentialCorpus_memory_structs
+  solidityDifferentialCorpus_assembly_calldata
+  solidityDifferentialCorpus_typed_catches
 Libs solidityBytecodeLib cv_transLib wordsLib
 
 fun holbuild_extra_deps (_ : string list) = ()
@@ -21,7 +24,9 @@ val () = holbuild_extra_deps [
   "../testdata/differential/fail_closed/enums.json",
   "../testdata/differential/fail_closed/dirty_bits.json",
   "../testdata/differential/fail_closed/udvt.json",
-  "../testdata/differential/fail_closed/memory_structs.json"
+  "../testdata/differential/fail_closed/memory_structs.json",
+  "../testdata/differential/fail_closed/assembly_calldata.json",
+  "../testdata/differential/fail_closed/typed_catches.json"
 ]
 
 fun rejected_suite group =
@@ -33,8 +38,13 @@ fun rejected_case group name =
     val suite = rejected_suite group
     val c = valOf (List.find (fn c => string_field c "name" = name)
                     (array_field suite "cases"))
+    val peer =
+      case JSONUtil.findField suite "peer" of
+        NONE => “[] : byte list”
+      | SOME _ => prim_mk_const {Thy = "solidityDirtyBitsBytecodeTest",
+          Name = "bytecode_rejected_" ^ group ^ "_peer_code"}
   in
-    case_term “[] : byte list” {names = [], refs = “[] : (num # num list) list”}
+    case_term peer {names = [], refs = “[] : (num # num list) list”}
       (call_input (fn () => “[] : byte list”) c) c
   end;
 
@@ -258,6 +268,42 @@ Theorem reject_memory_structs_paint_copy_byte_out_of_range_panics:
   source_execution bytecode_rejected_memory_structs_code
     corpus_memory_structs_unit corpus_memory_structs_program 1000
     ^(rejected_case "memory_structs" "paint_copy_byte_out_of_range_panics") =
+  (Diagnostic InvalidCompletion, NONE, [])
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem reject_assembly_calldata_length_past_end:
+  source_execution bytecode_rejected_assembly_calldata_code
+    corpus_assembly_calldata_unit corpus_assembly_calldata_program 1000
+    ^(rejected_case "assembly_calldata" "length_past_end") =
+  (Diagnostic InvalidCompletion, NONE, [])
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem reject_assembly_calldata_offset_past_end:
+  source_execution bytecode_rejected_assembly_calldata_code
+    corpus_assembly_calldata_unit corpus_assembly_calldata_program 1000
+    ^(rejected_case "assembly_calldata" "offset_past_end") =
+  (Diagnostic InvalidCompletion, NONE, [])
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem reject_assembly_calldata_static_past_end:
+  source_execution bytecode_rejected_assembly_calldata_code
+    corpus_assembly_calldata_unit corpus_assembly_calldata_program 1000
+    ^(rejected_case "assembly_calldata" "static_past_end") =
+  (Diagnostic InvalidCompletion, NONE, [])
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem reject_typed_catches_unaligned_error_write_next_header:
+  source_execution bytecode_rejected_typed_catches_code
+    corpus_typed_catches_unit corpus_typed_catches_program 1000
+    ^(rejected_case "typed_catches" "unaligned_error_write_next_header") =
   (Diagnostic InvalidCompletion, NONE, [])
 Proof
   CONV_TAC cv_eval

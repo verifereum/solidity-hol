@@ -405,7 +405,7 @@ val () =
     expect_function_lines "typed catch of an unsupported call"
       "../testdata/differential/expected/try_calls.json" "testdata/differential/try_calls.sol"
       "attempt" (edit_first "TryStatement" (typed_catch o in_call unknown_target))
-      [": unsupported expression UnknownTarget", "typed catch clauses are not supported"]
+      [": unsupported expression UnknownTarget", "Error catch requires one string memory parameter"]
   end
 
 (* A state variable of a struct left out (a function-typed member)
@@ -449,18 +449,18 @@ val () =
 (* Every unsupported reference of an inline assembly block is a line. *)
 val () =
   let
-    fun length_suffix (JSON.OBJECT kvs) =
+    fun selector_suffix (JSON.OBJECT kvs) =
           JSON.OBJECT
             (map (fn ("externalReferences", JSON.ARRAY rs) =>
                        ("externalReferences",
-                        JSON.ARRAY (map (set_field "suffix" (JSON.STRING "length")) rs))
+                        JSON.ARRAY (map (set_field "suffix" (JSON.STRING "selector")) rs))
                    | kv => kv) kvs)
-      | length_suffix v = v
+      | selector_suffix v = v
   in
     expect_function_lines "unsupported assembly references"
       "../testdata/differential/expected/inline_assembly.json"
       "testdata/differential/inline_assembly.sol"
-      "locations" (edit_first "InlineAssembly" length_suffix)
+      "locations" (edit_first "InlineAssembly" selector_suffix)
       ["unsupported reference packedHigh.offset", "unsupported reference packedHigh.slot",
        "unsupported reference total.offset", "unsupported reference total.slot"]
   end
