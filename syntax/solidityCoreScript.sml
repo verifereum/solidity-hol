@@ -57,6 +57,7 @@ End
 Datatype:
   core_value_type = SingleType sol_type | ReferenceType sol_type
                   | ProductType (core_value_type list)
+                  | RevertDataType
 End
 
 Datatype:
@@ -99,6 +100,10 @@ Datatype:
   external_kind = ExternalCall | ExternalStaticCall | ExternalDelegateCall
 End
 
+Datatype:
+  catch_kind = ErrorCatch | PanicCatch | GenericCatch
+End
+
 (* The call and transaction context a body reads: msg.sender, msg.value,
  * address(this), tx.origin, tx.gasprice and the block's scalars. msg.data is
  * the complete read-only calldata bytes, including the selector.
@@ -114,11 +119,11 @@ End
  * ty. AllocateMemoryOperation ty n: new ty(n), a zeroed byte sequence or
  * dynamic array of length n; for a struct type, a new memory struct of n
  * fields, a word per field, as a constructor allocates it before converting
- * and writing each field. ArrayIndexOperation a i: element i of the memory
- * or calldata array a. CopyToMemoryOperation a: a new memory copy of the
- * calldata or storage array or struct a.
- * Keccak256Operation a: the Keccak-256 hash of the memory byte sequence a, as
- * bytes32. EcrecoverOperation h v r s: ecrecover(h, v, r,
+ * and writing each field. ArrayIndexOperation a i: element i of fixed bytes,
+ * or a located byte sequence or array a. CopyToMemoryOperation a: a new memory
+ * copy of the calldata or storage array or struct a. Keccak256Operation a: the
+ * Keccak-256 hash of the memory byte sequence a, as bytes32. EcrecoverOperation
+ * h v r s: ecrecover(h, v, r,
  * s), the address the signature (v, r, s) of the bytes32 hash h recovers, or
  * address(0) if it is invalid; v is a uint8 and r and s are bytes32.
  * AbiDecodeOperation types a: abi.decode(a, (types)) of the memory bytes a
@@ -154,7 +159,6 @@ Datatype:
   | BytesLiteralOperation sol_type (byte list)
   | AllocateMemoryOperation sol_type core_atom
   | BytesToFixedOperation num core_atom
-  | ByteIndexOperation core_atom core_atom
   | ArrayIndexOperation core_atom core_atom
   (* Calldata view [start:end], with an omitted end using the current length. *)
   | CalldataSliceOperation core_atom core_atom (core_atom option)
@@ -169,6 +173,10 @@ Datatype:
   | AbiEncodeOperation (core_atom option) (sol_type list) (core_atom list)
   | AbiEncodePackedOperation (sol_type list) (core_atom list)
   | AbiDecodeOperation (sol_type list) core_atom
+  (* A non-reverting typed catch decoder, and the generic catch's lazy copy
+   * of the internal RevertDataType value into source memory. *)
+  | TryDecodeErrorOperation catch_kind core_atom
+  | MaterializeRevertDataOperation core_atom
   | ArrayPushOperation core_atom (core_atom option)
   | ArrayPopOperation core_atom
   | InternalCallOperation ast_id (core_atom list)
@@ -181,7 +189,7 @@ Datatype:
   (* target.transfer(value): exact stipend, failure bytes forwarded, no
    * return-data allocation. *)
   | TransferOperation core_atom core_atom
-  (* success flag, scalar returns, raw failure bytes; only a failed EVM call
+  (* success flag, scalar returns, RevertDataType; only a failed EVM call
    * is caught. Operand and return-decoding failures still propagate. *)
   | TryExternalCallOperation external_kind (byte list) (sol_type list)
       (sol_type list) core_atom core_atom (core_atom option) (core_atom list)
@@ -192,9 +200,12 @@ End
  * type (read on entry, written back on exit), the storage slot or byte offset
  * of a state variable (x.slot, x.offset), the slot or offset of the reference
  * a storage pointer local holds (assigning its slot rebinds the local), the
- * value of a constant of value type, held in an atom, or the memory address
- * of a local holding a memory byte sequence of the given type (bytes or
- * string). Only locals and storage pointer slots are assignable.
+ * calldata offset or length of the reference a calldata local holds (x.offset
+ * and x.length of a byte sequence or dynamic array, the plain name of a
+ * static array; assigning either rebinds the local), the value of a constant
+ * of value type, held in an atom, or the memory address of a local holding a
+ * memory byte sequence of the given type (bytes or string). Only locals,
+ * storage pointer slots and calldata offsets and lengths are assignable.
  *)
 Datatype:
   assembly_reference
@@ -203,6 +214,8 @@ Datatype:
   | AssemblyOffset ast_id
   | AssemblyPointerSlot ast_id
   | AssemblyPointerOffset ast_id
+  | AssemblyCalldataOffset ast_id
+  | AssemblyCalldataLength ast_id
   | AssemblyConstant core_atom sol_type
   | AssemblyMemory ast_id sol_type
 End

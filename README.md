@@ -77,22 +77,31 @@ memory array of value types (its length word if it is dynamic, then a word
 per element, read back on exit only if each element's word round-trips): it
 reads and writes back the value-type locals it names, reads state variables'
 slots and offsets and storage pointer locals' slots and offsets (assigning a
-pointer's `x.slot` points it at that slot of the executing account), integer,
-`bool` and fixed-bytes constants, and the addresses of the memory `bytes`,
-`string` and array locals it names as literals in its code, as the compiler
-puts them, so its Yul functions see them too (a function's parameters and results may
-reuse such a name in its body; a memory reference may not be assigned). Code
+pointer's `x.slot` points it at that slot of the executing account), calldata
+references' offsets and lengths (`x.offset` and `x.length`, a static array's
+plain name; assigning them rebinds the reference, which must stay within the
+calldata), integer, `bool` and fixed-bytes constants as literals in its code,
+as the compiler puts them, so its Yul functions see them too (a function's
+parameters and results may reuse such a name in its body), and reads and may
+assign the addresses of the memory `bytes`, `string` and array locals it
+names. Code
 that can reach the block's normal exit may write at a literal address only in
-the scratch space (an `if` or `switch` body or a Yul function's body that ends
+the scratch space and the free memory pointer (an `if` or `switch` body or a Yul function's body that ends
 in `return`, `revert` or `stop` may write anywhere), and a literal address and
 length are read only at the free memory pointer and memory the block wrote
 itself (an `mstore`, a call's output region or a `returndatacopy`, also in an
 argument to the right, since arguments run right to left); at a computed
 address, a block that exits normally may write only the scratch space, the byte
-sequences' data words, the arrays' elements and the memory from the free memory pointer up, not their
-length words or the free memory pointer itself; their bytes are read back, and
+sequences' data words, the arrays' elements, the free memory pointer and the memory from the free memory pointer up, not their
+length words; their bytes are read back, and
 the writes from the free memory pointer up, the temporary memory the Solidity
-docs allow a memory-safe block, are dropped. Whatever the address, a read outside the free memory pointer, the
+docs allow a memory-safe block, are dropped. A block may raise the free
+memory pointer (to a multiple of 32 below 2^64, never lower it) and leave a memory local at an
+object it wrote between the old and new pointer: the object is read back as a
+new one of the local's type (its length word and data written, each array
+element round-tripping, objects not overlapping, locals at one address sharing
+it only with equal types); a local left at any other address than its own, an
+existing object included, fails closed. Whatever the address, a read outside the free memory pointer, the
 zero slot, the byte sequences' and arrays' words and the bytes the block wrote fails with
 an `InvalidCompletion`. `return`/`stop`
 end the frame with a `HaltCompletion`. `call`, `staticcall` and
