@@ -2364,7 +2364,7 @@ Definition elab_assembly_reference_def:
                if assembly_memory_type t then INL (([], AssemblyMemory (AstId x) t), n)
                else INR [(id, "assembly reference of this type")]
            | LocatedT CalldataLoc t =>
-               if calldata_object_type t ∧ ¬calldata_slice_type t then
+               if located_object_shape CalldataLoc t ∧ ¬calldata_slice_type t then
                  INL (([], AssemblyCalldataOffset (AstId x)), n)
                else INR [(id, "assembly reference of this type")]
            | _ => INR [(id, "assembly reference of this type")])

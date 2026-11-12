@@ -1422,7 +1422,7 @@ Definition calldata_binding_def:
   calldata_binding ctx x =
     case ALOOKUP ctx.bindings x of
       SOME (SingleType (LocatedT CalldataLoc ty)) =>
-        if calldata_object_type ty then SOME ty else NONE
+        if located_object_shape CalldataLoc ty then SOME ty else NONE
     | _ => NONE
 End
 
