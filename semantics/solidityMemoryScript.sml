@@ -256,7 +256,7 @@ End
 
 (* The position and type of field f among a struct's fields. *)
 Definition field_position_def:
-  (field_position f [] = NONE) ∧
+  (field_position (f : ast_id) [] = NONE) ∧
   (field_position f ((g, ty) :: fields) =
     if f = g then SOME (0n, ty : sol_type) else
     case field_position f fields of
