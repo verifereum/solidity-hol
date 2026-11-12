@@ -142,6 +142,23 @@ contract Partial is Mid {
         return g.n;
     }
 
+    // a modifier parameter holding a recursive struct in memory
+    modifier withNode(Node memory n) {
+        _;
+    }
+
+    function nodeModified() public withNode(tree) {}
+
+    // a storage parameter of a struct that is left out
+    function grantParam(Roles.Grant storage g) internal view returns (uint8) {
+        return g.n;
+    }
+
+    // a tuple holding a storage struct
+    function treeTuple() public view {
+        (tree, 1);
+    }
+
     fallback() external {
         total = uint256(sha256(msg.data));
     }
