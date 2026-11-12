@@ -1057,6 +1057,38 @@ Proof
   CONV_TAC cv_eval
 QED
 
+(* A byte sequence at an unaligned address: its padding runs to the word its
+ * data ends in, which the free memory pointer must pass, and is padded only
+ * if the block zeroed all of it. *)
+Definition unaligned_bytes_def:
+  unaligned_bytes dirty top =
+    [YulAssign ["a"] (yadd (YulBuiltin YMLoad [ylit 0x40w]) (ylit 1w));
+     ymstore (yname "a") (ylit 32w);
+     ymstore (yadd (yname "a") (ylit 0x20w)) (ylit 0w);
+     ymstore (yadd (yname "a") (ylit 0x40w)) (ylit 0w)] ++
+    (if dirty then
+       [YulExprStmt (YulBuiltin YMStore8 [yadd (yname "a") (ylit 0x5ew); ylit 1w])]
+     else []) ++
+    [ymstore (ylit 0x40w) top]
+End
+
+val () = cv_auto_trans unaligned_bytes_def;
+
+Theorem asm_memory_alloc_unaligned:
+  (* the pointer at the data's end, short of its padding *)
+  FST (run_asm_alloc BytesT uarr (unaligned_bytes F (ylit 0x101w))) =
+    InvalidCompletion "assembly write-back failed" ∧
+  run_asm_alloc BytesT uarr (unaligned_bytes F (ylit 0x120w)) =
+    (ReturnCompletion [mref 2 BytesT; mref 0 uarr],
+     [SOME (2, 0xc1, T, bytes1s (REPLICATE 32 0w)); NONE], 0xa0) ∧
+  (* the padding's last byte dirty *)
+  run_asm_alloc BytesT uarr (unaligned_bytes T (ylit 0x120w)) =
+    (ReturnCompletion [mref 2 BytesT; mref 0 uarr],
+     [SOME (2, 0xc1, F, bytes1s (REPLICATE 32 0w)); NONE], 0xa0)
+Proof
+  CONV_TAC cv_eval
+QED
+
 (* Padding. When the compiler's memory need not hold zeros past b's last
  * byte, the block is not given those bytes: a read of b's data word fails
  * closed, while its data bytes alone may be read. A block that writes the

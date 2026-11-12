@@ -1412,17 +1412,19 @@ Definition memory_written_def:
 End
 
 (* An object of type ty a block allocated at p, read from its final memory as
- * solc lays it out, with the bytes it takes, in whole words, which must end
- * by f1: a byte sequence's or dynamic array's length word, then its data,
- * all written. An array's elements must round-trip, as in read-back, and a
- * byte sequence is padded if the block wrote its padding as zeros. *)
+ * solc lays it out, with the bytes it takes, which must end by f1: a byte
+ * sequence's or dynamic array's length word, then its data, all written. An
+ * array's elements must round-trip, as in read-back, and a byte sequence's
+ * padding runs to the word its data ends in, as object_padding rounds it, and
+ * is padded if the block wrote it as zeros. *)
 Definition assembly_new_object_def:
   assembly_new_object ty (m : yul_machine) f1 p =
     let (n, header) =
       case ty of
         ArrayT _ (SOME k) => (k, 0)
       | _ => (num_of_be_bytes (yul_memory_read m p 32), 32) in
-    let data = if byte_sequence_type ty then 32 * ((n + 31) DIV 32)
+    let data = if byte_sequence_type ty
+               then 32 * ((p + 32 + n + 31) DIV 32) - (p + 32)
                else 32 * n in
     if f1 < p + header + data ∨ ¬memory_written m.memory p header then NONE
     else if byte_sequence_type ty then
