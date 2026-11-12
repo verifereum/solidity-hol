@@ -28,8 +28,8 @@ val prepared = #prepared (solidityPrepareLib.prepare_artifact
  * does not elaborate. Once Partial.twice is unsupported its super calls
  * reach nothing, so neither Mid.twice nor Base.twice is among the
  * functions calls reach. The constant DIGITS does not elaborate, so it has
- * no procedure and digits, which reads it, uses an unsupported declaration;
- * pointer fails to elaborate, since its assembly assigns a bytes local.
+ * no procedure and digits, which reads it, uses an unsupported declaration.
+ * pointer's assembly assigns a bytes local, which elaborates.
  * hookCount's struct has a function-typed member, so the struct is left out
  * and hookCount's local does not elaborate, while the unit still imports.
  * Likewise Roles.Grant has an enum-keyed mapping, so the storage local of
@@ -64,8 +64,7 @@ val () =
      reasons "callsTwice" = [calls_unsupported] andalso
      reasons "twice" = [calls_unsupported] andalso
      reasons "digits" = [SOME "uses an unsupported declaration"] andalso
-     List.all elaboration_failure (reasons "pointer") andalso
-     length (reasons "pointer") = 1 andalso
+     reasons "pointer" = [NONE] andalso
      List.all elaboration_failure (reasons "hookCount") andalso
      length (reasons "hookCount") = 1 andalso
      List.all elaboration_failure (reasons "grantCount") andalso
@@ -129,8 +128,8 @@ Proof
   CONV_TAC (LAND_CONV cv_eval) >> REFL_TAC
 QED
 
-(* The getter of the constant that does not elaborate is refused, as are
- * digits, which reads it, and pointer. *)
+(* The getter of the constant that does not elaborate is refused, as is
+ * digits, which reads it. *)
 Theorem partial_constant_getter_refused:
   partial_call ^(listSyntax.mk_list (selector "d0263f8c", “:word8”)) =
   ContractInvalid "unknown procedure"
@@ -145,10 +144,12 @@ Proof
   CONV_TAC (LAND_CONV cv_eval) >> REFL_TAC
 QED
 
-Theorem partial_pointer_refused:
+(* pointer runs, but its block leaves b at 0, below the free memory
+ * pointer, so the write-back fails closed. *)
+Theorem partial_pointer_fails_closed:
   partial_call (^(listSyntax.mk_list (selector "8a237e56", “:word8”)) ++
                 word_to_bytes (32w : bytes32) T ++ REPLICATE 32 0w) =
-  ContractInvalid "unknown procedure"
+  ContractInvalid "assembly write-back failed"
 Proof
   CONV_TAC (LAND_CONV cv_eval) >> REFL_TAC
 QED
