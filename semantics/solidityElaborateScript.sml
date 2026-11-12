@@ -2724,11 +2724,7 @@ Definition elab_stmts_def:
        else [(info.node_id, "repeated assembly reference")]) in
     case elab_assembly_references ctx n info.node_id refs of
       INL ((ss, rs), n1) =>
-        (* a memory reference is read as a literal, so it can't be assigned *)
-        let own' = own ++
-          (if assembly_assigns_ok (assembly_memory_names rs) code then []
-           else [(info.node_id, "assignment to an assembly memory reference")]) in
-        if own' = [] then INL ((ss ++ [AssemblyStmt code rs], ctx), n1) else INR own'
+        if own = [] then INL ((ss ++ [AssemblyStmt code rs], ctx), n1) else INR own
     | INR bs => INR (own ++ bs)) ∧
   (elab_stmt ctx n (SrcUnsupportedStmt info msg es ss) =
     INR ((info.node_id, msg) :: blockers (elab_arg_values ctx n es) ++

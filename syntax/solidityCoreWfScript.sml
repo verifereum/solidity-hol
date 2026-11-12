@@ -1112,10 +1112,11 @@ End
  * sequences (bytes and string) and nothing else, so at a literal address it
  * may read only the free memory pointer and what it wrote itself earlier on
  * the same path; and code that can reach the block's normal exit may write at
- * a literal address only in the scratch space [0, 0x40). A read is covered by
- * the (start, length) ranges written at literal addresses before it: by
- * earlier statements of its statement list or an enclosing one, and by the
- * arguments to its right, which run first. A range is an mstore's word, a
+ * a literal address only in the scratch space [0, 0x40), and mstore a new
+ * free memory pointer at 0x40, which assembly_result checks. A read is
+ * covered by the (start, length) ranges written at literal addresses before
+ * it: by earlier statements of its statement list or an enclosing one, and by
+ * the arguments to its right, which run first. A range is an mstore's word, a
  * call's output region or a returndatacopy's, of which less may be written
  * (the runtime check then fails the read closed). A statement list that
  * halts (block_halts), as a whole block, an if or switch body or a Yul
@@ -1175,7 +1176,8 @@ Definition builtin_memory_ok_def:
     case (b, es) of
       (YMLoad, [p]) =>
         memory_read_ok ws p (YulLit (LitNumber 32w))
-    | (YMStore, [p; _]) => memory_write_ok halts p (SOME 32)
+    | (YMStore, [p; _]) =>
+        memory_write_ok halts p (SOME 32) ∨ yul_lit p = SOME 0x40
     | (YMStore8, [p; _]) => memory_write_ok halts p (SOME 1)
     | (YMCopy, [d; p; l]) =>
         memory_write_ok halts d (yul_lit l) ∧ memory_read_ok ws p l
@@ -1474,37 +1476,6 @@ Definition assembly_reference_ok_def:
         assembly_memory_type ty
 End
 
-(* The names of a block's memory references. The block reads each as a
- * literal address, so it may not assign one; a Yul function's parameters and
- * results may reuse such a name for its body. *)
-Definition assembly_memory_names_def:
-  (assembly_memory_names [] = []) ∧
-  (assembly_memory_names ((name, r) :: refs) =
-    case r of
-      AssemblyMemory _ _ => name :: assembly_memory_names refs
-    | _ => assembly_memory_names refs)
-End
-
-Definition assembly_assigns_ok_def:
-  (assembly_assign_ok xs (YulBlock ss) ⇔ assembly_assigns_ok xs ss) ∧
-  (assembly_assign_ok xs (YulFunction _ params results body) ⇔
-    assembly_assigns_ok (FILTER (λx. ¬MEM x (params ++ results)) xs) body) ∧
-  (assembly_assign_ok xs (YulAssign ys _) ⇔ EVERY (λy. ¬MEM y xs) ys) ∧
-  (assembly_assign_ok xs (YulIf _ body) ⇔ assembly_assigns_ok xs body) ∧
-  (assembly_assign_ok xs (YulSwitch _ cases default) ⇔
-    assembly_cases_assigns_ok xs cases ∧ assembly_assigns_ok xs default) ∧
-  (assembly_assign_ok xs (YulFor pre _ post body) ⇔
-    assembly_assigns_ok xs pre ∧ assembly_assigns_ok xs post ∧
-    assembly_assigns_ok xs body) ∧
-  (assembly_assign_ok xs _ ⇔ T) ∧
-  (assembly_assigns_ok xs [] ⇔ T) ∧
-  (assembly_assigns_ok xs (s :: ss) ⇔
-    assembly_assign_ok xs s ∧ assembly_assigns_ok xs ss) ∧
-  (assembly_cases_assigns_ok xs [] ⇔ T) ∧
-  (assembly_cases_assigns_ok xs ((_, body) :: cases) ⇔
-    assembly_assigns_ok xs body ∧ assembly_cases_assigns_ok xs cases)
-End
-
 Definition check_core_stmts_def:
   (check_core_stmts env ctx [] = SOME ctx) ∧
   (check_core_stmts env ctx (DefineStmt x ty op :: ss) =
@@ -1614,8 +1585,7 @@ Definition check_core_stmts_def:
     if assembly_stmts_ok assembly_unsupported code ∧ assembly_memory_ok code ∧
        assembly_gas_ok code ∧
        ALL_DISTINCT (MAP FST refs) ∧
-       EVERY (assembly_reference_ok env ctx) (MAP SND refs) ∧
-       assembly_assigns_ok (assembly_memory_names refs) code
+       EVERY (assembly_reference_ok env ctx) (MAP SND refs)
     then check_core_stmts env ctx ss else NONE) ∧
   (check_core_stmts env ctx (_ :: _) = NONE)
 Termination
@@ -1887,8 +1857,6 @@ val () = cv_auto_trans assembly_memory_type_def;
 val () = cv_auto_trans calldata_slice_type_def;
 val () = cv_auto_trans calldata_binding_def;
 val () = cv_auto_trans assembly_reference_ok_def;
-val () = cv_auto_trans assembly_memory_names_def;
-val () = cv_auto_trans assembly_assigns_ok_def;
 val () = cv_auto_trans fresh_core_id_def;
 val () = cv_auto_trans bind_core_id_def;
 val () = cv_auto_trans capture_core_target_def;

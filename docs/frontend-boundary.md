@@ -218,9 +218,21 @@ it cannot make the next object's length word writable. Under
 arithmetic relative to a pointer is modelled but returning, storing or
 comparing a raw pointer value is outside the boundary. The block's memory also
 holds the free memory pointer at `0x40`, `0x80` plus the memory allocated so
-far, under the same boundary; a block that exits normally may not change it,
-and what it wrote from it up is dropped (the temporary memory the Solidity
-docs allow a memory-safe block). A literal address with a literal length is
+far, under the same boundary. What a block wrote from it up is dropped (the
+temporary memory the Solidity docs allow a memory-safe block), except the
+objects it allocates there (`assembly_alloc.sol`): a block that exits normally
+may raise the pointer from F0 to a word-aligned F1 < 2^64, never lower it, and leave a memory
+local at an address p in [F0, F1). The object there is read back from the
+block's final memory as the local's type, as solc lays it out: its whole
+rounded size must end by F1, its length word and data must be written, each
+array element must round-trip, and a byte sequence is zero-padded
+(`object_padded`) only if the block wrote its padding as zeros, so a
+`returndatacopy` into it (Uniswap v4's `Hooks.callHook`) leaves the padding
+unwritten. It becomes a new heap object at p, and later allocations start at
+F1. Locals left at one address share its object only if their declared types
+are equal; overlapping objects, a local moved to an existing object (a
+retyping alias such as `EnumerableSet.values`' `result := store`) or to any
+other address fail closed. A literal address with a literal length is
 read only at the free memory pointer or where the block wrote it before (an
 `mstore`, a call's output region or a `returndatacopy`, also in an argument to
 the right, since arguments run right to left), as the elaborator checks. At a computed address a block may read only the free memory pointer,
