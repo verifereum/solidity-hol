@@ -864,6 +864,8 @@ Definition simple_stmt_def:
   simple_stmt env s st gas =
     case s of
       DefineStmt x ty (BytesLiteralOperation element bs) =>
+        if 2 ** 64 ≤ 128 + st.memory_allocated + 32 + 32 * ((LENGTH bs + 31) DIV 32)
+        then abrupt_result (PanicCompletion 65) st gas else
         let (v, st') = allocate_bytes T element bs st in
         normal_result (define_binding x ty v st') gas
     | DefineStmt x ty (DefaultMemoryOperation element) =>
@@ -1050,11 +1052,15 @@ End
  * locals are written back, cleaned per type as the compiler cleans a value on
  * every Solidity read, and each byte sequence's bytes are read back from
  * memory; writes outside the scratch space [0, 0x40), the byte sequences'
- * data words and the memory from the free memory pointer up fail closed, and
- * so do writes to a length word or the free memory pointer. The memory from
+ * data words, the free memory pointer and the memory from the free memory
+ * pointer up fail closed, and so do writes to a length word. The memory from
  * the free memory pointer up is the temporary memory the Solidity docs let a
  * memory-safe block use: the source keeps nothing there, and the block's
- * writes there are dropped. In a static frame, a block that names a builtin changing
+ * writes there are dropped, except for the objects it allocates there. A
+ * block may raise the free memory pointer, below 2^64, and leave a memory
+ * reference at an object it wrote between the old and the new pointer, which
+ * is read back as a new object of the reference's type (assembly_allocate).
+ * In a static frame, a block that names a builtin changing
  * the world (call included) fails closed, whether or not it would run it.
  *
  * A call and staticcall run the callee as the source's own calls do
@@ -1152,9 +1158,9 @@ Definition assembly_reference_word_def:
          | NONE => NONE)
 End
 
-(* The words of a block's references: the assignable ones' (locals and
- * storage pointer slots) as the block's initial scope, and the read-only
- * ones' by name, for the code to hold as literals. *)
+(* The words of a block's references: the assignable ones' (locals, storage
+ * pointer slots and memory references) as the block's initial scope, and the
+ * read-only ones' by name, for the code to hold as literals. *)
 Definition assembly_inputs_def:
   (assembly_inputs env st [] =
     SOME (FEMPTY : string |-> bytes32, [] : (string # bytes32) list)) ∧
@@ -1164,6 +1170,7 @@ Definition assembly_inputs_def:
         (case r of
            AssemblyLocal _ _ => SOME (scope |+ (name, n2w w), literals)
          | AssemblyPointerSlot _ => SOME (scope |+ (name, n2w w), literals)
+         | AssemblyMemory _ _ => SOME (scope |+ (name, n2w w), literals)
          | AssemblyCalldataOffset _ => SOME (scope |+ (name, n2w w), literals)
          | AssemblyCalldataLength _ => SOME (scope |+ (name, n2w w), literals)
          | _ => SOME (scope, (name, n2w w) :: literals))
@@ -1413,6 +1420,108 @@ Definition assembly_read_back_def:
     | NONE => assembly_read_back heap i m)
 End
 
+(* The n bytes from a are all written. *)
+Definition memory_written_def:
+  (memory_written (mem : num |-> word8) a 0 ⇔ T) ∧
+  (memory_written mem a (SUC n) ⇔
+     IS_SOME (FLOOKUP mem a) ∧ memory_written mem (a + 1) n)
+End
+
+(* An object of type ty a block allocated at p, read from its final memory as
+ * solc lays it out, with the bytes it takes, which must end by f1: a byte
+ * sequence's or dynamic array's length word, then its data, all written. An
+ * array's elements must round-trip, as in read-back, and a byte sequence's
+ * padding runs to the word its data ends in, as object_padding rounds it, and
+ * is padded if the block wrote it as zeros. *)
+Definition assembly_new_object_def:
+  assembly_new_object ty (m : yul_machine) f1 p =
+    let (n, header) =
+      case ty of
+        ArrayT _ (SOME k) => (k, 0)
+      | _ => (num_of_be_bytes (yul_memory_read m p 32), 32) in
+    let data = if byte_sequence_type ty
+               then 32 * ((p + 32 + n + 31) DIV 32) - (p + 32)
+               else 32 * n in
+    if f1 < p + header + data ∨ ¬memory_written m.memory p header then NONE
+    else if byte_sequence_type ty then
+      if memory_written m.memory (p + 32) n then
+        SOME (<| object_type := ty; object_length := n;
+                 object_cells := byte_cells (yul_memory_read m (p + 32) n);
+                 object_address := p;
+                 object_padded := memory_zeros m.memory (p + 32 + n) (data - n) |>,
+              header + data)
+      else NONE
+    else
+      case assembly_array ty of
+        SOME (element, _) =>
+          if memory_written m.memory (p + header) data then
+            OPTION_MAP (λcells. (<| object_type := ty; object_length := n;
+                                    object_cells := cells; object_address := p;
+                                    object_padded := T |>, header + data))
+              (assembly_read_elements element m (p + header) 0 n FEMPTY)
+          else NONE
+      | NONE => NONE
+End
+
+(* Whether [p, p + extent) overlaps an object in news, as (address, extent, id). *)
+Definition assembly_overlaps_def:
+  (assembly_overlaps p extent [] ⇔ F) ∧
+  (assembly_overlaps p extent ((q, sz, id : num) :: news) ⇔
+     (q < p + extent ∧ p < q + sz) ∨ assembly_overlaps p extent news)
+End
+
+(* The memory references a block left at a new address are bound to the
+ * objects it allocated there: an address from the free memory pointer it
+ * started with, f0, whose object ends by the one it left, f1. References left
+ * at the same address share one object if their types are equal, and objects
+ * may not overlap; news holds those made so far, as (address, extent, id). A
+ * reference left where it was keeps its object, and any other address fails,
+ * an existing object retyped or aliased included. *)
+Definition assembly_allocate_def:
+  (assembly_allocate f0 f1 (m0 : yul_machine) (m : yul_machine) []
+     (st : source_state) news = SOME st) ∧
+  (assembly_allocate f0 f1 m0 m ((name, r) :: refs) st news =
+    case r of
+      AssemblyMemory x ty =>
+        (case (yul_lookup name m0.scopes, yul_lookup name m.scopes) of
+           (SOME w0, SOME w) =>
+             if w = w0 then assembly_allocate f0 f1 m0 m refs st news else
+             let p = w2n w in
+             if p < f0 then NONE else
+             (case ALOOKUP news p of
+                SOME (_, id) =>
+                  (case FLOOKUP st.heap id of
+                     SOME obj =>
+                       if obj.object_type = ty then
+                         (case update_binding x
+                                 (ReferenceValue (MemoryReference (HeapId id) 0 ty))
+                                 st.scopes of
+                            SOME scopes =>
+                              assembly_allocate f0 f1 m0 m refs
+                                (st with scopes := scopes) news
+                          | NONE => NONE)
+                       else NONE
+                   | NONE => NONE)
+              | NONE =>
+                  (case assembly_new_object ty m f1 p of
+                     SOME (obj, extent) =>
+                       if assembly_overlaps p extent news then NONE else
+                       let id = st.next_heap_id + 1 in
+                       (case update_binding x
+                               (ReferenceValue (MemoryReference (HeapId id) 0 ty))
+                               st.scopes of
+                          SOME scopes =>
+                            assembly_allocate f0 f1 m0 m refs
+                              (st with <| scopes := scopes;
+                                          heap := st.heap |+ (id, obj);
+                                          next_heap_id := id |>)
+                              ((p, extent, id) :: news)
+                        | NONE => NONE)
+                   | NONE => NONE))
+         | _ => NONE)
+    | _ => assembly_allocate f0 f1 m0 m refs st news)
+End
+
 Definition assembly_world_def:
   assembly_world (m : yul_machine) =
     (<| accounts := m.accounts; transient := m.transient; logs := m.logs |>
@@ -1530,13 +1639,23 @@ Definition assembly_result_def:
     let world = assembly_world r.machine in
     case r.completion of
       YulNormal =>
-        let free = memory_free_pointer st in
-        let writable = (free, r.machine.memory_size - free) ::
+        let f0 = memory_free_pointer st in
+        let f1 = num_of_be_bytes (yul_memory_read r.machine 0x40 32) in
+        let writable = (0x40, 32) :: (f0, r.machine.memory_size - f0) ::
                        assembly_writable st.heap st.next_heap_id in
         if without_ranges writable r.machine.memory ≠
            without_ranges writable m0.memory then
           abrupt_result
             (InvalidCompletion "assembly wrote memory outside the scratch space and byte sequence data")
+            st gas
+        else if f1 < f0 ∨ 2 ** 64 ≤ f1 then
+          abrupt_result
+            (InvalidCompletion "assembly lowered the free memory pointer or raised it past 2^64")
+            st gas
+        (* the core allocates whole words from the pointer, as solc does *)
+        else if f1 MOD 32 ≠ 0 then
+          abrupt_result
+            (InvalidCompletion "assembly left the free memory pointer unaligned")
             st gas
         else
           (case (assembly_write_back st.frame.self_address refs st.scopes
@@ -1548,9 +1667,15 @@ Definition assembly_result_def:
                    (InvalidCompletion "assembly left a calldata reference outside the calldata")
                    st gas
                else
-               normal_result (st with <| world := world; scopes := scopes;
-                   heap := heap;
-                   return_data := assembly_return_data st r.machine |>) gas
+               (case assembly_allocate f0 f1 m0 r.machine refs
+                       (st with <| scopes := scopes; heap := heap |>) [] of
+                  SOME st1 =>
+                    normal_result (st1 with <| world := world;
+                        memory_allocated := f1 - 128;
+                        return_data := assembly_return_data st r.machine |>) gas
+                | NONE =>
+                    abrupt_result (InvalidCompletion "assembly write-back failed")
+                      st gas)
            | _ =>
                abrupt_result (InvalidCompletion "assembly write-back failed")
                  st gas)
@@ -1753,6 +1878,21 @@ val () = cv_auto_trans without_ranges_def;
 val () = cv_auto_trans memory_zeros_def;
 val () = cv_auto_trans assembly_read_elements_def;
 val () = cv_auto_trans assembly_read_back_def;
+val () = cv_auto_trans memory_written_def;
+val () = cv_auto_trans assembly_new_object_def;
+val () = cv_auto_trans assembly_overlaps_def;
+val assembly_allocate_pre_def =
+  cv_auto_trans_pre "assembly_allocate_pre" assembly_allocate_def;
+
+Theorem assembly_allocate_pre[cv_pre]:
+  ∀f0 f1 m0 m refs st news. assembly_allocate_pre f0 f1 m0 m refs st news
+Proof
+  ho_match_mp_tac assembly_allocate_ind >> rpt strip_tac >>
+  simp[Once assembly_allocate_pre_def] >> rw[] >> gvs[] >>
+  (* record updates appear as cases on the state *)
+  Cases_on ‘st’ >> gvs[solidityStateTheory.source_state_fn_updates]
+QED
+
 val () = cv_auto_trans assembly_world_def;
 val () = cv_auto_trans assembly_write_one_def;
 val () = cv_auto_trans calldata_span_def;
