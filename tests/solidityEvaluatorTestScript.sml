@@ -1020,6 +1020,43 @@ Proof
   CONV_TAC cv_eval
 QED
 
+(* A literal after a block that raised the free memory pointer is allocated
+ * past it, and panics as the compiler's allocator does when it would pass
+ * 2^64. *)
+Definition run_asm_literal_def:
+  run_asm_literal code =
+    let proc = <|
+      procedure_id := AstId 160; parameters := [];
+      return_bindings := [(AstId 161, LocatedT MemoryLoc BytesT)];
+      body := [AssemblyStmt code [];
+               DefineStmt (AstId 162) (SingleType (LocatedT MemoryLoc BytesT))
+                 (BytesLiteralOperation BytesT [0x78w]);
+               ReturnStmt [BoundAtom (AstId 162)]] |> in
+    let env = core_program_environment <|
+      unsupported_procedures := []; procedures := [proc];
+      struct_layouts := []; type_declarations := [];
+      state_variables := []; immutables := [];
+      entry_procedure := AstId 160;
+      external_functions := []; receive_procedure := NONE;
+      fallback_procedure := NONE; creation_procedure := NONE |> in
+    let r = invoke_source 20 env (AstId 160) [] initial_state [] in
+    (r.completion,
+     (case r.completion of
+        ReturnCompletion vs => MAP (asm_alloc_object r.state) vs
+      | _ => []))
+End
+
+val () = cv_auto_trans run_asm_literal_def;
+
+Theorem asm_memory_alloc_literal:
+  run_asm_literal [ymstore (ylit 0x40w) (ylit 0x100w)] =
+    (ReturnCompletion [mref 1 BytesT], [SOME (1, 0x100, T, bytes1s [0x78w])]) ∧
+  FST (run_asm_literal [ymstore (ylit 0x40w) (ylit 0xFFFFFFFFFFFFFFE0w)]) =
+    PanicCompletion 65
+Proof
+  CONV_TAC cv_eval
+QED
+
 (* Padding. When the compiler's memory need not hold zeros past b's last
  * byte, the block is not given those bytes: a read of b's data word fails
  * closed, while its data bytes alone may be read. A block that writes the

@@ -828,6 +828,8 @@ Definition simple_stmt_def:
   simple_stmt env s st gas =
     case s of
       DefineStmt x ty (BytesLiteralOperation element bs) =>
+        if 2 ** 64 ≤ 128 + st.memory_allocated + 32 + 32 * ((LENGTH bs + 31) DIV 32)
+        then abrupt_result (PanicCompletion 65) st gas else
         let (v, st') = allocate_bytes T element bs st in
         normal_result (define_binding x ty v st') gas
     | DefineStmt x ty (DefaultMemoryOperation element) =>
