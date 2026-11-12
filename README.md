@@ -92,7 +92,7 @@ sequences' data words, the arrays' elements, the free memory pointer and the mem
 length words; their bytes are read back, and
 the writes from the free memory pointer up, the temporary memory the Solidity
 docs allow a memory-safe block, are dropped. A block may raise the free
-memory pointer (below 2^64, never lower it) and leave a memory local at an
+memory pointer (to a multiple of 32 below 2^64, never lower it) and leave a memory local at an
 object it wrote between the old and new pointer: the object is read back as a
 new one of the local's type (its length word and data written, each array
 element round-tripping, objects not overlapping, locals at one address sharing

@@ -1580,6 +1580,11 @@ Definition assembly_result_def:
           abrupt_result
             (InvalidCompletion "assembly lowered the free memory pointer or raised it past 2^64")
             st gas
+        (* the core allocates whole words from the pointer, as solc does *)
+        else if f1 MOD 32 ≠ 0 then
+          abrupt_result
+            (InvalidCompletion "assembly left the free memory pointer unaligned")
+            st gas
         else
           (case (assembly_write_back st.frame.self_address refs st.scopes
                    r.machine.scopes,

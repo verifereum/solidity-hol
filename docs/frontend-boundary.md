@@ -212,7 +212,7 @@ holds the free memory pointer at `0x40`, `0x80` plus the memory allocated so
 far, under the same boundary. What a block wrote from it up is dropped (the
 temporary memory the Solidity docs allow a memory-safe block), except the
 objects it allocates there (`assembly_alloc.sol`): a block that exits normally
-may raise the pointer from F0 to F1 < 2^64, never lower it, and leave a memory
+may raise the pointer from F0 to a word-aligned F1 < 2^64, never lower it, and leave a memory
 local at an address p in [F0, F1). The object there is read back from the
 block's final memory as the local's type, as solc lays it out: its whole
 rounded size must end by F1, its length word and data must be written, each

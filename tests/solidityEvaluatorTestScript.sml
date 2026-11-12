@@ -964,7 +964,8 @@ Proof
   CONV_TAC cv_eval
 QED
 
-(* What fails closed: a pointer lowered or past 2^64; an object not inside
+(* What fails closed: a pointer lowered, past 2^64 or not a whole number of
+ * words; an object not inside
  * the memory the block allocated, or whose length word or elements it did
  * not write; an element that doesn't round-trip; locals of different types
  * at one address, or at overlapping objects; and a local moved to an
@@ -975,6 +976,8 @@ Theorem asm_memory_alloc_invalid:
   FST (run_asm_alloc uarr uarr
          [ymstore (ylit 0x40w) (YulBuiltin YShl [ylit 64w; ylit 1w])]) =
     InvalidCompletion "assembly lowered the free memory pointer or raised it past 2^64" ∧
+  FST (run_asm_alloc uarr uarr [ymstore (ylit 0x40w) (ylit 0xc1w)]) =
+    InvalidCompletion "assembly left the free memory pointer unaligned" ∧
   (* the pointer not raised past the second array *)
   FST (run_asm_alloc uarr uarr (singletons (ylit 0x20w))) =
     InvalidCompletion "assembly write-back failed" ∧
@@ -1077,7 +1080,7 @@ val () = cv_auto_trans unaligned_bytes_def;
 Theorem asm_memory_alloc_unaligned:
   (* the pointer at the data's end, short of its padding *)
   FST (run_asm_alloc BytesT uarr (unaligned_bytes F (ylit 0x101w))) =
-    InvalidCompletion "assembly write-back failed" ∧
+    InvalidCompletion "assembly left the free memory pointer unaligned" ∧
   run_asm_alloc BytesT uarr (unaligned_bytes F (ylit 0x120w)) =
     (ReturnCompletion [mref 2 BytesT; mref 0 uarr],
      [SOME (2, 0xc1, T, bytes1s (REPLICATE 32 0w)); NONE], 0xa0) ∧
