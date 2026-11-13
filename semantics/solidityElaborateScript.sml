@@ -948,15 +948,16 @@ Definition internal_call_ok_def:
     | _ => decode_type_identifier tid = SOME (call_value_type rets)
 End
 
-(* An elaborated member access root that is a memory struct: its prelude,
- * atom and struct id. A separate definition, so elab_expr's fallback to
- * elab_location is one case, not one per other root type. *)
-Definition memory_struct_root_def:
-  memory_struct_root (r : ((core_stmt list # core_atom # elab_type) # num) +
-                           (num # string) list) =
+(* An elaborated member access root that is a memory or calldata struct: its
+ * prelude, atom, location and struct id. A separate definition, so
+ * elab_expr's fallback to elab_location is one case, not one per other root
+ * type. *)
+Definition struct_root_def:
+  struct_root (r : ((core_stmt list # core_atom # elab_type) # num) +
+                    (num # string) list) =
     case r of
-      INL ((ss, ref, ElabType (LocatedT MemoryLoc (StructT (AstId id)))), n1) =>
-        SOME ((ss, ref, id), n1)
+      INL ((ss, ref, ElabType (LocatedT loc (StructT (AstId id)))), n1) =>
+        if loc = StorageLoc then NONE else SOME ((ss, ref, loc, id), n1)
     | _ => NONE
 End
 
@@ -1425,11 +1426,11 @@ Definition elab_expr_def:
                else INL (([], ConstantAtom (BoolValue F), ElabRational), n)
            | _ => INR [(info.node_id, "unsupported literal")])
     | SrcMemberAccess info root_expr member_id tid =>
-        (case memory_struct_root (elab_expr ctx n root_expr) of
-           SOME ((ss, ref, id), n1) =>
+        (case struct_root (elab_expr ctx n root_expr) of
+           SOME ((ss, ref, loc, id), n1) =>
              (case source_struct_field ctx.structs id member_id of
                 SOME fty =>
-                  let ety = element_type MemoryLoc fty in
+                  let ety = element_type loc fty in
                   ensure (source_type_matches ety tid) (info.node_id, "type annotation mismatch")
                   (let (rs, a) = bind_value (n1 + 1) ety
                                    (ReadOperation ety (BoundAtom (AstId n1))) in
@@ -2467,11 +2468,12 @@ Definition elab_expr_def:
                  INL ((ss, ReferenceDestination ref ty), n1)
              | INR bs => INR bs)
     | SrcMemberAccess info root_expr member_id tid =>
-          (case memory_struct_root (elab_expr ctx n root_expr) of
-             SOME ((ss, ref, id), n1) =>
+          (case struct_root (elab_expr ctx n root_expr) of
+             SOME ((ss, ref, loc, id), n1) =>
                let (captured, n2) =
                  snapshot n1 ref (ElabType (LocatedT MemoryLoc (StructT (AstId id)))) in
                let (saved, ref') = captured in
+               ensure (loc = MemoryLoc) (info.node_id, "write to calldata")
                (case source_struct_field ctx.structs id member_id of
                   SOME fty =>
                     let ety = element_type MemoryLoc fty in
@@ -3966,7 +3968,7 @@ val () = cv_auto_trans elab_struct_layouts_def;
 val () = cv_auto_trans memory_binding_ok_def;
 val () = cv_auto_trans abi_binding_ok_def;
 val () = cv_auto_trans copy_target_ok_def;
-val () = cv_auto_trans memory_struct_root_def;
+val () = cv_auto_trans struct_root_def;
 val () = cv_auto_trans struct_field_types_def;
 val () = cv_auto_trans field_values_def;
 val () = cv_auto_trans field_writes_def;

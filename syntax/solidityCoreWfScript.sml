@@ -790,9 +790,9 @@ Definition wf_core_operation_def:
     | NONE => F) ∧
   (wf_core_operation env ctx annotation (ReadOperation ty a) ⇔
     (case ty of
-       LocatedT MemoryLoc ty' =>
-         annotation = SingleType ty ∧ located_type_ok env MemoryLoc ty' ∧
-         wf_core_atom env ctx (ReferenceType ty) a
+       LocatedT loc ty' =>
+         loc ≠ StorageLoc ∧ annotation = SingleType ty ∧
+         located_type_ok env loc ty' ∧ wf_core_atom env ctx (ReferenceType ty) a
      | _ =>
        if located_type_ok env StorageLoc ty then
          annotation = SingleType (LocatedT StorageLoc ty) ∧
@@ -803,18 +803,20 @@ Definition wf_core_operation_def:
          annotation = SingleType ty ∧ core_scalar_type env ty ∧
          IS_SOME (storage_bytes ty) ∧
          wf_core_atom env ctx (ReferenceType ty) a)) ∧
-  (* A field of a storage struct, or of a memory struct as its element type. *)
+  (* A field of a storage struct, or of a memory or calldata struct as its
+   * element type there. *)
   (wf_core_operation env ctx annotation
      (NavigateOperation ty base (FieldNavigation field)) ⇔
     annotation = ReferenceType ty ∧
     case base of
       BoundAtom x =>
         (case ALOOKUP ctx.bindings x of
-           SOME (SingleType (LocatedT MemoryLoc (StructT id))) =>
+           SOME (SingleType (LocatedT loc (StructT id))) =>
              (case lookup_struct env id of
                 SOME fields =>
                   (case ALOOKUP fields field of
-                     SOME fty => ty = element_type MemoryLoc fty
+                     SOME fty =>
+                       ty = if loc = StorageLoc then fty else element_type loc fty
                    | NONE => F)
               | NONE => F)
          | b =>
