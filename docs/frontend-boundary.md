@@ -779,9 +779,12 @@ annotations, at the node whose type it computes:
   modifier bodies make no super call, and modifier arguments see the
   function's parameters but not its return variables;
 - a fallback takes no parameters and returns nothing, as the core's does;
-- `delete` captures a scalar destination once and writes its default value,
-  preserving neighboring packed storage. Aggregate deletion is rejected;
-  every scalar result is annotated with its own type, and every other
+- `delete` captures its destination once. Scalar resets preserve neighboring
+  packed storage; storage objects clear their contents while preserving mapping
+  members. Memory references are rebound to their zero value, leaving aliases
+  to the previous object intact. Calldata, local storage pointers and direct
+  mapping deletion are rejected;
+- every scalar result is annotated with its own type, and every other
   annotation decodes to an elementary, rational literal or tuple type.
 
 Left to the compiler: supplied storage layout calculation, that view functions
