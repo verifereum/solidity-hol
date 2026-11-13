@@ -121,9 +121,9 @@ End
  * fields, a word per field, as a constructor allocates it before converting
  * and writing each field. ArrayIndexOperation a i: element i of fixed bytes,
  * or a located byte sequence or array a. CopyToMemoryOperation a: a new memory
- * copy of the calldata or storage array or struct a. Keccak256Operation a: the
- * Keccak-256 hash of the memory byte sequence a, as bytes32. EcrecoverOperation
- * h v r s: ecrecover(h, v, r,
+ * copy of the calldata or storage object a.
+ * Keccak256Operation a: the Keccak-256 hash of the memory byte sequence a, as
+ * bytes32. EcrecoverOperation h v r s: ecrecover(h, v, r,
  * s), the address the signature (v, r, s) of the bytes32 hash h recovers, or
  * address(0) if it is invalid; v is a uint8 and r and s are bytes32.
  * AbiDecodeOperation types a: abi.decode(a, (types)) of the memory bytes a

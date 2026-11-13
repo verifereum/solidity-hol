@@ -920,9 +920,9 @@ Definition simple_stmt_def:
              (case copy_calldata_array env st.frame.call_data rty data n
                      (memory_free_pointer st) of
                 INL v =>
-                  (case materialize_value env rty v st of
+                  (case materialize_value env CalldataLoc rty v st of
                      SOME (v', st') => normal_result (define_binding x ty v' st') gas
-                   | NONE => abrupt_result (InvalidCompletion "bad calldata array copy") st gas)
+                   | NONE => abrupt_result (InvalidCompletion "bad calldata object copy") st gas)
               | INR c => abrupt_result c st gas)
          | SOME (ReferenceValue (StorageReference PersistentStorage addr slot 0 rty _)) =>
              (case storage_array_value env (LENGTH env.type_declarations)
@@ -931,11 +931,11 @@ Definition simple_stmt_def:
                   if 2 ** 64 ≤ memory_free_pointer st + memory_value_size env rty v then
                     abrupt_result (PanicCompletion 65) st gas
                   else
-                    (case materialize_value env rty v st of
+                    (case materialize_value env StorageLoc rty v st of
                        SOME (v', st') => normal_result (define_binding x ty v' st') gas
-                     | NONE => abrupt_result (InvalidCompletion "bad storage array copy") st gas)
+                     | NONE => abrupt_result (InvalidCompletion "bad storage object copy") st gas)
               | INR c => abrupt_result c st gas)
-         | _ => abrupt_result (InvalidCompletion "bad array copy") st gas)
+         | _ => abrupt_result (InvalidCompletion "bad object copy") st gas)
     (* Decoded memory values are allocated, as external call results are. *)
     | DefineStmt x ty (AbiDecodeOperation tys a) =>
         (case eval_atom st.scopes a of

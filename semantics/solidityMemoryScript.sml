@@ -82,19 +82,7 @@ Definition navigate_memory_byte_def:
     | _ => ValueAbrupt (InvalidCompletion "bad memory byte array")
 End
 
-Definition copy_memory_bytes_def:
-  copy_memory_bytes src dst (st : source_state) =
-    case (reference_bytes st src, dst) of
-      (SOME bs, MemoryReference (HeapId id) 0 ty) =>
-        (case FLOOKUP st.heap id of
-           SOME obj =>
-             if byte_sequence_type ty ∧ byte_sequence_type obj.object_type ∧
-                obj.object_length = LENGTH bs then
-               SOME (st with heap := st.heap |+ (id, obj with object_cells := byte_cells bs))
-             else NONE
-         | NONE => NONE)
-    | _ => NONE
-End
+
 
 (* Memory arrays: an object of type ArrayT element length holds one cell per
  * element, a value or a pointer to another object, as the compiler's memory
@@ -423,19 +411,7 @@ Definition copy_byte_contents_def:
            | INL bs => case store_storage_bytes st.world.accounts dst bs st.frame.static_context of
                INL accounts => INL (st with world := st.world with accounts := accounts)
              | INR c => INR c)
-    | _ =>
-      (* The compiler's calldata-to-memory conversion reverts when the data,
-       * added as a word, ends past the calldata; its other readers pad. *)
-      if (case src of
-            CalldataReference offset length _ =>
-              LENGTH st.frame.call_data < (offset + length) MOD 2 ** 256
-          | _ => F)
-      then INR (RevertCompletion []) else
-      (case byte_contents st src of
-        INR c => INR c
-      | INL bs => case copy_memory_bytes src dst st of
-          SOME st' => INL st'
-        | NONE => INR (InvalidCompletion "bad memory byte copy"))
+    | _ => INR (InvalidCompletion "bad storage byte copy")
 End
 
 (* Reference conversion preserves identity and location; copying is a statement. *)
@@ -466,7 +442,7 @@ val () = cv_auto_trans heap_bytes_def;
 val () = cv_auto_trans memory_bytes_def;
 val () = cv_auto_trans reference_bytes_def;
 val () = cv_auto_trans navigate_memory_byte_def;
-val () = cv_auto_trans copy_memory_bytes_def;
+
 
 val () = cv_auto_trans default_elementary_def;
 val () = cv_auto_trans memory_cell_def;

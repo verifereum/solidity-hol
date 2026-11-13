@@ -749,28 +749,8 @@ fun is_base_member v =
   not (is_library_member v)
 
 fun is_attached v =
-  String.isSubstring "$attached_to$"
+  String.isSubstring "_$attached_to$_"
     (string_field (field v "typeDescriptions") "typeIdentifier")
-
-(* Whether x.f converts x from storage or calldata to memory. *)
-fun copies_receiver v =
-  let
-    val receiver =
-      string_field (field (field v "expression") "typeDescriptions") "typeIdentifier"
-    val f =
-      case List.find (fn (i, _) => i = int_field v "referencedDeclaration")
-             (!library_members) of
-        SOME (_, f) => f
-      | NONE => fail (describe v ^ ": unknown library member")
-    val parameter =
-      case JSONUtil.arrayMap I (field (field f "parameters") "parameters") of
-        p :: _ => string_field (field p "typeDescriptions") "typeIdentifier"
-      | [] => fail (describe v ^ ": an attached function takes a parameter")
-  in
-    (List.exists (fn l => String.isSuffix l receiver)
-       ["_storage", "_storage_ptr", "_calldata", "_calldata_ptr"]) andalso
-    String.isSuffix "_memory_ptr" parameter
-  end
 
 (* Expressions *)
 
@@ -1132,13 +1112,9 @@ fun expr v = guarded (fn e => [ExprChild e]) unsupported_expr (fn v => within v 
                    argument_order v r 0, type_id v]
               end
             else if is_library_member callee andalso is_attached callee then
-              (* x.f(args) calls f with x as its first argument; the compiler
-               * converts x before evaluating args, and elaboration after, so
-               * a conversion that copies x (from storage or calldata to
-               * memory) is not supported *)
+              (* The attached type annotation retains the receiver's early
+               * evaluation/conversion schedule after it becomes argument 0. *)
               let val receiver = expr (field callee "expression") in
-                require v (not (copies_receiver callee))
-                  "a bound call copying its receiver to memory is not supported";
                 con "SrcFunctionCall"
                   [info v,
                    con "SrcIdentifier"
