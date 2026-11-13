@@ -11,6 +11,7 @@ Ancestors solidityDifferential solidityDirtyBitsBytecodeTest
   solidityDifferentialCorpus_enums
   solidityDifferentialCorpus_dirty_bits
   solidityDifferentialCorpus_udvt
+  solidityDifferentialCorpus_memory_structs
   solidityDifferentialCorpus_assembly_calldata
   solidityDifferentialCorpus_typed_catches
 Libs solidityBytecodeLib cv_transLib wordsLib
@@ -23,6 +24,7 @@ val () = holbuild_extra_deps [
   "../testdata/differential/fail_closed/enums.json",
   "../testdata/differential/fail_closed/dirty_bits.json",
   "../testdata/differential/fail_closed/udvt.json",
+  "../testdata/differential/fail_closed/memory_structs.json",
   "../testdata/differential/fail_closed/assembly_calldata.json",
   "../testdata/differential/fail_closed/typed_catches.json"
 ]
@@ -257,6 +259,15 @@ Theorem reject_udvt_wrap_cleans_underlying_bits:
   source_execution bytecode_rejected_udvt_code
     corpus_udvt_unit corpus_udvt_program 1000
     ^(rejected_case "udvt" "wrap_cleans_underlying_bits") =
+  (Diagnostic InvalidCompletion, NONE, [])
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem reject_memory_structs_paint_copy_byte_out_of_range_panics:
+  source_execution bytecode_rejected_memory_structs_code
+    corpus_memory_structs_unit corpus_memory_structs_program 1000
+    ^(rejected_case "memory_structs" "paint_copy_byte_out_of_range_panics") =
   (Diagnostic InvalidCompletion, NONE, [])
 Proof
   CONV_TAC cv_eval

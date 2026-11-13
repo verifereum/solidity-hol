@@ -86,8 +86,8 @@ Datatype:
 End
 
 (* BindTarget includes local variables and temporaries. ReferenceFieldTarget
- * is an element of a memory array (its heap object, index and element type):
- * a write stores a scalar or rebinds a reference, never copies contents.
+ * is an element of a memory array or a field of a memory struct (its heap
+ * object, cell index and type): a write stores a scalar or rebinds a reference, never copies contents.
  *)
 Datatype:
   captured_target
@@ -117,10 +117,13 @@ End
 
 (* DefaultMemoryOperation ty: the default value of a memory variable of type
  * ty. AllocateMemoryOperation ty n: new ty(n), a zeroed byte sequence or
- * dynamic array of length n. ArrayIndexOperation a i: element i of fixed bytes,
+ * dynamic array of length n; for a struct type, a new memory struct of n
+ * fields, a word per field, as a constructor allocates it before converting
+ * and writing each field. ArrayIndexOperation a i: element i of fixed bytes,
  * or a located byte sequence or array a. CopyToMemoryOperation a: a new memory
- * copy of the calldata array a. Keccak256Operation a: the Keccak-256 hash of the memory
- * byte sequence a, as bytes32. EcrecoverOperation h v r s: ecrecover(h, v, r,
+ * copy of the calldata or storage array or struct a. Keccak256Operation a: the
+ * Keccak-256 hash of the memory byte sequence a, as bytes32. EcrecoverOperation
+ * h v r s: ecrecover(h, v, r,
  * s), the address the signature (v, r, s) of the bytes32 hash h recovers, or
  * address(0) if it is invalid; v is a uint8 and r and s are bytes32.
  * AbiDecodeOperation types a: abi.decode(a, (types)) of the memory bytes a
