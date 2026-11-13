@@ -344,6 +344,22 @@ fun address_type_name v =
 
 (* Type names *)
 
+(* The length of a fixed array type, a positive integer constant. *)
+fun array_dimension v length =
+  let
+    val dimension =
+      case String.fields (fn c => c = #"_")
+             (string_field (field length "typeDescriptions") "typeIdentifier") of
+        ["t", "rational", n, "by", "1"] =>
+          if size n > 0 andalso CharVector.all Char.isDigit n
+          then IntInf.fromString n else NONE
+      | _ => NONE
+  in
+    case dimension of
+      SOME n => if n > 0 then n else fail "nonpositive array length"
+    | NONE => fail (describe v ^ ": array length is not a positive integer constant")
+  end
+
 fun type_name v = guarded (fn _ => []) unsupported_type_name (fn v => within v (fn v =>
   case node_type v of
     "UserDefinedTypeName" =>
@@ -384,21 +400,9 @@ fun type_name v = guarded (fn _ => []) unsupported_type_name (fn v => within v (
   | "ArrayTypeName" =>
       (case optional_field v "length" of
          NONE => con "SrcDynamicArrayTypeName" [info v, type_name (field v "baseType")]
-       | SOME length => let
-        val base = type_name (field v "baseType")
-        val dimension =
-          case String.fields (fn c => c = #"_")
-                 (string_field (field length "typeDescriptions") "typeIdentifier") of
-            ["t", "rational", n, "by", "1"] =>
-              if size n > 0 andalso CharVector.all Char.isDigit n
-              then IntInf.fromString n else NONE
-          | _ => NONE
-        val n = case dimension of
-                  SOME n => if n > 0 then n else fail "nonpositive array length"
-                | NONE => fail (describe v ^ ": array length is not a positive integer constant")
-      in
-        con "SrcArrayTypeName" [info v, base, mk_num n]
-      end)
+       | SOME length =>
+           con "SrcArrayTypeName"
+             [info v, type_name (field v "baseType"), mk_num (array_dimension v length)])
   | "FunctionTypeName" =>
       (require v (string_field v "visibility" = "internal")
          "external function types are not supported";
@@ -1245,17 +1249,39 @@ and abi_decode_call v callee args =
           then JSONUtil.arrayMap I (field types "components")
           else [types]
       | _ => fail (describe v ^ ": abi.decode takes data and a list of types")
+    (* A type written as an expression: an elementary type, a struct, enum or
+     * user-defined value type name, or an array of one. *)
     fun decoded_type c =
       case c of
         JSON.NULL => NONE
-      | _ => if node_type c = "ElementaryTypeNameExpression"
-             then SOME (type_name (field c "typeName"))
-             else Option.map (fn (_, ty) => type_name (type_at c ty))
-                    (value_type_expression c)
+      | _ =>
+        case node_type c of
+          "ElementaryTypeNameExpression" => SOME (type_name (field c "typeName"))
+        | "IndexAccess" =>
+            Option.map (fn base =>
+                case optional_field c "indexExpression" of
+                  NONE => con "SrcDynamicArrayTypeName" [info c, base]
+                | SOME length =>
+                    con "SrcArrayTypeName" [info c, base, mk_num (array_dimension c length)])
+              (decoded_type (field c "baseExpression"))
+        | _ =>
+          case value_type_expression c of
+            SOME (_, ty) => SOME (type_name (type_at c ty))
+          | NONE =>
+            let val tid = raw_type_id c in
+              if String.isPrefix "t_type$_t_struct$_" tid then
+                SOME (con "SrcStructTypeName"
+                        [info c, mk_num (int_field c "referencedDeclaration"),
+                         mk_str (String.substring (tid, 8, size tid - 10))])
+              else if String.isPrefix "t_type$_t_enum$_" tid then
+                SOME (con "SrcEnumTypeName"
+                        [info c, mk_num (int_field c "referencedDeclaration")])
+              else NONE
+            end
     val types = map decoded_type components
   in
     require v (List.all isSome types)
-      "abi.decode of a non-elementary type is not supported";
+      "abi.decode of this type is not supported";
     con "SrcAbiDecode"
       [info v, info callee, hd args,
        listSyntax.mk_list (map valOf types, type_name_ty), type_id v]
@@ -2132,9 +2158,25 @@ fun contract external_structs contracts declared v = within v (fn v =>
                 then []
                 else List.filter (fn m => node_type m = "StructDefinition") (nodes c))
            declared)
+    (* The signatures of the functions, events and errors of other contracts
+     * that the code names: a struct may appear only in a call's parameter
+     * or return types. *)
+    val named = List.concat (map references (bases @ used_members))
+    val signature_ids =
+      List.concat (List.mapPartial
+        (fn (id, d) =>
+           if List.exists (fn i => i = id) named andalso
+              List.exists (fn k => k = node_type d)
+                ["FunctionDefinition", "EventDefinition", "ErrorDefinition"]
+           then SOME (references (field d "parameters") @
+                      (case optional_field d "returnParameters" of
+                         SOME r => references r
+                       | NONE => []))
+           else NONE)
+        (!selector_declarations))
     fun used picked =
       let
-        val ids = List.concat (map references (bases @ used_members @ picked))
+        val ids = signature_ids @ List.concat (map references (bases @ used_members @ picked))
         val picked' =
           List.filter (fn s => List.exists (fn i => i = int_field s "id") ids)
             (external_structs @ library_structs)
