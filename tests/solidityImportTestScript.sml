@@ -121,6 +121,23 @@ Proof
   EVAL_TAC
 QED
 
+Theorem array_identifier_locations:
+  decode_type_identifier "t_tuple$_t_array$_t_enum_37_$dyn_storage_$_t_rational_7_by_1_$" =
+    SOME (SrcTupleType [ArrayT (EnumT (AstId 37)) NONE; UintT 256]) ∧
+  decode_type_identifier "t_array$_t_enum_37_$dyn_memory_ptr" =
+    SOME (SrcType (LocatedT MemoryLoc (ArrayT (EnumT (AstId 37)) NONE))) ∧
+  decode_type_identifier "t_array$_t_bytes_storage_$dyn_memory_ptr" = NONE ∧
+  decode_type_identifier "t_array$_t_string_storage_$dyn_calldata_ptr" = NONE ∧
+  decode_type_identifier "t_array$_t_struct$_S_$1_storage_$dyn_memory_ptr" = NONE ∧
+  decode_type_identifier "t_array$_t_bytes_storage_ptr_$dyn_storage" = NONE ∧
+  decode_type_identifier "t_array$_t_struct$_S_$1_storage_ptr_$dyn_storage" = NONE ∧
+  decode_type_identifier "t_array$_t_bytes_$dyn_storage" = NONE ∧
+  decode_type_identifier "t_array$_t_string_$dyn_storage" = NONE ∧
+  decode_type_identifier "t_array$_t_enum_37_$dyn_calldata_ptr" = NONE
+Proof
+  EVAL_TAC
+QED
+
 (* Negative fixtures: the fixture's AST with one edit to the first node, in
  * document order, of a given nodeType.
  *)

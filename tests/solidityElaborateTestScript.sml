@@ -788,3 +788,11 @@ Theorem address_literal_bounds_checked:
 Proof
   EVAL_TAC
 QED
+
+Theorem delete_readonly_and_storage_pointer_fail_in_elaboration:
+  EVERY (λty. ISR (finish_delete ctx 1 [] (LocalDestination 2 ty) 3))
+    [LocatedT CalldataLoc BytesT; LocatedT StorageLoc BytesT;
+     MappingT (UintT 256) (UintT 256)]
+Proof
+  EVAL_TAC
+QED

@@ -14,7 +14,7 @@ Ancestors
   externalCall solidityMemory solidityEvaluator solidityABI solidityEntry solidityEvaluatorProps solidityEvaluatorTest
   solidityCoreProgramsTest solidityImport solidityImportTest
   solidityElaborate solidityElaborateTest solidityPrepareTest solidityPartialTest
-  solidityDifferential
+  solidityDifferential solidityDifferentialCorpus_zero_reset
   solidityDifferentialCorpus solidityDifferentialTest solidityDirtyBitsTest
   yulAST yulDialect yulState yulEvaluator yulEvaluatorProps yulEvaluatorTest
   yulImportTest yulContractTest yulConvTest yulDifferential yulDifferentialTest
