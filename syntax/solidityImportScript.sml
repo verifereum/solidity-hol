@@ -644,15 +644,8 @@ Definition decode_base_identifier_def:
     else if s = "t_string_calldata_ptr" then SOME (LocatedT CalldataLoc StringT)
     else if s = "t_bytes_storage_ptr" then SOME (LocatedT StorageLoc BytesT)
     else if s = "t_string_storage_ptr" then SOME (LocatedT StorageLoc StringT)
-    else if s = "t_address_payable" then SOME (AddressT PayableAddress)
-    else if isPREFIX "t_enum_" s then
-      OPTION_MAP (λid. EnumT (AstId id)) (fromDecString (DROP 7 s))
     else if isPREFIX "t_struct$_" s then decode_struct_identifier s
-    else if isPREFIX "t_" s ∧ s ≠ "t_uint" ∧ s ≠ "t_int" then
-      case elementary_type (DROP 2 s) of
-        SOME ty => if is_elementary_type ty then SOME ty else NONE
-      | NONE => NONE
-    else NONE
+    else scalar_type_identifier s
 End
 
 (* Array bases carry their location only for reference types. Storage uses
@@ -877,7 +870,7 @@ Theorem decode_elementary_identifier_valid:
   decode_elementary_identifier s = SOME ty ⇒ valid_type_shape ty
 Proof
   rw[decode_elementary_identifier_def, decode_base_identifier_def,
-     decode_located_array_def, AllCaseEqs()] >>
+     scalar_type_identifier_def, decode_located_array_def, AllCaseEqs()] >>
   imp_res_tac elementary_type_valid >>
   imp_res_tac decode_struct_identifier_valid >>
   gvs[valid_type_shape_def, outer_location_free_def, location_shape_ok_def,

@@ -66,8 +66,10 @@ Proof
 QED
 
 Theorem enum_array_location_boundary:
-  (∀length. ¬located_value_type (LocatedT MemoryLoc (ArrayT (EnumT (AstId 5)) length))) ∧
+  (∀length. located_value_type (LocatedT MemoryLoc (ArrayT (EnumT (AstId 5)) length)) ⇔
+            valid_array_length length) ∧
   (∀length. ¬located_value_type (LocatedT CalldataLoc (ArrayT (EnumT (AstId 5)) length)))
 Proof
-  simp[located_value_type_def, located_object_shape_def, byte_sequence_type_def]
+  simp[located_value_type_def, located_object_shape_def, byte_sequence_type_def,
+       is_stored_scalar_type_def, is_elementary_type_def, valid_type_shape_def]
 QED
