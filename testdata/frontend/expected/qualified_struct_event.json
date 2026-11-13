@@ -38,24 +38,31 @@
       "viaIR": true
     },
     "sources": {
-      "testdata/frontend/qualified_unsupported_event.sol": {
-        "content": "// SPDX-License-Identifier: UNLICENSED\npragma solidity 0.8.37;\n\nlibrary UnsupportedEvents {\n    event Payload(function () external pure returns (uint256) item);\n}\n\ncontract QualifiedUnsupportedEvent {\n    function supported() external pure returns (uint256) {\n        return 7;\n    }\n\n    function emitsUnsupported() external {\n        emit UnsupportedEvents.Payload(this.supported);\n    }\n}\n"
+      "testdata/frontend/qualified_struct_event.sol": {
+        "content": "// SPDX-License-Identifier: UNLICENSED\npragma solidity 0.8.37;\n\nstruct EventPayload {\n    uint256 value;\n}\n\nlibrary StructEvents {\n    event Payload(EventPayload item);\n}\n\ncontract QualifiedStructEvent {\n    function supported() external pure returns (uint256) {\n        return 7;\n    }\n\n    function emitsPayload() external {\n        emit StructEvents.Payload(EventPayload(1));\n    }\n}\n"
       }
     }
   },
   "output": {
     "contracts": {
-      "testdata/frontend/qualified_unsupported_event.sol": {
-        "QualifiedUnsupportedEvent": {
+      "testdata/frontend/qualified_struct_event.sol": {
+        "QualifiedStructEvent": {
           "abi": [
             {
               "anonymous": false,
               "inputs": [
                 {
+                  "components": [
+                    {
+                      "internalType": "uint256",
+                      "name": "value",
+                      "type": "uint256"
+                    }
+                  ],
                   "indexed": false,
-                  "internalType": "function () pure external returns (uint256)",
+                  "internalType": "struct EventPayload",
                   "name": "item",
-                  "type": "function"
+                  "type": "tuple"
                 }
               ],
               "name": "Payload",
@@ -63,7 +70,7 @@
             },
             {
               "inputs": [],
-              "name": "emitsUnsupported",
+              "name": "emitsPayload",
               "outputs": [],
               "stateMutability": "nonpayable",
               "type": "function"
@@ -84,14 +91,14 @@
           ],
           "evm": {
             "bytecode": {
-              "object": "608060405234601c57600e6020565b61021161002b823961021190f35b6026565b60405190565b5f80fdfe60806040526004361015610013575b6100f1565b61001d5f3561003c565b8063c9ae24d6146100375763f93908f20361000e576100be565b610084565b60e01c90565b60405190565b5f80fd5b5f80fd5b5f91031261005a57565b61004c565b90565b61006b9061005f565b9052565b9190610082905f60208501940190610062565b565b346100b457610094366004610050565b6100b061009f61011b565b6100a7610042565b9182918261006f565b0390f35b610048565b5f0190565b346100ec576100ce366004610050565b6100d66101c8565b6100de610042565b806100e8816100b9565b0390f35b610048565b5f80fd5b5f90565b90565b90565b61011361010e610118926100f9565b6100fc565b61005f565b90565b6101236100f5565b5061012e60076100ff565b90565b60018060a01b031690565b61015061014b61015592610131565b6100fc565b610131565b90565b6101619061013c565b90565b61016d90610158565b90565b60201b90565b60401b90565b61018f63ffffffff610195931691610170565b17610176565b90565b91565b6101ae916101a891610198565b9061017c565b9052565b9291906101c6915f6020860195019161019b565b565b6101d130610164565b63c9ae24d67facb95d89b4119c4e17ecd69881fc78b7f39abd2b35336b8a1f9b9cfc84c05ee39161020c610203610042565b928392836101b2565b0390a156"
+              "object": "608060405234601c57600e6020565b61025561002b823961025590f35b6026565b60405190565b5f80fdfe60806040526004361015610013575b6100f1565b61001d5f3561003c565b8063a6232e34146100375763c9ae24d60361000e576100bc565b610064565b60e01c90565b60405190565b5f80fd5b5f80fd5b5f91031261005a57565b61004c565b5f0190565b3461009257610074366004610050565b61007c6101c3565b610084610042565b8061008e8161005f565b0390f35b610048565b90565b6100a390610097565b9052565b91906100ba905f6020850194019061009a565b565b346100ec576100cc366004610050565b6100e86100d761023f565b6100df610042565b918291826100a7565b0390f35b610048565b5f80fd5b601f801991011690565b634e487b7160e01b5f52604160045260245ffd5b9061011d906100f5565b810190811067ffffffffffffffff82111761013757604052565b6100ff565b9061014f610148610042565b9283610113565b565b61015b602061013c565b90565b90565b90565b61017861017361017d9261015e565b610161565b610097565b90565b9061018a90610097565b9052565b61019790610097565b9052565b905f806101ac93015191019061018e565b565b91906101c1905f6020850194019061019b565b565b60016101e16101d96101d3610151565b92610164565b5f8301610180565b6102177ffc43e25e3c987cf9925240eca30b3e69459f834a3f5fbd18a1a0644da08ab4d09161020e610042565b918291826101ae565b0390a1565b5f90565b90565b61023761023261023c92610220565b610161565b610097565b90565b61024761021c565b506102526007610223565b9056"
             },
             "deployedBytecode": {
               "immutableReferences": {},
-              "object": "60806040526004361015610013575b6100f1565b61001d5f3561003c565b8063c9ae24d6146100375763f93908f20361000e576100be565b610084565b60e01c90565b60405190565b5f80fd5b5f80fd5b5f91031261005a57565b61004c565b90565b61006b9061005f565b9052565b9190610082905f60208501940190610062565b565b346100b457610094366004610050565b6100b061009f61011b565b6100a7610042565b9182918261006f565b0390f35b610048565b5f0190565b346100ec576100ce366004610050565b6100d66101c8565b6100de610042565b806100e8816100b9565b0390f35b610048565b5f80fd5b5f90565b90565b90565b61011361010e610118926100f9565b6100fc565b61005f565b90565b6101236100f5565b5061012e60076100ff565b90565b60018060a01b031690565b61015061014b61015592610131565b6100fc565b610131565b90565b6101619061013c565b90565b61016d90610158565b90565b60201b90565b60401b90565b61018f63ffffffff610195931691610170565b17610176565b90565b91565b6101ae916101a891610198565b9061017c565b9052565b9291906101c6915f6020860195019161019b565b565b6101d130610164565b63c9ae24d67facb95d89b4119c4e17ecd69881fc78b7f39abd2b35336b8a1f9b9cfc84c05ee39161020c610203610042565b928392836101b2565b0390a156"
+              "object": "60806040526004361015610013575b6100f1565b61001d5f3561003c565b8063a6232e34146100375763c9ae24d60361000e576100bc565b610064565b60e01c90565b60405190565b5f80fd5b5f80fd5b5f91031261005a57565b61004c565b5f0190565b3461009257610074366004610050565b61007c6101c3565b610084610042565b8061008e8161005f565b0390f35b610048565b90565b6100a390610097565b9052565b91906100ba905f6020850194019061009a565b565b346100ec576100cc366004610050565b6100e86100d761023f565b6100df610042565b918291826100a7565b0390f35b610048565b5f80fd5b601f801991011690565b634e487b7160e01b5f52604160045260245ffd5b9061011d906100f5565b810190811067ffffffffffffffff82111761013757604052565b6100ff565b9061014f610148610042565b9283610113565b565b61015b602061013c565b90565b90565b90565b61017861017361017d9261015e565b610161565b610097565b90565b9061018a90610097565b9052565b61019790610097565b9052565b905f806101ac93015191019061018e565b565b91906101c1905f6020850194019061019b565b565b60016101e16101d96101d3610151565b92610164565b5f8301610180565b6102177ffc43e25e3c987cf9925240eca30b3e69459f834a3f5fbd18a1a0644da08ab4d09161020e610042565b918291826101ae565b0390a1565b5f90565b90565b61023761023261023c92610220565b610161565b610097565b90565b61024761021c565b506102526007610223565b9056"
             },
             "methodIdentifiers": {
-              "emitsUnsupported()": "f93908f2",
+              "emitsPayload()": "a6232e34",
               "supported()": "c9ae24d6"
             }
           },
@@ -104,16 +111,23 @@
             "types": null
           }
         },
-        "UnsupportedEvents": {
+        "StructEvents": {
           "abi": [
             {
               "anonymous": false,
               "inputs": [
                 {
+                  "components": [
+                    {
+                      "internalType": "uint256",
+                      "name": "value",
+                      "type": "uint256"
+                    }
+                  ],
                   "indexed": false,
-                  "internalType": "function () pure external returns (uint256)",
+                  "internalType": "struct EventPayload",
                   "name": "item",
-                  "type": "function"
+                  "type": "tuple"
                 }
               ],
               "name": "Payload",
@@ -142,18 +156,21 @@
       }
     },
     "sources": {
-      "testdata/frontend/qualified_unsupported_event.sol": {
+      "testdata/frontend/qualified_struct_event.sol": {
         "ast": {
-          "absolutePath": "testdata/frontend/qualified_unsupported_event.sol",
+          "absolutePath": "testdata/frontend/qualified_struct_event.sol",
           "exportedSymbols": {
-            "QualifiedUnsupportedEvent": [
-              30
+            "EventPayload": [
+              4
             ],
-            "UnsupportedEvents": [
+            "QualifiedStructEvent": [
+              31
+            ],
+            "StructEvents": [
               10
             ]
           },
-          "id": 31,
+          "id": 32,
           "license": "UNLICENSED",
           "nodeType": "SourceUnit",
           "nodes": [
@@ -168,9 +185,48 @@
               "src": "39:23:0"
             },
             {
+              "canonicalName": "EventPayload",
+              "id": 4,
+              "members": [
+                {
+                  "constant": false,
+                  "id": 3,
+                  "mutability": "mutable",
+                  "name": "value",
+                  "nameLocation": "98:5:0",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 4,
+                  "src": "90:13:0",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_uint256",
+                    "typeString": "uint256"
+                  },
+                  "typeName": {
+                    "id": 2,
+                    "name": "uint256",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "90:7:0",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_uint256",
+                      "typeString": "uint256"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "name": "EventPayload",
+              "nameLocation": "71:12:0",
+              "nodeType": "StructDefinition",
+              "scope": 32,
+              "src": "64:42:0",
+              "visibility": "public"
+            },
+            {
               "abstract": false,
               "baseContracts": [],
-              "canonicalName": "UnsupportedEvents",
+              "canonicalName": "StructEvents",
               "contractDependencies": [],
               "contractKind": "library",
               "fullyImplemented": true,
@@ -178,16 +234,16 @@
               "linearizedBaseContracts": [
                 10
               ],
-              "name": "UnsupportedEvents",
-              "nameLocation": "72:17:0",
+              "name": "StructEvents",
+              "nameLocation": "116:12:0",
               "nodeType": "ContractDefinition",
               "nodes": [
                 {
                   "anonymous": false,
-                  "eventSelector": "acb95d89b4119c4e17ecd69881fc78b7f39abd2b35336b8a1f9b9cfc84c05ee3",
+                  "eventSelector": "fc43e25e3c987cf9925240eca30b3e69459f834a3f5fbd18a1a0644da08ab4d0",
                   "id": 9,
                   "name": "Payload",
-                  "nameLocation": "102:7:0",
+                  "nameLocation": "141:7:0",
                   "nodeType": "EventDefinition",
                   "parameters": {
                     "id": 8,
@@ -199,78 +255,46 @@
                         "indexed": false,
                         "mutability": "mutable",
                         "name": "item",
-                        "nameLocation": "154:4:0",
+                        "nameLocation": "162:4:0",
                         "nodeType": "VariableDeclaration",
                         "scope": 9,
-                        "src": "110:48:0",
+                        "src": "149:17:0",
                         "stateVariable": false,
                         "storageLocation": "default",
                         "typeDescriptions": {
-                          "typeIdentifier": "t_function_external_pure$__$returns$_t_uint256_$",
-                          "typeString": "function () pure external returns (uint256)"
+                          "typeIdentifier": "t_struct$_EventPayload_$4_memory_ptr",
+                          "typeString": "struct EventPayload"
                         },
                         "typeName": {
                           "id": 6,
-                          "nodeType": "FunctionTypeName",
-                          "parameterTypes": {
-                            "id": 2,
-                            "nodeType": "ParameterList",
-                            "parameters": [],
-                            "src": "119:2:0"
-                          },
-                          "returnParameterTypes": {
+                          "nodeType": "UserDefinedTypeName",
+                          "pathNode": {
                             "id": 5,
-                            "nodeType": "ParameterList",
-                            "parameters": [
-                              {
-                                "constant": false,
-                                "id": 4,
-                                "indexed": false,
-                                "mutability": "mutable",
-                                "name": "",
-                                "nameLocation": "-1:-1:-1",
-                                "nodeType": "VariableDeclaration",
-                                "scope": 6,
-                                "src": "145:7:0",
-                                "stateVariable": false,
-                                "storageLocation": "default",
-                                "typeDescriptions": {
-                                  "typeIdentifier": "t_uint256",
-                                  "typeString": "uint256"
-                                },
-                                "typeName": {
-                                  "id": 3,
-                                  "name": "uint256",
-                                  "nodeType": "ElementaryTypeName",
-                                  "src": "145:7:0",
-                                  "typeDescriptions": {
-                                    "typeIdentifier": "t_uint256",
-                                    "typeString": "uint256"
-                                  }
-                                },
-                                "visibility": "internal"
-                              }
+                            "name": "EventPayload",
+                            "nameLocations": [
+                              "149:12:0"
                             ],
-                            "src": "144:9:0"
+                            "nodeType": "IdentifierPath",
+                            "referencedDeclaration": 4,
+                            "src": "149:12:0"
                           },
-                          "src": "110:48:0",
-                          "stateMutability": "pure",
+                          "referencedDeclaration": 4,
+                          "src": "149:12:0",
                           "typeDescriptions": {
-                            "typeIdentifier": "t_function_external_pure$__$returns$_t_uint256_$",
-                            "typeString": "function () pure external returns (uint256)"
-                          },
-                          "visibility": "external"
+                            "typeIdentifier": "t_struct$_EventPayload_$4_storage_ptr",
+                            "typeString": "struct EventPayload"
+                          }
                         },
                         "visibility": "internal"
                       }
                     ],
-                    "src": "109:50:0"
+                    "src": "148:19:0"
                   },
-                  "src": "96:64:0"
+                  "src": "135:33:0"
                 }
               ],
-              "scope": 31,
-              "src": "64:98:0",
+              "scope": 32,
+              "src": "108:62:0",
               "usedErrors": [],
               "usedEvents": [
                 9
@@ -279,23 +303,23 @@
             {
               "abstract": false,
               "baseContracts": [],
-              "canonicalName": "QualifiedUnsupportedEvent",
+              "canonicalName": "QualifiedStructEvent",
               "contractDependencies": [],
               "contractKind": "contract",
               "fullyImplemented": true,
-              "id": 30,
+              "id": 31,
               "linearizedBaseContracts": [
-                30
+                31
               ],
-              "name": "QualifiedUnsupportedEvent",
-              "nameLocation": "173:25:0",
+              "name": "QualifiedStructEvent",
+              "nameLocation": "181:20:0",
               "nodeType": "ContractDefinition",
               "nodes": [
                 {
                   "body": {
                     "id": 17,
                     "nodeType": "Block",
-                    "src": "258:25:0",
+                    "src": "261:25:0",
                     "statements": [
                       {
                         "expression": {
@@ -307,7 +331,7 @@
                           "kind": "number",
                           "lValueRequested": false,
                           "nodeType": "Literal",
-                          "src": "275:1:0",
+                          "src": "278:1:0",
                           "typeDescriptions": {
                             "typeIdentifier": "t_rational_7_by_1",
                             "typeString": "int_const 7"
@@ -317,7 +341,7 @@
                         "functionReturnParameters": 14,
                         "id": 16,
                         "nodeType": "Return",
-                        "src": "268:8:0"
+                        "src": "271:8:0"
                       }
                     ]
                   },
@@ -327,13 +351,13 @@
                   "kind": "function",
                   "modifiers": [],
                   "name": "supported",
-                  "nameLocation": "214:9:0",
+                  "nameLocation": "217:9:0",
                   "nodeType": "FunctionDefinition",
                   "parameters": {
                     "id": 11,
                     "nodeType": "ParameterList",
                     "parameters": [],
-                    "src": "223:2:0"
+                    "src": "226:2:0"
                   },
                   "returnParameters": {
                     "id": 14,
@@ -347,7 +371,7 @@
                         "nameLocation": "-1:-1:-1",
                         "nodeType": "VariableDeclaration",
                         "scope": 18,
-                        "src": "249:7:0",
+                        "src": "252:7:0",
                         "stateVariable": false,
                         "storageLocation": "default",
                         "typeDescriptions": {
@@ -358,7 +382,7 @@
                           "id": 12,
                           "name": "uint256",
                           "nodeType": "ElementaryTypeName",
-                          "src": "249:7:0",
+                          "src": "252:7:0",
                           "typeDescriptions": {
                             "typeIdentifier": "t_uint256",
                             "typeString": "uint256"
@@ -367,69 +391,94 @@
                         "visibility": "internal"
                       }
                     ],
-                    "src": "248:9:0"
+                    "src": "251:9:0"
                   },
-                  "scope": 30,
-                  "src": "205:78:0",
+                  "scope": 31,
+                  "src": "208:78:0",
                   "stateMutability": "pure",
                   "virtual": false,
                   "visibility": "external"
                 },
                 {
                   "body": {
-                    "id": 28,
+                    "id": 29,
                     "nodeType": "Block",
-                    "src": "326:63:0",
+                    "src": "325:59:0",
                     "statements": [
                       {
                         "eventCall": {
                           "arguments": [
                             {
+                              "arguments": [
+                                {
+                                  "hexValue": "31",
+                                  "id": 25,
+                                  "isConstant": false,
+                                  "isLValue": false,
+                                  "isPure": true,
+                                  "kind": "number",
+                                  "lValueRequested": false,
+                                  "nodeType": "Literal",
+                                  "src": "374:1:0",
+                                  "typeDescriptions": {
+                                    "typeIdentifier": "t_rational_1_by_1",
+                                    "typeString": "int_const 1"
+                                  },
+                                  "value": "1"
+                                }
+                              ],
                               "expression": {
+                                "argumentTypes": [
+                                  {
+                                    "typeIdentifier": "t_rational_1_by_1",
+                                    "typeString": "int_const 1"
+                                  }
+                                ],
                                 "id": 24,
-                                "name": "this",
+                                "name": "EventPayload",
                                 "nodeType": "Identifier",
                                 "overloadedDeclarations": [],
-                                "referencedDeclaration": -28,
-                                "src": "367:4:0",
+                                "referencedDeclaration": 4,
+                                "src": "361:12:0",
                                 "typeDescriptions": {
-                                  "typeIdentifier": "t_contract$_QualifiedUnsupportedEvent_$30",
-                                  "typeString": "contract QualifiedUnsupportedEvent"
+                                  "typeIdentifier": "t_type$_t_struct$_EventPayload_$4_storage_ptr_$",
+                                  "typeString": "type(struct EventPayload storage pointer)"
                                 }
                               },
-                              "id": 25,
+                              "id": 26,
                               "isConstant": false,
                               "isLValue": false,
-                              "isPure": false,
+                              "isPure": true,
+                              "kind": "structConstructorCall",
                               "lValueRequested": false,
-                              "memberLocation": "372:9:0",
-                              "memberName": "supported",
-                              "nodeType": "MemberAccess",
-                              "referencedDeclaration": 18,
-                              "src": "367:14:0",
+                              "nameLocations": [],
+                              "names": [],
+                              "nodeType": "FunctionCall",
+                              "src": "361:15:0",
+                              "tryCall": false,
                               "typeDescriptions": {
-                                "typeIdentifier": "t_function_external_pure$__$returns$_t_uint256_$",
-                                "typeString": "function () pure external returns (uint256)"
+                                "typeIdentifier": "t_struct$_EventPayload_$4_memory_ptr",
+                                "typeString": "struct EventPayload memory"
                               }
                             }
                           ],
                           "expression": {
                             "argumentTypes": [
                               {
-                                "typeIdentifier": "t_function_external_pure$__$returns$_t_uint256_$",
-                                "typeString": "function () pure external returns (uint256)"
+                                "typeIdentifier": "t_struct$_EventPayload_$4_memory_ptr",
+                                "typeString": "struct EventPayload memory"
                               }
                             ],
                             "expression": {
                               "id": 21,
-                              "name": "UnsupportedEvents",
+                              "name": "StructEvents",
                               "nodeType": "Identifier",
                               "overloadedDeclarations": [],
                               "referencedDeclaration": 10,
-                              "src": "341:17:0",
+                              "src": "340:12:0",
                               "typeDescriptions": {
-                                "typeIdentifier": "t_type$_t_contract$_UnsupportedEvents_$10_$",
-                                "typeString": "type(library UnsupportedEvents)"
+                                "typeIdentifier": "t_type$_t_contract$_StructEvents_$10_$",
+                                "typeString": "type(library StructEvents)"
                               }
                             },
                             "id": 23,
@@ -437,17 +486,17 @@
                             "isLValue": false,
                             "isPure": false,
                             "lValueRequested": false,
-                            "memberLocation": "359:7:0",
+                            "memberLocation": "353:7:0",
                             "memberName": "Payload",
                             "nodeType": "MemberAccess",
                             "referencedDeclaration": 9,
-                            "src": "341:25:0",
+                            "src": "340:20:0",
                             "typeDescriptions": {
-                              "typeIdentifier": "t_function_event_nonpayable$_t_function_external_pure$__$returns$_t_uint256_$_$returns$__$",
-                              "typeString": "function (function () pure external returns (uint256))"
+                              "typeIdentifier": "t_function_event_nonpayable$_t_struct$_EventPayload_$4_memory_ptr_$returns$__$",
+                              "typeString": "function (struct EventPayload memory)"
                             }
                           },
-                          "id": 26,
+                          "id": 27,
                           "isConstant": false,
                           "isLValue": false,
                           "isPure": false,
@@ -456,55 +505,55 @@
                           "nameLocations": [],
                           "names": [],
                           "nodeType": "FunctionCall",
-                          "src": "341:41:0",
+                          "src": "340:37:0",
                           "tryCall": false,
                           "typeDescriptions": {
                             "typeIdentifier": "t_tuple$__$",
                             "typeString": "tuple()"
                           }
                         },
-                        "id": 27,
+                        "id": 28,
                         "nodeType": "EmitStatement",
-                        "src": "336:46:0"
+                        "src": "335:42:0"
                       }
                     ]
                   },
-                  "functionSelector": "f93908f2",
-                  "id": 29,
+                  "functionSelector": "a6232e34",
+                  "id": 30,
                   "implemented": true,
                   "kind": "function",
                   "modifiers": [],
-                  "name": "emitsUnsupported",
-                  "nameLocation": "298:16:0",
+                  "name": "emitsPayload",
+                  "nameLocation": "301:12:0",
                   "nodeType": "FunctionDefinition",
                   "parameters": {
                     "id": 19,
                     "nodeType": "ParameterList",
                     "parameters": [],
-                    "src": "314:2:0"
+                    "src": "313:2:0"
                   },
                   "returnParameters": {
                     "id": 20,
                     "nodeType": "ParameterList",
                     "parameters": [],
-                    "src": "326:0:0"
+                    "src": "325:0:0"
                   },
-                  "scope": 30,
-                  "src": "289:100:0",
+                  "scope": 31,
+                  "src": "292:92:0",
                   "stateMutability": "nonpayable",
                   "virtual": false,
                   "visibility": "external"
                 }
               ],
-              "scope": 31,
-              "src": "164:227:0",
+              "scope": 32,
+              "src": "172:214:0",
               "usedErrors": [],
               "usedEvents": [
                 9
               ]
             }
           ],
-          "src": "39:353:0"
+          "src": "39:348:0"
         },
         "id": 0
       }

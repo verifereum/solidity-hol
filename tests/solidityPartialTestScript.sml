@@ -318,12 +318,14 @@ Proof
   CONV_TAC (QUANT_CONV (LAND_CONV cv_eval)) >> simp[] >> EVAL_TAC
 QED
 
-Theorem creation_argument_deploy_refused:
-  deploy_contract 1000 creation_argument_program
-    (differential_frame (n2w 0x1212) 0 [])
-    (differential_world empty_accounts) = ContractInvalid "unknown procedure"
+(* With every creation procedure supported, a deployment without encoded
+ * constructor arguments reverts in their decoding, as solc's does. *)
+Theorem creation_argument_empty_deploy_reverts:
+  ∃w. deploy_contract 1000 creation_argument_program
+        (differential_frame (n2w 0x1212) 0 [])
+        (differential_world empty_accounts) = ContractReverted [] w
 Proof
-  CONV_TAC (LAND_CONV cv_eval) >> REFL_TAC
+  CONV_TAC (QUANT_CONV (LAND_CONV cv_eval)) >> simp[]
 QED
 
 (* Function types the core does not model
