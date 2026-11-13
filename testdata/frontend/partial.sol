@@ -154,7 +154,7 @@ contract Partial is Mid {
         return g.n;
     }
 
-    // a tuple holding a storage struct
+    // a tuple holding a storage struct, as a reference
     function treeTuple() public view {
         (tree, 1);
     }

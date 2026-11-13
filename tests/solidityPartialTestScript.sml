@@ -38,9 +38,9 @@ val prepared = #prepared (solidityPrepareLib.prepare_artifact
  * encodePair, emitPair and putPair take a memory struct across an ABI
  * boundary, which the core does not model. Roles.Grant has an enum-keyed mapping, so the storage local of
  * grantCount does not elaborate, nor does grantParam's storage parameter.
- * nodeModified's modifier takes a recursive struct in memory, and treeTuple's
- * tuple holds a storage struct the core does not take as a tuple component;
- * both fail at elaboration rather than leaving the unit ill-formed. *)
+ * nodeModified's modifier takes a recursive struct in memory, which fails at
+ * elaboration rather than leaving the unit ill-formed; treeTuple's tuple holds
+ * a storage struct, as a reference, which elaborates. *)
 val outcomes = map (fn {name, reason, ...} => (name, reason)) (#functions prepared);
 fun reasons name =
   map #2 (List.filter (fn (n, _) => n = name) outcomes);
@@ -92,8 +92,7 @@ val () =
      length (reasons "grantParam") = 1 andalso
      List.all elaboration_failure (reasons "nodeModified") andalso
      length (reasons "nodeModified") = 1 andalso
-     List.all elaboration_failure (reasons "treeTuple") andalso
-     length (reasons "treeTuple") = 1 andalso
+     reasons "treeTuple" = [NONE] andalso
      length outcomes = 20
   then ()
   else raise Fail ("unexpected function outcomes: " ^

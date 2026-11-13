@@ -39,7 +39,7 @@
     },
     "sources": {
       "testdata/frontend/partial.sol": {
-        "content": "// SPDX-License-Identifier: GPL-3.0\npragma solidity >=0.8.0;\n\n// A contract of supported and unsupported functions (sha256 is not\n// modelled, nor are halting assembly in a constructor or fixed-byte indexing\n// in a constant): the unsupported ones, and those calling them, have no\n// procedure, and calls of them are refused.\ncontract Base {\n    function twice(uint256 x) public pure virtual returns (uint256) {\n        return x * 2;\n    }\n}\n\ncontract Mid is Base {\n    function twice(uint256 x) public pure virtual override returns (uint256) {\n        return uint256(sha256(abi.encodePacked(x)));\n    }\n}\n\n// A member type the importer cannot represent: the structs are left out,\n// so only the functions using them are unsupported.\nlibrary Hooks {\n    struct Hook {\n        function () internal pure returns (uint256) f;\n        uint8 n;\n    }\n\n    struct Box {\n        Hook hook;\n    }\n}\n\n// A recursive struct: the core holds no recursive struct in memory, so the\n// functions with one in memory, or that copy one in storage, are\n// unsupported.\nstruct Node {\n    uint8 v;\n    Node[] kids;\n}\n\n// The ABI forms of structs are not modelled: the functions that encode or\n// emit a memory struct, or pass one to an external call, are unsupported.\nstruct Pair {\n    uint8 a;\n    uint8 b;\n}\n\ninterface IPair {\n    function put(Pair memory p) external;\n}\n\n// A mapping key type the core cannot hold: the struct is left out too.\nlibrary Roles {\n    enum Role { A, B }\n\n    struct Grant {\n        mapping(Role => bool) granted;\n        uint8 n;\n    }\n}\n\ncontract Partial is Mid {\n    uint256 public total;\n    Node tree;\n    Node otherTree;\n\n    event Paired(Pair p);\n\n    // Fixed-byte indexing does not elaborate, so the constant has no procedure:\n    // its getter and the functions reading it are unsupported\n    bytes16 public constant DIGITS = bytes16(bytes32(\"0123456789abcdef\")[0]);\n\n    // imports and passes the source check, but does not elaborate\n    constructor() {\n        assembly { stop() }\n    }\n\n    function add(uint256 x) public returns (uint256) {\n        total += x;\n        return total;\n    }\n\n    function digest(bytes memory b) public pure returns (bytes32) {\n        return sha256(b);\n    }\n\n    function digestTwice(bytes memory b) public pure returns (bytes32) {\n        return digest(abi.encodePacked(digest(b)));\n    }\n\n    // super reaches Mid.twice, which is unsupported, not Base.twice\n    function twice(uint256 x) public pure override returns (uint256) {\n        return super.twice(x) + 1;\n    }\n\n    function callsTwice(uint256 x) public pure returns (uint256) {\n        return twice(x);\n    }\n\n    function digits() public pure returns (bytes16) {\n        return DIGITS;\n    }\n\n    // admitted, but leaves b below the free memory pointer: fails at run time\n    function pointer(bytes memory b) public pure returns (uint256 p) {\n        assembly { b := p }\n    }\n\n    function hookCount() public pure returns (uint8) {\n        Hooks.Box memory b;\n        return b.hook.n;\n    }\n\n    function nodeValue() public pure returns (uint8) {\n        Node memory n;\n        return n.v;\n    }\n\n    function nodeCount() public pure returns (uint256) {\n        return new Node[](2).length;\n    }\n\n    function copyTree() public {\n        tree = otherTree;\n    }\n\n    function encodePair() public pure returns (bytes memory) {\n        return abi.encode(Pair(1, 2));\n    }\n\n    function emitPair() public {\n        emit Paired(Pair(1, 2));\n    }\n\n    function putPair(IPair t) public {\n        t.put(Pair(1, 2));\n    }\n\n    function grantCount() internal view returns (uint8) {\n        Roles.Grant storage g;\n        assembly { g.slot := 0 }\n        return g.n;\n    }\n\n    // a modifier parameter holding a recursive struct in memory\n    modifier withNode(Node memory n) {\n        _;\n    }\n\n    function nodeModified() public withNode(tree) {}\n\n    // a storage parameter of a struct that is left out\n    function grantParam(Roles.Grant storage g) internal view returns (uint8) {\n        return g.n;\n    }\n\n    // a tuple holding a storage struct\n    function treeTuple() public view {\n        (tree, 1);\n    }\n\n    fallback() external {\n        total = uint256(sha256(msg.data));\n    }\n}\n"
+        "content": "// SPDX-License-Identifier: GPL-3.0\npragma solidity >=0.8.0;\n\n// A contract of supported and unsupported functions (sha256 is not\n// modelled, nor are halting assembly in a constructor or fixed-byte indexing\n// in a constant): the unsupported ones, and those calling them, have no\n// procedure, and calls of them are refused.\ncontract Base {\n    function twice(uint256 x) public pure virtual returns (uint256) {\n        return x * 2;\n    }\n}\n\ncontract Mid is Base {\n    function twice(uint256 x) public pure virtual override returns (uint256) {\n        return uint256(sha256(abi.encodePacked(x)));\n    }\n}\n\n// A member type the importer cannot represent: the structs are left out,\n// so only the functions using them are unsupported.\nlibrary Hooks {\n    struct Hook {\n        function () internal pure returns (uint256) f;\n        uint8 n;\n    }\n\n    struct Box {\n        Hook hook;\n    }\n}\n\n// A recursive struct: the core holds no recursive struct in memory, so the\n// functions with one in memory, or that copy one in storage, are\n// unsupported.\nstruct Node {\n    uint8 v;\n    Node[] kids;\n}\n\n// The ABI forms of structs are not modelled: the functions that encode or\n// emit a memory struct, or pass one to an external call, are unsupported.\nstruct Pair {\n    uint8 a;\n    uint8 b;\n}\n\ninterface IPair {\n    function put(Pair memory p) external;\n}\n\n// A mapping key type the core cannot hold: the struct is left out too.\nlibrary Roles {\n    enum Role { A, B }\n\n    struct Grant {\n        mapping(Role => bool) granted;\n        uint8 n;\n    }\n}\n\ncontract Partial is Mid {\n    uint256 public total;\n    Node tree;\n    Node otherTree;\n\n    event Paired(Pair p);\n\n    // Fixed-byte indexing does not elaborate, so the constant has no procedure:\n    // its getter and the functions reading it are unsupported\n    bytes16 public constant DIGITS = bytes16(bytes32(\"0123456789abcdef\")[0]);\n\n    // imports and passes the source check, but does not elaborate\n    constructor() {\n        assembly { stop() }\n    }\n\n    function add(uint256 x) public returns (uint256) {\n        total += x;\n        return total;\n    }\n\n    function digest(bytes memory b) public pure returns (bytes32) {\n        return sha256(b);\n    }\n\n    function digestTwice(bytes memory b) public pure returns (bytes32) {\n        return digest(abi.encodePacked(digest(b)));\n    }\n\n    // super reaches Mid.twice, which is unsupported, not Base.twice\n    function twice(uint256 x) public pure override returns (uint256) {\n        return super.twice(x) + 1;\n    }\n\n    function callsTwice(uint256 x) public pure returns (uint256) {\n        return twice(x);\n    }\n\n    function digits() public pure returns (bytes16) {\n        return DIGITS;\n    }\n\n    // admitted, but leaves b below the free memory pointer: fails at run time\n    function pointer(bytes memory b) public pure returns (uint256 p) {\n        assembly { b := p }\n    }\n\n    function hookCount() public pure returns (uint8) {\n        Hooks.Box memory b;\n        return b.hook.n;\n    }\n\n    function nodeValue() public pure returns (uint8) {\n        Node memory n;\n        return n.v;\n    }\n\n    function nodeCount() public pure returns (uint256) {\n        return new Node[](2).length;\n    }\n\n    function copyTree() public {\n        tree = otherTree;\n    }\n\n    function encodePair() public pure returns (bytes memory) {\n        return abi.encode(Pair(1, 2));\n    }\n\n    function emitPair() public {\n        emit Paired(Pair(1, 2));\n    }\n\n    function putPair(IPair t) public {\n        t.put(Pair(1, 2));\n    }\n\n    function grantCount() internal view returns (uint8) {\n        Roles.Grant storage g;\n        assembly { g.slot := 0 }\n        return g.n;\n    }\n\n    // a modifier parameter holding a recursive struct in memory\n    modifier withNode(Node memory n) {\n        _;\n    }\n\n    function nodeModified() public withNode(tree) {}\n\n    // a storage parameter of a struct that is left out\n    function grantParam(Roles.Grant storage g) internal view returns (uint8) {\n        return g.n;\n    }\n\n    // a tuple holding a storage struct, as a reference\n    function treeTuple() public view {\n        (tree, 1);\n    }\n\n    fallback() external {\n        total = uint256(sha256(msg.data));\n    }\n}\n"
       }
     }
   },
@@ -4726,7 +4726,7 @@
                   "body": {
                     "id": 341,
                     "nodeType": "Block",
-                    "src": "4102:26:0",
+                    "src": "4118:26:0",
                     "statements": [
                       {
                         "expression": {
@@ -4737,7 +4737,7 @@
                               "nodeType": "Identifier",
                               "overloadedDeclarations": [],
                               "referencedDeclaration": 88,
-                              "src": "4113:4:0",
+                              "src": "4129:4:0",
                               "typeDescriptions": {
                                 "typeIdentifier": "t_struct$_Node_$57_storage",
                                 "typeString": "struct Node storage ref"
@@ -4752,7 +4752,7 @@
                               "kind": "number",
                               "lValueRequested": false,
                               "nodeType": "Literal",
-                              "src": "4119:1:0",
+                              "src": "4135:1:0",
                               "typeDescriptions": {
                                 "typeIdentifier": "t_rational_1_by_1",
                                 "typeString": "int_const 1"
@@ -4767,7 +4767,7 @@
                           "isPure": false,
                           "lValueRequested": false,
                           "nodeType": "TupleExpression",
-                          "src": "4112:9:0",
+                          "src": "4128:9:0",
                           "typeDescriptions": {
                             "typeIdentifier": "t_tuple$_t_struct$_Node_$57_storage_$_t_rational_1_by_1_$",
                             "typeString": "tuple(struct Node storage ref,int_const 1)"
@@ -4775,7 +4775,7 @@
                         },
                         "id": 340,
                         "nodeType": "ExpressionStatement",
-                        "src": "4112:9:0"
+                        "src": "4128:9:0"
                       }
                     ]
                   },
@@ -4785,22 +4785,22 @@
                   "kind": "function",
                   "modifiers": [],
                   "name": "treeTuple",
-                  "nameLocation": "4078:9:0",
+                  "nameLocation": "4094:9:0",
                   "nodeType": "FunctionDefinition",
                   "parameters": {
                     "id": 335,
                     "nodeType": "ParameterList",
                     "parameters": [],
-                    "src": "4087:2:0"
+                    "src": "4103:2:0"
                   },
                   "returnParameters": {
                     "id": 336,
                     "nodeType": "ParameterList",
                     "parameters": [],
-                    "src": "4102:0:0"
+                    "src": "4118:0:0"
                   },
                   "scope": 357,
-                  "src": "4069:59:0",
+                  "src": "4085:59:0",
                   "stateMutability": "view",
                   "virtual": false,
                   "visibility": "public"
@@ -4809,7 +4809,7 @@
                   "body": {
                     "id": 355,
                     "nodeType": "Block",
-                    "src": "4154:50:0",
+                    "src": "4170:50:0",
                     "statements": [
                       {
                         "expression": {
@@ -4824,7 +4824,7 @@
                             "nodeType": "Identifier",
                             "overloadedDeclarations": [],
                             "referencedDeclaration": 85,
-                            "src": "4164:5:0",
+                            "src": "4180:5:0",
                             "typeDescriptions": {
                               "typeIdentifier": "t_uint256",
                               "typeString": "uint256"
@@ -4843,7 +4843,7 @@
                                       "nodeType": "Identifier",
                                       "overloadedDeclarations": [],
                                       "referencedDeclaration": -15,
-                                      "src": "4187:3:0",
+                                      "src": "4203:3:0",
                                       "typeDescriptions": {
                                         "typeIdentifier": "t_magic_message",
                                         "typeString": "msg"
@@ -4854,10 +4854,10 @@
                                     "isLValue": false,
                                     "isPure": false,
                                     "lValueRequested": false,
-                                    "memberLocation": "4191:4:0",
+                                    "memberLocation": "4207:4:0",
                                     "memberName": "data",
                                     "nodeType": "MemberAccess",
-                                    "src": "4187:8:0",
+                                    "src": "4203:8:0",
                                     "typeDescriptions": {
                                       "typeIdentifier": "t_bytes_calldata_ptr",
                                       "typeString": "bytes calldata"
@@ -4876,7 +4876,7 @@
                                   "nodeType": "Identifier",
                                   "overloadedDeclarations": [],
                                   "referencedDeclaration": -22,
-                                  "src": "4180:6:0",
+                                  "src": "4196:6:0",
                                   "typeDescriptions": {
                                     "typeIdentifier": "t_function_sha256_pure$_t_bytes_memory_ptr_$returns$_t_bytes32_$",
                                     "typeString": "function (bytes memory) pure returns (bytes32)"
@@ -4891,7 +4891,7 @@
                                 "nameLocations": [],
                                 "names": [],
                                 "nodeType": "FunctionCall",
-                                "src": "4180:16:0",
+                                "src": "4196:16:0",
                                 "tryCall": false,
                                 "typeDescriptions": {
                                   "typeIdentifier": "t_bytes32",
@@ -4912,7 +4912,7 @@
                               "isPure": true,
                               "lValueRequested": false,
                               "nodeType": "ElementaryTypeNameExpression",
-                              "src": "4172:7:0",
+                              "src": "4188:7:0",
                               "typeDescriptions": {
                                 "typeIdentifier": "t_type$_t_uint256_$",
                                 "typeString": "type(uint256)"
@@ -4921,7 +4921,7 @@
                                 "id": 346,
                                 "name": "uint256",
                                 "nodeType": "ElementaryTypeName",
-                                "src": "4172:7:0",
+                                "src": "4188:7:0",
                                 "typeDescriptions": {}
                               }
                             },
@@ -4934,14 +4934,14 @@
                             "nameLocations": [],
                             "names": [],
                             "nodeType": "FunctionCall",
-                            "src": "4172:25:0",
+                            "src": "4188:25:0",
                             "tryCall": false,
                             "typeDescriptions": {
                               "typeIdentifier": "t_uint256",
                               "typeString": "uint256"
                             }
                           },
-                          "src": "4164:33:0",
+                          "src": "4180:33:0",
                           "typeDescriptions": {
                             "typeIdentifier": "t_uint256",
                             "typeString": "uint256"
@@ -4949,7 +4949,7 @@
                         },
                         "id": 354,
                         "nodeType": "ExpressionStatement",
-                        "src": "4164:33:0"
+                        "src": "4180:33:0"
                       }
                     ]
                   },
@@ -4964,30 +4964,30 @@
                     "id": 343,
                     "nodeType": "ParameterList",
                     "parameters": [],
-                    "src": "4142:2:0"
+                    "src": "4158:2:0"
                   },
                   "returnParameters": {
                     "id": 344,
                     "nodeType": "ParameterList",
                     "parameters": [],
-                    "src": "4154:0:0"
+                    "src": "4170:0:0"
                   },
                   "scope": 357,
-                  "src": "4134:70:0",
+                  "src": "4150:70:0",
                   "stateMutability": "nonpayable",
                   "virtual": false,
                   "visibility": "external"
                 }
               ],
               "scope": 358,
-              "src": "1549:2657:0",
+              "src": "1549:2673:0",
               "usedErrors": [],
               "usedEvents": [
                 96
               ]
             }
           ],
-          "src": "36:4171:0"
+          "src": "36:4187:0"
         },
         "id": 0
       }
