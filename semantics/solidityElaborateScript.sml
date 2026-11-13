@@ -1167,15 +1167,20 @@ End
 (* Keep value checks outside the mutually recursive elaborator so pattern
  * completion does not duplicate the recursive definition across type cases. *)
 Definition finish_delete_def:
-  finish_delete (id : num) ss target n =
+  finish_delete ctx (id : num) ss target n =
     let ty = destination_type target in
-    if ¬is_stored_scalar_type ty then INR [(id, "delete of a non-scalar")] else
-    case default_operation ty of
-      SOME operation =>
-        let (ds, zero) = bind_value n ty operation in
-        INL ((ss ++ ds ++ write_destination (n + 1) target zero,
-              ConstantAtom (BoolValue F), ElabTuple []), n + 2)
-    | NONE => INR [(id, "delete of a non-scalar")]
+    let allowed =
+      case ty of
+        LocatedT MemoryLoc element => memory_binding_ok ctx.enums ctx.structs ty
+      | LocatedT _ _ => F
+      | MappingT _ _ => F
+      | _ => is_stored_scalar_type ty ∨ is_function_type ty ∨
+             (located_object_shape StorageLoc ty ∧
+              memory_binding_ok ctx.enums ctx.structs (LocatedT StorageLoc ty)) in
+    if ¬allowed then INR [(id, "delete of this type or location")] else
+    INL ((ss ++ capture_destination n target ++
+            [ResetTargetStmt (AstId n) ty],
+          ConstantAtom (BoolValue F), ElabTuple []), n + 1)
 End
 
 Definition finish_transfer_def:
@@ -1439,7 +1444,7 @@ Definition elab_expr_def:
         (if op = SrcDelete then
            ensure (tid = "t_tuple$__$") (info.node_id, "type annotation mismatch")
            (case elab_destination ctx n e of
-              INL ((ss, target), n1) => finish_delete info.node_id ss target n1
+              INL ((ss, target), n1) => finish_delete ctx info.node_id ss target n1
             | INR bs => INR bs)
          else case identifier_integer tid of
            SOME i =>

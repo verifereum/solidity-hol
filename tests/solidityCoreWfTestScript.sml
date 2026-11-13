@@ -1311,3 +1311,51 @@ Theorem byte_prefix_rejects_bad_width_and_type:
 Proof
   CONV_TAC cv_eval
 QED
+
+Theorem reset_accepts_scalar_and_located_memory_targets:
+  EVERY (λty. IS_SOME (check_core_stmts test_env
+    <| bindings := []; targets := [(AstId 1, ty)]; returns := []; in_loop := F |>
+    [ResetTargetStmt (AstId 1) ty]))
+    [UintT 8; BoolT; EnumT (AstId 900);
+     FunctionT InternalFn PureMut [] [];
+     LocatedT MemoryLoc BytesT; LocatedT MemoryLoc (ArrayT (UintT 8) (SOME 2))]
+Proof
+  EVAL_TAC
+QED
+
+Theorem reset_accepts_captured_storage_objects:
+  EVERY (λty. IS_SOME (check_core_stmts
+    (struct_layout_environment [packed_struct_layout])
+    <| bindings := [(AstId 1, ReferenceType ty)]; targets := [];
+       returns := []; in_loop := F |>
+    [CaptureValueStmt (AstId 2) (BoundAtom (AstId 1)); ResetTargetStmt (AstId 2) ty]))
+    [BytesT; StringT; ArrayT (UintT 8) NONE; StructT (AstId 950)]
+Proof
+  EVAL_TAC
+QED
+
+Theorem reset_rejects_readonly_pointer_mapping_and_bad_targets:
+  EVERY (λty. ¬IS_SOME (check_core_stmts test_env
+    <| bindings := []; targets := [(AstId 1, ty)]; returns := []; in_loop := F |>
+    [ResetTargetStmt (AstId 1) ty]))
+    [LocatedT CalldataLoc BytesT; LocatedT StorageLoc BytesT;
+     MappingT (UintT 256) (UintT 256); StructT (AstId 999); UintT 7] ∧
+  ¬IS_SOME (check_core_stmts test_env
+    <| bindings := []; targets := [(AstId 1, UintT 8)]; returns := []; in_loop := F |>
+    [ResetTargetStmt (AstId 1) (UintT 16)]) ∧
+  ¬IS_SOME (check_core_stmts test_env
+    <| bindings := []; targets := []; returns := []; in_loop := F |>
+    [ResetTargetStmt (AstId 1) (UintT 8)])
+Proof
+  EVAL_TAC
+QED
+
+Theorem aggregate_capture_does_not_admit_scalar_assignment:
+  ¬IS_SOME (check_core_stmts test_env
+    <| bindings := [(AstId 1, ReferenceType (ArrayT (UintT 8) NONE))];
+       targets := []; returns := []; in_loop := F |>
+    [CaptureValueStmt (AstId 2) (BoundAtom (AstId 1));
+     WriteScalarStmt (AstId 2) (ArrayT (UintT 8) NONE) (ConstantAtom (IntegerValue 0))])
+Proof
+  EVAL_TAC
+QED

@@ -1858,3 +1858,55 @@ Theorem asm_calldata_references:
 Proof
   CONV_TAC cv_eval
 QED
+
+Definition recursive_reset_env_def:
+  recursive_reset_env = test_env with <|
+    type_declarations := [(AstId 900, StructDeclaration
+      [(AstId 901, UintT 8); (AstId 902, ArrayT (StructT (AstId 900)) NONE)])];
+    struct_layouts := [(AstId 900, <| struct_id := AstId 900; struct_slots := 2;
+      struct_fields :=
+        [<| state_id := AstId 901; state_type := UintT 8;
+            state_backend := PersistentStorage; state_slot := 0w; state_offset := 0 |>;
+         <| state_id := AstId 902; state_type := ArrayT (StructT (AstId 900)) NONE;
+            state_backend := PersistentStorage; state_slot := 1w; state_offset := 0 |>] |>)]
+  |>
+End
+
+Definition recursive_reset_state_def:
+  recursive_reset_state = initial_state with <|
+    world := initial_state.world with accounts :=
+      set_storage_word (set_storage_word (set_storage_word empty_accounts 0w 11w 7w)
+        0w 12w 1w) 0w (mapping_slot [] 12w) 8w;
+    targets := FEMPTY |+ (ast_key (AstId 1), ValueTarget
+      (StorageReference PersistentStorage 0w 11w 0 (StructT (AstId 900)) (LayoutId 0)))
+  |>
+End
+
+val () = cv_auto_trans recursive_reset_env_def;
+val () = cv_auto_trans recursive_reset_state_def;
+
+Theorem recursive_reset_exhaustion_is_not_invalid:
+  (reset_target 0 recursive_reset_env (AstId 1) (StructT (AstId 900))
+     recursive_reset_state []).completion = FuelExhausted
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem recursive_reset_with_more_fuel_completes:
+  (reset_target 1 recursive_reset_env (AstId 1) (StructT (AstId 900))
+     recursive_reset_state []).completion = NormalCompletion ∧
+  reset_target 1 recursive_reset_env (AstId 1) (StructT (AstId 900))
+     recursive_reset_state [] =
+  reset_target 20 recursive_reset_env (AstId 1) (StructT (AstId 900))
+     recursive_reset_state []
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem reset_storage_in_static_frame_fails:
+  (reset_target 1 recursive_reset_env (AstId 1) (StructT (AstId 900))
+     (recursive_reset_state with frame := recursive_reset_state.frame with static_context := T)
+     []).completion = InvalidCompletion "storage reset in static frame"
+Proof
+  CONV_TAC cv_eval
+QED
