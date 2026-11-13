@@ -1280,7 +1280,8 @@ Definition elab_expr_def:
                    INL ((ss ++ DefineStmt (AstId n1) (ReferenceType ety)
                                  (NavigateOperation ety ref (FieldNavigation (AstId member_id))) ::
                                rs, a, ElabType ety), n1 + 2))
-              | NONE => read_location info.node_id (elab_location ctx n expression))
+              | NONE => INR [(info.node_id, "unknown struct member")])
+         | NONE => read_location info.node_id (elab_location ctx n expression))
     | SrcIndexAccess info root_expr index tid =>
         (case elab_expr ctx n root_expr of
            INL ((ss, root, ElabType ty), n1) =>
