@@ -475,12 +475,18 @@ Termination
   rw[solidityASTTheory.sol_type_size_def]
 End
 
-(* A memory copy of a calldata array whose data starts at data, as the pinned
- * compiler converts one: allocated, its data span checked, then decoded as an
- * ABI argument is. *)
+(* A calldata object copied to memory: check allocation before its data span,
+ * then read its value for materialization. Byte copies use word addition
+ * for the span and calldatacopy's zero filling. *)
 Definition copy_calldata_array_def:
   copy_calldata_array cd ty data length free =
-    case ty of
+    if byte_sequence_type ty then
+      let size = 32 + 32 * ((length + 31) DIV 32) in
+      if 2 ** 64 ≤ length ∨ 2 ** 64 ≤ free + size then INR (PanicCompletion 65)
+      else if LENGTH cd < (data + length) MOD 2 ** 256 then INR (RevertCompletion [])
+      else INL (ScalarValue (BytesValue
+             (TAKE length (DROP data cd ++ REPLICATE length 0w))))
+    else case ty of
       ArrayT element l =>
         let size = (if l = NONE then 32 else 0) + 32 * length in
         if 2 ** 64 ≤ free + size then INR (PanicCompletion 65)
