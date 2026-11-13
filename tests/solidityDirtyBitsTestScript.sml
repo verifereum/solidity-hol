@@ -5,6 +5,7 @@
 Theory solidityDirtyBitsTest
 Ancestors solidityDifferential solidityDirtyBitsBytecodeTest
   solidityStorageEnumArraysTest
+  solidityStorageMemoryPaddingTest
   solidityDifferentialCorpus_inline_assembly
   solidityDifferentialCorpus_storage
   solidityDifferentialCorpus_storage_arrays
