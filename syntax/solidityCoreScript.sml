@@ -177,7 +177,7 @@ Datatype:
    * of the internal RevertDataType value into source memory. *)
   | TryDecodeErrorOperation catch_kind core_atom
   | MaterializeRevertDataOperation core_atom
-  | ArrayPushOperation core_atom (core_atom option)
+  | ArrayPushOperation core_atom
   | ArrayPopOperation core_atom
   | InternalCallOperation ast_id (core_atom list)
   (* a call of the procedure an internal function value names *)

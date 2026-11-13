@@ -241,13 +241,12 @@ Definition storage_type_ok_def:
   (storage_type_ok env ty ⇔ elementary_storage_type_ok ty)
 End
 
-(* Whether a type reaches no struct, through array elements: the ABI values
- * the core encodes and decodes. *)
-Definition struct_free_def:
-  (struct_free (StructT _) ⇔ F) ∧
-  (struct_free (ArrayT ty _) ⇔ struct_free ty) ∧
-  (struct_free (LocatedT _ ty) ⇔ struct_free ty) ∧
-  (struct_free _ ⇔ T)
+(* ABI object leaves currently supported by the codec. Shape and location
+ * are checked separately by located_object_shape. *)
+Definition abi_object_leaves_def:
+  (abi_object_leaves (ArrayT ty _) ⇔ abi_object_leaves ty) ∧
+  (abi_object_leaves (LocatedT _ ty) ⇔ abi_object_leaves ty) ∧
+  (abi_object_leaves ty ⇔ is_elementary_type ty ∨ byte_sequence_type ty)
 End
 
 (* Whether an encoding of the type has a fixed size, with no offsets. *)
@@ -275,7 +274,8 @@ Definition located_object_shape_def:
     | _ => byte_sequence_type ty) ∧
   (located_object_shape loc (ArrayT element length) ⇔
     valid_array_length length ∧
-    ((is_elementary_type element ∧ valid_type_shape element) ∨
+    (((if loc = MemoryLoc then is_stored_scalar_type element
+        else is_elementary_type element) ∧ valid_type_shape element) ∨
      located_object_shape loc element) ∧
     (loc = CalldataLoc ∧ IS_SOME length ⇒ static_object_type element)) ∧
   (located_object_shape MemoryLoc (StructT _) ⇔ T) ∧
@@ -292,10 +292,12 @@ Definition memory_type_ok_def:
     case lookup_struct env id of
       SOME fields => memory_fields_ok env (n - 1) (MAP SND fields)
     | NONE => F) ∧
+  (memory_type_ok env n (EnumT id) ⇔ IS_SOME (lookup_enum env id)) ∧
   (memory_type_ok env n _ ⇔ T) ∧
   (memory_fields_ok env n [] ⇔ T) ∧
   (memory_fields_ok env n (ty :: tys) ⇔
-    (is_stored_scalar_type ty ∨ (located_object_shape MemoryLoc ty ∧ memory_type_ok env n ty)) ∧
+    ((is_stored_scalar_type ty ∨ located_object_shape MemoryLoc ty) ∧
+     memory_type_ok env n ty) ∧
     memory_fields_ok env n tys)
 Termination
   WF_REL_TAC ‘inv_image ($< LEX $<) (λx. case x of
@@ -343,7 +345,7 @@ End
 Definition abi_value_type_def:
   abi_value_type ty ⇔
     is_stored_scalar_type ty ∨
-    (located_value_type ty ∧ struct_free ty ∧
+    (located_value_type ty ∧ abi_object_leaves ty ∧
      case ty of LocatedT StorageLoc _ => F | _ => T)
 End
 
@@ -968,18 +970,13 @@ Definition wf_core_operation_def:
          | SOME (ReferenceType (ArrayT _ NONE)) => T
          | _ => F)
     | _ => F) ∧
-  (wf_core_operation env ctx annotation (ArrayPushOperation a value) ⇔
+  (wf_core_operation env ctx annotation (ArrayPushOperation a) ⇔
     case a of
       BoundAtom x =>
         (case storage_base (ALOOKUP ctx.bindings x) of
            SOME (ArrayT element NONE) =>
              storage_type_ok env element ∧
-             annotation = ReferenceType element ∧
-             (case value of
-                NONE => T
-              | SOME v =>
-                  IS_SOME (storage_bytes element) ∧
-                  wf_core_atom env ctx (SingleType element) v)
+             annotation = ReferenceType element
          | _ => F)
     | _ => F) ∧
   (wf_core_operation env ctx annotation (ArrayPopOperation a) ⇔
@@ -988,7 +985,7 @@ Definition wf_core_operation_def:
       BoundAtom x =>
         (case storage_base (ALOOKUP ctx.bindings x) of
            SOME (ArrayT element NONE) =>
-             storage_type_ok env element ∧ IS_SOME (storage_bytes element)
+             storage_type_ok env element
          | _ => F)
     | _ => F) ∧
   (wf_core_operation env ctx annotation (InternalCallOperation f args) ⇔

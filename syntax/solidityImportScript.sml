@@ -576,19 +576,6 @@ Definition array_dimensions_def:
     | NONE => NONE)
 End
 
-Definition array_base_def:
-  array_base loc name =
-    if name = "t_bytes" ++ location_suffix loc then SOME BytesT
-    else if name = "t_string" ++ location_suffix loc then SOME StringT
-    else if name = "t_address_payable" then SOME (AddressT PayableAddress)
-    else if isPREFIX "t_" name ∧ name ≠ "t_uint" ∧ name ≠ "t_int" then
-      case elementary_type (DROP 2 name) of
-        SOME ty => if is_elementary_type ty then SOME ty else NONE
-      | NONE => NONE
-    else NONE
-End
-
-
 (* Struct names are display metadata; declaration IDs determine identity.
  * Keep every other character, including location/pointer suffixes. *)
 Definition canonical_storage_identifier_def:
@@ -646,18 +633,31 @@ Definition array_base_split_def:
     else array_base_split b fs)
 End
 
-(* The element type an array base names: an elementary type or byte
- * sequence, or a struct in the array's location (unlocated in storage, as
- * decode_struct_identifier gives it). *)
+(* A non-array identifier's type, shared by direct and array decoding. *)
+Definition decode_base_identifier_def:
+  decode_base_identifier s =
+    if s = "t_bytes_storage" then SOME BytesT
+    else if s = "t_string_storage" then SOME StringT
+    else if s = "t_bytes_memory_ptr" then SOME (LocatedT MemoryLoc BytesT)
+    else if s = "t_string_memory_ptr" then SOME (LocatedT MemoryLoc StringT)
+    else if s = "t_bytes_calldata_ptr" then SOME (LocatedT CalldataLoc BytesT)
+    else if s = "t_string_calldata_ptr" then SOME (LocatedT CalldataLoc StringT)
+    else if s = "t_bytes_storage_ptr" then SOME (LocatedT StorageLoc BytesT)
+    else if s = "t_string_storage_ptr" then SOME (LocatedT StorageLoc StringT)
+    else if isPREFIX "t_struct$_" s then decode_struct_identifier s
+    else scalar_type_identifier s
+End
+
+(* Array bases carry their location only for reference types. Storage uses
+ * unlocated bases, whereas memory and calldata use matching pointers. *)
 Definition array_element_def:
   array_element loc name =
-    if isPREFIX "t_struct$_" name then
-      case decode_struct_identifier name of
-        SOME (LocatedT loc' (StructT id)) =>
-          if loc' = loc ∧ loc ≠ StorageLoc then SOME (StructT id) else NONE
-      | SOME (StructT id) => if loc = StorageLoc then SOME (StructT id) else NONE
-      | _ => NONE
-    else array_base loc name
+    case decode_base_identifier name of
+      SOME (LocatedT loc' ty) =>
+        if loc' = loc ∧ loc ≠ StorageLoc then SOME ty else NONE
+    | SOME ty =>
+        if is_stored_scalar_type ty ∨ loc = StorageLoc then SOME ty else NONE
+    | NONE => NONE
 End
 
 (* A memory, calldata or storage array type identifier, nested to any depth. *)
@@ -696,21 +696,7 @@ Definition decode_elementary_identifier_def:
        else if isPREFIX (REVERSE (location_suffix CalldataLoc)) (REVERSE s) then
          decode_located_array CalldataLoc s
        else decode_located_array MemoryLoc s)
-    else if s = "t_bytes_storage" then SOME BytesT
-    else if s = "t_string_storage" then SOME StringT
-    else if s = "t_bytes_memory_ptr" then SOME (LocatedT MemoryLoc BytesT)
-    else if s = "t_string_memory_ptr" then SOME (LocatedT MemoryLoc StringT)
-    else if s = "t_bytes_calldata_ptr" then SOME (LocatedT CalldataLoc BytesT)
-    else if s = "t_string_calldata_ptr" then SOME (LocatedT CalldataLoc StringT)
-    else if s = "t_bytes_storage_ptr" then SOME (LocatedT StorageLoc BytesT)
-    else if s = "t_string_storage_ptr" then SOME (LocatedT StorageLoc StringT)
-    else if s = "t_address_payable" then SOME (AddressT PayableAddress)
-    else if isPREFIX "t_enum_" s then
-      OPTION_MAP (λid. EnumT (AstId id)) (fromDecString (DROP 7 s))
-    else if isPREFIX "t_struct$_" s then decode_struct_identifier s
-    else if isPREFIX "t_" s ∧ s ≠ "t_uint" ∧ s ≠ "t_int" then
-      elementary_type (DROP 2 s)
-    else NONE
+    else decode_base_identifier s
 End
 
 
@@ -883,7 +869,8 @@ QED
 Theorem decode_elementary_identifier_valid:
   decode_elementary_identifier s = SOME ty ⇒ valid_type_shape ty
 Proof
-  rw[decode_elementary_identifier_def, decode_located_array_def, AllCaseEqs()] >>
+  rw[decode_elementary_identifier_def, decode_base_identifier_def,
+     scalar_type_identifier_def, decode_located_array_def, AllCaseEqs()] >>
   imp_res_tac elementary_type_valid >>
   imp_res_tac decode_struct_identifier_valid >>
   gvs[valid_type_shape_def, outer_location_free_def, location_shape_ok_def,

@@ -1216,7 +1216,7 @@ QED
 Theorem array_push_missing_binding_rejected:
   ¬wf_core_operation test_env
     <| bindings := []; targets := []; returns := []; in_loop := F |>
-    (ReferenceType (UintT 8)) (ArrayPushOperation (BoundAtom (AstId 1)) NONE)
+    (ReferenceType (UintT 8)) (ArrayPushOperation (BoundAtom (AstId 1)))
 Proof
   CONV_TAC cv_eval
 QED
@@ -1250,6 +1250,20 @@ Theorem calldata_byte_is_not_a_writable_reference:
     (ReferenceType (FixedBytesT 1))
     (NavigateOperation (FixedBytesT 1) (BoundAtom (AstId 1))
       (IndexNavigation (ConstantAtom (IntegerValue 0))))
+Proof
+  EVAL_TAC
+QED
+
+Theorem memory_enum_arrays_keep_abi_boundary:
+  core_binding_type test_env
+    (LocatedT MemoryLoc (ArrayT (EnumT (AstId 900)) NONE)) ∧
+  ¬core_binding_type test_env
+    (LocatedT MemoryLoc (ArrayT (EnumT (AstId 901)) NONE)) ∧
+  memory_fields_ok test_env 1 [EnumT (AstId 900)] ∧
+  ¬memory_fields_ok test_env 1 [EnumT (AstId 901)] ∧
+  ¬abi_value_type (LocatedT MemoryLoc (ArrayT (EnumT (AstId 900)) NONE)) ∧
+  ¬abi_value_type
+    (LocatedT MemoryLoc (ArrayT (ArrayT (EnumT (AstId 900)) NONE) NONE))
 Proof
   EVAL_TAC
 QED
