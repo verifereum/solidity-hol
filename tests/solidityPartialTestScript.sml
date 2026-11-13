@@ -276,8 +276,8 @@ Proof
   CONV_TAC cv_eval
 QED
 
-(* Both constructor bodies elaborate, but the base-constructor argument
- * calls readString, whose dynamic ABI decoding does not. *)
+(* Both constructor bodies elaborate, and so does readString, which the
+ * base-constructor argument calls, with its dynamic ABI decoding. *)
 val creation_prepared = #prepared (solidityPrepareLib.prepare_artifact
   {root = "..", path = "../testdata/frontend/expected/creation_argument.json",
    source = "testdata/frontend/creation_argument.sol"});
@@ -288,9 +288,8 @@ val () =
   if List.filter (fn (n, _) => n = "") creation_outcomes =
        [("", NONE), ("", NONE)] andalso
      List.filter (fn (n, _) => n = "value") creation_outcomes = [("value", NONE)] andalso
-     (case List.filter (fn (n, _) => n = "readString") creation_outcomes of
-        [(_, SOME r)] => String.isSuffix ": abi decoding of these types" r
-      | _ => false)
+     List.filter (fn (n, _) => n = "readString") creation_outcomes =
+       [("readString", NONE)]
   then ()
   else raise Fail "unexpected creation_argument function outcomes";
 
