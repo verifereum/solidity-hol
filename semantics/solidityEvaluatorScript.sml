@@ -902,7 +902,7 @@ Definition simple_stmt_def:
              (case copy_calldata_array st.frame.call_data rty data n
                      (memory_free_pointer st) of
                 INL v =>
-                  (case materialize_value env rty v st of
+                  (case materialize_value env CalldataLoc rty v st of
                      SOME (v', st') => normal_result (define_binding x ty v' st') gas
                    | NONE => abrupt_result (InvalidCompletion "bad calldata object copy") st gas)
               | INR c => abrupt_result c st gas)
@@ -913,7 +913,7 @@ Definition simple_stmt_def:
                   if 2 ** 64 ≤ memory_free_pointer st + memory_value_size env rty v then
                     abrupt_result (PanicCompletion 65) st gas
                   else
-                    (case materialize_value env rty v st of
+                    (case materialize_value env StorageLoc rty v st of
                        SOME (v', st') => normal_result (define_binding x ty v' st') gas
                      | NONE => abrupt_result (InvalidCompletion "bad storage object copy") st gas)
               | INR c => abrupt_result c st gas)
