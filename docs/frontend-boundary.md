@@ -562,12 +562,18 @@ a `super` or explicit base call may run it): `L.f(args)` is an internal call of 
 with `x` as the first argument, evaluated before the others, and `L.c` names
 the constant `c`. Library functions see no state variables. `using`
 directives naming a library are accepted, in a contract or at file level,
-since the compiler resolves which function a call names. A bound call whose
-receiver is in storage or calldata and whose first parameter is in memory is
-rejected: the compiler copies the receiver before evaluating the other
-arguments, while elaboration converts arguments after evaluating them all.
-Public and external library functions, which a contract calls with
-`DELEGATECALL`, and library structs are rejected. Referenced library events
+since the compiler resolves which function a call names. Every internal or
+library argument uses assignment's type and location conversion: memory
+references alias, storage parameters retain storage pointers, and storage or
+calldata objects passed to memory parameters copy through `CopyToMemoryOperation`
+and `materialize_value`, including byte sequences. Variable initialization,
+assignment and returns use the same conversion; `CopyContentsStmt` writes
+storage contents. A bound receiver is argument 0, evaluated and converted before
+the other arguments; ordinary calls evaluate all arguments before converting
+them. This matters when later arguments mutate the copied object or rebind the
+receiver variable. Calldata structs remain unsupported until their ABI and copy
+operations are available. Public and external library functions, which a
+contract calls with `DELEGATECALL`, are rejected. Referenced library events
 are imported with the contracts that emit them. Function-list
 `using` directives are accepted: attached free and library functions use the
 same internal-call path. In the Yul the compiler emits, `linkersymbol`, a linked

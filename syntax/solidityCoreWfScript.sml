@@ -683,14 +683,17 @@ Definition implicitly_convertible_def:
 End
 
 (* The objects whose contents a copy moves from one location into another
- * object: a byte sequence into memory or storage, as the same type, or an
+ * object: an object of the same type into memory, or a byte sequence or
  * array into storage, of the same shape, a fixed-size dimension also into a
  * dynamic one or a longer fixed-size one, with leaves implicitly convertible
  * scalars, byte sequences or structs of the same declaration. A struct's
  * fields copy member-wise; the copy check bounds them with memory_type_ok. *)
 Definition copy_convertible_def:
   copy_convertible (src_loc, src) (dst_loc, dst) ⇔
-    case (src, dst_loc, dst) of
+    if dst_loc = MemoryLoc then
+      src_loc ≠ MemoryLoc ∧ src = dst ∧
+      located_object_shape src_loc src ∧ located_object_shape MemoryLoc dst
+    else case (src, dst_loc, dst) of
       (ArrayT e l, StorageLoc, ArrayT e' l') =>
         located_object_shape src_loc src ∧
         valid_array_length l ∧ valid_array_length l' ∧
@@ -893,9 +896,11 @@ Definition wf_core_operation_def:
   (wf_core_operation env ctx annotation (CopyToMemoryOperation a) ⇔
     case (a, annotation) of
       (BoundAtom x, SingleType (LocatedT MemoryLoc ty)) =>
-        (ALOOKUP ctx.bindings x = SOME (SingleType (LocatedT CalldataLoc ty)) ∨
-         ALOOKUP ctx.bindings x = SOME (SingleType (LocatedT StorageLoc ty))) ∧
-        located_type_ok env MemoryLoc ty ∧ (case ty of ArrayT _ _ => T | StructT _ => T | _ => F)
+        located_type_ok env MemoryLoc ty ∧
+        (case ALOOKUP ctx.bindings x of
+           SOME (SingleType (LocatedT loc src)) =>
+             copy_convertible (loc, src) (MemoryLoc, ty)
+         | _ => F)
     | _ => F) ∧
   (wf_core_operation env ctx annotation (Keccak256Operation a) ⇔
     annotation = SingleType (FixedBytesT 32) ∧
@@ -1583,8 +1588,8 @@ Definition check_core_stmts_def:
     then check_core_stmts env ctx ss else NONE) ∧
   (check_core_stmts env ctx (CopyContentsStmt src dst a b :: ss) =
     if (case (src, dst) of
-          (LocatedT src_loc ty, LocatedT dst_loc ty') =>
-            copy_convertible (src_loc, ty) (dst_loc, ty') ∧
+          (LocatedT src_loc ty, LocatedT StorageLoc ty') =>
+            copy_convertible (src_loc, ty) (StorageLoc, ty') ∧
             memory_type_ok env (LENGTH env.type_declarations) ty
         | _ => F) ∧
        wf_core_atom env ctx (SingleType src) a ∧
