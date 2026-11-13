@@ -150,9 +150,7 @@ contract Partial is Mid {
     function nodeModified() public withNode(tree) {}
 
     // a storage parameter of a struct that is left out
-    function grantParam(Roles.Grant storage g) internal view returns (uint8) {
-        return g.n;
-    }
+    function grantParam(Roles.Grant storage) internal pure {}
 
     // a tuple holding a storage struct, as a reference
     function treeTuple() public view {
