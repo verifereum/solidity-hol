@@ -1259,6 +1259,8 @@ Theorem memory_enum_arrays_keep_abi_boundary:
     (LocatedT MemoryLoc (ArrayT (EnumT (AstId 900)) NONE)) ∧
   ¬core_binding_type test_env
     (LocatedT MemoryLoc (ArrayT (EnumT (AstId 901)) NONE)) ∧
+  memory_fields_ok test_env 1 [EnumT (AstId 900)] ∧
+  ¬memory_fields_ok test_env 1 [EnumT (AstId 901)] ∧
   ¬abi_value_type (LocatedT MemoryLoc (ArrayT (EnumT (AstId 900)) NONE)) ∧
   ¬abi_value_type
     (LocatedT MemoryLoc (ArrayT (ArrayT (EnumT (AstId 900)) NONE) NONE))

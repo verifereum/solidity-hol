@@ -241,13 +241,12 @@ Definition storage_type_ok_def:
   (storage_type_ok env ty ⇔ elementary_storage_type_ok ty)
 End
 
-(* Whether a type reaches no struct, through array elements: the ABI values
- * the core encodes and decodes. *)
-Definition struct_free_def:
-  (struct_free (StructT _) ⇔ F) ∧
-  (struct_free (ArrayT ty _) ⇔ struct_free ty) ∧
-  (struct_free (LocatedT _ ty) ⇔ struct_free ty) ∧
-  (struct_free _ ⇔ T)
+(* ABI object leaves currently supported by the codec. Shape and location
+ * are checked separately by located_object_shape. *)
+Definition abi_object_leaves_def:
+  (abi_object_leaves (ArrayT ty _) ⇔ abi_object_leaves ty) ∧
+  (abi_object_leaves (LocatedT _ ty) ⇔ abi_object_leaves ty) ∧
+  (abi_object_leaves ty ⇔ is_elementary_type ty ∨ byte_sequence_type ty)
 End
 
 (* Whether an encoding of the type has a fixed size, with no offsets. *)
@@ -297,7 +296,8 @@ Definition memory_type_ok_def:
   (memory_type_ok env n _ ⇔ T) ∧
   (memory_fields_ok env n [] ⇔ T) ∧
   (memory_fields_ok env n (ty :: tys) ⇔
-    (is_stored_scalar_type ty ∨ (located_object_shape MemoryLoc ty ∧ memory_type_ok env n ty)) ∧
+    ((is_stored_scalar_type ty ∨ located_object_shape MemoryLoc ty) ∧
+     memory_type_ok env n ty) ∧
     memory_fields_ok env n tys)
 Termination
   WF_REL_TAC ‘inv_image ($< LEX $<) (λx. case x of
@@ -327,16 +327,6 @@ Definition element_type_def:
     if is_stored_scalar_type element then element else LocatedT loc element
 End
 
-(* Object types supported by the ABI reader: bytes or arrays with elementary
- * leaves. Declared aggregate and enum leaves need environment-aware decoding. *)
-Definition abi_object_type_def:
-  (abi_object_type (ArrayT element length) ⇔
-    valid_array_length length ∧
-    ((is_elementary_type element ∧ valid_type_shape element) ∨
-     abi_object_type element)) ∧
-  (abi_object_type ty ⇔ byte_sequence_type ty)
-End
-
 (* Indexed values share their element type independently of their layout. *)
 Definition indexed_element_type_def:
   indexed_element_type ty =
@@ -355,10 +345,8 @@ End
 Definition abi_value_type_def:
   abi_value_type ty ⇔
     is_stored_scalar_type ty ∨
-    (located_value_type ty ∧
-     case ty of LocatedT StorageLoc _ => F
-              | LocatedT _ element => abi_object_type element
-              | _ => F)
+    (located_value_type ty ∧ abi_object_leaves ty ∧
+     case ty of LocatedT StorageLoc _ => F | _ => T)
 End
 
 Definition core_binding_type_def:

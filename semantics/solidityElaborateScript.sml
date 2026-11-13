@@ -752,7 +752,7 @@ Definition abi_argument_def:
         (case ty of
            LocatedT _ element =>
              if byte_sequence_type element ∨
-                (¬packed ∧ located_object_shape MemoryLoc element ∧ abi_object_type element)
+                (¬packed ∧ abi_value_type (LocatedT MemoryLoc element))
              then INL (LocatedT MemoryLoc element, a)
              else INR "abi encoding of this type"
          | _ => INR "abi encoding of this type")
