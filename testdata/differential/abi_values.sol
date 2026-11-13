@@ -133,6 +133,10 @@ contract AbiValues {
         emit Logged(o.items[0], o, p);
     }
 
+    function kinds(Kind[] memory ks) external pure returns (Kind[] memory, uint256) {
+        return (ks, ks.length);
+    }
+
     function revertBad(Inner calldata i) external pure {
         revert Bad(i, Kind.Mid);
     }

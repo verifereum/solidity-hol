@@ -263,7 +263,8 @@ Definition located_object_shape_def:
     | _ => byte_sequence_type ty) ∧
   (located_object_shape loc (ArrayT element length) ⇔
     valid_array_length length ∧
-    ((is_elementary_type element ∧ valid_type_shape element) ∨
+    (((if loc = MemoryLoc then is_stored_scalar_type element
+        else is_elementary_type element) ∧ valid_type_shape element) ∨
      located_object_shape loc element)) ∧
   (located_object_shape loc (StructT _) ⇔ T) ∧
   (located_object_shape loc ty ⇔ byte_sequence_type ty)
@@ -280,10 +281,12 @@ Definition memory_type_ok_def:
     case lookup_struct env id of
       SOME fields => memory_fields_ok env (n - 1) (MAP SND fields)
     | NONE => F) ∧
+  (memory_type_ok env n (EnumT id) ⇔ IS_SOME (lookup_enum env id)) ∧
   (memory_type_ok env n _ ⇔ T) ∧
   (memory_fields_ok env n [] ⇔ T) ∧
   (memory_fields_ok env n (ty :: tys) ⇔
-    (is_stored_scalar_type ty ∨ (located_object_shape MemoryLoc ty ∧ memory_type_ok env n ty)) ∧
+    ((is_stored_scalar_type ty ∨ located_object_shape MemoryLoc ty) ∧
+     memory_type_ok env n ty) ∧
     memory_fields_ok env n tys)
 Termination
   WF_REL_TAC ‘inv_image ($< LEX $<) (λx. case x of
@@ -966,18 +969,13 @@ Definition wf_core_operation_def:
          | SOME (ReferenceType (ArrayT _ NONE)) => T
          | _ => F)
     | _ => F) ∧
-  (wf_core_operation env ctx annotation (ArrayPushOperation a value) ⇔
+  (wf_core_operation env ctx annotation (ArrayPushOperation a) ⇔
     case a of
       BoundAtom x =>
         (case storage_base (ALOOKUP ctx.bindings x) of
            SOME (ArrayT element NONE) =>
              storage_type_ok env element ∧
-             annotation = ReferenceType element ∧
-             (case value of
-                NONE => T
-              | SOME v =>
-                  IS_SOME (storage_bytes element) ∧
-                  wf_core_atom env ctx (SingleType element) v)
+             annotation = ReferenceType element
          | _ => F)
     | _ => F) ∧
   (wf_core_operation env ctx annotation (ArrayPopOperation a) ⇔
@@ -986,7 +984,7 @@ Definition wf_core_operation_def:
       BoundAtom x =>
         (case storage_base (ALOOKUP ctx.bindings x) of
            SOME (ArrayT element NONE) =>
-             storage_type_ok env element ∧ IS_SOME (storage_bytes element)
+             storage_type_ok env element
          | _ => F)
     | _ => F) ∧
   (wf_core_operation env ctx annotation (InternalCallOperation f args) ⇔
@@ -1537,8 +1535,9 @@ Definition check_core_stmts_def:
       BoundAtom x =>
         (case ALOOKUP ctx.bindings x of
            SOME (ReferenceType ty) =>
-             if fresh_core_id ctx t ∧ core_scalar_type env ty ∧
-                IS_SOME (storage_bytes ty)
+             if fresh_core_id ctx t ∧
+                ((core_scalar_type env ty ∧ IS_SOME (storage_bytes ty)) ∨
+                 located_type_ok env StorageLoc ty)
              then check_core_stmts env (capture_core_target t ty ctx) ss
              else NONE
          | _ => NONE)
@@ -1590,6 +1589,15 @@ Definition check_core_stmts_def:
         | _ => F) ∧
        wf_core_atom env ctx (SingleType src) a ∧
        wf_core_atom env ctx (SingleType dst) b
+    then check_core_stmts env ctx ss else NONE) ∧
+  (check_core_stmts env ctx (ResetTargetStmt t ty :: ss) =
+    if ALOOKUP ctx.targets t = SOME ty ∧
+       (core_scalar_type env ty ∨
+        case ty of
+          LocatedT MemoryLoc element => located_type_ok env MemoryLoc element
+        | LocatedT _ _ => F
+        | MappingT _ _ => F
+        | _ => located_type_ok env StorageLoc ty)
     then check_core_stmts env ctx ss else NONE) ∧
   (check_core_stmts env ctx (WriteScalarStmt t ty a :: ss) =
     if core_scalar_type env ty ∧ ALOOKUP ctx.targets t = SOME ty ∧

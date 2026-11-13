@@ -1218,7 +1218,7 @@ QED
 Theorem array_push_missing_binding_rejected:
   ¬wf_core_operation test_env
     <| bindings := []; targets := []; returns := []; in_loop := F |>
-    (ReferenceType (UintT 8)) (ArrayPushOperation (BoundAtom (AstId 1)) NONE)
+    (ReferenceType (UintT 8)) (ArrayPushOperation (BoundAtom (AstId 1)))
 Proof
   CONV_TAC cv_eval
 QED
@@ -1252,6 +1252,23 @@ Theorem calldata_byte_is_not_a_writable_reference:
     (ReferenceType (FixedBytesT 1))
     (NavigateOperation (FixedBytesT 1) (BoundAtom (AstId 1))
       (IndexNavigation (ConstantAtom (IntegerValue 0))))
+Proof
+  EVAL_TAC
+QED
+
+(* Memory enum arrays cross the ABI boundary with declared enums only; the
+ * codec validates each element as it decodes it. *)
+Theorem memory_enum_arrays_abi_boundary:
+  core_binding_type test_env
+    (LocatedT MemoryLoc (ArrayT (EnumT (AstId 900)) NONE)) ∧
+  ¬core_binding_type test_env
+    (LocatedT MemoryLoc (ArrayT (EnumT (AstId 901)) NONE)) ∧
+  memory_fields_ok test_env 1 [EnumT (AstId 900)] ∧
+  ¬memory_fields_ok test_env 1 [EnumT (AstId 901)] ∧
+  abi_type_ok test_env (LocatedT MemoryLoc (ArrayT (EnumT (AstId 900)) NONE)) ∧
+  abi_type_ok test_env
+    (LocatedT MemoryLoc (ArrayT (ArrayT (EnumT (AstId 900)) NONE) NONE)) ∧
+  ¬abi_type_ok test_env (LocatedT MemoryLoc (ArrayT (EnumT (AstId 901)) NONE))
 Proof
   EVAL_TAC
 QED
@@ -1298,4 +1315,52 @@ Theorem byte_prefix_rejects_bad_width_and_type:
     (SingleType (FixedBytesT 4)) (BytesToFixedOperation 4 (BoundAtom (AstId 1)))
 Proof
   CONV_TAC cv_eval
+QED
+
+Theorem reset_accepts_scalar_and_located_memory_targets:
+  EVERY (λty. IS_SOME (check_core_stmts test_env
+    <| bindings := []; targets := [(AstId 1, ty)]; returns := []; in_loop := F |>
+    [ResetTargetStmt (AstId 1) ty]))
+    [UintT 8; BoolT; EnumT (AstId 900);
+     FunctionT InternalFn PureMut [] [];
+     LocatedT MemoryLoc BytesT; LocatedT MemoryLoc (ArrayT (UintT 8) (SOME 2))]
+Proof
+  EVAL_TAC
+QED
+
+Theorem reset_accepts_captured_storage_objects:
+  EVERY (λty. IS_SOME (check_core_stmts
+    (struct_layout_environment [packed_struct_layout])
+    <| bindings := [(AstId 1, ReferenceType ty)]; targets := [];
+       returns := []; in_loop := F |>
+    [CaptureValueStmt (AstId 2) (BoundAtom (AstId 1)); ResetTargetStmt (AstId 2) ty]))
+    [BytesT; StringT; ArrayT (UintT 8) NONE; StructT (AstId 950)]
+Proof
+  EVAL_TAC
+QED
+
+Theorem reset_rejects_readonly_pointer_mapping_and_bad_targets:
+  EVERY (λty. ¬IS_SOME (check_core_stmts test_env
+    <| bindings := []; targets := [(AstId 1, ty)]; returns := []; in_loop := F |>
+    [ResetTargetStmt (AstId 1) ty]))
+    [LocatedT CalldataLoc BytesT; LocatedT StorageLoc BytesT;
+     MappingT (UintT 256) (UintT 256); StructT (AstId 999); UintT 7] ∧
+  ¬IS_SOME (check_core_stmts test_env
+    <| bindings := []; targets := [(AstId 1, UintT 8)]; returns := []; in_loop := F |>
+    [ResetTargetStmt (AstId 1) (UintT 16)]) ∧
+  ¬IS_SOME (check_core_stmts test_env
+    <| bindings := []; targets := []; returns := []; in_loop := F |>
+    [ResetTargetStmt (AstId 1) (UintT 8)])
+Proof
+  EVAL_TAC
+QED
+
+Theorem aggregate_capture_does_not_admit_scalar_assignment:
+  ¬IS_SOME (check_core_stmts test_env
+    <| bindings := [(AstId 1, ReferenceType (ArrayT (UintT 8) NONE))];
+       targets := []; returns := []; in_loop := F |>
+    [CaptureValueStmt (AstId 2) (BoundAtom (AstId 1));
+     WriteScalarStmt (AstId 2) (ArrayT (UintT 8) NONE) (ConstantAtom (IntegerValue 0))])
+Proof
+  EVAL_TAC
 QED

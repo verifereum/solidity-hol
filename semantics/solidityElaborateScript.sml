@@ -879,19 +879,6 @@ Definition index_value_ok_def:
     | _ => F
 End
 
-(* An element dynamic storage arrays push and pop. *)
-Definition push_element_ok_def:
-  push_element_ok element ⇔
-    case element of EnumT _ => T | _ => elementary_storage_type_ok element
-End
-
-(* An element dynamic storage arrays push with no value: also a struct,
- * whose new element is the storage it now covers. *)
-Definition empty_push_element_ok_def:
-  empty_push_element_ok element ⇔
-    case element of StructT _ => T | _ => push_element_ok element
-End
-
 (* A call of an internal function or a super call, annotated with tid: as
  * many arguments as parameters, in a valid order, a callee that is not
  * external, and the callee's return types as its type. *)
@@ -1199,15 +1186,20 @@ End
 (* Keep value checks outside the mutually recursive elaborator so pattern
  * completion does not duplicate the recursive definition across type cases. *)
 Definition finish_delete_def:
-  finish_delete (id : num) ss target n =
+  finish_delete ctx (id : num) ss target n =
     let ty = destination_type target in
-    if ¬is_stored_scalar_type ty then INR [(id, "delete of a non-scalar")] else
-    case default_operation ty of
-      SOME operation =>
-        let (ds, zero) = bind_value n ty operation in
-        INL ((ss ++ ds ++ write_destination (n + 1) target zero,
-              ConstantAtom (BoolValue F), ElabTuple []), n + 2)
-    | NONE => INR [(id, "delete of a non-scalar")]
+    let allowed =
+      case ty of
+        LocatedT MemoryLoc element => memory_binding_ok ctx.enums ctx.structs ty
+      | LocatedT _ _ => F
+      | MappingT _ _ => F
+      | _ => is_stored_scalar_type ty ∨ is_function_type ty ∨
+             (located_object_shape StorageLoc ty ∧
+              memory_binding_ok ctx.enums ctx.structs (LocatedT StorageLoc ty)) in
+    if ¬allowed then INR [(id, "delete of this type or location")] else
+    INL ((ss ++ capture_destination n target ++
+            [ResetTargetStmt (AstId n) ty],
+          ConstantAtom (BoolValue F), ElabTuple []), n + 1)
 End
 
 Definition finish_transfer_def:
@@ -1505,7 +1497,7 @@ Definition elab_expr_def:
         (if op = SrcDelete then
            ensure (tid = "t_tuple$__$") (info.node_id, "type annotation mismatch")
            (case elab_destination ctx n e of
-              INL ((ss, target), n1) => finish_delete info.node_id ss target n1
+              INL ((ss, target), n1) => finish_delete ctx info.node_id ss target n1
             | INR bs => INR bs)
          else case identifier_integer tid of
            SOME i =>
@@ -1718,9 +1710,7 @@ Definition elab_expr_def:
            SrcArrayMember _ member root_expr _ =>
              (case elab_location ctx n root_expr of
                 INL ((ss, ref, ArrayT element NONE), n1) =>
-                  if order ≠ [] ∨
-                     ¬(if member = "push" ∧ args = [] then empty_push_element_ok element
-                       else push_element_ok element)
+                  if order ≠ []
                   then INR [(info.node_id, "unsupported array member call")] else
                   if member = "push" then
                     (case args of
@@ -1732,18 +1722,24 @@ Definition elab_expr_def:
                          let (rs, a) = bind_value (n1 + 1) ty
                                          (ReadOperation element target) in
                          INL ((ss ++ [DefineStmt (AstId n1) (ReferenceType element)
-                                        (ArrayPushOperation ref NONE)] ++ rs,
+                                        (ArrayPushOperation ref)] ++ rs,
                                a, ElabType ty), n1 + 2)
                      | [arg] =>
                          ensure (tid = "t_tuple$__$") (info.node_id, "type annotation mismatch")
-                         (case elab_expr ctx n1 arg of
+                         (let array_ty = ArrayT element NONE in
+                          let (saved, array) = bind_value n1 (LocatedT StorageLoc array_ty)
+                            (ReadOperation array_ty ref) in
+                          case elab_expr ctx (n1 + 1) arg of
                             INL ((sa, a, vt), n2) =>
-                              (case coerce n2 element a vt of
-                                 INL ((cs, a'), n3) =>
-                                   INL ((ss ++ sa ++ cs ++
-                                           [DefineStmt (AstId n3) (ReferenceType element)
-                                              (ArrayPushOperation ref (SOME a'))],
-                                         ConstantAtom (BoolValue F), ElabTuple []), n3 + 1)
+                              let target = ReferenceDestination (BoundAtom (AstId n2)) element in
+                              if ¬copy_target_ok ctx.enums ctx.structs target
+                              then INR [(info.node_id, "storage copy of this type")] else
+                              (case plain_assignment (n2 + 1) target a vt of
+                                 INL ((cs, _, _), n3) =>
+                                   INL ((ss ++ saved ++ sa ++
+                                           [DefineStmt (AstId n2) (ReferenceType element)
+                                              (ArrayPushOperation array)] ++ cs,
+                                         ConstantAtom (BoolValue F), ElabTuple []), n3)
                                | INR why => INR [(expr_id arg, why)])
                           | INR bs => INR bs)
                      | _ => INR [(info.node_id, "unsupported array member call")])
@@ -2405,11 +2401,11 @@ Definition elab_expr_def:
     | SrcFunctionCall info (SrcArrayMember _ member root_expr _) [] [] tid =>
         (case elab_location ctx n root_expr of
            INL ((ss, ref, ArrayT element NONE), n1) =>
-             if ¬(member = "push" ∧ empty_push_element_ok element ∧
+             if ¬(member = "push" ∧
                   source_type_matches element tid)
              then INR [(info.node_id, "unsupported array member call")] else
              INL ((ss ++ [DefineStmt (AstId n1) (ReferenceType element)
-                            (ArrayPushOperation ref NONE)],
+                            (ArrayPushOperation ref)],
                    BoundAtom (AstId n1), element), n1 + 1)
          | INL _ => INR [(info.node_id, "unsupported array member call")]
          | INR bs => INR bs)
