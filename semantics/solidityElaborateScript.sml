@@ -962,8 +962,105 @@ Definition elab_type_declarations_def:
                            (field_variable_type v)) s.struct_members))) structs))
 End
 
+(* The state variables at their layout entries, which a valid unit lists in
+ * the same order.
+ *)
+Definition core_state_variables_def:
+  (core_state_variables [] [] = SOME []) ∧
+  (core_state_variables ((x, ty) :: vs) (e :: es) =
+    case core_state_variables vs es of
+      SOME cvs =>
+        SOME (<| state_id := AstId x; state_type := ty;
+                 state_backend := e.storage_backend;
+                 state_slot := n2w e.storage_slot;
+                 state_offset := e.storage_offset |> :: cvs)
+    | NONE => NONE) ∧
+  (core_state_variables _ _ = NONE)
+End
+
+(* Pack scalar members from the low-order byte; aggregates occupy whole
+ * slots. fixed_storage_slots also handles packing inside fixed arrays. *)
+Definition computed_struct_fields_def:
+  (computed_struct_fields env slot offset [] =
+    SOME (slot + (if offset = 0 then 0 else 1), [])) ∧
+  (computed_struct_fields env slot offset (v :: vs) =
+    case field_variable_type v of
+      NONE => NONE
+    | SOME ty =>
+        case storage_bytes ty of
+          SOME bytes =>
+            if bytes = 0 ∨ 32 < bytes then NONE else
+            let (pos, off) = if offset + bytes ≤ 32 then (slot, offset)
+                             else (slot + 1, 0) in
+            OPTION_MAP (λ(slots, fields).
+              (slots, <| state_id := AstId v.var_info.node_id; state_type := ty;
+                         state_backend := PersistentStorage;
+                         state_slot := n2w pos; state_offset := off |> :: fields))
+              (computed_struct_fields env pos (off + bytes) vs)
+        | NONE =>
+            case fixed_storage_slots env ty of
+              NONE => NONE
+            | SOME slots_used =>
+                let pos = slot + (if offset = 0 then 0 else 1) in
+                OPTION_MAP (λ(slots, fields).
+                  (slots, <| state_id := AstId v.var_info.node_id; state_type := ty;
+                         state_backend := PersistentStorage;
+                             state_slot := n2w pos; state_offset := 0 |> :: fields))
+                  (computed_struct_fields env (pos + slots_used) 0 vs))
+End
+
+(* Each round resolves one more level of inline struct containment. A mapping
+ * or dynamic array needs only its root slot, so recursive structs through
+ * those containers do not consume another round. *)
+Definition computed_struct_layouts_def:
+  (computed_struct_layouts 0 structs = []) ∧
+  (computed_struct_layouts (SUC n) structs =
+    let layouts = computed_struct_layouts n structs in
+    let env = <| procedures := []; state_variables := []; immutables := [];
+                 type_declarations := [];
+                 struct_layouts := MAP (λs. (s.struct_id, s)) layouts |> in
+    FLAT (MAP (λs.
+      case computed_struct_fields env 0 0 s.struct_members of
+        NONE => []
+      | SOME (slots, fields) =>
+          [<| struct_id := AstId s.struct_info.node_id;
+              struct_fields := fields; struct_slots := slots |>]) structs))
+End
+
+Definition elab_struct_layouts_with_def:
+  (elab_struct_layouts_with computed [] = SOME []) ∧
+  (elab_struct_layouts_with computed (s :: ss) =
+    case elab_struct_layouts_with computed ss of
+      NONE => NONE
+    | SOME layouts =>
+        case s.struct_layout of
+          NONE => SOME (case ALOOKUP computed (AstId s.struct_info.node_id) of
+                          NONE => layouts
+                        | SOME layout => layout :: layouts)
+        | SOME (bytes, fields) =>
+            case all_some (MAP (λv. OPTION_MAP (λty. (v.var_info.node_id, ty))
+                               (field_variable_type v)) s.struct_members) of
+              NONE => NONE
+            | SOME types =>
+                case core_state_variables types fields of
+                  NONE => NONE
+                | SOME cvs =>
+                    SOME (<| struct_id := AstId s.struct_info.node_id;
+                             struct_fields := cvs; struct_slots := bytes DIV 32 |>
+                          :: layouts))
+End
+
+
+Definition elab_struct_layouts_def:
+  elab_struct_layouts structs =
+    elab_struct_layouts_with
+      (MAP (λs. (s.struct_id, s))
+        (computed_struct_layouts (LENGTH structs) structs)) structs
+End
+
 (* Whether a binding of type ty is one the core accepts: a memory type's
- * structs are declared, not recursive and hold no mapping. *)
+ * structs are declared, not recursive and hold no mapping; a storage type's
+ * structs have layouts. *)
 Definition memory_binding_ok_def:
   memory_binding_ok enums structs ty ⇔
     case ty of
@@ -974,6 +1071,13 @@ Definition memory_binding_ok_def:
                                struct_layouts := []; type_declarations := decls |>
                (LENGTH decls) element
          | NONE => F)
+    | LocatedT StorageLoc element =>
+        (case (elab_type_declarations enums structs, elab_struct_layouts structs) of
+           (SOME decls, SOME layouts) =>
+             storage_type_ok <| procedures := []; state_variables := []; immutables := [];
+                                struct_layouts := MAP (λs. (s.struct_id, s)) layouts;
+                                type_declarations := decls |> element
+         | _ => F)
     | _ => T
 End
 
@@ -1537,8 +1641,12 @@ Definition elab_expr_def:
          | INR bs => INR bs)
     | SrcTupleExpression info cs tid =>
         (case (decode_type_identifier tid, elab_components ctx n cs) of
-           (SOME (SrcTupleType tys), INL ((ss, vs), n1)) =>
-             if MEM NONE cs then INR [(info.node_id, "tuple with an empty component")] else
+           (SOME (SrcTupleType tys0), INL ((ss, vs), n1)) =>
+             (* a storage component is a reference, as a read gives it *)
+             let tys = MAP read_value_type tys0 in
+             if MEM NONE cs then INR [(info.node_id, "tuple with an empty component")]
+             else if ¬EVERY (memory_binding_ok ctx.enums ctx.structs) tys then
+               INR [(info.node_id, "unsupported tuple type")] else
              (case convert_operands n1 info.node_id
                      (MAP (λc. case c of NONE => info.node_id | SOME e => expr_id e) cs)
                      (values_of tys) vs of
@@ -3066,9 +3174,11 @@ Definition elab_levels_def:
         case (all_some (MAP variable_binding md.modifier_parameters),
               md.modifier_body) of
           (SOME mps, SrcBlock minfo mss) =>
-            let own = if static_memory_returns rs
-                      then [(m, "modifier of a function returning a static memory array")]
-                      else [] in
+            let own = (if static_memory_returns rs
+                       then [(m, "modifier of a function returning a static memory array")]
+                       else []) ++
+                      (if EVERY (λ(_, ty). memory_binding_ok ctx.enums ctx.structs ty) mps
+                       then [] else [(m, "unsupported modifier parameter type")]) in
             let mctx = ctx with <| supers := []; variables := mps;
                                    placeholder := SOME (n, ps);
                                    scope := minfo.node_id;
@@ -3198,102 +3308,6 @@ Definition elab_functions_def:
            INL (ps', n2) => INL (ps ++ ps', n2)
          | INR bs => INR bs)
     | INR bs => INR (bs ++ blockers (elab_functions ctx c strict library n fs)))
-End
-
-(* The state variables at their layout entries, which a valid unit lists in
- * the same order.
- *)
-Definition core_state_variables_def:
-  (core_state_variables [] [] = SOME []) ∧
-  (core_state_variables ((x, ty) :: vs) (e :: es) =
-    case core_state_variables vs es of
-      SOME cvs =>
-        SOME (<| state_id := AstId x; state_type := ty;
-                 state_backend := e.storage_backend;
-                 state_slot := n2w e.storage_slot;
-                 state_offset := e.storage_offset |> :: cvs)
-    | NONE => NONE) ∧
-  (core_state_variables _ _ = NONE)
-End
-
-(* Pack scalar members from the low-order byte; aggregates occupy whole
- * slots. fixed_storage_slots also handles packing inside fixed arrays. *)
-Definition computed_struct_fields_def:
-  (computed_struct_fields env slot offset [] =
-    SOME (slot + (if offset = 0 then 0 else 1), [])) ∧
-  (computed_struct_fields env slot offset (v :: vs) =
-    case field_variable_type v of
-      NONE => NONE
-    | SOME ty =>
-        case storage_bytes ty of
-          SOME bytes =>
-            if bytes = 0 ∨ 32 < bytes then NONE else
-            let (pos, off) = if offset + bytes ≤ 32 then (slot, offset)
-                             else (slot + 1, 0) in
-            OPTION_MAP (λ(slots, fields).
-              (slots, <| state_id := AstId v.var_info.node_id; state_type := ty;
-                         state_backend := PersistentStorage;
-                         state_slot := n2w pos; state_offset := off |> :: fields))
-              (computed_struct_fields env pos (off + bytes) vs)
-        | NONE =>
-            case fixed_storage_slots env ty of
-              NONE => NONE
-            | SOME slots_used =>
-                let pos = slot + (if offset = 0 then 0 else 1) in
-                OPTION_MAP (λ(slots, fields).
-                  (slots, <| state_id := AstId v.var_info.node_id; state_type := ty;
-                         state_backend := PersistentStorage;
-                             state_slot := n2w pos; state_offset := 0 |> :: fields))
-                  (computed_struct_fields env (pos + slots_used) 0 vs))
-End
-
-(* Each round resolves one more level of inline struct containment. A mapping
- * or dynamic array needs only its root slot, so recursive structs through
- * those containers do not consume another round. *)
-Definition computed_struct_layouts_def:
-  (computed_struct_layouts 0 structs = []) ∧
-  (computed_struct_layouts (SUC n) structs =
-    let layouts = computed_struct_layouts n structs in
-    let env = <| procedures := []; state_variables := []; immutables := [];
-                 type_declarations := [];
-                 struct_layouts := MAP (λs. (s.struct_id, s)) layouts |> in
-    FLAT (MAP (λs.
-      case computed_struct_fields env 0 0 s.struct_members of
-        NONE => []
-      | SOME (slots, fields) =>
-          [<| struct_id := AstId s.struct_info.node_id;
-              struct_fields := fields; struct_slots := slots |>]) structs))
-End
-
-Definition elab_struct_layouts_with_def:
-  (elab_struct_layouts_with computed [] = SOME []) ∧
-  (elab_struct_layouts_with computed (s :: ss) =
-    case elab_struct_layouts_with computed ss of
-      NONE => NONE
-    | SOME layouts =>
-        case s.struct_layout of
-          NONE => SOME (case ALOOKUP computed (AstId s.struct_info.node_id) of
-                          NONE => layouts
-                        | SOME layout => layout :: layouts)
-        | SOME (bytes, fields) =>
-            case all_some (MAP (λv. OPTION_MAP (λty. (v.var_info.node_id, ty))
-                               (field_variable_type v)) s.struct_members) of
-              NONE => NONE
-            | SOME types =>
-                case core_state_variables types fields of
-                  NONE => NONE
-                | SOME cvs =>
-                    SOME (<| struct_id := AstId s.struct_info.node_id;
-                             struct_fields := cvs; struct_slots := bytes DIV 32 |>
-                          :: layouts))
-End
-
-
-Definition elab_struct_layouts_def:
-  elab_struct_layouts structs =
-    elab_struct_layouts_with
-      (MAP (λs. (s.struct_id, s))
-        (computed_struct_layouts (LENGTH structs) structs)) structs
 End
 
 (* Getters. The location a getter reads, from the state variable's
@@ -3928,6 +3942,11 @@ val () = cv_auto_trans abi_encoding_def;
 val () = cv_auto_trans decoded_types_match_def;
 val () = cv_auto_trans arrange_def;
 val () = cv_auto_trans elab_type_declarations_def;
+val () = cv_auto_trans core_state_variables_def;
+val () = cv_auto_trans computed_struct_fields_def;
+val () = cv_auto_trans computed_struct_layouts_def;
+val () = cv_auto_trans elab_struct_layouts_with_def;
+val () = cv_auto_trans elab_struct_layouts_def;
 val () = cv_auto_trans memory_binding_ok_def;
 val () = cv_auto_trans copy_target_ok_def;
 val () = cv_auto_trans memory_struct_root_def;
@@ -4214,11 +4233,6 @@ val () = cv_auto_trans bound_variables_def;
 val () = cv_auto_trans elab_function_def;
 val () = cv_auto_trans contract_ctx_def;
 val () = cv_auto_trans elab_functions_def;
-val () = cv_auto_trans core_state_variables_def;
-val () = cv_auto_trans computed_struct_fields_def;
-val () = cv_auto_trans computed_struct_layouts_def;
-val () = cv_auto_trans elab_struct_layouts_with_def;
-val () = cv_auto_trans elab_struct_layouts_def;
 val () = cv_auto_trans getter_location_def;
 val () = cv_auto_trans getter_result_def;
 val () = cv_auto_trans getter_parameters_def;

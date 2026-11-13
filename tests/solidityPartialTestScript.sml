@@ -37,7 +37,11 @@ val prepared = #prepared (solidityPrepareLib.prepare_artifact
  * memory, which the core does not hold, and copyTree copies one in storage.
  * encodePair, emitPair and putPair take a memory struct across an ABI
  * boundary, which the core does not model. Roles.Grant has an enum-keyed mapping, so the storage local of
- * grantCount does not elaborate. *)
+ * grantCount does not elaborate, nor does grantParam's storage parameter,
+ * which its body never uses.
+ * nodeModified's modifier takes a recursive struct in memory, which fails at
+ * elaboration rather than leaving the unit ill-formed; treeTuple's tuple holds
+ * a storage struct, as a reference, which elaborates. *)
 val outcomes = map (fn {name, reason, ...} => (name, reason)) (#functions prepared);
 fun reasons name =
   map #2 (List.filter (fn (n, _) => n = name) outcomes);
@@ -52,6 +56,8 @@ fun elaboration_failure r =
   case r of
     SOME m => List.all hol_blocker (String.tokens (fn c => c = #"\n") m)
   | NONE => false;
+fun elaboration_failure_with tag r =
+  elaboration_failure r andalso String.isSubstring tag (valOf r);
 fun imported_failure r =
   case r of
     SOME m => not (String.isPrefix "calls" m) andalso not (elaboration_failure r)
@@ -85,7 +91,14 @@ val () =
      length (reasons "putPair") = 1 andalso
      List.all elaboration_failure (reasons "grantCount") andalso
      length (reasons "grantCount") = 1 andalso
-     length outcomes = 17
+     List.all (elaboration_failure_with "unsupported memory struct type")
+       (reasons "grantParam") andalso
+     length (reasons "grantParam") = 1 andalso
+     List.all (elaboration_failure_with "unsupported modifier parameter type")
+       (reasons "nodeModified") andalso
+     length (reasons "nodeModified") = 1 andalso
+     reasons "treeTuple" = [NONE] andalso
+     length outcomes = 20
   then ()
   else raise Fail ("unexpected function outcomes: " ^
     String.concatWith "; " (map (fn (n, r) => n ^ " " ^
