@@ -234,6 +234,14 @@ Definition eval_operation_def:
         (case eval_atom st.scopes a of
            SOME (ReferenceValue (MemoryReference h i rty)) =>
              read_memory_reference st ty (MemoryReference h i rty)
+         | SOME (ReferenceValue (CalldataReference head n rty)) =>
+             if (case ty of LocatedT _ t => t | t => t) ≠ rty then
+               ValueAbrupt (InvalidCompletion "bad calldata reference")
+             else if is_stored_scalar_type rty then
+               (case calldata_part env st.frame.call_data rty head head of
+                  INL v => ValueOk v
+                | INR c => ValueAbrupt c)
+             else ValueOk (ReferenceValue (CalldataReference head n rty))
          | SOME (ReferenceValue (ImmutableReference x)) =>
              (case FLOOKUP st.immutables (ast_key x) of
                 SOME s => ValueOk (ScalarValue s)
@@ -279,7 +287,8 @@ Definition eval_operation_def:
                       | NONE => ValueAbrupt (InvalidCompletion "bad indexed storage type"))
                  | CalldataReference data n (ArrayT element _) =>
                      if i < 0 ∨ &n ≤ i then ValueAbrupt (PanicCompletion 50) else
-                     (case calldata_element st.frame.call_data element data (Num i) of
+                     (case calldata_part env st.frame.call_data element data
+                             (data + Num i * abi_stride env element) of
                         INL v => ValueOk v
                       | INR c => ValueAbrupt c)
                  | MemoryReference _ _ (ArrayT _ _) =>
@@ -303,7 +312,7 @@ Definition eval_operation_def:
                 SOME (ScalarValue (IntegerValue stop)) =>
                   if first < 0 ∨ stop < first ∨ &length < stop
                   then ValueAbrupt (RevertCompletion []) else
-                  let stride = case ty of ArrayT element NONE => abi_stride element | _ => 1 in
+                  let stride = case ty of ArrayT element NONE => abi_stride env element | _ => 1 in
                   ValueOk (ReferenceValue (CalldataReference
                     (offset + Num first * stride) (Num (stop - first)) ty))
               | _ => ValueAbrupt (InvalidCompletion "bad calldata slice end"))
@@ -360,6 +369,10 @@ Definition eval_operation_def:
              (case memory_struct_field env st (MemoryReference h offset rty) member_id of
                 INL (id, k, fty, _) =>
                   ValueOk (ReferenceValue (MemoryReference (HeapId id) k fty))
+              | INR c => ValueAbrupt c)
+         | SOME (ReferenceValue (CalldataReference pos _ (StructT s))) =>
+             (case calldata_struct_field env st.frame.call_data s pos member_id of
+                INL v => ValueOk v
               | INR c => ValueAbrupt c)
          | SOME (ReferenceValue r) => navigate_storage_field env r member_id
          | _ => ValueAbrupt (InvalidCompletion "bad struct reference"))
@@ -671,10 +684,9 @@ Definition call_external_mode_def:
                        <| accounts := r.call_accounts;
                           transient := r.call_transient;
                           logs := st.world.logs ++ r.call_logs |> in
-                 let reserved = if EXISTS (λty. is_dynamic (abi_type ty)) rets then
-                       LENGTH r.call_return
-                     else MIN (head_lengths (MAP abi_type rets) 0)
-                            (LENGTH r.call_return) in
+                 let ret_types = abi_types env (LENGTH env.type_declarations) rets in
+                 let reserved = if EXISTS is_dynamic ret_types then LENGTH r.call_return
+                     else MIN (head_lengths ret_types 0) (LENGTH r.call_return) in
                  let st1 = st' with memory_allocated := st'.memory_allocated +
                        32 * ((reserved + 31) DIV 32) in
                  case decode_arguments env rets r.call_return 0 (memory_free_pointer st1) of
@@ -855,10 +867,10 @@ Definition abi_encode_def:
 End
 
 Definition abi_encode_packed_def:
-  abi_encode_packed x ty tys args st gas =
+  abi_encode_packed env x ty tys args st gas =
     case eval_atoms st.scopes args of
       SOME vs =>
-        (case packed_values st tys vs of
+        (case packed_values env st tys vs of
            INL bs => allocate_encoding x ty bs st gas
          | INR c => abrupt_result c st gas)
     | NONE => abrupt_result (InvalidCompletion "bad abi.encodePacked operands") st gas
@@ -909,7 +921,7 @@ Definition simple_stmt_def:
     | DefineStmt x ty (CopyToMemoryOperation a) =>
         (case eval_atom st.scopes a of
            SOME (ReferenceValue (CalldataReference data n rty)) =>
-             (case copy_calldata_array st.frame.call_data rty data n
+             (case copy_calldata_array env st.frame.call_data rty data n
                      (memory_free_pointer st) of
                 INL v =>
                   (case materialize_value env rty v st of
@@ -931,7 +943,7 @@ Definition simple_stmt_def:
     | DefineStmt x ty (AbiEncodeOperation selector tys args) =>
         abi_encode env x ty selector tys args st gas
     | DefineStmt x ty (AbiEncodePackedOperation tys args) =>
-        abi_encode_packed x ty tys args st gas
+        abi_encode_packed env x ty tys args st gas
     | DefineStmt x ty (ArrayPushOperation a value) =>
         push_storage_array env x ty a value st gas
     | DefineStmt x ty (ArrayPopOperation a) =>

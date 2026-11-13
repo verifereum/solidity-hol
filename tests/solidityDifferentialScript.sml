@@ -81,6 +81,22 @@ Definition argument_values_def:
   (argument_values _ _ = NONE)
 End
 
+(* The context test arguments, scalars and byte sequences, take their ABI
+ * types and values in: no type declarations. A struct or array argument is
+ * given as raw calldata. *)
+Definition argument_env_def:
+  argument_env = <|
+    procedures := []; state_variables := []; immutables := [];
+    struct_layouts := []; type_declarations := [] |> : core_environment
+End
+
+Definition encoded_values_def:
+  encoded_values tys vs =
+    case fields_abi_value argument_env tys vs of
+      SOME avs => SOME (enc (Tuple (abi_types argument_env 0 tys)) (ListV avs))
+    | NONE => NONE
+End
+
 (* Functions of the unit's contract *)
 
 Definition unit_function_def:
@@ -184,7 +200,7 @@ End
 Definition call_data_def:
   call_data name params vs =
     case encoded_values params vs of
-      SOME bs => SOME (function_selector name (MAP abi_type params) ++ bs)
+      SOME bs => SOME (function_selector name (abi_types argument_env 0 params) ++ bs)
     | NONE => NONE
 End
 
@@ -471,6 +487,8 @@ val () = cv_auto_trans argument_scalar_def;
 val () = cv_auto_trans solidityCoreWfTheory.elementary_scalar_has_type_def;
 val () = cv_auto_trans argument_value_def;
 val () = cv_auto_trans argument_values_def;
+val () = cv_auto_trans argument_env_def;
+val () = cv_auto_trans encoded_values_def;
 val () = cv_auto_trans unit_function_def;
 val () = cv_auto_trans function_types_def;
 val () = cv_auto_trans unit_immutables_def;
