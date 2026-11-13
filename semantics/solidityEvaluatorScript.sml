@@ -914,7 +914,7 @@ Definition simple_stmt_def:
                 INL v =>
                   (case materialize_value env rty v st of
                      SOME (v', st') => normal_result (define_binding x ty v' st') gas
-                   | NONE => abrupt_result (InvalidCompletion "bad calldata array copy") st gas)
+                   | NONE => abrupt_result (InvalidCompletion "bad calldata object copy") st gas)
               | INR c => abrupt_result c st gas)
          | SOME (ReferenceValue (StorageReference PersistentStorage addr slot 0 rty _)) =>
              (case storage_array_value env (LENGTH env.type_declarations)
@@ -925,9 +925,9 @@ Definition simple_stmt_def:
                   else
                     (case materialize_value env rty v st of
                        SOME (v', st') => normal_result (define_binding x ty v' st') gas
-                     | NONE => abrupt_result (InvalidCompletion "bad storage array copy") st gas)
+                     | NONE => abrupt_result (InvalidCompletion "bad storage object copy") st gas)
               | INR c => abrupt_result c st gas)
-         | _ => abrupt_result (InvalidCompletion "bad array copy") st gas)
+         | _ => abrupt_result (InvalidCompletion "bad object copy") st gas)
     | DefineStmt x ty (AbiEncodeOperation selector tys args) =>
         abi_encode env x ty selector tys args st gas
     | DefineStmt x ty (AbiEncodePackedOperation tys args) =>

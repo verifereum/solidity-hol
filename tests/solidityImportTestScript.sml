@@ -1035,10 +1035,8 @@ val () = expect_function_lines "unknown enum bound declaration"
   (edit_first "Identifier" (set_field "referencedDeclaration" (JSON.INT 999999)))
   ["unknown enum declaration"]
 
-(* Libraries: only internal functions, attached through a library name, with a
- * receiver that is not copied, are imported; library functions are plain
- * functions.
- *)
+(* Internal library functions are plain calls with an attached receiver
+ * retained as argument 0, including receivers that change data location. *)
 
 val using_fixture = "../testdata/differential/expected/using_for.json"
 val using_source = "testdata/differential/using_for.sol"
@@ -1204,16 +1202,6 @@ val () = import_error_with Unsupported using_contracts "reached library using fu
                     | kv => kv) kvs)
        | v => v)
      using_ast)
-val () = import_error_with UnsupportedFunction using_contracts "receiver copied to memory"
-  (edit_first_where
-     (fn v => is_node "MemberAccess" v andalso
-              JSONUtil.testField "memberName" (fn JSON.STRING s => s = "fill" | _ => false) v)
-     "xs.fill"
-     (fn m => set_field "expression"
-                (type_identifier "t_array$_t_uint256_$dyn_storage_ptr"
-                   (JSONUtil.lookupField m "expression")) m)
-     using_ast)
-
 val () = edited_unit_with using_contracts "library_receive"
   (edit_first_where (named "FunctionDefinition" "addBonus") "addBonus"
      (set_field "kind" (JSON.STRING "receive")) using_ast)
