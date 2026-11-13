@@ -362,11 +362,12 @@ End
 Definition wf_core_value_type_def:
   (wf_core_value_type env (SingleType ty) ⇔
     core_binding_type env ty) ∧
-  (* a captured storage lvalue, or a navigated memory struct field: a
-   * reference field is located in memory *)
+  (* a captured storage lvalue, or a navigated memory or calldata struct
+   * field: a reference field is located with its struct *)
   (wf_core_value_type env (ReferenceType ty) ⇔
     case ty of
       LocatedT MemoryLoc _ => core_binding_type env ty
+    | LocatedT CalldataLoc _ => core_binding_type env ty
     | _ => storage_type_ok env ty) ∧
   (wf_core_value_type env RevertDataType ⇔ T) ∧
   (wf_core_value_type env (ProductType tys) ⇔
