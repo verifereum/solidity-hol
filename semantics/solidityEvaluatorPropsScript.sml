@@ -57,6 +57,28 @@ Proof
   simp[]
 QED
 
+Theorem reset_target_fuel_stable[local]:
+  (reset_target n env t ty st gas).completion ≠ FuelExhausted ∧ n ≤ m ⇒
+  reset_target m env t ty st gas = reset_target n env t ty st gas
+Proof
+  simp[reset_target_def] >> rpt strip_tac >>
+  Cases_on ‘FLOOKUP st.targets (ast_key t)’ >> gvs[] >>
+  rename1 ‘SOME target’ >> Cases_on ‘target’ >> gvs[] >>
+  rename1 ‘ValueTarget ref’ >> Cases_on ‘ref’ >> gvs[] >>
+  rename1 ‘StorageReference space addr slot offset stored_ty layout’ >>
+  Cases_on ‘space’ >> gvs[] >>
+  Cases_on ‘st.frame.static_context’ >> gvs[] >>
+  Cases_on ‘clear_storage_value env (n + LENGTH env.type_declarations)
+    st.world.accounts addr slot offset stored_ty = INR FuelExhausted’
+  >- gvs[abrupt_result_def] >>
+  ‘clear_storage_value env (m + LENGTH env.type_declarations)
+    st.world.accounts addr slot offset stored_ty =
+   clear_storage_value env (n + LENGTH env.type_declarations)
+    st.world.accounts addr slot offset stored_ty’ by
+    (irule (cj 1 solidityStorageTheory.clear_storage_fuel_stable) >> simp[]) >>
+  simp[]
+QED
+
 Theorem simple_stmt_fuel_stable[local]:
   (simple_stmt n env s st gas).completion <> FuelExhausted /\ n <= m ==>
   simple_stmt m env s st gas = simple_stmt n env s st gas
@@ -64,7 +86,7 @@ Proof
   Cases_on ‘s’
   >~ [‘DefineStmt x ty op’] >-
     (Cases_on ‘op’ >> simp[simple_stmt_def, pop_storage_array_fuel_stable]) >>
-  simp[simple_stmt_def]
+  simp[simple_stmt_def, reset_target_fuel_stable]
 QED
 
 Theorem eval_fuel_stable[local]:

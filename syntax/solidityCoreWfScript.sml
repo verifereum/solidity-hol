@@ -1547,8 +1547,9 @@ Definition check_core_stmts_def:
       BoundAtom x =>
         (case ALOOKUP ctx.bindings x of
            SOME (ReferenceType ty) =>
-             if fresh_core_id ctx t ∧ core_scalar_type env ty ∧
-                IS_SOME (storage_bytes ty)
+             if fresh_core_id ctx t ∧
+                ((core_scalar_type env ty ∧ IS_SOME (storage_bytes ty)) ∨
+                 located_type_ok env StorageLoc ty)
              then check_core_stmts env (capture_core_target t ty ctx) ss
              else NONE
          | _ => NONE)
@@ -1600,6 +1601,15 @@ Definition check_core_stmts_def:
         | _ => F) ∧
        wf_core_atom env ctx (SingleType src) a ∧
        wf_core_atom env ctx (SingleType dst) b
+    then check_core_stmts env ctx ss else NONE) ∧
+  (check_core_stmts env ctx (ResetTargetStmt t ty :: ss) =
+    if ALOOKUP ctx.targets t = SOME ty ∧
+       (core_scalar_type env ty ∨
+        case ty of
+          LocatedT MemoryLoc element => located_type_ok env MemoryLoc element
+        | LocatedT _ _ => F
+        | MappingT _ _ => F
+        | _ => located_type_ok env StorageLoc ty)
     then check_core_stmts env ctx ss else NONE) ∧
   (check_core_stmts env ctx (WriteScalarStmt t ty a :: ss) =
     if core_scalar_type env ty ∧ ALOOKUP ctx.targets t = SOME ty ∧

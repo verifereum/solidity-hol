@@ -230,6 +230,7 @@ Datatype:
   | CaptureBindingStmt ast_id ast_id
   | CaptureValueStmt ast_id core_atom
   | CaptureReferenceFieldStmt ast_id core_atom navigation
+  | ResetTargetStmt ast_id sol_type
   | WriteScalarStmt ast_id sol_type core_atom
   | BindReferenceStmt ast_id sol_type core_atom
   | CopyContentsStmt sol_type sol_type core_atom core_atom
