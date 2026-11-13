@@ -757,6 +757,34 @@ Proof
   EVAL_TAC
 QED
 
+(* Calldata structs are not modelled, so no calldata binding reaches one. *)
+Theorem calldata_struct_binding_rejected:
+  ¬core_binding_type struct_env
+     (LocatedT CalldataLoc (ArrayT (StructT (AstId 912)) (SOME 1)))
+Proof
+  EVAL_TAC
+QED
+
+(* Storage struct copies are member-wise and never reach a mapping. *)
+Theorem storage_struct_copy_mapping_checked:
+  IS_SOME (check_core_stmts struct_env
+    <| bindings := [(AstId 1, SingleType (LocatedT StorageLoc (StructT (AstId 912))));
+                   (AstId 2, SingleType (LocatedT StorageLoc (StructT (AstId 912))))];
+       targets := []; returns := []; in_loop := F |>
+    [CopyContentsStmt (LocatedT StorageLoc (StructT (AstId 912)))
+       (LocatedT StorageLoc (StructT (AstId 912)))
+       (BoundAtom (AstId 1)) (BoundAtom (AstId 2))]) ∧
+  check_core_stmts struct_env
+    <| bindings := [(AstId 1, SingleType (LocatedT StorageLoc (StructT (AstId 911))));
+                   (AstId 2, SingleType (LocatedT StorageLoc (StructT (AstId 911))))];
+       targets := []; returns := []; in_loop := F |>
+    [CopyContentsStmt (LocatedT StorageLoc (StructT (AstId 911)))
+       (LocatedT StorageLoc (StructT (AstId 911)))
+       (BoundAtom (AstId 1)) (BoundAtom (AstId 2))] = NONE
+Proof
+  EVAL_TAC
+QED
+
 (* Scope exit: prelude and body bindings, and a target captured in a branch,
  * are gone afterwards.
  *)

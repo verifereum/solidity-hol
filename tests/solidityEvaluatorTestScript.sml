@@ -388,7 +388,8 @@ Theorem unassigned_fixed_memory_rejected:
   memory_array_element initial_state
     (MemoryReference (HeapId 0) 0 (ArrayT u256 (SOME 1))) 0 =
     INR (InvalidCompletion "bad memory array reference") ∧
-  memory_array_value initial_state (ArrayT u256 (SOME 1))
+  memory_array_value test_env (LENGTH test_env.type_declarations) initial_state
+    (ArrayT u256 (SOME 1))
     (ReferenceValue (MemoryReference (HeapId 0) 0 (ArrayT u256 (SOME 1)))) =
     INR (InvalidCompletion "bad memory array reference") ∧
   memory_abi_value initial_state (ArrayT u256 (SOME 1))

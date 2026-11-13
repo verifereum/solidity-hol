@@ -88,7 +88,7 @@ Definition run_entry_def:
     let st = <| world := w; frame := fr; immutables := imm; scopes := [];
                 heap := FEMPTY; next_heap_id := 0; memory_allocated := reserved;
                 targets := FEMPTY; return_data := SOME [] |> in
-    let r = case materialize_arguments (MAP SND p.parameters) args st of
+    let r = case materialize_arguments env (MAP SND p.parameters) args st of
       SOME (values, st1) => invoke_source fuel env p.procedure_id values st1 []
     | NONE => abrupt_result (InvalidCompletion "bad entry arguments") st [] in
     case finish_source_frame w r.state.world r.completion of

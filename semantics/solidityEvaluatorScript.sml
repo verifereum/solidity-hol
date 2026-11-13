@@ -356,7 +356,12 @@ Definition eval_operation_def:
          | _ => ValueAbrupt (InvalidCompletion "bad array reference"))
     | NavigateOperation ty root_expr (FieldNavigation member_id) =>
         (case eval_atom st.scopes root_expr of
-           SOME (ReferenceValue r) => navigate_storage_field env r member_id
+           SOME (ReferenceValue (MemoryReference h offset rty)) =>
+             (case memory_struct_field env st (MemoryReference h offset rty) member_id of
+                INL (id, k, fty, _) =>
+                  ValueOk (ReferenceValue (MemoryReference (HeapId id) k fty))
+              | INR c => ValueAbrupt c)
+         | SOME (ReferenceValue r) => navigate_storage_field env r member_id
          | _ => ValueAbrupt (InvalidCompletion "bad struct reference"))
     | NavigateOperation ty root_expr (IndexNavigation index) =>
         (case (eval_atom st.scopes root_expr, eval_atom st.scopes index) of
@@ -474,8 +479,8 @@ Definition write_target_def:
         (case update_binding x v st.scopes of
            SOME scopes => SOME (st with scopes := scopes)
          | NONE => NONE)
-    | (SOME (ValueTarget (MemoryReference h i ty)), SOME (ScalarValue s)) =>
-        write_memory_byte (MemoryReference h i ty) s st
+    | (SOME (ValueTarget (MemoryReference h i ty)), SOME v) =>
+        write_memory_reference (MemoryReference h i ty) v st
     | (SOME (ReferenceFieldTarget (HeapId id) i _), SOME v) =>
         write_memory_element id i v st
     | (SOME (ValueTarget (ImmutableReference x)), SOME (ScalarValue s)) =>
@@ -674,7 +679,7 @@ Definition call_external_mode_def:
                        32 * ((reserved + 31) DIV 32) in
                  case decode_arguments env rets r.call_return 0 (memory_free_pointer st1) of
                    INL rvs =>
-                     (case materialize_arguments rets rvs st1 of
+                     (case materialize_arguments env rets rvs st1 of
                         SOME (values, st2) =>
                           let result = if catching then
                                 TupleValue (ScalarValue (BoolValue T) :: values ++
@@ -869,7 +874,7 @@ Definition simple_stmt_def:
         let (v, st') = allocate_bytes T element bs st in
         normal_result (define_binding x ty v st') gas
     | DefineStmt x ty (DefaultMemoryOperation element) =>
-        (case default_memory_value element st of
+        (case default_memory_value env element st of
            INL (v, st') => normal_result (define_binding x ty v st') gas
          | INR c => abrupt_result c st gas)
     | DefineStmt x ty (AllocateMemoryOperation element length) =>
@@ -883,9 +888,23 @@ Definition simple_stmt_def:
                let (v, st') = allocate_bytes T element (REPLICATE (Num n) 0w) st in
                normal_result (define_binding x ty v st') gas
              else
-               (case zero_array element (Num n) st of
-                  INL (v, st') => normal_result (define_binding x ty v st') gas
-                | INR c => abrupt_result c st gas)
+               (case element of
+                  StructT s =>
+                    (case lookup_struct env s of
+                       SOME fields =>
+                         if Num n ≠ LENGTH fields then
+                           abrupt_result (InvalidCompletion "bad struct allocation") st gas
+                         else
+                           (case allocate_object element (Num n) (32 * Num n) st of
+                              SOME (id, st1) =>
+                                normal_result (define_binding x ty
+                                  (ReferenceValue (MemoryReference (HeapId id) 0 element)) st1) gas
+                            | NONE => abrupt_result (PanicCompletion 65) st gas)
+                     | NONE => abrupt_result (InvalidCompletion "unknown struct") st gas)
+                | _ =>
+                  case zero_object env (LENGTH env.type_declarations) element (Num n) st of
+                    INL (v, st') => normal_result (define_binding x ty v st') gas
+                  | INR c => abrupt_result c st gas)
          | _ => abrupt_result (InvalidCompletion "bad allocation length") st gas)
     | DefineStmt x ty (CopyToMemoryOperation a) =>
         (case eval_atom st.scopes a of
@@ -893,21 +912,22 @@ Definition simple_stmt_def:
              (case copy_calldata_array st.frame.call_data rty data n
                      (memory_free_pointer st) of
                 INL v =>
-                  (case materialize_value rty v st of
+                  (case materialize_value env rty v st of
                      SOME (v', st') => normal_result (define_binding x ty v' st') gas
-                   | NONE => abrupt_result (InvalidCompletion "bad calldata array copy") st gas)
+                   | NONE => abrupt_result (InvalidCompletion "bad calldata object copy") st gas)
               | INR c => abrupt_result c st gas)
          | SOME (ReferenceValue (StorageReference PersistentStorage addr slot 0 rty _)) =>
-             (case storage_array_value env st.world.accounts addr slot rty of
+             (case storage_array_value env (LENGTH env.type_declarations)
+                     st.world.accounts addr slot rty of
                 INL v =>
-                  if 2 ** 64 ≤ memory_free_pointer st + memory_value_size rty v then
+                  if 2 ** 64 ≤ memory_free_pointer st + memory_value_size env rty v then
                     abrupt_result (PanicCompletion 65) st gas
                   else
-                    (case materialize_value rty v st of
+                    (case materialize_value env rty v st of
                        SOME (v', st') => normal_result (define_binding x ty v' st') gas
-                     | NONE => abrupt_result (InvalidCompletion "bad storage array copy") st gas)
+                     | NONE => abrupt_result (InvalidCompletion "bad storage object copy") st gas)
               | INR c => abrupt_result c st gas)
-         | _ => abrupt_result (InvalidCompletion "bad array copy") st gas)
+         | _ => abrupt_result (InvalidCompletion "bad object copy") st gas)
     | DefineStmt x ty (AbiEncodeOperation selector tys args) =>
         abi_encode env x ty selector tys args st gas
     | DefineStmt x ty (AbiEncodePackedOperation tys args) =>
@@ -968,6 +988,15 @@ Definition simple_stmt_def:
              normal_result
                (st with targets := set_target t (ValueTarget r) st.targets) gas
          | _ => abrupt_result (InvalidCompletion "bad captured reference") st gas)
+    | CaptureReferenceFieldStmt t a (FieldNavigation f) =>
+        (case eval_atom st.scopes a of
+           SOME (ReferenceValue r) =>
+             (case memory_struct_field env st r f of
+                INL (id, k, ty, _) =>
+                  normal_result (st with targets := set_target t
+                    (ReferenceFieldTarget (HeapId id) k ty) st.targets) gas
+              | INR c => abrupt_result c st gas)
+         | _ => abrupt_result (InvalidCompletion "bad struct field capture") st gas)
     | CaptureReferenceFieldStmt t a (IndexNavigation index) =>
         (case (eval_atom st.scopes a, eval_atom st.scopes index) of
            (SOME (ReferenceValue r), SOME (ScalarValue (IntegerValue i))) =>
@@ -992,8 +1021,11 @@ Definition simple_stmt_def:
     | CopyContentsStmt src_ty _ a b =>
         (case (eval_atom st.scopes a, eval_atom st.scopes b) of
            (SOME (ReferenceValue src), SOME (ReferenceValue dst)) =>
-             (case src_ty of
-                LocatedT _ (ArrayT element length) =>
+             (case (case src_ty of
+                      LocatedT _ (ArrayT element length) => SOME (ArrayT element length)
+                    | LocatedT _ (StructT s) => SOME (StructT s)
+                    | _ => NONE) of
+                SOME cty =>
                   (* The compiler's storage-to-storage copy returns at once
                    * when the source is the destination. *)
                   if (case (src, dst) of
@@ -1002,15 +1034,15 @@ Definition simple_stmt_def:
                           src_addr = dst_addr ∧ src_slot = dst_slot
                       | _ => F)
                   then normal_result st gas else
-                  (case array_copy_value env st (ArrayT element length) src of
+                  (case array_copy_value env st cty src of
                      INL v =>
-                       (case copy_to_storage env st.world.accounts (ArrayT element length) v
+                       (case copy_to_storage env st.world.accounts cty v
                                dst st.frame.static_context of
                           INL accounts =>
                             normal_result (st with world := st.world with accounts := accounts) gas
                         | INR c => abrupt_result c st gas)
                    | INR c => abrupt_result c st gas)
-              | _ =>
+              | NONE =>
                 case copy_byte_contents src dst st of
                   INL st' => normal_result st' gas
                 | INR c => abrupt_result c st gas)
