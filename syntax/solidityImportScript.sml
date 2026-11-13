@@ -1371,7 +1371,7 @@ End
 (* The bases after x in the linearization, where a super call from a
  * function of x looks. *)
 Definition later_bases_def:
-  (later_bases x [] = []) ∧
+  (later_bases (x : num) [] = []) ∧
   (later_bases x (y :: ys) = if x = y then ys else later_bases x ys)
 End
 
