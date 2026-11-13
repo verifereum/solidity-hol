@@ -38,8 +38,8 @@ struct Node {
     Node[] kids;
 }
 
-// The ABI forms of structs are not modelled: the functions that encode or
-// emit a memory struct, or pass one to an external call, are unsupported.
+// The ABI forms of structs: the functions that encode or emit a memory
+// struct, or pass one to an external call, elaborate.
 struct Pair {
     uint8 a;
     uint8 b;

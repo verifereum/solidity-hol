@@ -1,12 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.37;
 
-struct EventPayload {
-    uint256 value;
-}
-
 library UnsupportedEvents {
-    event Payload(EventPayload item);
+    event Payload(function () external pure returns (uint256) item);
 }
 
 contract QualifiedUnsupportedEvent {
@@ -15,6 +11,6 @@ contract QualifiedUnsupportedEvent {
     }
 
     function emitsUnsupported() external {
-        emit UnsupportedEvents.Payload(EventPayload(1));
+        emit UnsupportedEvents.Payload(this.supported);
     }
 }

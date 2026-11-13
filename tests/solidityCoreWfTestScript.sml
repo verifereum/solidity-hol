@@ -757,10 +757,12 @@ Proof
   EVAL_TAC
 QED
 
-(* Calldata structs are not modelled, so no calldata binding reaches one. *)
-Theorem calldata_struct_binding_rejected:
+(* Calldata structs take the memory field rule: no mapping reaches one. *)
+Theorem calldata_struct_binding_checked:
+  core_binding_type struct_env
+     (LocatedT CalldataLoc (ArrayT (StructT (AstId 912)) (SOME 1))) ∧
   ¬core_binding_type struct_env
-     (LocatedT CalldataLoc (ArrayT (StructT (AstId 912)) (SOME 1)))
+     (LocatedT CalldataLoc (ArrayT (StructT (AstId 911)) (SOME 1)))
 Proof
   EVAL_TAC
 QED

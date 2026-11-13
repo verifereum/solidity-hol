@@ -36,7 +36,7 @@ val prepared = #prepared (solidityPrepareLib.prepare_artifact
  * nodeValue's local and nodeCount's new array hold a recursive struct in
  * memory, which the core does not hold, and copyTree copies one in storage.
  * encodePair, emitPair and putPair take a memory struct across an ABI
- * boundary, which the core does not model. Roles.Grant has an enum-keyed mapping, so the storage local of
+ * boundary, which elaborates. Roles.Grant has an enum-keyed mapping, so the storage local of
  * grantCount does not elaborate, nor does grantParam's storage parameter,
  * which its body never uses.
  * nodeModified's modifier takes a recursive struct in memory, which fails at
@@ -83,12 +83,9 @@ val () =
      length (reasons "nodeCount") = 1 andalso
      List.all elaboration_failure (reasons "copyTree") andalso
      length (reasons "copyTree") = 1 andalso
-     List.all elaboration_failure (reasons "encodePair") andalso
-     length (reasons "encodePair") = 1 andalso
-     List.all elaboration_failure (reasons "emitPair") andalso
-     length (reasons "emitPair") = 1 andalso
-     List.all elaboration_failure (reasons "putPair") andalso
-     length (reasons "putPair") = 1 andalso
+     reasons "encodePair" = [NONE] andalso
+     reasons "emitPair" = [NONE] andalso
+     reasons "putPair" = [NONE] andalso
      List.all elaboration_failure (reasons "grantCount") andalso
      length (reasons "grantCount") = 1 andalso
      List.all (elaboration_failure_with "unsupported memory struct type")

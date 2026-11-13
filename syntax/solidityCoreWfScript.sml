@@ -506,29 +506,29 @@ Definition wf_gas_atom_def:
   (wf_gas_atom env ctx (SOME g) ⇔ wf_core_atom env ctx (SingleType (UintT 256)) g)
 End
 
-(* ABI serialization consumes bytes from their original location. Literal
- * bytes are already available and need no heap object for encoding. A memory
- * array is encoded from its heap object. *)
+(* ABI serialization consumes a value from its original location. Literal
+ * bytes are already available and need no heap object for encoding. An array
+ * or struct is encoded from its object in any valid location. *)
 Definition wf_abi_atom_def:
   wf_abi_atom env ctx ty a ⇔
     case ty of
-      LocatedT _ (ArrayT element length) =>
-        (case a of
-           BoundAtom x =>
-             (case ALOOKUP ctx.bindings x of
-                SOME (SingleType (LocatedT loc actual)) =>
-                  actual = ArrayT element length ∧ located_type_ok env loc actual
-              | _ => F)
-         | _ => F)
-    | LocatedT _ element =>
-        byte_sequence_type element ∧
-        (case a of
-           ConstantAtom (BytesValue _) => T
-         | BoundAtom x =>
-             (case ALOOKUP ctx.bindings x of
-                SOME (SingleType (LocatedT _ actual)) => element = actual
-              | _ => F)
-         | _ => F)
+      LocatedT _ element =>
+        if byte_sequence_type element then
+          (case a of
+             ConstantAtom (BytesValue _) => T
+           | BoundAtom x =>
+               (case ALOOKUP ctx.bindings x of
+                  SOME (SingleType (LocatedT _ actual)) => element = actual
+                | _ => F)
+           | _ => F)
+        else
+          (case a of
+             BoundAtom x =>
+               (case ALOOKUP ctx.bindings x of
+                  SOME (SingleType (LocatedT loc actual)) =>
+                    actual = element ∧ located_type_ok env loc actual
+                | _ => F)
+           | _ => F)
     | _ => wf_core_atom env ctx (SingleType ty) a
 End
 
