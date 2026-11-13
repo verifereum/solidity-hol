@@ -243,9 +243,23 @@ End
 
 (* Whether an encoding of the type has a fixed size, with no offsets. *)
 Definition static_object_type_def:
-  (static_object_type (ArrayT element (SOME n)) ⇔ static_object_type element) ∧
-  (static_object_type (ArrayT element NONE) ⇔ F) ∧
-  (static_object_type ty ⇔ ¬byte_sequence_type ty)
+  (static_object_type env (fuel : num) (ArrayT element (SOME n)) ⇔
+    static_object_type env fuel element) ∧
+  (static_object_type env fuel (ArrayT element NONE) ⇔ F) ∧
+  (static_object_type env fuel (StructT id) ⇔
+    if fuel = 0 then F else
+    case lookup_struct env id of
+      SOME fields => static_object_types env (fuel - 1) (MAP SND fields)
+    | NONE => F) ∧
+  (static_object_type env fuel ty ⇔ ¬byte_sequence_type ty) ∧
+  (static_object_types env fuel [] ⇔ T) ∧
+  (static_object_types env fuel (ty :: tys) ⇔
+    static_object_type env fuel ty ∧ static_object_types env fuel tys)
+Termination
+  WF_REL_TAC ‘inv_image ($< LEX $<) (λx. case x of
+    INL (env, fuel, ty) => (fuel, sol_type_size ty)
+  | INR (env, fuel, tys) => (fuel, list_size sol_type_size tys))’ >>
+  rw[list_size_def]
 End
 
 (* The objects a reference in each data location may denote. Storage holds
@@ -263,8 +277,7 @@ Definition located_object_shape_def:
     | _ => byte_sequence_type ty) ∧
   (located_object_shape loc (ArrayT element length) ⇔
     valid_array_length length ∧
-    (((if loc = MemoryLoc then is_stored_scalar_type element
-        else is_elementary_type element) ∧ valid_type_shape element) ∨
+    ((is_stored_scalar_type element ∧ valid_type_shape element) ∨
      located_object_shape loc element)) ∧
   (located_object_shape loc (StructT _) ⇔ T) ∧
   (located_object_shape loc ty ⇔ byte_sequence_type ty)
@@ -886,7 +899,8 @@ Definition wf_core_operation_def:
     case annotation of
       SingleType (LocatedT CalldataLoc ty) =>
         located_type_ok env CalldataLoc ty ∧
-        (ty = BytesT ∨ case ty of ArrayT element NONE => static_object_type element | _ => F) ∧
+        (ty = BytesT ∨ case ty of ArrayT element NONE =>
+           static_object_type env (LENGTH env.type_declarations) element | _ => F) ∧
         wf_core_atom env ctx annotation a ∧
         wf_core_atom env ctx (SingleType (UintT 256)) start ∧
         (case end_bound of NONE => T | SOME end_index =>
@@ -1871,6 +1885,12 @@ val () = cv_auto_trans_rec memory_type_ok_def (
   WF_REL_TAC ‘inv_image ($< LEX $<) (λx. case x of
     INL (env, n, ty) => (cv$c2n n, cv_size ty)
   | INR (env, n, tys) => (cv$c2n n, cv_size tys))’ >>
+  cv_termination_tac
+);
+val () = cv_auto_trans_rec static_object_type_def (
+  WF_REL_TAC ‘inv_image ($< LEX $<) (λx. case x of
+    INL (env, fuel, ty) => (cv$c2n fuel, cv_size ty)
+  | INR (env, fuel, tys) => (cv$c2n fuel, cv_size tys))’ >>
   cv_termination_tac
 );
 val () = cv_auto_trans_rec declared_type_ok_def (

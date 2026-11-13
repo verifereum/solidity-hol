@@ -25,6 +25,10 @@ struct Pair {
     bool flag;
 }
 
+struct Kinds {
+    Kind[] values;
+}
+
 interface IAbiPeer {
     function echo(Outer calldata o) external pure returns (Outer memory);
     function make(uint64 a, string calldata name) external pure returns (Outer memory, Pair memory);
@@ -135,6 +139,18 @@ contract AbiValues {
 
     function kinds(Kind[] memory ks) external pure returns (Kind[] memory, uint256) {
         return (ks, ks.length);
+    }
+
+    function calldataKinds(Kind[] calldata ks) external pure returns (Kind[] memory) {
+        return ks;
+    }
+
+    function structKinds(Kinds calldata ks) external pure returns (uint256, Kind, Kind[] memory) {
+        return (ks.values.length, ks.values[1], ks.values);
+    }
+
+    function slicePairs(Pair[] calldata ps) external pure returns (Pair[] memory) {
+        return ps[1:];
     }
 
     function revertBad(Inner calldata i) external pure {

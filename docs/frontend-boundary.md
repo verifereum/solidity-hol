@@ -413,7 +413,8 @@ fails closed with `InvalidCompletion`; copying an array onto itself is a
 no-op and reads no elements. Clearing old destination contents does not
 validate the bytes being discarded. Memory arrays of declared enums support
 allocation, access, copies and ABI encoding and decoding, each element checked
-where it is decoded. Calldata enum arrays remain outside the supported boundary.
+where it is decoded. Calldata arrays of declared enums use the same element
+validation, including when nested inside structs.
 
 An enum is ABI encoded as `uint8`, as a parameter, a return, an event
 argument or an external call's argument. A call or creation whose enum

@@ -1666,12 +1666,13 @@ End
 
 (* The calldata bytes a calldata reference of type ty and length n covers,
  * as the compiler's accessors read them: a dynamic array's elements, a
- * static array's whole encoding, a byte sequence's bytes. *)
+ * fixed array's or struct's heads, a byte sequence's bytes. *)
 Definition calldata_span_def:
   calldata_span env ty n =
     case ty of
       ArrayT element NONE => n * abi_stride env element
-    | ArrayT _ (SOME _) => static_length (abi_type env (LENGTH env.type_declarations) ty)
+    | ArrayT _ (SOME _) => abi_head_size (abi_type env (LENGTH env.type_declarations) ty)
+    | StructT _ => abi_head_size (abi_type env (LENGTH env.type_declarations) ty)
     | _ => n
 End
 

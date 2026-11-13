@@ -1087,6 +1087,18 @@ Definition abi_binding_ok_def:
     | NONE => F
 End
 
+(* Slices retain their elements' offsets, so each element's ABI head must
+ * contain its whole value, including any struct fields. *)
+Definition static_binding_ok_def:
+  static_binding_ok enums structs ty ⇔
+    case elab_type_declarations enums structs of
+      SOME decls =>
+        static_object_type <| procedures := []; state_variables := []; immutables := [];
+                              struct_layouts := []; type_declarations := decls |>
+          (LENGTH decls) ty
+    | NONE => F
+End
+
 (* A storage copy into a reference target holds a type the memory checks
  * admit: its structs are declared, not recursive and reach no mapping, so
  * the member-wise copy terminates. Other targets copy nothing. *)
@@ -1459,7 +1471,8 @@ Definition elab_expr_def:
            INL ((ss, ref, ElabType (LocatedT CalldataLoc ty)), n1) =>
              if ¬(source_type_matches (LocatedT CalldataLoc ty) tid ∧
                   (ty = BytesT ∨ case ty of
-                     ArrayT element NONE => static_object_type element | _ => F))
+                     ArrayT element NONE =>
+                       static_binding_ok ctx.enums ctx.structs element | _ => F))
              then INR [(info.node_id, "unsupported calldata slice type")] else
              let (saved, n2) = snapshot n1 ref (ElabType (LocatedT CalldataLoc ty)) in
              let (sc, ref') = saved in
@@ -3963,6 +3976,7 @@ val () = cv_auto_trans elab_struct_layouts_with_def;
 val () = cv_auto_trans elab_struct_layouts_def;
 val () = cv_auto_trans memory_binding_ok_def;
 val () = cv_auto_trans abi_binding_ok_def;
+val () = cv_auto_trans static_binding_ok_def;
 val () = cv_auto_trans copy_target_ok_def;
 val () = cv_auto_trans struct_root_def;
 val () = cv_auto_trans struct_field_types_def;

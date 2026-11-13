@@ -767,6 +767,31 @@ Proof
   EVAL_TAC
 QED
 
+Definition slice_struct_env_def:
+  slice_struct_env = test_env with type_declarations :=
+    [(AstId 914, StructDeclaration [(AstId 1, UintT 8)]);
+     (AstId 915, StructDeclaration [(AstId 1, BytesT)])]
+End
+
+Theorem calldata_struct_slices_require_static_fields:
+  wf_core_operation slice_struct_env
+    <| bindings := [(AstId 1, SingleType
+         (LocatedT CalldataLoc (ArrayT (StructT (AstId 914)) NONE)))];
+       targets := []; returns := []; in_loop := F |>
+    (SingleType (LocatedT CalldataLoc (ArrayT (StructT (AstId 914)) NONE)))
+    (CalldataSliceOperation (BoundAtom (AstId 1))
+       (ConstantAtom (IntegerValue 0)) NONE) ∧
+  ¬wf_core_operation slice_struct_env
+    <| bindings := [(AstId 1, SingleType
+         (LocatedT CalldataLoc (ArrayT (StructT (AstId 915)) NONE)))];
+       targets := []; returns := []; in_loop := F |>
+    (SingleType (LocatedT CalldataLoc (ArrayT (StructT (AstId 915)) NONE)))
+    (CalldataSliceOperation (BoundAtom (AstId 1))
+       (ConstantAtom (IntegerValue 0)) NONE)
+Proof
+  EVAL_TAC
+QED
+
 (* Storage struct copies are member-wise and never reach a mapping. *)
 Theorem storage_struct_copy_mapping_checked:
   IS_SOME (check_core_stmts struct_env

@@ -1908,3 +1908,30 @@ Theorem reset_storage_in_static_frame_fails:
 Proof
   CONV_TAC cv_eval
 QED
+
+Definition calldata_head_env_def:
+  calldata_head_env = recursive_reset_env with type_declarations :=
+    [(AstId 950, StructDeclaration [(AstId 951, UintT 8); (AstId 952, BytesT)])]
+End
+
+Definition calldata_head_scopes_def:
+  calldata_head_scopes ty offset =
+    [FEMPTY |+ (1, <| binding_type := SingleType (LocatedT CalldataLoc ty);
+      binding_value := ReferenceValue (CalldataReference offset 0 ty) |>)]
+End
+
+val () = cv_auto_trans calldata_head_env_def;
+val () = cv_auto_trans calldata_head_scopes_def;
+
+Theorem assembly_calldata_requires_complete_object_head:
+  EVERY (λty.
+    assembly_calldata_ok calldata_head_env (REPLICATE 64 0w)
+      (calldata_head_scopes ty 0) [("p", AssemblyCalldataOffset (AstId 1))] ∧
+    ¬assembly_calldata_ok calldata_head_env (REPLICATE 63 0w)
+      (calldata_head_scopes ty 0) [("p", AssemblyCalldataOffset (AstId 1))] ∧
+    ¬assembly_calldata_ok calldata_head_env (REPLICATE 64 0w)
+      (calldata_head_scopes ty 64) [("p", AssemblyCalldataOffset (AstId 1))])
+    [StructT (AstId 950); ArrayT BytesT (SOME 2)]
+Proof
+  EVAL_TAC
+QED
