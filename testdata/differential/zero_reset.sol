@@ -84,7 +84,7 @@ contract ZeroReset {
         MemoryBox memory alias_ = a[0]; delete a[0]; return (a[0].x, alias_.x);
     }
     function memoryArray() external pure returns (uint, uint) {
-        uint[2] memory a = [uint(7), 8]; uint[2] memory b = a;
+        uint[2] memory a; a[0] = 7; a[1] = 8; uint[2] memory b = a;
         delete a; return (a[0], b[0]);
     }
     function memoryNestedArray() external pure returns (uint, uint) {
