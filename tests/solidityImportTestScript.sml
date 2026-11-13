@@ -34,6 +34,7 @@ val () = holbuild_extra_deps [
   "../testdata/differential/expected/external.json",
   "../testdata/differential/expected/low_level_calls.json",
   "../testdata/differential/expected/udvt.json",
+  "../testdata/differential/expected/override_getters.json",
   "../testdata/differential/expected/transient_values.json",
   "../testdata/differential/expected/byte_mapping_keys.json",
   "../testdata/differential/expected/virtual_modifiers.json",
@@ -254,7 +255,7 @@ val edited_unit = edited_unit_with contracts
 val () = function_error "unknown statement"
   (edit_first "Break" (set_field "nodeType" (JSON.STRING "UnknownStatement")) ast)
 val () = function_error "unknown expression"
-  (edit_first "Literal" (set_field "nodeType" (JSON.STRING "IndexRangeAccess")) ast)
+  (edit_first "Literal" (set_field "nodeType" (JSON.STRING "FutureUnsupportedExpression")) ast)
 val () = malformed_input "missing type annotation"
   (edit_first "Identifier" (drop_field "typeDescriptions") ast)
 val () = malformed_input "missing declaration reference"
@@ -421,7 +422,7 @@ val () =
     expect_function_lines "typed catch of an unsupported call"
       "../testdata/differential/expected/try_calls.json" "testdata/differential/try_calls.sol"
       "attempt" (edit_first "TryStatement" (typed_catch o in_call unknown_target))
-      [": unsupported expression UnknownTarget", "typed catch clauses are not supported"]
+      [": unsupported expression UnknownTarget", "Error catch requires one string memory parameter"]
   end
 
 (* A state variable of a struct left out (a function-typed member)
@@ -465,18 +466,18 @@ val () =
 (* Every unsupported reference of an inline assembly block is a line. *)
 val () =
   let
-    fun length_suffix (JSON.OBJECT kvs) =
+    fun selector_suffix (JSON.OBJECT kvs) =
           JSON.OBJECT
             (map (fn ("externalReferences", JSON.ARRAY rs) =>
                        ("externalReferences",
-                        JSON.ARRAY (map (set_field "suffix" (JSON.STRING "length")) rs))
+                        JSON.ARRAY (map (set_field "suffix" (JSON.STRING "selector")) rs))
                    | kv => kv) kvs)
-      | length_suffix v = v
+      | selector_suffix v = v
   in
     expect_function_lines "unsupported assembly references"
       "../testdata/differential/expected/inline_assembly.json"
       "testdata/differential/inline_assembly.sol"
-      "locations" (edit_first "InlineAssembly" length_suffix)
+      "locations" (edit_first "InlineAssembly" selector_suffix)
       ["unsupported reference packedHigh.offset", "unsupported reference packedHigh.slot",
        "unsupported reference total.offset", "unsupported reference total.slot"]
   end
@@ -1160,7 +1161,7 @@ fun named ty name v =
   is_node ty v andalso
   JSONUtil.testField "name" (fn JSON.STRING s => s = name | _ => false) v
 
-val () = import_error_with Unsupported using_contracts "public library function"
+val () = edited_unit_with using_contracts "public_library_unit"
   (edit_first_where (named "FunctionDefinition" "addBonus") "addBonus"
      (set_field "visibility" (JSON.STRING "public")) using_ast)
 val () = import_error_with Unsupported using_contracts "file-level using with functions"
@@ -1406,6 +1407,25 @@ val () = import_units_error_with UnsupportedFunction [udvt_types] udvt_contracts
      (fn v => is_node "BinaryOperation" v andalso
               isSome (JSONUtil.findField v "function")) "overloaded operator"
      (set_field "function" (declaration_id "FunctionDefinition" "bump" udvt_ast)) udvt_ast)
+
+(* A getter may replace only an external function, and its references must
+ * resolve to function declarations. *)
+val override_getters_fixture = "../testdata/differential/expected/override_getters.json"
+val override_getters_source = "testdata/differential/override_getters.sol"
+val override_getters_ast =
+  artifact_part override_getters_fixture ["sources", override_getters_source, "ast"]
+val override_getters_contracts =
+  artifact_part override_getters_fixture ["contracts", override_getters_source]
+
+val () = import_error_with Unsupported override_getters_contracts "getter overrides a public function"
+  (edit_first "FunctionDefinition"
+     (set_field "visibility" (JSON.STRING "public")) override_getters_ast)
+val () = import_error_with Unsupported override_getters_contracts "getter override reference is missing"
+  (edit_first_where
+     (fn v => is_node "VariableDeclaration" v andalso
+              JSONUtil.testField "name" (fn JSON.STRING s => s = "value" | _ => false) v)
+     "overriding variable"
+     (set_field "baseFunctions" (JSON.ARRAY [JSON.INT 999999])) override_getters_ast)
 
 Definition transient_unit_def:
   transient_unit = ^(import_artifact

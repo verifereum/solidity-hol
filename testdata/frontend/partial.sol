@@ -2,9 +2,9 @@
 pragma solidity >=0.8.0;
 
 // A contract of supported and unsupported functions (sha256 is not
-// modelled, nor are halting assembly in a constructor, dynamic bytes as a
-// bytes16 constant, or assembly assigning a bytes local): the unsupported ones,
-// and those calling them, have no procedure, and calls of them are refused.
+// modelled, nor are halting assembly in a constructor or fixed-byte indexing
+// in a constant): the unsupported ones, and those calling them, have no
+// procedure, and calls of them are refused.
 contract Base {
     function twice(uint256 x) public pure virtual returns (uint256) {
         return x * 2;
@@ -66,9 +66,9 @@ contract Partial is Mid {
 
     event Paired(Pair p);
 
-    // dynamic bytes does not elaborate as a bytes16, so the constant has no
-    // procedure: its getter and the functions reading it are unsupported
-    bytes16 public constant DIGITS = bytes16(bytes("0123456789abcdef"));
+    // Fixed-byte indexing does not elaborate, so the constant has no procedure:
+    // its getter and the functions reading it are unsupported
+    bytes16 public constant DIGITS = bytes16(bytes32("0123456789abcdef")[0]);
 
     // imports and passes the source check, but does not elaborate
     constructor() {
@@ -101,7 +101,7 @@ contract Partial is Mid {
         return DIGITS;
     }
 
-    // imports, but assembly may not assign a memory reference
+    // admitted, but leaves b below the free memory pointer: fails at run time
     function pointer(bytes memory b) public pure returns (uint256 p) {
         assembly { b := p }
     }
@@ -140,6 +140,21 @@ contract Partial is Mid {
         Roles.Grant storage g;
         assembly { g.slot := 0 }
         return g.n;
+    }
+
+    // a modifier parameter holding a recursive struct in memory
+    modifier withNode(Node memory n) {
+        _;
+    }
+
+    function nodeModified() public withNode(tree) {}
+
+    // a storage parameter of a struct that is left out
+    function grantParam(Roles.Grant storage) internal pure {}
+
+    // a tuple holding a storage struct, as a reference
+    function treeTuple() public view {
+        (tree, 1);
     }
 
     fallback() external {

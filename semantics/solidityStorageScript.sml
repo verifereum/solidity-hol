@@ -301,7 +301,7 @@ End
 
 (* The value of a storage array or struct, as a copy reads it: arrays as the
  * tuple of their elements, structs as the tuple of their fields in
- * declaration order, byte sequences as their bytes and scalars cleaned. A
+ * declaration order, byte sequences as their bytes and canonical scalars. A
  * length of 2^64 or more panics with 0x41, as the compiler's copies do. The
  * fuel bounds the struct nesting. *)
 Definition storage_array_value_def:
@@ -648,7 +648,7 @@ Definition read_storage_reference_def:
     case r of
       StorageReference backend addr slot offset rty _ =>
         if rty ≠ ty then ValueAbrupt (InvalidCompletion "bad read type")
-        else if backend = PersistentStorage ∧ offset = 0 ∧ storage_object_type ty
+        else if backend = PersistentStorage ∧ offset = 0 ∧ located_object_shape StorageLoc ty
         then ValueOk (ReferenceValue r)
         else (case read_storage_word env
                 (lookup_storage slot (case backend of

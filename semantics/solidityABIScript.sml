@@ -278,7 +278,7 @@ Definition storage_abi_value_def:
       NONE => INR (InvalidCompletion "bad array element type")
     | SOME (s, offset) =>
         let value =
-          if is_elementary_type element then
+          if is_stored_scalar_type element then
             (case read_storage env accounts addr s offset element of
                SOME v =>
                  (case abi_value element (ScalarValue v) of
@@ -725,7 +725,7 @@ Definition event_parts_def:
               OPTION_MAP (λbs. word_of_bytes_be (Keccak_256_w64 bs))
                 (indexed_array_data (ArrayT element length) a encoded_body)
           | _ => SOME (case a of
-                   BytesV bs => if byte_sequence_value_type ty then
+                   BytesV bs => if (case ty of LocatedT _ e => byte_sequence_type e | _ => F) then
                      word_of_bytes_be (Keccak_256_w64 bs)
                      else word_of_bytes T (0w : bytes32) encoded_body
                  | _ => word_of_bytes T (0w : bytes32) encoded_body) in
