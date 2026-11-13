@@ -1084,10 +1084,13 @@ Definition call_value_type_def:
 End
 
 (* The type abi.decode gives a value it decodes as this type: the compiler
- * types a decoded address as address payable. *)
+ * types a decoded address as address payable, and an object as one in
+ * memory. *)
 Definition decoded_type_def:
-  (decoded_type (AddressT _) = AddressT PayableAddress) ∧
-  (decoded_type ty = ty)
+  decoded_type ty =
+    case ty of
+      AddressT _ => AddressT PayableAddress
+    | _ => if located_object_shape MemoryLoc ty then LocatedT MemoryLoc ty else ty
 End
 
 (* Ids *)

@@ -339,16 +339,6 @@ Definition eval_operation_def:
          | _ => ValueAbrupt (InvalidCompletion "bad keccak256 operand"))
     (* The compiler's decoder from memory: short data, or a value outside its
      * type, reverts with no data; data after the encoding is ignored. *)
-    | AbiDecodeOperation tys a =>
-        (case eval_atom st.scopes a of
-           SOME (ReferenceValue r) =>
-             (case byte_contents st r of
-                INL bs =>
-                  (case decode_arguments env tys bs 0 (memory_free_pointer st) of
-                     INL vs => ValueOk (pack_results vs)
-                   | INR c => ValueAbrupt c)
-              | INR c => ValueAbrupt c)
-         | _ => ValueAbrupt (InvalidCompletion "bad abi.decode operand"))
     | ArrayLengthOperation a =>
         (case eval_atom st.scopes a of
            SOME (ReferenceValue r) =>
@@ -638,10 +628,16 @@ End
  *)
 (* The unused success fields of a failed try call still have their declared
  * scalar types. *)
+(* The results a failed try call binds, never read: a memory result is the
+ * null reference. *)
 Definition default_call_results_def:
   (default_call_results [] = SOME []) ∧
   (default_call_results (ty :: rets) =
-    case (default_elementary ty, default_call_results rets) of
+    case ((case ty of
+             LocatedT MemoryLoc element =>
+               SOME (ReferenceValue (MemoryReference (HeapId 0) 0 element))
+           | _ => OPTION_MAP ScalarValue (default_elementary ty)),
+          default_call_results rets) of
       (SOME v, SOME vs) => SOME (v :: vs)
     | _ => NONE)
 End
@@ -675,7 +671,7 @@ Definition call_external_mode_def:
                    (case default_call_results rets of
                       NONE => abrupt_result (InvalidCompletion "bad try return types") st gas
                     | SOME defaults =>
-                        let values = ScalarValue (BoolValue F) :: MAP ScalarValue defaults in
+                        let values = ScalarValue (BoolValue F) :: defaults in
                         normal_result (define_binding x ty
                           (TupleValue (values ++
                             [ScalarValue (BytesValue r.call_return)])) st) gas)
@@ -940,6 +936,21 @@ Definition simple_stmt_def:
                      | NONE => abrupt_result (InvalidCompletion "bad storage array copy") st gas)
               | INR c => abrupt_result c st gas)
          | _ => abrupt_result (InvalidCompletion "bad array copy") st gas)
+    (* Decoded memory values are allocated, as external call results are. *)
+    | DefineStmt x ty (AbiDecodeOperation tys a) =>
+        (case eval_atom st.scopes a of
+           SOME (ReferenceValue r) =>
+             (case byte_contents st r of
+                INL bs =>
+                  (case decode_arguments env tys bs 0 (memory_free_pointer st) of
+                     INL vs =>
+                       (case materialize_arguments env tys vs st of
+                          SOME (values, st1) =>
+                            normal_result (define_binding x ty (pack_results values) st1) gas
+                        | NONE => abrupt_result (InvalidCompletion "bad abi.decode results") st gas)
+                   | INR c => abrupt_result c st gas)
+              | INR c => abrupt_result c st gas)
+         | _ => abrupt_result (InvalidCompletion "bad abi.decode operand") st gas)
     | DefineStmt x ty (AbiEncodeOperation selector tys args) =>
         abi_encode env x ty selector tys args st gas
     | DefineStmt x ty (AbiEncodePackedOperation tys args) =>
@@ -1629,21 +1640,21 @@ End
  * as the compiler's accessors read them: a dynamic array's elements, a
  * static array's whole encoding, a byte sequence's bytes. *)
 Definition calldata_span_def:
-  calldata_span ty n =
+  calldata_span env ty n =
     case ty of
-      ArrayT element NONE => n * abi_stride element
-    | ArrayT _ (SOME _) => static_length (abi_type ty)
+      ArrayT element NONE => n * abi_stride env element
+    | ArrayT _ (SOME _) => static_length (abi_type env (LENGTH env.type_declarations) ty)
     | _ => n
 End
 
 (* A calldata local's reference lies inside the calldata. *)
 Definition calldata_in_bounds_def:
-  calldata_in_bounds cd scopes x ⇔
+  calldata_in_bounds env cd scopes x ⇔
     case lookup_binding x scopes of
       SOME b =>
         (case b.binding_value of
            ReferenceValue (CalldataReference offset n ty) =>
-             offset + calldata_span ty n ≤ LENGTH (cd : byte list)
+             offset + calldata_span env ty n ≤ LENGTH (cd : byte list)
          | _ => F)
     | NONE => F
 End
@@ -1651,13 +1662,13 @@ End
 (* Each calldata reference a block names still lies inside the calldata on
  * exit; one it rebound past the end fails closed. *)
 Definition assembly_calldata_ok_def:
-  (assembly_calldata_ok cd scopes [] ⇔ T) ∧
-  (assembly_calldata_ok cd scopes ((_, r) :: refs) ⇔
+  (assembly_calldata_ok env cd scopes [] ⇔ T) ∧
+  (assembly_calldata_ok env cd scopes ((_, r) :: refs) ⇔
     (case r of
-       AssemblyCalldataOffset x => calldata_in_bounds cd scopes x
-     | AssemblyCalldataLength x => calldata_in_bounds cd scopes x
+       AssemblyCalldataOffset x => calldata_in_bounds env cd scopes x
+     | AssemblyCalldataLength x => calldata_in_bounds env cd scopes x
      | _ => T) ∧
-    assembly_calldata_ok cd scopes refs)
+    assembly_calldata_ok env cd scopes refs)
 End
 
 Definition assembly_write_back_def:
@@ -1679,7 +1690,7 @@ Definition assembly_return_data_def:
 End
 
 Definition assembly_result_def:
-  assembly_result refs (st : source_state) m0 (r : yul_result) gas =
+  assembly_result env refs (st : source_state) m0 (r : yul_result) gas =
     let world = assembly_world r.machine in
     case r.completion of
       YulNormal =>
@@ -1706,7 +1717,7 @@ Definition assembly_result_def:
                    r.machine.scopes,
                  assembly_read_back st.heap st.next_heap_id r.machine) of
              (SOME scopes, SOME heap) =>
-               if ¬assembly_calldata_ok st.frame.call_data scopes refs then
+               if ¬assembly_calldata_ok env st.frame.call_data scopes refs then
                  abrupt_result
                    (InvalidCompletion "assembly left a calldata reference outside the calldata")
                    st gas
@@ -1749,7 +1760,7 @@ Definition eval_assembly_def:
         case assembly_machine st scope of
           NONE => abrupt_result (InvalidCompletion "bad memory object") st gas
         | SOME m0 =>
-            assembly_result refs st m0
+            assembly_result env refs st m0
               (run_yul n (yul_substitute_stmts literals code) m0) gas
 End
 

@@ -241,15 +241,6 @@ Definition storage_type_ok_def:
   (storage_type_ok env ty ⇔ elementary_storage_type_ok ty)
 End
 
-(* Whether a type reaches no struct, through array elements: the ABI values
- * the core encodes and decodes. *)
-Definition struct_free_def:
-  (struct_free (StructT _) ⇔ F) ∧
-  (struct_free (ArrayT ty _) ⇔ struct_free ty) ∧
-  (struct_free (LocatedT _ ty) ⇔ struct_free ty) ∧
-  (struct_free _ ⇔ T)
-End
-
 (* Whether an encoding of the type has a fixed size, with no offsets. *)
 Definition static_object_type_def:
   (static_object_type (ArrayT element (SOME n)) ⇔ static_object_type element) ∧
@@ -259,13 +250,10 @@ End
 
 (* The objects a reference in each data location may denote. Storage holds
  * byte sequences, arrays, mappings and structs; their shape against the
- * environment is storage_type_ok's. Memory and calldata hold byte sequences
- * and arrays whose elements are elementary values or, as pointers, other
- * objects in the same location; memory also holds structs, whose fields
- * memory_type_ok checks. A calldata array of fixed length is read in
- * place from its ABI encoding, so its elements are static and every dynamic
- * object is reached through an offset and a length. Array elements are
- * unlocated: element_type adds the location on access. *)
+ * environment is storage_type_ok's. Memory and calldata hold byte sequences,
+ * structs, and arrays whose elements are elementary values or, as pointers,
+ * other objects in the same location; memory_type_ok checks struct fields.
+ * Array elements are unlocated: element_type adds the location on access. *)
 Definition located_object_shape_def:
   (located_object_shape StorageLoc ty ⇔
     case ty of
@@ -276,15 +264,15 @@ Definition located_object_shape_def:
   (located_object_shape loc (ArrayT element length) ⇔
     valid_array_length length ∧
     ((is_elementary_type element ∧ valid_type_shape element) ∨
-     located_object_shape loc element) ∧
-    (loc = CalldataLoc ∧ IS_SOME length ⇒ static_object_type element)) ∧
-  (located_object_shape MemoryLoc (StructT _) ⇔ T) ∧
+     located_object_shape loc element)) ∧
+  (located_object_shape loc (StructT _) ⇔ T) ∧
   (located_object_shape loc ty ⇔ byte_sequence_type ty)
 End
 
-(* The structs a memory object type reaches are declared, and each field is a
- * stored scalar or, as a pointer, a memory object: no mapping or function
- * type. The fuel bounds the struct nesting, so a recursive struct fails. *)
+(* The structs a memory or calldata object type reaches are declared, and each
+ * field is a stored scalar or, as a pointer, an object in the same location
+ * (memory and calldata objects share a shape): no mapping or function type.
+ * The fuel bounds the struct nesting, so a recursive struct fails. *)
 Definition memory_type_ok_def:
   (memory_type_ok env (n : num) (ArrayT element _) ⇔ memory_type_ok env n element) ∧
   (memory_type_ok env n (StructT id) ⇔
@@ -305,11 +293,11 @@ Termination
 End
 
 (* A located type that is well formed in env: its object shape, in storage
- * its layout, and in memory its structs' fields. *)
+ * its layout, and in memory and calldata its structs' fields. *)
 Definition located_type_ok_def:
   located_type_ok env loc ty ⇔
     located_object_shape loc ty ∧ (loc = StorageLoc ⇒ storage_type_ok env ty) ∧
-    (loc = MemoryLoc ⇒ memory_type_ok env (LENGTH env.type_declarations) ty)
+    (loc ≠ StorageLoc ⇒ memory_type_ok env (LENGTH env.type_declarations) ty)
 End
 
 (* Located values: references to an object in a data location. *)
@@ -337,14 +325,21 @@ Definition indexed_element_type_def:
     | _ => NONE
 End
 
-(* ABI values contain scalars (an enum as a uint8), byte sequences in
- * memory/calldata and memory arrays without structs; storage pointers never
- * cross an ABI boundary. *)
-Definition abi_value_type_def:
-  abi_value_type ty ⇔
-    is_stored_scalar_type ty ∨
-    (located_value_type ty ∧ struct_free ty ∧
-     case ty of LocatedT StorageLoc _ => F | _ => T)
+(* The types that cross an ABI boundary: stored scalars (an enum as a uint8)
+ * and memory or calldata objects; storage pointers never do. *)
+Definition abi_type_ok_def:
+  abi_type_ok env ty ⇔
+    (is_stored_scalar_type ty ∧ valid_type_shape ty ∧ declared_type_ok env ty) ∨
+    case ty of
+      LocatedT MemoryLoc element => located_type_ok env MemoryLoc element
+    | LocatedT CalldataLoc element => located_type_ok env CalldataLoc element
+    | _ => F
+End
+
+(* What ABI decoding produces: a scalar or a memory object. *)
+Definition decoded_type_ok_def:
+  decoded_type_ok env ty ⇔
+    abi_type_ok env ty ∧ case ty of LocatedT CalldataLoc _ => F | _ => T
 End
 
 Definition core_binding_type_def:
@@ -917,7 +912,7 @@ Definition wf_core_operation_def:
     (case selector of
        NONE => T
      | SOME s => wf_core_atom env ctx (SingleType (FixedBytesT 4)) s) ∧
-    EVERY (λty. abi_value_type ty ∧ valid_type_shape ty) tys ∧
+    EVERY (abi_type_ok env) tys ∧
     LIST_REL (wf_abi_atom env ctx) tys args) ∧
   (* A byte sequence argument is encoded where it is, in any location. *)
   (wf_core_operation env ctx annotation (AbiEncodePackedOperation tys args) ⇔
@@ -942,7 +937,7 @@ Definition wf_core_operation_def:
      | _ => wf_core_atom env ctx (SingleType (LocatedT MemoryLoc BytesT)) data ∨
             wf_core_atom env ctx (SingleType (LocatedT CalldataLoc BytesT)) data)) ∧
   (wf_core_operation env ctx annotation (AbiDecodeOperation tys a) ⇔
-    tys ≠ [] ∧ EVERY (λty. is_elementary_type ty ∧ valid_type_shape ty) tys ∧
+    tys ≠ [] ∧ EVERY (decoded_type_ok env) tys ∧
     annotation = call_result_type tys ∧
     (wf_core_atom env ctx (SingleType (LocatedT MemoryLoc BytesT)) a ∨
      wf_core_atom env ctx (SingleType (LocatedT CalldataLoc BytesT)) a)) ∧
@@ -1004,15 +999,13 @@ Definition wf_core_operation_def:
     | ConstantAtom _ => F) ∧
   (wf_core_operation env ctx annotation (EnvironmentOperation f) ⇔
     annotation = SingleType (environment_type f)) ∧
-  (* High-level calls pass elementary values; a view or pure callee is
-     called statically, with no value. *)
+  (* High-level calls pass ABI values; a view or pure callee is called
+     statically, with no value. Returndata is decoded into the caller's
+     memory. *)
   (wf_core_operation env ctx annotation
      (ExternalCallOperation kind selector params rets target value gas args) ⇔
     kind ≠ ExternalDelegateCall ∧ LENGTH selector = 4 ∧
-    EVERY (λty. abi_value_type ty ∧ valid_type_shape ty) (params ++ rets) ∧
-    (* Returndata belongs to the caller's memory, never its calldata. *)
-    EVERY (λty. is_elementary_type ty ∨
-                case ty of LocatedT MemoryLoc _ => T | _ => F) rets ∧
+    EVERY (abi_type_ok env) params ∧ EVERY (decoded_type_ok env) rets ∧
     wf_core_atom env ctx (SingleType (AddressT NonpayableAddress)) target ∧
     wf_core_atom env ctx (SingleType (UintT 256)) value ∧
     (kind = ExternalStaticCall ⇒ value = ConstantAtom (IntegerValue 0)) ∧
@@ -1022,8 +1015,7 @@ Definition wf_core_operation_def:
   (wf_core_operation env ctx annotation
      (TryExternalCallOperation kind selector params rets target value gas args) ⇔
     kind ≠ ExternalDelegateCall ∧ LENGTH selector = 4 ∧
-    EVERY (λty. abi_value_type ty ∧ valid_type_shape ty) params ∧
-    EVERY (λty. is_stored_scalar_type ty ∧ valid_type_shape ty) rets ∧
+    EVERY (abi_type_ok env) params ∧ EVERY (decoded_type_ok env) rets ∧
     wf_core_atom env ctx (SingleType (AddressT NonpayableAddress)) target ∧
     wf_core_atom env ctx (SingleType (UintT 256)) value ∧
     (kind = ExternalStaticCall ⇒ value = ConstantAtom (IntegerValue 0)) ∧
@@ -1052,8 +1044,7 @@ End
 Definition emit_indexed_count_def:
   (emit_indexed_count env ctx [] = SOME (0 : num)) ∧
   (emit_indexed_count env ctx ((ty, indexed, a) :: args) =
-    if abi_value_type ty ∧ valid_type_shape ty ∧
-       wf_abi_atom env ctx ty a then
+    if abi_type_ok env ty ∧ wf_abi_atom env ctx ty a then
       case emit_indexed_count env ctx args of
         SOME n => SOME (if indexed then n + 1 else n)
       | NONE => NONE
@@ -1628,7 +1619,7 @@ Definition check_core_stmts_def:
   (* Revert data uses the same in-place ABI serialization as calls. *)
   (check_core_stmts env ctx (RevertErrorStmt selector params args :: ss) =
     if LENGTH selector = 4 ∧
-       EVERY (λty. abi_value_type ty ∧ valid_type_shape ty ∧ declared_type_ok env ty) params ∧
+       EVERY (abi_type_ok env) params ∧
        LIST_REL (wf_abi_atom env ctx) params args
     then check_core_stmts env ctx ss else NONE) ∧
   (check_core_stmts env ctx (EmitStmt topic args :: ss) =
@@ -1756,7 +1747,7 @@ Definition abi_procedure_def:
   abi_procedure env f ⇔
     case lookup_procedure env f of
       SOME p =>
-        EVERY (λ(_, ty). abi_value_type ty)
+        EVERY (λ(_, ty). abi_type_ok env ty)
           (p.parameters ++ p.return_bindings)
     | NONE => F
 End
