@@ -331,13 +331,18 @@ expression. Scalar elements pack without straddling slots; each nested row
 starts on a fresh slot. Array indexing checks bounds with panic `0x32`, and
 `.length` still evaluates its indexed prefix. Dynamic-array length is read from
 its root slot and packed elements start at Keccak-256 of that slot. `push(value)`,
-`push()` (also as a scalar lvalue), and `pop()` use the captured location. Empty
+`push()` (also as an element lvalue), and `pop()` use the captured location.
+`push(value)` appends a location, then uses the shared scalar or aggregate
+assignment rule, including structs, nested arrays and byte sequences. Empty
 pop panics with `0x31`; both push forms follow the pinned compiler's resource
 panic `0x41` at length >= `2^64`. Length reads and indexing retain the full
-256-bit range. `pop()` clears only the removed scalar bytes; `push()` preserves
-existing bytes at the appended position, as the pinned compiler does. Dynamic
-array mutation of aggregates, local reference bindings and aggregate copies
-remain coverage work.
+256-bit range. For scalar elements, `pop()` clears only the removed bytes,
+preserving packed neighbors. Aggregate elements are cleared recursively;
+struct scalar fields clear their whole slots, including padding, while mapping
+entries survive. `push()` preserves existing bytes at the appended position,
+as the pinned compiler does. Local storage reference bindings and aggregate
+copies use the same location and assignment rules. Calldata arrays of enums or
+structs, and ABI array values containing those element types, remain rejected.
 
 A public state variable's getter takes one key per mapping and one index per
 array along its type, an index past an array's length reverting with no data.
@@ -406,15 +411,16 @@ values and copied to other storage arrays (`storage_enum_arrays.sol`). Copies
 clear old destination contents and pack enum elements one byte each. A copy that reads an out-of-range source byte
 fails closed with `InvalidCompletion`; copying an array onto itself is a
 no-op and reads no elements. Clearing old destination contents does not
-validate the bytes being discarded. Memory and calldata enum arrays remain
-outside the supported boundary.
+validate the bytes being discarded. Memory arrays of declared enums support
+allocation, access and copies. Calldata enum arrays and enum arrays used as
+ABI values remain outside the supported boundary.
 
 An enum is ABI encoded as `uint8`, as a parameter, a return, an event
 argument or an external call's argument. A call or creation whose enum
 argument is out of range reverts when the decoder reaches it, before later arguments are read.
 `type(E).min` and `type(E).max` are the first and last enum values.
-Enums as mapping keys, as elements of memory or calldata
-arrays, as constants or immutables, or returned by an
+Enums as mapping keys, as elements of calldata arrays or ABI array values,
+as constants or immutables, or returned by an
 external call are rejected.
 
 `keccak256(b)` hashes the contents of a `bytes` value with Keccak-256, giving
@@ -723,7 +729,8 @@ Admitted: one contract, flattened along its bases, with
 - functions over elementary value types, persistent/transient value-type state
   variables and immutables, storage structs, value-type or bytes/string-key mappings and fixed or dynamic
   storage arrays; member and indexed scalar reads and updates, array lengths,
-  scalar push and pop; bytes and string literals and memory or calldata
+  push and pop through the element's storage layout and assignment rules;
+  bytes and string literals and memory or calldata
   values, which keep their locations (memory assignments alias,
   calldata-to-memory assignments copy); storage byte sequences and dynamic
   ABI values are rejected;
