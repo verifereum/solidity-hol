@@ -2692,6 +2692,18 @@ Definition elab_assembly_references_def:
     | INR bs => INR (bs ++ blockers (elab_assembly_references ctx n id refs)))
 End
 
+(* The caught operation of a try statement: an external call. Kept out of
+ * elab_stmt, whose termination proof the case split on the call's form
+ * would multiply. *)
+Definition try_operation_def:
+  try_operation ctx n call =
+    case call of
+      SrcExternalCall info callee opts operands order tid =>
+        external_call T ctx info callee opts operands order tid
+          (elab_arg_values ctx n operands)
+    | _ => INR [(expr_id call, "unsupported try statement")]
+End
+
 (* A caught call's success flag, results and raw revert data, projected from
  * its result r after its statements ss; the try's returns are the callee's. *)
 Definition try_call_def:
@@ -2782,11 +2794,7 @@ Definition elab_stmts_def:
         else INL ((ss, ctx), n1)
     | INR bs => INR bs) ∧
   (elab_stmt ctx n (SrcTryStatement info call ok ps body handlers) =
-    case (case call of
-            SrcExternalCall cinfo callee opts operands order tid =>
-              external_call T ctx cinfo callee opts operands order tid
-                (elab_arg_values ctx n operands)
-          | _ => INR [(expr_id call, "unsupported try statement")]) of
+    case try_operation ctx n call of
       INR bs =>
         INR (bs ++ blockers (elab_stmt (bind_failed ctx (MAP SOME ps)) n body) ++
              blockers (elab_catches ctx n (ConstantAtom (BytesValue [])) handlers))
