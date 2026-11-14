@@ -757,10 +757,37 @@ Proof
   EVAL_TAC
 QED
 
-(* Calldata structs are not modelled, so no calldata binding reaches one. *)
-Theorem calldata_struct_binding_rejected:
+(* Calldata structs take the memory field rule: no mapping reaches one. *)
+Theorem calldata_struct_binding_checked:
+  core_binding_type struct_env
+     (LocatedT CalldataLoc (ArrayT (StructT (AstId 912)) (SOME 1))) ∧
   ¬core_binding_type struct_env
-     (LocatedT CalldataLoc (ArrayT (StructT (AstId 912)) (SOME 1)))
+     (LocatedT CalldataLoc (ArrayT (StructT (AstId 911)) (SOME 1)))
+Proof
+  EVAL_TAC
+QED
+
+Definition slice_struct_env_def:
+  slice_struct_env = test_env with type_declarations :=
+    [(AstId 914, StructDeclaration [(AstId 1, UintT 8)]);
+     (AstId 915, StructDeclaration [(AstId 1, BytesT)])]
+End
+
+Theorem calldata_struct_slices_require_static_fields:
+  wf_core_operation slice_struct_env
+    <| bindings := [(AstId 1, SingleType
+         (LocatedT CalldataLoc (ArrayT (StructT (AstId 914)) NONE)))];
+       targets := []; returns := []; in_loop := F |>
+    (SingleType (LocatedT CalldataLoc (ArrayT (StructT (AstId 914)) NONE)))
+    (CalldataSliceOperation (BoundAtom (AstId 1))
+       (ConstantAtom (IntegerValue 0)) NONE) ∧
+  ¬wf_core_operation slice_struct_env
+    <| bindings := [(AstId 1, SingleType
+         (LocatedT CalldataLoc (ArrayT (StructT (AstId 915)) NONE)))];
+       targets := []; returns := []; in_loop := F |>
+    (SingleType (LocatedT CalldataLoc (ArrayT (StructT (AstId 915)) NONE)))
+    (CalldataSliceOperation (BoundAtom (AstId 1))
+       (ConstantAtom (IntegerValue 0)) NONE)
 Proof
   EVAL_TAC
 QED
@@ -1254,16 +1281,19 @@ Proof
   EVAL_TAC
 QED
 
-Theorem memory_enum_arrays_keep_abi_boundary:
+(* Memory enum arrays cross the ABI boundary with declared enums only; the
+ * codec validates each element as it decodes it. *)
+Theorem memory_enum_arrays_abi_boundary:
   core_binding_type test_env
     (LocatedT MemoryLoc (ArrayT (EnumT (AstId 900)) NONE)) ∧
   ¬core_binding_type test_env
     (LocatedT MemoryLoc (ArrayT (EnumT (AstId 901)) NONE)) ∧
   memory_fields_ok test_env 1 [EnumT (AstId 900)] ∧
   ¬memory_fields_ok test_env 1 [EnumT (AstId 901)] ∧
-  ¬abi_value_type (LocatedT MemoryLoc (ArrayT (EnumT (AstId 900)) NONE)) ∧
-  ¬abi_value_type
-    (LocatedT MemoryLoc (ArrayT (ArrayT (EnumT (AstId 900)) NONE) NONE))
+  abi_type_ok test_env (LocatedT MemoryLoc (ArrayT (EnumT (AstId 900)) NONE)) ∧
+  abi_type_ok test_env
+    (LocatedT MemoryLoc (ArrayT (ArrayT (EnumT (AstId 900)) NONE) NONE)) ∧
+  ¬abi_type_ok test_env (LocatedT MemoryLoc (ArrayT (EnumT (AstId 901)) NONE))
 Proof
   EVAL_TAC
 QED

@@ -392,8 +392,6 @@ Theorem unassigned_fixed_memory_rejected:
     (ArrayT u256 (SOME 1))
     (ReferenceValue (MemoryReference (HeapId 0) 0 (ArrayT u256 (SOME 1)))) =
     INR (InvalidCompletion "bad memory array reference") ∧
-  memory_abi_value initial_state (ArrayT u256 (SOME 1))
-    (ReferenceValue (MemoryReference (HeapId 0) 0 (ArrayT u256 (SOME 1)))) = NONE ∧
   memory_array_length initial_state
     (MemoryReference (HeapId 0) 0 (ArrayT u256 NONE)) = SOME 0 ∧
   memory_array_element initial_state
@@ -1909,4 +1907,31 @@ Theorem reset_storage_in_static_frame_fails:
      []).completion = InvalidCompletion "storage reset in static frame"
 Proof
   CONV_TAC cv_eval
+QED
+
+Definition calldata_head_env_def:
+  calldata_head_env = recursive_reset_env with type_declarations :=
+    [(AstId 950, StructDeclaration [(AstId 951, UintT 8); (AstId 952, BytesT)])]
+End
+
+Definition calldata_head_scopes_def:
+  calldata_head_scopes ty offset =
+    [FEMPTY |+ (1, <| binding_type := SingleType (LocatedT CalldataLoc ty);
+      binding_value := ReferenceValue (CalldataReference offset 0 ty) |>)]
+End
+
+val () = cv_auto_trans calldata_head_env_def;
+val () = cv_auto_trans calldata_head_scopes_def;
+
+Theorem assembly_calldata_requires_complete_object_head:
+  EVERY (λty.
+    assembly_calldata_ok calldata_head_env (REPLICATE 64 0w)
+      (calldata_head_scopes ty 0) [("p", AssemblyCalldataOffset (AstId 1))] ∧
+    ¬assembly_calldata_ok calldata_head_env (REPLICATE 63 0w)
+      (calldata_head_scopes ty 0) [("p", AssemblyCalldataOffset (AstId 1))] ∧
+    ¬assembly_calldata_ok calldata_head_env (REPLICATE 64 0w)
+      (calldata_head_scopes ty 64) [("p", AssemblyCalldataOffset (AstId 1))])
+    [StructT (AstId 950); ArrayT BytesT (SOME 2)]
+Proof
+  EVAL_TAC
 QED

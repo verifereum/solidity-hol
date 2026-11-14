@@ -587,15 +587,22 @@ Definition option_value_def:
 End
 
 (* A high-level call of a view or pure function is a static call. *)
+(* A caught call binds its success flag, its results and its raw revert
+ * data. *)
 Definition external_call_value_def:
-  external_call_value n mutability selector params rets ss target opts atoms
-                      args =
+  external_call_value catching n mutability selector params rets ss target opts
+                      atoms args =
     let kind = if mutability = ViewMut ∨ mutability = PureMut
                then ExternalStaticCall else ExternalCall in
-    ((ss ++ [DefineStmt (AstId n) (call_result_type rets)
-               (ExternalCallOperation kind selector params rets target
-                  (option_value opts atoms) (option_atom GasOption opts atoms)
-                  args)],
+    let value = option_value opts atoms in
+    let gas = option_atom GasOption opts atoms in
+    ((ss ++ [if catching then
+               DefineStmt (AstId n)
+                 (ProductType (MAP SingleType (BoolT :: rets) ++ [RevertDataType]))
+                 (TryExternalCallOperation kind selector params rets target value gas args)
+             else
+               DefineStmt (AstId n) (call_result_type rets)
+                 (ExternalCallOperation kind selector params rets target value gas args)],
       BoundAtom (AstId n), call_value rets), n + 1)
 End
 
@@ -744,7 +751,7 @@ Definition abi_argument_def:
         (case ty of
            LocatedT _ element =>
              if byte_sequence_type element ∨
-                (¬packed ∧ abi_value_type (LocatedT MemoryLoc element))
+                (¬packed ∧ located_object_shape MemoryLoc element)
              then INL (LocatedT MemoryLoc element, a)
              else INR "abi encoding of this type"
          | _ => INR "abi encoding of this type")
@@ -928,15 +935,16 @@ Definition internal_call_ok_def:
     | _ => decode_type_identifier tid = SOME (call_value_type rets)
 End
 
-(* An elaborated member access root that is a memory struct: its prelude,
- * atom and struct id. A separate definition, so elab_expr's fallback to
- * elab_location is one case, not one per other root type. *)
-Definition memory_struct_root_def:
-  memory_struct_root (r : ((core_stmt list # core_atom # elab_type) # num) +
-                           (num # string) list) =
+(* An elaborated member access root that is a memory or calldata struct: its
+ * prelude, atom, location and struct id. A separate definition, so
+ * elab_expr's fallback to elab_location is one case, not one per other root
+ * type. *)
+Definition struct_root_def:
+  struct_root (r : ((core_stmt list # core_atom # elab_type) # num) +
+                    (num # string) list) =
     case r of
-      INL ((ss, ref, ElabType (LocatedT MemoryLoc (StructT (AstId id)))), n1) =>
-        SOME ((ss, ref, id), n1)
+      INL ((ss, ref, ElabType (LocatedT loc (StructT (AstId id)))), n1) =>
+        if loc = StorageLoc then NONE else SOME ((ss, ref, loc, id), n1)
     | _ => NONE
 End
 
@@ -1045,27 +1053,50 @@ Definition elab_struct_layouts_def:
         (computed_struct_layouts (LENGTH structs) structs)) structs
 End
 
-(* Whether a binding of type ty is one the core accepts: a memory type's
- * structs are declared, not recursive and hold no mapping; a storage type's
- * structs have layouts. *)
+(* Whether a binding of type ty is one the core accepts: a memory or calldata
+ * type's structs are declared, not recursive and hold no mapping; a storage
+ * type's structs have layouts. *)
 Definition memory_binding_ok_def:
   memory_binding_ok enums structs ty ⇔
     case ty of
-      LocatedT MemoryLoc element =>
-        (case elab_type_declarations enums structs of
-           SOME decls =>
-             memory_type_ok <| procedures := []; state_variables := []; immutables := [];
-                               struct_layouts := []; type_declarations := decls |>
-               (LENGTH decls) element
-         | NONE => F)
-    | LocatedT StorageLoc element =>
+      LocatedT StorageLoc element =>
         (case (elab_type_declarations enums structs, elab_struct_layouts structs) of
            (SOME decls, SOME layouts) =>
              storage_type_ok <| procedures := []; state_variables := []; immutables := [];
                                 struct_layouts := MAP (λs. (s.struct_id, s)) layouts;
                                 type_declarations := decls |> element
          | _ => F)
+    | LocatedT _ element =>
+        (case elab_type_declarations enums structs of
+           SOME decls =>
+             memory_type_ok <| procedures := []; state_variables := []; immutables := [];
+                               struct_layouts := []; type_declarations := decls |>
+               (LENGTH decls) element
+         | NONE => F)
     | _ => T
+End
+
+(* Whether values of type ty cross an ABI boundary (abi_type_ok), against the
+ * declarations in scope. *)
+Definition abi_binding_ok_def:
+  abi_binding_ok enums structs ty ⇔
+    case elab_type_declarations enums structs of
+      SOME decls =>
+        abi_type_ok <| procedures := []; state_variables := []; immutables := [];
+                       struct_layouts := []; type_declarations := decls |> ty
+    | NONE => F
+End
+
+(* Slices retain their elements' offsets, so each element's ABI head must
+ * contain its whole value, including any struct fields. *)
+Definition static_binding_ok_def:
+  static_binding_ok enums structs ty ⇔
+    case elab_type_declarations enums structs of
+      SOME decls =>
+        static_object_type <| procedures := []; state_variables := []; immutables := [];
+                              struct_layouts := []; type_declarations := decls |>
+          (LENGTH decls) ty
+    | NONE => F
 End
 
 (* A storage copy into a reference target holds a type the memory checks
@@ -1119,16 +1150,16 @@ End
 
 (* A custom error's resolved signature and argument permutation. *)
 Definition revert_shape_def:
-  revert_shape selector params order count ⇔
+  revert_shape enums structs selector params order count ⇔
     LENGTH selector = 4 ∧ count = LENGTH params ∧
-    argument_order_ok order count ∧ EVERY abi_value_type params
+    argument_order_ok order count ∧ EVERY (abi_binding_ok enums structs) params
 End
 
 (* Revert payloads keep byte references live until the failure branch
  * serializes them; evaluating the arguments does not copy their contents. *)
 Definition revert_arguments_def:
-  revert_arguments n (id : num) selector params order ids vs =
-    if ¬revert_shape selector params order (LENGTH vs) then
+  revert_arguments enums structs n (id : num) selector params order ids vs =
+    if ¬revert_shape enums structs selector params order (LENGTH vs) then
       INR [(id, "revert does not match the error")]
     else
       case (arrange order vs, arrange order ids) of
@@ -1302,6 +1333,40 @@ Definition call_location_def:
     | INR bs => INR bs
 End
 
+(* An external call, caught or not, from its elaborated operands r: the
+ * target, the call options in source order and the arguments. Value only for
+ * a payable callee, as the compiler requires. *)
+Definition external_call_def:
+  external_call catching ctx (info : node_info) callee opts operands order tid r =
+    let shape =
+      (case (all_some (MAP call_variable_type callee.ext_parameters),
+             all_some (MAP call_variable_type callee.ext_returns)) of
+         (SOME params, SOME rets) =>
+           if (MEM ValueOption opts ⇒ callee.ext_mutability = PayableMut) ∧
+              LENGTH operands = LENGTH params + 1 + LENGTH opts ∧
+              argument_order_ok order (LENGTH params) ∧
+              decode_type_identifier tid = SOME (call_value_type rets) ∧
+              EVERY (abi_binding_ok ctx.enums ctx.structs) (params ++ rets)
+           then INL (params, rets) else INR (info.node_id, "unsupported external call")
+       | _ => INR (info.node_id, "unsupported external call")) in
+    case (shape, r) of
+      (INR b, r) => reject b r
+    | (INL _, INR bs) => INR bs
+    | (INL (params, rets), INL ((ss, vs0), next)) =>
+        (case (arrange order vs0, arrange order (expr_ids operands)) of
+           (SOME vs, SOME ids) =>
+             (case convert_operands next info.node_id ids
+                     (encoded_as (AddressT NonpayableAddress ::
+                        REPLICATE (LENGTH opts) (UintT 256) ++ params)) vs of
+                INL (cs, _, t :: atoms, n1) =>
+                  INL (external_call_value catching n1 callee.ext_mutability
+                         callee.ext_selector params rets (ss ++ cs) t opts
+                         (TAKE (LENGTH opts) atoms) (DROP (LENGTH opts) atoms))
+              | INL _ => INR [(info.node_id, "unsupported external call")]
+              | INR bs => INR bs)
+         | _ => INR [(info.node_id, "unsupported external call")])
+End
+
 Definition elab_expr_def:
   (elab_expr ctx n expression =
     case expression of
@@ -1365,11 +1430,11 @@ Definition elab_expr_def:
                else INL (([], ConstantAtom (BoolValue F), ElabRational), n)
            | _ => INR [(info.node_id, "unsupported literal")])
     | SrcMemberAccess info root_expr member_id tid =>
-        (case memory_struct_root (elab_expr ctx n root_expr) of
-           SOME ((ss, ref, id), n1) =>
+        (case struct_root (elab_expr ctx n root_expr) of
+           SOME ((ss, ref, loc, id), n1) =>
              (case source_struct_field ctx.structs id member_id of
                 SOME fty =>
-                  let ety = element_type MemoryLoc fty in
+                  let ety = element_type loc fty in
                   ensure (source_type_matches ety tid) (info.node_id, "type annotation mismatch")
                   (let (rs, a) = bind_value (n1 + 1) ety
                                    (ReadOperation ety (BoundAtom (AstId n1))) in
@@ -1406,7 +1471,8 @@ Definition elab_expr_def:
            INL ((ss, ref, ElabType (LocatedT CalldataLoc ty)), n1) =>
              if ¬(source_type_matches (LocatedT CalldataLoc ty) tid ∧
                   (ty = BytesT ∨ case ty of
-                     ArrayT element NONE => static_object_type element | _ => F))
+                     ArrayT element NONE =>
+                       static_binding_ok ctx.enums ctx.structs element | _ => F))
              then INR [(info.node_id, "unsupported calldata slice type")] else
              let (saved, n2) = snapshot n1 ref (ElabType (LocatedT CalldataLoc ty)) in
              let (sc, ref') = saved in
@@ -1756,7 +1822,7 @@ Definition elab_expr_def:
                 | SOME m =>
                     (case elab_arg_values ctx n [m] of
                        INL ((ss, vs), n1) =>
-                         (case revert_arguments n1 info.node_id [0x08w; 0xc3w; 0x79w; 0xa0w]
+                         (case revert_arguments ctx.enums ctx.structs n1 info.node_id [0x08w; 0xc3w; 0x79w; 0xa0w]
                                  [LocatedT MemoryLoc StringT] [] [expr_id m] vs of
                             INL (cs, failure, n2) => INL (builtin_result n2 (ss ++ cs) NONE failure)
                           | INR bs => INR bs)
@@ -1772,7 +1838,7 @@ Definition elab_expr_def:
                 | SOME m =>
                     (case elab_arg_values ctx n [c; m] of
                        INL ((ss, (v, ElabType BoolT) :: vs), n1) =>
-                         (case revert_arguments n1 info.node_id [0x08w; 0xc3w; 0x79w; 0xa0w]
+                         (case revert_arguments ctx.enums ctx.structs n1 info.node_id [0x08w; 0xc3w; 0x79w; 0xa0w]
                                  [LocatedT MemoryLoc StringT] [] [expr_id m] vs of
                             INL (cs, failure, n2) => INL (builtin_result n2 (ss ++ cs) (SOME v) failure)
                           | INR bs => INR bs)
@@ -1784,51 +1850,21 @@ Definition elab_expr_def:
                         blockers (elab_arg_values ctx n (condition :: args)))
          | SOME params =>
              if tid ≠ "t_tuple$__$" ∨
-                ¬revert_shape err.error_selector params order (LENGTH args) then
+                ¬revert_shape ctx.enums ctx.structs err.error_selector params order (LENGTH args) then
                reject (info.node_id, "require does not match the error")
                  (elab_arg_values ctx n (condition :: args))
              else
                (case elab_arg_values ctx n (condition :: args) of
                   INL ((ss, (v, ElabType BoolT) :: vs), n1) =>
-                    (case revert_arguments n1 info.node_id err.error_selector params order
+                    (case revert_arguments ctx.enums ctx.structs n1 info.node_id err.error_selector params order
                             (expr_ids args) vs of
                        INL (cs, failure, n2) => INL (builtin_result n2 (ss ++ cs) (SOME v) failure)
                      | INR bs => INR bs)
                 | INL _ => INR [(expr_id condition, "condition not a bool")]
                 | INR bs => INR bs))
-    (* The operands are the target, the call options in source order and
-       the arguments. Value only for a payable callee, as the compiler
-       requires; calls returning enums, and struct parameters or returns,
-       are not supported yet. *)
     | SrcExternalCall info callee opts operands order tid =>
-        (let shape =
-           (case (all_some (MAP call_variable_type callee.ext_parameters),
-                  all_some (MAP call_variable_type callee.ext_returns)) of
-              (SOME params, SOME rets) =>
-                if (MEM ValueOption opts ⇒ callee.ext_mutability = PayableMut) ∧
-                   LENGTH operands = LENGTH params + 1 + LENGTH opts ∧
-                   argument_order_ok order (LENGTH params) ∧
-                   decode_type_identifier tid = SOME (call_value_type rets) ∧
-                   EVERY (λty. case ty of EnumT _ => F | _ => T) rets ∧
-                   EVERY abi_value_type (params ++ rets)
-                then INL (params, rets) else INR (info.node_id, "unsupported external call")
-            | _ => INR (info.node_id, "unsupported external call")) in
-         case (shape, elab_arg_values ctx n operands) of
-           (INR b, r) => reject b r
-         | (INL _, INR bs) => INR bs
-         | (INL (params, rets), INL ((ss, vs0), next)) =>
-             (case (arrange order vs0, arrange order (expr_ids operands)) of
-                (SOME vs, SOME ids) =>
-                  (case convert_operands next info.node_id ids
-                          (encoded_as (AddressT NonpayableAddress ::
-                             REPLICATE (LENGTH opts) (UintT 256) ++ params)) vs of
-                     INL (cs, _, t :: atoms, n1) =>
-                       INL (external_call_value n1 callee.ext_mutability
-                              callee.ext_selector params rets (ss ++ cs) t opts
-                              (TAKE (LENGTH opts) atoms) (DROP (LENGTH opts) atoms))
-                   | INL _ => INR [(info.node_id, "unsupported external call")]
-                   | INR bs => INR bs)
-              | _ => INR [(info.node_id, "unsupported external call")]))
+        external_call F ctx info callee opts operands order tid
+          (elab_arg_values ctx n operands)
     (* S(args): the arguments in the call's order, then the struct is
        allocated, and each field converted and written in declaration order *)
     | SrcStructConstructor info id args order tid =>
@@ -2089,8 +2125,7 @@ Definition elab_expr_def:
                        SOME (SrcType ty) => [ty]
                      | SOME (SrcTupleType ts) => ts
                      | _ => []) in
-                  (* only elementary types decode: bytes and string are type names too *)
-                  if NULL out_tys ∨ ¬EVERY is_elementary_type out_tys ∨
+                  if NULL out_tys ∨ ¬EVERY (abi_binding_ok ctx.enums ctx.structs) out_tys ∨
                      ¬decoded_types_match tys out_tys ∨
                      decode_type_identifier tid ≠ SOME (call_value_type out_tys)
                   then INR [(info.node_id, "abi decoding of these types")] else
@@ -2442,11 +2477,12 @@ Definition elab_expr_def:
                  INL ((ss, ReferenceDestination ref ty), n1)
              | INR bs => INR bs)
     | SrcMemberAccess info root_expr member_id tid =>
-          (case memory_struct_root (elab_expr ctx n root_expr) of
-             SOME ((ss, ref, id), n1) =>
+          (case struct_root (elab_expr ctx n root_expr) of
+             SOME ((ss, ref, loc, id), n1) =>
                let (captured, n2) =
                  snapshot n1 ref (ElabType (LocatedT MemoryLoc (StructT (AstId id)))) in
                let (saved, ref') = captured in
+               ensure (loc = MemoryLoc) (info.node_id, "write to calldata")
                (case source_struct_field ctx.structs id member_id of
                   SOME fty =>
                     let ety = element_type MemoryLoc fty in
@@ -2702,38 +2738,32 @@ Definition elab_assembly_references_def:
     | INR bs => INR (bs ++ blockers (elab_assembly_references ctx n id refs)))
 End
 
-(* Ordinary external-call lowering has already evaluated and coerced every
- * operand; only its final operation belongs inside the catching boundary. *)
-Definition try_external_call_def:
-  try_external_call ss result =
-    case REVERSE ss of
-      DefineStmt x _ (ExternalCallOperation kind selector params rets target value g
-                        args) :: pre =>
-        if result = BoundAtom x ∧ EVERY is_stored_scalar_type rets then
-          let types = BoolT :: rets in
-          SOME (REVERSE pre ++
-            [DefineStmt x (ProductType (MAP SingleType types ++ [RevertDataType]))
-              (TryExternalCallOperation kind selector params rets target value g
-                 args)],
-            types)
-        else NONE
-    | _ => NONE
+(* The caught operation of a try statement: an external call. Kept out of
+ * elab_stmt, whose termination proof the case split on the call's form
+ * would multiply. *)
+Definition try_operation_def:
+  try_operation ctx n id call =
+    case call of
+      SrcExternalCall info callee opts operands order tid =>
+        external_call T ctx info callee opts operands order tid
+          (elab_arg_values ctx n operands)
+    | _ => INR [(id, "unsupported try statement")]
 End
 
-(* Only the external operation is caught; scalar success values and raw
- * revert data are projected separately. *)
+(* A caught call's success flag, results and raw revert data, projected from
+ * its result r after its statements ss; the try's returns are the callee's. *)
 Definition try_call_def:
   try_call n call ok ps body ss r =
-    case (call, all_some (MAP (scoped_variable ok) ps), try_external_call ss r) of
-      (SrcExternalCall _ callee _ _ _ _, SOME locals, SOME (cs, types)) =>
-        if ¬(EVERY (is_stored_scalar_type o SND) locals ∧
-             all_some (MAP variable_type callee.ext_returns) = SOME (MAP SND locals) ∧
+    case (call, all_some (MAP (scoped_variable ok) ps)) of
+      (SrcExternalCall _ callee _ _ _ _, SOME locals) =>
+        if ¬(all_some (MAP variable_type callee.ext_returns) = SOME (MAP SND locals) ∧
              ¬is_declaration body)
         then NONE else
+        let types = BoolT :: MAP SND locals in
         let (xs, values, n1) = tuple_components n r 0 types in
         (case values of
            (condition, _) :: rest =>
-             SOME (cs ++ xs ++
+             SOME (ss ++ xs ++
                [DefineStmt (AstId n1) RevertDataType
                   (TupleComponentOperation (LENGTH types) r)],
                condition, rest, BoundAtom (AstId n1), n1 + 1)
@@ -2810,7 +2840,7 @@ Definition elab_stmts_def:
         else INL ((ss, ctx), n1)
     | INR bs => INR bs) ∧
   (elab_stmt ctx n (SrcTryStatement info call ok ps body handlers) =
-    case elab_expr ctx n call of
+    case try_operation ctx n info.node_id call of
       INR bs =>
         INR (bs ++ blockers (elab_stmt (bind_failed ctx (MAP SOME ps)) n body) ++
              blockers (elab_catches ctx n (ConstantAtom (BytesValue [])) handlers))
@@ -2977,7 +3007,7 @@ Definition elab_stmts_def:
            then INR (info.node_id, "emit does not match the event") else
            (case all_some (MAP event_parameter e.event_parameters) of
               SOME ps =>
-                if EVERY (abi_value_type o FST) ps then INL (e, ps)
+                if EVERY (abi_binding_ok ctx.enums ctx.structs o FST) ps then INL (e, ps)
                 else INR (info.node_id, "unsupported event parameter type")
             | NONE => INR (info.node_id, "unsupported event parameter type"))) in
     case (event, elab_arg_values ctx n args) of
@@ -2997,14 +3027,14 @@ Definition elab_stmts_def:
       NONE => INR (variables_blockers (MAP SOME err.error_parameters) ++
                    blockers (elab_arg_values ctx n args))
     | SOME params =>
-        if ¬revert_shape err.error_selector params order (LENGTH args)
+        if ¬revert_shape ctx.enums ctx.structs err.error_selector params order (LENGTH args)
         then reject (info.node_id, "revert does not match the error")
                (elab_arg_values ctx n args)
         else
           (case elab_arg_values ctx n args of
              INR bs => INR bs
            | INL ((ss, vs), n1) =>
-               (case revert_arguments n1 info.node_id err.error_selector params order
+               (case revert_arguments ctx.enums ctx.structs n1 info.node_id err.error_selector params order
                        (expr_ids args) vs of
                   INL (cs, failure, n2) => INL ((ss ++ cs ++ [failure], ctx), n2)
                 | INR bs => INR bs))) ∧
@@ -3270,8 +3300,9 @@ Definition elab_function_def:
         (ensure ((f.fn_selector = NONE ∧ f.fn_kind ≠ ConstructorKind) ∨
                  EVERY (λ(_, ty). case ty of
                                     LocatedT StorageLoc _ => T
-                                  | _ => abi_value_type ty) (ps ++ rs))
-           (f.fn_info.node_id, "struct parameter or return of an external function")
+                                  | _ => abi_binding_ok c.contract_enums c.contract_structs ty)
+                   (ps ++ rs))
+           (f.fn_info.node_id, "unsupported ABI parameter or return type")
         (ensure (EVERY (λ(_, ty). memory_binding_ok c.contract_enums c.contract_structs ty)
                    (ps ++ rs))
            (f.fn_info.node_id, "unsupported memory struct type")
@@ -3944,8 +3975,10 @@ val () = cv_auto_trans computed_struct_layouts_def;
 val () = cv_auto_trans elab_struct_layouts_with_def;
 val () = cv_auto_trans elab_struct_layouts_def;
 val () = cv_auto_trans memory_binding_ok_def;
+val () = cv_auto_trans abi_binding_ok_def;
+val () = cv_auto_trans static_binding_ok_def;
 val () = cv_auto_trans copy_target_ok_def;
-val () = cv_auto_trans memory_struct_root_def;
+val () = cv_auto_trans struct_root_def;
 val () = cv_auto_trans struct_field_types_def;
 val () = cv_auto_trans field_values_def;
 val () = cv_auto_trans field_writes_def;
@@ -4130,7 +4163,6 @@ val () = cv_auto_trans static_memory_returns_def;
 val () = cv_auto_trans flag_def;
 val () = cv_auto_trans set_flag_def;
 
-val () = cv_auto_trans try_external_call_def;
 val () = cv_auto_trans try_call_def;
 val () = cv_auto_trans catch_binding_def;
 val bind_failed_pre_def = cv_auto_trans_pre "bind_failed_pre" bind_failed_def;

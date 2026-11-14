@@ -341,8 +341,7 @@ preserving packed neighbors. Aggregate elements are cleared recursively;
 struct scalar fields clear their whole slots, including padding, while mapping
 entries survive. `push()` preserves existing bytes at the appended position,
 as the pinned compiler does. Local storage reference bindings and aggregate
-copies use the same location and assignment rules. Calldata arrays of enums or
-structs, and ABI array values containing those element types, remain rejected.
+copies use the same location and assignment rules.
 
 A public state variable's getter takes one key per mapping and one index per
 array along its type, an index past an array's length reverting with no data.
@@ -412,16 +411,15 @@ clear old destination contents and pack enum elements one byte each. A copy that
 fails closed with `InvalidCompletion`; copying an array onto itself is a
 no-op and reads no elements. Clearing old destination contents does not
 validate the bytes being discarded. Memory arrays of declared enums support
-allocation, access and copies. Calldata enum arrays and enum arrays used as
-ABI values remain outside the supported boundary.
+allocation, access, copies and ABI encoding and decoding, each element checked
+where it is decoded. Calldata arrays of declared enums use the same element
+validation, including when nested inside structs.
 
 An enum is ABI encoded as `uint8`, as a parameter, a return, an event
 argument or an external call's argument. A call or creation whose enum
 argument is out of range reverts when the decoder reaches it, before later arguments are read.
 `type(E).min` and `type(E).max` are the first and last enum values.
-Enums as mapping keys, as elements of calldata arrays or ABI array values,
-as constants or immutables, or returned by an
-external call are rejected.
+Enums as mapping keys, constants or immutables are rejected.
 
 `keccak256(b)` hashes the contents of a `bytes` value with Keccak-256, giving
 a `bytes32`. A string or hex literal is hashed directly without allocating
@@ -475,10 +473,10 @@ their smallest type, which has the encoding of `int256` or `uint256`.
 bytes of a `bytes4` selector for `encodeWithSelector`, or of the Keccak-256
 hash of a literal signature for `encodeWithSignature`; `abi.encodePacked`
 gives each scalar in its own width, a `bytesN` as its N bytes, and a byte
-sequence as its contents. Unpacked encoding also accepts fixed and dynamic
-arrays of scalars, byte sequences and nested arrays in memory, calldata or
-storage, retaining the reference until all arguments have been evaluated.
-Packed arrays, structs as arguments, a selector that
+sequence as its contents. Unpacked encoding also accepts arrays and structs
+of any nesting in memory, calldata or storage, retaining the reference until
+all arguments have been evaluated.
+Packed arrays and structs, a selector that
 is not a `bytes4` value (a literal selector included), and a signature that is
 not a plain string literal are rejected.
 
@@ -487,23 +485,24 @@ encoding of the arguments, each converted to its parameter's type as an
 internal call's argument is; a single argument may stand without parentheses.
 `f` is a member access naming a function whose receiver is one the compiler
 does not evaluate (as for `x.f.selector`), or a variable other than a
-constant, which is not read (reading it has no effect). Parameters must be
-scalars or byte sequences; other receivers (a constant, whose initializer the
-compiler evaluates and which may fail, included), and array and struct
-parameters, are rejected.
+constant, which is not read (reading it has no effect). Parameters use the
+same ABI types as unpacked encoding, including nested arrays and structs.
+Other receivers (a constant, whose initializer the compiler evaluates and
+which may fail, included) are rejected.
 
 `abi.decode(data, (T1, ..., Tk))` decodes memory or calldata `bytes` into values of
-elementary types (booleans, integers, addresses and fixed-size byte
-sequences, including erased user-defined value types), as the compiler's
-decoder from memory does. The result keeps the compiler's annotated types:
+any ABI type (scalars, enums, byte sequences, arrays and structs, nested), as
+the compiler's decoder from memory does: arrays, structs and byte sequences
+are allocated in memory in the compiler's order, an enum out of range reverts
+with no data, and memory running out panics with 0x41. The result keeps the compiler's annotated types:
 a plain `address` target decodes as `address payable`, while a user-defined
 value type backed by nonpayable `address` keeps that underlying type.
 Each result must match its requested elementary type or its payable-address
 decoding variant. Data shorter than the
 encoding, or a word that is not a value of its type, reverts with no data, and
 data after the encoding is ignored. Memory and calldata bytes, including
-slices, decode in place without allocating memory. Storage input and types
-other than elementary ones are rejected.
+slices, decode in place; scalar results allocate no memory. Storage input is
+rejected.
 
 `a.call(data)`, `a.staticcall(data)` and `a.delegatecall(data)`, with `a`
 an address and `data` a memory or calldata `bytes` or a bytes literal,
@@ -542,7 +541,7 @@ forwards the callee's revert bytes; success records its return bytes in the
 frame's return-data buffer without allocating memory. Subsequent assembly
 can read that buffer. A failed call or enclosing revert rolls back the transfer.
 
-External calls returning scalar values admit `try ... returns (...) { ... }`
+External calls admit `try ... returns (...) { ... }`
 with `catch Error(string memory reason)`, `catch Panic(uint256 code)`, and a
 generic `catch (bytes memory data)` or parameterless `catch`. Typed handlers run
 before the generic handler regardless of their source order. A matching selector
@@ -557,8 +556,9 @@ cannot be used as a source value without materialization.
 
 Only failure of the external call selects a catch body; argument evaluation,
 missing-code checks, return decoding and the success/catch bodies keep their
-ordinary failure behavior. Contract creation and dynamic success returns in a
-try statement remain unsupported.
+ordinary failure behavior. Returns are decoded as a high-level call's are,
+arrays and structs included. Contract creation in a try statement remains
+unsupported.
 
 Internal and private library functions, their modifiers, and library
 constants come with the contracts that use them, also through each other,
@@ -577,8 +577,9 @@ assignment and returns use the same conversion; `CopyContentsStmt` writes
 storage contents. A bound receiver is argument 0, evaluated and converted before
 the other arguments; ordinary calls evaluate all arguments before converting
 them. This matters when later arguments mutate the copied object or rebind the
-receiver variable. Calldata structs remain unsupported until their ABI and copy
-operations are available. Public and external library functions, which a
+receiver variable. A calldata struct's fields are read in place, each
+scalar validated as it is read and a dynamic field reached through its
+offset, and copying it to memory decodes it as an ABI argument. Public and external library functions, which a
 contract calls with `DELEGATECALL`, are rejected. Referenced library events
 are imported with the contracts that emit them. Function-list
 `using` directives are accepted: attached free and library functions use the

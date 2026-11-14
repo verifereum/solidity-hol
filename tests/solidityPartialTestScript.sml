@@ -36,7 +36,7 @@ val prepared = #prepared (solidityPrepareLib.prepare_artifact
  * nodeValue's local and nodeCount's new array hold a recursive struct in
  * memory, which the core does not hold, and copyTree copies one in storage.
  * encodePair, emitPair and putPair take a memory struct across an ABI
- * boundary, which the core does not model. Roles.Grant has an enum-keyed mapping, so the storage local of
+ * boundary, which elaborates. Roles.Grant has an enum-keyed mapping, so the storage local of
  * grantCount does not elaborate, nor does grantParam's storage parameter,
  * which its body never uses.
  * nodeModified's modifier takes a recursive struct in memory, which fails at
@@ -83,12 +83,9 @@ val () =
      length (reasons "nodeCount") = 1 andalso
      List.all elaboration_failure (reasons "copyTree") andalso
      length (reasons "copyTree") = 1 andalso
-     List.all elaboration_failure (reasons "encodePair") andalso
-     length (reasons "encodePair") = 1 andalso
-     List.all elaboration_failure (reasons "emitPair") andalso
-     length (reasons "emitPair") = 1 andalso
-     List.all elaboration_failure (reasons "putPair") andalso
-     length (reasons "putPair") = 1 andalso
+     reasons "encodePair" = [NONE] andalso
+     reasons "emitPair" = [NONE] andalso
+     reasons "putPair" = [NONE] andalso
      List.all elaboration_failure (reasons "grantCount") andalso
      length (reasons "grantCount") = 1 andalso
      List.all (elaboration_failure_with "unsupported memory struct type")
@@ -276,8 +273,8 @@ Proof
   CONV_TAC cv_eval
 QED
 
-(* Both constructor bodies elaborate, but the base-constructor argument
- * calls readString, whose dynamic ABI decoding does not. *)
+(* Both constructor bodies elaborate, and so does readString, which the
+ * base-constructor argument calls, with its dynamic ABI decoding. *)
 val creation_prepared = #prepared (solidityPrepareLib.prepare_artifact
   {root = "..", path = "../testdata/frontend/expected/creation_argument.json",
    source = "testdata/frontend/creation_argument.sol"});
@@ -288,9 +285,8 @@ val () =
   if List.filter (fn (n, _) => n = "") creation_outcomes =
        [("", NONE), ("", NONE)] andalso
      List.filter (fn (n, _) => n = "value") creation_outcomes = [("value", NONE)] andalso
-     (case List.filter (fn (n, _) => n = "readString") creation_outcomes of
-        [(_, SOME r)] => String.isSuffix ": abi decoding of these types" r
-      | _ => false)
+     List.filter (fn (n, _) => n = "readString") creation_outcomes =
+       [("readString", NONE)]
   then ()
   else raise Fail "unexpected creation_argument function outcomes";
 
@@ -322,12 +318,14 @@ Proof
   CONV_TAC (QUANT_CONV (LAND_CONV cv_eval)) >> simp[] >> EVAL_TAC
 QED
 
-Theorem creation_argument_deploy_refused:
-  deploy_contract 1000 creation_argument_program
-    (differential_frame (n2w 0x1212) 0 [])
-    (differential_world empty_accounts) = ContractInvalid "unknown procedure"
+(* With every creation procedure supported, a deployment without encoded
+ * constructor arguments reverts in their decoding, as solc's does. *)
+Theorem creation_argument_empty_deploy_reverts:
+  ∃w. deploy_contract 1000 creation_argument_program
+        (differential_frame (n2w 0x1212) 0 [])
+        (differential_world empty_accounts) = ContractReverted [] w
 Proof
-  CONV_TAC (LAND_CONV cv_eval) >> REFL_TAC
+  CONV_TAC (QUANT_CONV (LAND_CONV cv_eval)) >> simp[]
 QED
 
 (* Function types the core does not model
