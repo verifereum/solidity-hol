@@ -35,6 +35,7 @@ jobs:
         id: holbuild
         with:
           holbuild-ref: v0.14.34
+          polyml-rev: ${{ steps.polyml.outputs.polyml-rev }}
 
       - name: Report holbuild version
         run: holbuild --version
