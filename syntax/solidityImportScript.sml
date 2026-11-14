@@ -1319,9 +1319,9 @@ Definition argument_order_ok_def:
     (LENGTH order = n ∧ ALL_DISTINCT order ∧ EVERY (λi. i < n) order)
 End
 
-(* The ABI type of a parameter of the function abi.encodeCall names, by its
- * type identifier: a scalar as itself; a byte sequence in any location as a
- * memory one, whose encoding does not depend on its location. *)
+(* The ABI type of a parameter of the function abi.encodeCall names: scalars
+ * keep their type, and objects use the same memory shape as ABI arguments.
+ * Their references retain their original location until encoding. *)
 Definition abi_call_parameter_def:
   abi_call_parameter tid =
     case decode_type_identifier tid of
@@ -1329,7 +1329,7 @@ Definition abi_call_parameter_def:
         if is_stored_scalar_type ty then SOME ty else
         (case ty of
            LocatedT _ element =>
-             if byte_sequence_type element
+             if located_object_shape MemoryLoc element
              then SOME (LocatedT MemoryLoc element) else NONE
          | _ => NONE)
     | _ => NONE

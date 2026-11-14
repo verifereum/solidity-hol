@@ -30,6 +30,7 @@ struct Kinds {
 }
 
 interface IAbiPeer {
+    function combined(Outer calldata o, Inner[] calldata xs) external;
     function echo(Outer calldata o) external pure returns (Outer memory);
     function make(uint64 a, string calldata name) external pure returns (Outer memory, Pair memory);
     function fail(Inner calldata i) external pure returns (Outer memory);
@@ -46,7 +47,9 @@ contract AbiValues {
     Stored stored;
 
     event Logged(Inner indexed i, Outer o, Pair p);
+    event LoggedStored(Stored indexed key, Stored value);
     error Bad(Inner i, Kind k);
+    error BadStored(Stored value);
 
     constructor(Pair memory p, Inner[] memory items) {
         pair = p;
@@ -92,6 +95,14 @@ contract AbiValues {
         return abi.encode(stored, pair);
     }
 
+    function encodeCallStored() external view returns (bytes memory) {
+        return abi.encodeCall(this.setStored, (stored));
+    }
+
+    function encodeCallValues(Outer calldata o, Inner[] memory xs) external pure returns (bytes memory) {
+        return abi.encodeCall(IAbiPeer.combined, (o, xs));
+    }
+
     function encodeValues(Outer calldata o, Pair memory p) external pure returns (bytes memory) {
         Inner memory i = Inner(7, hex"beef");
         return abi.encode(o, p, i, o.items);
@@ -135,6 +146,22 @@ contract AbiValues {
 
     function emitLogged(Outer calldata o, Pair calldata p) external {
         emit Logged(o.items[0], o, p);
+    }
+
+    function emitStored() external {
+        emit LoggedStored(stored, stored);
+    }
+
+    function emitMemory(Stored memory value) external {
+        emit LoggedStored(value, value);
+    }
+
+    function revertStored() external view {
+        revert BadStored(stored);
+    }
+
+    function revertMemory(Stored memory value) external pure {
+        revert BadStored(value);
     }
 
     function kinds(Kind[] memory ks) external pure returns (Kind[] memory, uint256) {

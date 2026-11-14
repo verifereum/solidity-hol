@@ -341,8 +341,7 @@ preserving packed neighbors. Aggregate elements are cleared recursively;
 struct scalar fields clear their whole slots, including padding, while mapping
 entries survive. `push()` preserves existing bytes at the appended position,
 as the pinned compiler does. Local storage reference bindings and aggregate
-copies use the same location and assignment rules. Calldata arrays of enums
-remain rejected.
+copies use the same location and assignment rules.
 
 A public state variable's getter takes one key per mapping and one index per
 array along its type, an index past an array's length reverting with no data.
@@ -420,8 +419,7 @@ An enum is ABI encoded as `uint8`, as a parameter, a return, an event
 argument or an external call's argument. A call or creation whose enum
 argument is out of range reverts when the decoder reaches it, before later arguments are read.
 `type(E).min` and `type(E).max` are the first and last enum values.
-Enums as mapping keys, as elements of calldata arrays, or as constants or
-immutables are rejected.
+Enums as mapping keys, constants or immutables are rejected.
 
 `keccak256(b)` hashes the contents of a `bytes` value with Keccak-256, giving
 a `bytes32`. A string or hex literal is hashed directly without allocating
@@ -487,10 +485,10 @@ encoding of the arguments, each converted to its parameter's type as an
 internal call's argument is; a single argument may stand without parentheses.
 `f` is a member access naming a function whose receiver is one the compiler
 does not evaluate (as for `x.f.selector`), or a variable other than a
-constant, which is not read (reading it has no effect). Parameters must be
-scalars or byte sequences; other receivers (a constant, whose initializer the
-compiler evaluates and which may fail, included), and array and struct
-parameters, are rejected.
+constant, which is not read (reading it has no effect). Parameters use the
+same ABI types as unpacked encoding, including nested arrays and structs.
+Other receivers (a constant, whose initializer the compiler evaluates and
+which may fail, included) are rejected.
 
 `abi.decode(data, (T1, ..., Tk))` decodes memory or calldata `bytes` into values of
 any ABI type (scalars, enums, byte sequences, arrays and structs, nested), as
