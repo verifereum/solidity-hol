@@ -554,7 +554,6 @@ Proof
 QED
 
 val () = cv_auto_trans argument_scalar_def;
-val () = cv_auto_trans solidityCoreWfTheory.elementary_scalar_has_type_def;
 val () = cv_auto_trans argument_value_def;
 val () = cv_auto_trans argument_values_def;
 val () = cv_auto_trans is_diagnostic_def;
@@ -565,7 +564,6 @@ val () = cv_auto_trans seed_storage_def;
 val () = cv_auto_trans contract_accounts_def;
 val () = cv_auto_trans differential_accounts_def;
 val () = cv_auto_trans case_accounts_def;
-val () = cv_auto_trans listTheory.nub_def;
 val () = cv_auto_trans observed_slots_def;
 val () = cv_auto_trans storage_values_def;
 val () = cv_auto_trans project_observation_def;
