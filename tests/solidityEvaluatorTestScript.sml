@@ -1135,6 +1135,25 @@ Proof
   CONV_TAC cv_eval
 QED
 
+(* A storage byte sequence of length 2^64 or more is not encoded in place:
+ * the memory for its encoding cannot be allocated, so it panics with 0x41, as
+ * a read of its contents does. *)
+Definition long_bytes_accounts_def:
+  long_bytes_accounts =
+    update_account 0w (empty_account_state with
+      storage := update_storage 0w (n2w (2 * 2 ** 64 + 1)) empty_storage)
+      empty_accounts
+End
+
+Theorem storage_abi_value_bytes_too_long:
+  storage_abi_value env 0 long_bytes_accounts 0w 0w BytesT = INR (PanicCompletion 65) ∧
+  storage_byte_contents long_bytes_accounts
+    (StorageReference PersistentStorage 0w 0w 0 BytesT (LayoutId 0)) =
+  INR (PanicCompletion 65)
+Proof
+  simp[Once solidityABITheory.storage_abi_value_def, long_bytes_accounts_def] >> EVAL_TAC
+QED
+
 (* A byte sequence at an unaligned address: its padding runs to the word its
  * data ends in, which the free memory pointer must pass, and is padded only
  * if the block zeroed all of it. *)

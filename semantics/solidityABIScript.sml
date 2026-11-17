@@ -299,6 +299,7 @@ Definition storage_abi_value_def:
       (case storage_byte_length accounts addr slot of
          INR c => INR c
        | INL length =>
+         if 2 ** 64 ≤ length then INR (PanicCompletion 65) else
          let padded = storage_byte_range accounts addr slot length 0
                         (32 * ((length + 31) DIV 32)) in
          let data = if 0 < length ∧ length < 32 then TAKE 31 padded ++ [0w]
