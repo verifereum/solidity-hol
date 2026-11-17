@@ -1198,12 +1198,14 @@ End
 
 (* The builtins an inline assembly block may not use: the object's data
  * builtins, and setimmutable and linkersymbol, which only the compiler's code
- * uses. codesize and codecopy read the running account's code, which a
- * creation frame doesn't have yet, so eval_assembly refuses them there. Gas,
- * calls and return data are limited by assembly_gas_ok instead. *)
+ * uses, and selfdestruct, whose halt the constructor and static-frame checks
+ * don't cover yet. codesize and codecopy read the running account's code,
+ * which a creation frame doesn't have yet, so eval_assembly refuses them
+ * there. Gas, calls and return data are limited by assembly_gas_ok instead. *)
 Definition assembly_unsupported_def:
   assembly_unsupported =
-    [YDataCopy; YDataSize; YDataOffset; YSetImmutable; YLinkerSymbol]
+    [YDataCopy; YDataSize; YDataOffset; YSetImmutable; YLinkerSymbol;
+     YSelfDestruct]
 End
 
 (* The builtins that change the world, which a static frame forbids. A call
