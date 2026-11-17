@@ -68,6 +68,13 @@ Datatype:
   |>
 End
 
+(* A Yul value: a word, or a word only some of whose bits are known -- those
+ * set in the mask -- as a load from memory the block was given only part of
+ * leaves it.  The unknown bits are held as zero. *)
+Datatype:
+  yul_value = YulWord bytes32 | YulBits bytes32 bytes32
+End
+
 Datatype:
   yul_machine = <|
     accounts : evm_accounts;
@@ -86,7 +93,7 @@ Datatype:
     memory_size : num;
     gas_limit : num;
     gas_observations : gas_observation list;
-    scopes : (string |-> bytes32 option) list;
+    scopes : (string |-> yul_value) list;
     transaction_parameters : transaction_parameters
   |>
 End

@@ -1222,16 +1222,21 @@ QED
 
 (* What assembly_memory_ok admits: scratch written then read, the free
  * memory pointer and the zero slot read and written, and other writes at or
- * above 0x80 only in a block that halts. *)
+ * above 0x80 only in a block that halts.  An mload is admitted wherever it
+ * reads: the bytes it was not given are unknown, which the run checks. *)
 Theorem asm_memory_rule:
   assembly_memory_ok
     [YulExprStmt (YulBuiltin YMStore [ylit 0w; YulName "x"]);
      YulExprStmt (YulBuiltin YMStore [ylit 32w; YulName "x"]);
      YulAssign ["x"] (YulBuiltin YKeccak256 [ylit 0w; ylit 64w])] ∧
-  ¬assembly_memory_ok [YulAssign ["x"] (YulBuiltin YMLoad [ylit 0w])] ∧
+  assembly_memory_ok [YulAssign ["x"] (YulBuiltin YMLoad [ylit 0w])] ∧
   assembly_memory_ok [YulAssign ["x"] (YulBuiltin YMLoad [ylit 64w])] ∧
   assembly_memory_ok [YulAssign ["x"] (YulBuiltin YMLoad [ylit 96w])] ∧
-  ¬assembly_memory_ok [YulAssign ["x"] (YulBuiltin YMLoad [ylit 97w])] ∧
+  assembly_memory_ok [YulAssign ["x"] (YulBuiltin YMLoad [ylit 97w])] ∧
+  ¬assembly_memory_ok
+    [YulAssign ["x"] (YulBuiltin YKeccak256 [ylit 0w; ylit 32w])] ∧
+  ¬assembly_memory_ok
+    [YulAssign ["x"] (YulBuiltin YKeccak256 [ylit 96w; ylit 33w])] ∧
   ¬assembly_memory_ok
     [YulExprStmt (YulBuiltin YMStore [ylit 1w; YulName "x"]);
      YulExprStmt (YulBuiltin YLog0 [ylit 0w; ylit 64w])] ∧
@@ -1257,49 +1262,32 @@ Proof
   EVAL_TAC
 QED
 
-(* A sub-word load reads only the bytes that survive it: shr(96, mload(0x0c))
- * after mstore(0x00, x) keeps [0x0c, 0x20), all written, but shr(88, ...)
- * keeps byte 0x20 too, and a plain mload reads [0x20, 0x2c). *)
-Theorem asm_prefix_load_rule:
-  assembly_memory_ok
-    [YulExprStmt (YulBuiltin YMStore [ylit 0w; YulName "x"]);
-     YulAssign ["x"] (YulBuiltin YShr [ylit 96w; YulBuiltin YMLoad [ylit 12w]])] ∧
-  ¬assembly_memory_ok
-    [YulExprStmt (YulBuiltin YMStore [ylit 0w; YulName "x"]);
-     YulAssign ["x"] (YulBuiltin YShr [ylit 88w; YulBuiltin YMLoad [ylit 12w]])] ∧
-  ¬assembly_memory_ok
-    [YulExprStmt (YulBuiltin YMStore [ylit 0w; YulName "x"]);
-     YulAssign ["x"] (YulBuiltin YMLoad [ylit 12w])] ∧
-  assembly_memory_ok
-    [YulExprStmt (YulBuiltin YMStore [ylit 16w; YulName "x"]);
-     YulAssign ["x"] (YulBuiltin YShr [ylit 128w; YulBuiltin YMLoad [ylit 32w]])] ∧
-  assembly_memory_ok
-    [YulExprStmt (YulBuiltin YMStore8 [ylit 32w; YulName "x"]);
-     YulAssign ["x"] (YulBuiltin YByte [ylit 0w; YulBuiltin YMLoad [ylit 32w]])] ∧
-  ¬assembly_memory_ok
-    [YulExprStmt (YulBuiltin YMStore8 [ylit 32w; YulName "x"]);
-     YulAssign ["x"] (YulBuiltin YByte [ylit 1w; YulBuiltin YMLoad [ylit 32w]])]
+(* A sub-word load is no special form: its mload is checked as any other,
+ * and only what the run observes of the word it gives has to be known. *)
+Theorem asm_sub_word_load_lowering:
+  yul_substitute_expr [("s", 5w)]
+    (YulBuiltin YShr [ylit 96w; YulBuiltin YMLoad [YulName "s"]]) =
+    YulCheckedBuiltin YShr [ylit 96w; YulCheckedBuiltin YMLoad [ylit 5w]]
 Proof
   EVAL_TAC
 QED
 
-(* As the block runs, the mload of a sub-word load is checked over the
- * surviving bytes only; a shift by a name is a plain mload. *)
-Theorem asm_prefix_load_lowering:
-  yul_substitute_expr [("s", 5w)]
-    (YulBuiltin YShr [ylit 96w; YulBuiltin YMLoad [YulName "s"]]) =
-    YulCheckedBuiltin YShr
-      [ylit 96w; YulCheckedBuiltin YMLoad [ylit 5w; ylit 20w]] ∧
-  yul_substitute_expr []
-    (YulBuiltin YByte [ylit 0w; YulBuiltin YMLoad [YulName "p"]]) =
-    YulCheckedBuiltin YByte
-      [ylit 0w; YulCheckedBuiltin YMLoad [YulName "p"; ylit 1w]] ∧
-  yul_substitute_expr []
-    (YulBuiltin YShr [YulName "k"; YulBuiltin YMLoad [YulName "p"]]) =
-    YulCheckedBuiltin YShr
-      [YulName "k"; YulCheckedBuiltin YMLoad [YulName "p"]]
+(* An address kept in the low 20 bytes of the scratch word at 0, read back
+ * from 0x0c through a variable: [0x20, 0x2c) is never written, and the shift
+ * drops it.  A shift by one byte less keeps a byte nobody wrote. *)
+Theorem asm_sub_word_load_runs:
+  run_asm_bytes [YulExprStmt (YulBuiltin YMStore [ylit 0w; ylit 0xAABBCCw]);
+                 YulLet ["w"] (SOME (YulBuiltin YMLoad [ylit 0x0cw]));
+                 YulAssign ["r"] (YulBuiltin YShr [ylit 96w; YulName "w"])]
+    [1w; 2w; 3w] =
+    (ReturnCompletion [ScalarValue (IntegerValue 0xAABBCC)], SOME [1w; 2w; 3w]) ∧
+  run_asm_bytes [YulExprStmt (YulBuiltin YMStore [ylit 0w; ylit 0xAABBCCw]);
+                 YulLet ["w"] (SOME (YulBuiltin YMLoad [ylit 0x0cw]));
+                 YulAssign ["r"] (YulBuiltin YShr [ylit 88w; YulName "w"])]
+    [1w; 2w; 3w] =
+    (InvalidCompletion "assembly read memory it was not given", SOME [1w; 2w; 3w])
 Proof
-  EVAL_TAC
+  CONV_TAC cv_eval
 QED
 
 (* call(gas(), a, 0, i, isz, o, osz) with literal arguments. *)
@@ -1322,7 +1310,7 @@ Theorem asm_call_memory_rule:
      YulAssign ["x"] (YulBuiltin YMLoad [ylit 0w])] ∧
   ¬assembly_memory_ok
     [YulLet ["s"] (SOME (ycall (YulName "t") 0w 0w 0w 32w));
-     YulAssign ["x"] (YulBuiltin YMLoad [ylit 1w])] ∧
+     YulAssign ["x"] (YulBuiltin YKeccak256 [ylit 1w; ylit 32w])] ∧
   assembly_memory_ok
     [YulExprStmt (YulBuiltin YMStore [ylit 0w; YulName "x"]);
      YulLet ["s"] (SOME (ycall (YulName "t") 0w 4w 0w 32w))] ∧
@@ -1385,10 +1373,10 @@ QED
 Theorem asm_argument_order_rule:
   assembly_memory_ok
     [YulAssign ["x"] (YulBuiltin YAnd
-       [YulBuiltin YMLoad [ylit 0w]; ycall (YulName "t") 0w 0w 0w 32w])] ∧
+       [YulBuiltin YKeccak256 [ylit 0w; ylit 32w]; ycall (YulName "t") 0w 0w 0w 32w])] ∧
   ¬assembly_memory_ok
     [YulAssign ["x"] (YulBuiltin YAnd
-       [ycall (YulName "t") 0w 0w 0w 32w; YulBuiltin YMLoad [ylit 0w]])] ∧
+       [ycall (YulName "t") 0w 0w 0w 32w; YulBuiltin YKeccak256 [ylit 0w; ylit 32w]])] ∧
   assembly_calls_ok
     [YulAssign ["x"] (YulBuiltin YAnd
        [YulBuiltin YGt [YulBuiltin YReturnDataSize []; ylit 31w];
@@ -1401,10 +1389,10 @@ Theorem asm_argument_order_rule:
     [YulExprStmt (YulBuiltin YRevert [ylit 0w; YulBuiltin YReturnDataSize []])] ∧
   assembly_memory_ok
     [YulExprStmt (YulBuiltin YReturnDataCopy [ylit 0w; ylit 0w; YulBuiltin YReturnDataSize []]);
-     YulAssign ["x"] (YulBuiltin YMLoad [ylit 0w])] ∧
+     YulAssign ["x"] (YulBuiltin YKeccak256 [ylit 0w; ylit 32w])] ∧
   assembly_memory_ok
     [YulExprStmt (YulBuiltin YReturnDataCopy [ylit 64w; ylit 0w; YulBuiltin YReturnDataSize []]);
-     YulAssign ["x"] (YulBuiltin YMLoad [ylit 96w])] ∧
+     YulAssign ["x"] (YulBuiltin YKeccak256 [ylit 96w; ylit 32w])] ∧
   ¬assembly_memory_ok
     [YulExprStmt (YulBuiltin YReturnDataCopy [ylit 128w; ylit 0w; YulBuiltin YReturnDataSize []])]
 Proof
@@ -1466,10 +1454,10 @@ QED
 Theorem asm_structural_stores_rule:
   assembly_memory_ok
     [YulBlock [YulExprStmt (YulBuiltin YMStore [ylit 0w; YulName "x"])];
-     YulAssign ["x"] (YulBuiltin YMLoad [ylit 0w])] ∧
+     YulAssign ["x"] (YulBuiltin YKeccak256 [ylit 0w; ylit 32w])] ∧
   assembly_memory_ok
     [YulIf (YulName "c") [YulExprStmt (YulBuiltin YMStore [ylit 0w; YulName "x"])];
-     YulAssign ["x"] (YulBuiltin YMLoad [ylit 0w])] ∧
+     YulAssign ["x"] (YulBuiltin YKeccak256 [ylit 0w; ylit 32w])] ∧
   assembly_memory_ok
     [YulSwitch (YulName "c")
        [(LitNumber 0w, [YulExprStmt (YulBuiltin YMStore [ylit 0w; ylit 1w])])]
@@ -1477,16 +1465,16 @@ Theorem asm_structural_stores_rule:
      YulAssign ["x"] (YulBuiltin YKeccak256 [ylit 0w; ylit 64w])] ∧
   assembly_memory_ok
     [YulFor [YulExprStmt (YulBuiltin YMStore [ylit 0w; ylit 1w])]
-       (YulBuiltin YMLoad [ylit 0w])
-       [YulAssign ["x"] (YulBuiltin YMLoad [ylit 0x20w])]
+       (YulBuiltin YKeccak256 [ylit 0w; ylit 32w])
+       [YulAssign ["x"] (YulBuiltin YKeccak256 [ylit 0x20w; ylit 32w])]
        [YulExprStmt (YulBuiltin YMStore [ylit 0x20w; ylit 1w])];
      YulAssign ["x"] (YulBuiltin YKeccak256 [ylit 0w; ylit 64w])] ∧
   ¬assembly_memory_ok
-    [YulFor [] (YulBuiltin YMLoad [ylit 0w]) []
+    [YulFor [] (YulBuiltin YKeccak256 [ylit 0w; ylit 32w]) []
        [YulExprStmt (YulBuiltin YMStore [ylit 0w; ylit 1w])]] ∧
   ¬assembly_memory_ok
     [YulFor [] (ylit 1w) [YulExprStmt (YulBuiltin YMStore [ylit 0w; ylit 1w])]
-       [YulAssign ["x"] (YulBuiltin YMLoad [ylit 0w])]] ∧
+       [YulAssign ["x"] (YulBuiltin YKeccak256 [ylit 0w; ylit 32w])]] ∧
   assembly_memory_ok
     [YulExprStmt (YulBuiltin YMStore8 [ylit 0w; ylit 1w]);
      YulAssign ["x"] (YulBuiltin YKeccak256 [ylit 0w; ylit 1w])] ∧
@@ -1499,23 +1487,23 @@ Theorem asm_structural_stores_rule:
   assembly_memory_ok
     [YulExprStmt (YulBuiltin YMStore [ylit 0w; ylit 1w]);
      YulExprStmt (YulBuiltin YMCopy [ylit 0x20w; ylit 0w; ylit 32w]);
-     YulAssign ["x"] (YulBuiltin YMLoad [ylit 0x20w])] ∧
+     YulAssign ["x"] (YulBuiltin YKeccak256 [ylit 0x20w; ylit 32w])] ∧
   assembly_memory_ok
     [YulExprStmt (YulBuiltin YMStore [YulName "p"; ylit 1w]);
-     YulAssign ["x"] (YulBuiltin YMLoad [ylit 0w])] ∧
+     YulAssign ["x"] (YulBuiltin YKeccak256 [ylit 0w; ylit 32w])] ∧
   assembly_memory_ok
     [YulExprStmt (YulBuiltin YMStore [ylit 0w; ylit 1w]);
-     YulFunction "f" [] ["r"] [YulAssign ["r"] (YulBuiltin YMLoad [ylit 0w])]] ∧
+     YulFunction "f" [] ["r"] [YulAssign ["r"] (YulBuiltin YKeccak256 [ylit 0w; ylit 32w])]] ∧
   assembly_memory_ok
-    [YulFunction "f" [] ["r"] [YulAssign ["r"] (YulBuiltin YMLoad [ylit 0w])];
+    [YulFunction "f" [] ["r"] [YulAssign ["r"] (YulBuiltin YKeccak256 [ylit 0w; ylit 32w])];
      YulExprStmt (YulBuiltin YMStore [ylit 0w; ylit 1w])] ∧
   ¬assembly_memory_ok
-    [YulFunction "f" [] ["r"] [YulAssign ["r"] (YulBuiltin YMLoad [ylit 0w])];
+    [YulFunction "f" [] ["r"] [YulAssign ["r"] (YulBuiltin YKeccak256 [ylit 0w; ylit 32w])];
      YulFunction "g" [] []
        [YulExprStmt (YulBuiltin YMStore [ylit 0w; ylit 1w])]] ∧
   ¬assembly_memory_ok
     [YulBlock
-       [YulFunction "f" [] ["r"] [YulAssign ["r"] (YulBuiltin YMLoad [ylit 0w])]];
+       [YulFunction "f" [] ["r"] [YulAssign ["r"] (YulBuiltin YKeccak256 [ylit 0w; ylit 32w])]];
      YulExprStmt (YulBuiltin YMStore [ylit 0w; ylit 1w])]
 Proof
   EVAL_TAC

@@ -784,6 +784,57 @@ Proof
   CONV_TAC cv_eval
 QED
 
+(* A checked mload of memory written only in part gives a word whose bytes
+ * from there are unknown.  Shifts, and, or and byte keep track of which bits
+ * of their answer are known, held in a variable or not; the answer is
+ * observable once every bit of it is. *)
+Definition partial_code_def:
+  partial_code e =
+    [YulExprStmt (YulBuiltin YMStore [YulLit (LitNumber 0w);
+                                      YulLit (LitNumber 0xAABBCCw)]);
+     YulLet ["w"] (SOME (YulCheckedBuiltin YMLoad [YulLit (LitNumber 0x0cw)]));
+     YulExprStmt (YulBuiltin YMStore [YulLit (LitNumber 0w); e]);
+     YulExprStmt (YulBuiltin YReturn [YulLit (LitNumber 0w); YulLit (LitNumber 32w)])]
+End
+
+val () = cv_auto_trans partial_code_def;
+
+Theorem a_partly_written_word_is_known_where_it_was_written:
+  (run 20 (partial_code
+     (YulCheckedBuiltin YShr [YulLit (LitNumber 96w); YulName "w"]))).completion =
+    YulReturn (word_to_bytes_be (0xAABBCCw : bytes32)) ∧
+  (run 20 (partial_code
+     (YulCheckedBuiltin YAnd
+        [YulName "w"; YulLit (LitNumber (word_lsl UINT_MAXw 96))]))).completion =
+    YulReturn (word_to_bytes_be (word_lsl (0xAABBCCw : bytes32) 96)) ∧
+  (run 20 (partial_code
+     (YulCheckedBuiltin YByte [YulLit (LitNumber 19w); YulName "w"]))).completion =
+    YulReturn (word_to_bytes_be (0xCCw : bytes32)) ∧
+  (run 20 (partial_code
+     (YulCheckedBuiltin YShl [YulLit (LitNumber 160w);
+        YulCheckedBuiltin YShr [YulLit (LitNumber 96w); YulName "w"]]))).completion =
+    YulReturn (word_to_bytes_be (word_lsl (0xAABBCCw : bytes32) 160)) ∧
+  (run 20 (partial_code
+     (YulCheckedBuiltin YOr
+        [YulName "w"; YulLit (LitNumber (word_lsr UINT_MAXw 160))]))).completion =
+    YulReturn (word_to_bytes_be
+      (word_or (word_lsl (0xAABBCCw : bytes32) 96) (word_lsr UINT_MAXw 160))) ∧
+  (run 20 (partial_code
+     (YulCheckedBuiltin YShr [YulLit (LitNumber 88w); YulName "w"]))).completion =
+    YulInvalid "assembly read memory it was not given" ∧
+  (run 20 (partial_code
+     (YulCheckedBuiltin YByte [YulLit (LitNumber 20w); YulName "w"]))).completion =
+    YulInvalid "assembly read memory it was not given" ∧
+  (run 20 (partial_code
+     (YulCheckedBuiltin YShr [YulName "w"; YulLit (LitNumber 1w)]))).completion =
+    YulInvalid "assembly read memory it was not given" ∧
+  (run 20 (partial_code
+     (YulCheckedBuiltin YAdd [YulName "w"; YulLit (LitNumber 0w)]))).completion =
+    YulInvalid "assembly read memory it was not given"
+Proof
+  CONV_TAC cv_eval
+QED
+
 Theorem unbound_name_is_invalid:
   (run 20 unbound_code).completion = YulInvalid "unbound name"
 Proof
@@ -1364,7 +1415,7 @@ Theorem creation_long_object_name:
       [YulLit (LitBytes (MAP (n2w o ORD) "DynamicStorageArrays_739_deployed"))])
     (yul_test_machine with objects :=
        FEMPTY |+ ("DynamicStorageArrays_739_deployed", (11, 37))) =
-    EvalValues [SOME 37w] (yul_test_machine with objects :=
+    EvalValues [YulWord 37w] (yul_test_machine with objects :=
        FEMPTY |+ ("DynamicStorageArrays_739_deployed", (11, 37)))
 Proof
   CONV_TAC cv_eval

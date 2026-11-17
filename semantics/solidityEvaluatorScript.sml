@@ -1407,39 +1407,25 @@ End
  * a word nobody wrote starts the block unknown. *)
 Definition assembly_inputs_def:
   (assembly_inputs env st [] =
-    SOME (FEMPTY : string |-> bytes32 option, [] : (string # bytes32) list)) ∧
+    SOME (FEMPTY : string |-> yul_value, [] : (string # bytes32) list)) ∧
   (assembly_inputs env st ((name, r) :: refs) =
     case (assembly_reference_word env st r, assembly_inputs env st refs) of
       (SOME w, SOME (scope, literals)) =>
         (case r of
-           AssemblyLocal _ _ => SOME (scope |+ (name, SOME (n2w w)), literals)
-         | AssemblyPointerSlot _ => SOME (scope |+ (name, SOME (n2w w)), literals)
-         | AssemblyMemory _ _ => SOME (scope |+ (name, SOME (n2w w)), literals)
-         | AssemblyCalldataOffset _ => SOME (scope |+ (name, SOME (n2w w)), literals)
-         | AssemblyCalldataLength _ => SOME (scope |+ (name, SOME (n2w w)), literals)
+           AssemblyLocal _ _ => SOME (scope |+ (name, YulWord (n2w w)), literals)
+         | AssemblyPointerSlot _ => SOME (scope |+ (name, YulWord (n2w w)), literals)
+         | AssemblyMemory _ _ => SOME (scope |+ (name, YulWord (n2w w)), literals)
+         | AssemblyCalldataOffset _ => SOME (scope |+ (name, YulWord (n2w w)), literals)
+         | AssemblyCalldataLength _ => SOME (scope |+ (name, YulWord (n2w w)), literals)
          | _ => SOME (scope, (name, n2w w) :: literals))
     | (NONE, SOME (scope, literals)) =>
         (case r of
            AssemblyLocal x _ =>
              if unwritten_atom st.scopes (BoundAtom x) then
-               SOME (scope |+ (name, NONE), literals)
+               SOME (scope |+ (name, YulBits 0w 0w), literals)
              else NONE
          | _ => NONE)
     | _ => NONE)
-End
-
-(* The arguments es' substituted from a builtin b's arguments es, with a
- * sub-word load's mload given the length of the prefix it keeps
- * (mload_prefix) as a second argument, so that only those bytes are
- * checked. *)
-Definition yul_prefix_load_def:
-  yul_prefix_load b es es' =
-    case (es, es') of
-      ([YulLit (LitNumber k); YulBuiltin m [_]], [k'; YulCheckedBuiltin _ [p]]) =>
-        (case mload_prefix b k m of
-           SOME n => [k'; YulCheckedBuiltin YMLoad [p; YulLit (LitNumber (n2w n))]]
-         | NONE => es')
-    | _ => es'
 End
 
 (* The code with each name in sub read as its word, as the compiler puts the
@@ -1448,7 +1434,7 @@ End
  * Nested function definitions aren't imported, so a body's narrowed sub never
  * reaches an inner function, where the compiler would see the block's names.
  * Each builtin call becomes a checked one, whose memory reads the evaluator
- * holds to the memory the block was given (yul_prefix_load). *)
+ * holds to the memory the block was given. *)
 Definition yul_substitute_expr_def:
   (yul_substitute_expr sub (YulLit l) = YulLit l) ∧
   (yul_substitute_expr sub (YulName x) =
@@ -1457,22 +1443,20 @@ Definition yul_substitute_expr_def:
     | NONE => YulName x) ∧
   (yul_substitute_expr sub (YulBuiltin b es) =
     YulCheckedBuiltin b
-      (yul_prefix_load b es
-        (case es of
-           YulBuiltin YGas [] :: rest =>
-             if MEM b [YCall; YStaticCall; YDelegateCall] then
-               YulBuiltin YGas [] :: yul_substitute_exprs sub rest
-             else yul_substitute_exprs sub es
-         | _ => yul_substitute_exprs sub es))) ∧
+      (case es of
+         YulBuiltin YGas [] :: rest =>
+           if MEM b [YCall; YStaticCall; YDelegateCall] then
+             YulBuiltin YGas [] :: yul_substitute_exprs sub rest
+           else yul_substitute_exprs sub es
+       | _ => yul_substitute_exprs sub es)) ∧
   (yul_substitute_expr sub (YulCheckedBuiltin b es) =
     YulCheckedBuiltin b
-      (yul_prefix_load b es
-        (case es of
-           YulBuiltin YGas [] :: rest =>
-             if MEM b [YCall; YStaticCall; YDelegateCall] then
-               YulBuiltin YGas [] :: yul_substitute_exprs sub rest
-             else yul_substitute_exprs sub es
-         | _ => yul_substitute_exprs sub es))) ∧
+      (case es of
+         YulBuiltin YGas [] :: rest =>
+           if MEM b [YCall; YStaticCall; YDelegateCall] then
+             YulBuiltin YGas [] :: yul_substitute_exprs sub rest
+           else yul_substitute_exprs sub es
+       | _ => yul_substitute_exprs sub es)) ∧
   (yul_substitute_expr sub (YulApply f es) =
     YulApply f (yul_substitute_exprs sub es)) ∧
   (yul_substitute_exprs sub [] = []) ∧
@@ -1775,7 +1759,7 @@ Definition assembly_allocate_def:
     case r of
       AssemblyMemory x ty =>
         (case (yul_lookup name m0.scopes, yul_lookup name m.scopes) of
-           (SOME (SOME w0), SOME (SOME w)) =>
+           (SOME (YulWord w0), SOME (YulWord w)) =>
              if w = w0 then assembly_allocate env f0 f1 m0 m refs st news else
              let p = w2n w in
              if p < f0 then NONE else
@@ -1821,7 +1805,8 @@ End
 
 (* Writes a referenced local back from the block's final scopes; a location
  * or constant reference has nothing to write. A full-word local the block
- * left holding a word nobody wrote holds UnwrittenValue, which fails only
+ * left holding a word not all of whose bits are known holds UnwrittenValue,
+ * which fails only
  * when something reads it; a narrower one fails now, since its value would be
  * the word's cleaned part. A storage pointer whose slot
  * the block may have assigned is rebound to that slot of the executing
@@ -1830,19 +1815,19 @@ End
  * length the block leaves, keeping its type. *)
 Definition assembly_write_one_def:
   assembly_write_one env self (name, r) scopes
-                     (yscopes : (string |-> bytes32 option) list) =
+                     (yscopes : (string |-> yul_value) list) =
     case r of
       AssemblyLocal x ty =>
         (case yul_lookup name yscopes of
            NONE => NONE
-         | SOME NONE =>
+         | SOME (YulBits _ _) =>
              (case assembly_word_type env ty of
                 SOME t =>
                   if t = UintT 256 ∨ t = IntT 256 ∨ t = FixedBytesT 32 then
                     update_binding x UnwrittenValue scopes
                   else NONE
               | NONE => NONE)
-         | SOME (SOME w) =>
+         | SOME (YulWord w) =>
              case assembly_value env ty (w2n w) of
                NONE => NONE
              | SOME s =>
@@ -1851,7 +1836,7 @@ Definition assembly_write_one_def:
                  else NONE)
     | AssemblyPointerSlot x =>
         (case (yul_lookup name yscopes, lookup_binding x scopes) of
-           (SOME (SOME w), SOME b) =>
+           (SOME (YulWord w), SOME b) =>
              (case b.binding_value of
                 ReferenceValue (StorageReference PersistentStorage _ _ _ ty layout) =>
                   update_binding x
@@ -1862,7 +1847,7 @@ Definition assembly_write_one_def:
          | _ => NONE)
     | AssemblyCalldataOffset x =>
         (case (yul_lookup name yscopes, lookup_binding x scopes) of
-           (SOME (SOME w), SOME b) =>
+           (SOME (YulWord w), SOME b) =>
              (case b.binding_value of
                 ReferenceValue (CalldataReference _ length ty) =>
                   update_binding x
@@ -1871,7 +1856,7 @@ Definition assembly_write_one_def:
          | _ => NONE)
     | AssemblyCalldataLength x =>
         (case (yul_lookup name yscopes, lookup_binding x scopes) of
-           (SOME (SOME w), SOME b) =>
+           (SOME (YulWord w), SOME b) =>
              (case b.binding_value of
                 ReferenceValue (CalldataReference offset _ ty) =>
                   if calldata_slice_type ty then
@@ -2183,7 +2168,6 @@ val () = cv_auto_trans assembly_value_def;
 val () = cv_auto_trans assembly_cell_word_def;
 val () = cv_auto_trans assembly_reference_word_def;
 val () = cv_auto_trans assembly_inputs_def;
-val () = cv_auto_trans yul_prefix_load_def;
 val () = cv_auto_trans yul_substitute_expr_def;
 val () = cv_auto_trans yul_unbind_def;
 val () = cv_auto_trans yul_substitute_stmt_def;

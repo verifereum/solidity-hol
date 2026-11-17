@@ -67,7 +67,7 @@ Libs
 
 Definition yul_push_scope_def:
   yul_push_scope m =
-    m with scopes := (FEMPTY : string |-> bytes32 option) :: m.scopes
+    m with scopes := (FEMPTY : string |-> yul_value) :: m.scopes
 End
 
 Definition yul_pop_scope_def:
@@ -99,7 +99,7 @@ End
  *)
 Definition yul_lookup_def:
   (yul_lookup (x : string) [] = NONE) ∧
-  (yul_lookup (x : string) ((scope : string |-> bytes32 option) :: rest) =
+  (yul_lookup (x : string) ((scope : string |-> yul_value) :: rest) =
     case FLOOKUP scope x of SOME v => SOME v | NONE => yul_lookup x rest)
 End
 
@@ -120,8 +120,8 @@ End
  * translation of a non-recursive definition cannot discharge.
  *)
 Definition yul_bind_scope_def:
-  (yul_bind_scope (scope : string |-> bytes32 option) [] = scope) ∧
-  (yul_bind_scope (scope : string |-> bytes32 option) ((x, v) :: ps) =
+  (yul_bind_scope (scope : string |-> yul_value) [] = scope) ∧
+  (yul_bind_scope (scope : string |-> yul_value) ((x, v) :: ps) =
      yul_bind_scope (scope |+ (x, v)) ps)
 End
 
@@ -145,9 +145,9 @@ End
 Definition yul_push_frame_def:
   yul_push_frame params args results m =
     m with scopes :=
-      [yul_bind_scope (FEMPTY : string |-> bytes32 option)
-         (ZIP (params, MAP SOME args) ++
-          ZIP (results, REPLICATE (LENGTH results) (SOME 0w)))]
+      [yul_bind_scope (FEMPTY : string |-> yul_value)
+         (ZIP (params, MAP YulWord args) ++
+          ZIP (results, REPLICATE (LENGTH results) (YulWord 0w)))]
 End
 
 (* Binds names in the innermost scope.  Written as a case on the scope stack
@@ -167,9 +167,9 @@ End
 
 (* Updates the innermost scope that binds x. *)
 Definition yul_update_def:
-  (yul_update (x : string) (v : bytes32 option) [] = NONE) ∧
-  (yul_update (x : string) (v : bytes32 option)
-     ((scope : string |-> bytes32 option) :: rest) =
+  (yul_update (x : string) (v : yul_value) [] = NONE) ∧
+  (yul_update (x : string) (v : yul_value)
+     ((scope : string |-> yul_value) :: rest) =
     if FLOOKUP scope x = NONE then
       case yul_update x v rest of
         NONE => NONE
@@ -178,8 +178,8 @@ Definition yul_update_def:
 End
 
 Definition yul_assign_list_def:
-  (yul_assign_list [] (rest : (string |-> bytes32 option) list) = SOME rest) ∧
-  (yul_assign_list ((x, v) :: ps) (rest : (string |-> bytes32 option) list) =
+  (yul_assign_list [] (rest : (string |-> yul_value) list) = SOME rest) ∧
+  (yul_assign_list ((x, v) :: ps) (rest : (string |-> yul_value) list) =
     case yul_update x v rest of
       NONE => NONE
     | SOME rest' => yul_assign_list ps rest')
@@ -325,7 +325,7 @@ End
 
 (* Expression results: values, or an abrupt completion with the machine it
  * left behind.  A builtin's values are words; an expression's are words or
- * unknown (bytes32 option), and yul_lift_result makes the one the other. *)
+ * values (yul_value), and yul_lift_result makes the one the other. *)
 Datatype:
   yul_expr_result
   = EvalValues ('a list) yul_machine
@@ -335,17 +335,34 @@ End
 Definition yul_lift_result_def:
   yul_lift_result (r : bytes32 yul_expr_result) =
     case r of
-      EvalValues ws m => EvalValues (MAP SOME ws) m
+      EvalValues ws m => EvalValues (MAP YulWord ws) m
     | EvalAbrupt c m => EvalAbrupt c m
 End
 
 (* The words of values that are all known. *)
 Definition yul_known_def:
-  (yul_known ([] : bytes32 option list) = SOME []) ∧
+  (yul_known ([] : yul_value list) = SOME []) ∧
   (yul_known (v :: vs) =
      case (v, yul_known vs) of
-       (SOME w, SOME ws) => SOME (w :: ws)
+       (YulWord w, SOME ws) => SOME (w :: ws)
      | _ => NONE)
+End
+
+Definition yul_is_word_def:
+  (yul_is_word (YulWord w) ⇔ T) ∧
+  (yul_is_word (YulBits w k) ⇔ F)
+End
+
+(* A value's word and the mask of its known bits. *)
+Definition yul_value_bits_def:
+  (yul_value_bits (YulWord w) = (w, UINT_MAXw : bytes32)) ∧
+  (yul_value_bits (YulBits w k) = (w, k))
+End
+
+(* The value of word w whose known bits are those set in k. *)
+Definition yul_bits_def:
+  yul_bits (w : bytes32) k =
+    if k = UINT_MAXw then YulWord w else YulBits (word_and w k) k
 End
 
 (* A message call, as the EVM's CALL, STATICCALL and DELEGATECALL make it.
@@ -512,9 +529,6 @@ Definition eval_yul_builtin_def:
         let (m', bs) = yul_memory_region m (w2n p) (w2n s) in
           EvalValues [word_of_bytes_be (Keccak_256_w64 bs)] m'
     | (YMLoad, [p]) =>
-        let (m', bs) = yul_mload m (w2n p) in
-          EvalValues [word_of_bytes_be bs] m'
-    | (YMLoad, [p; _]) =>
         let (m', bs) = yul_mload m (w2n p) in
           EvalValues [word_of_bytes_be bs] m'
     | (YMStore, [p; v]) => EvalValues [] (yul_mstore m (w2n p) v)
@@ -698,15 +712,12 @@ End
  * bytes the Solidity side laid out for it, and the bytes it has written
  * since; the rest of solc's memory (other objects, leftover scratch) is not
  * modelled.  yul_read_regions gives the (offset, size) regions a builtin
- * reads from memory, on its evaluated arguments.  An mload given a length n
- * (a sub-word load, as inline assembly lowers it) reads only its first n
- * bytes; it still loads the whole word.
+ * reads from memory, on its evaluated arguments.
  *)
 Definition yul_read_regions_def:
   yul_read_regions op (vs : bytes32 list) : (num # num) list =
     case (op, vs) of
       (YMLoad, [p]) => [(w2n p, 32)]
-    | (YMLoad, [p; n]) => [(w2n p, w2n n)]
     | (YKeccak256, [p; s]) => [(w2n p, w2n s)]
     | (YMCopy, [_; s; l]) => [(w2n s, w2n l)]
     | (YReturn, [p; s]) => [(w2n p, w2n s)]
@@ -741,21 +752,52 @@ Definition yul_regions_readable_def:
      if yul_region_readable mem p l then yul_regions_readable mem rs else F)
 End
 
-(* A pure builtin with an operand nobody wrote: its words are unknown too,
- * unless an operand fixes the answer whatever the other is -- a zero for
- * and, all ones for or.  The builtin's own clause runs on the operands with
- * the unknown ones read as zero: it checks the arity, and with an absorbing
- * operand its word is the answer whatever the unknown one held.
+(* The mask of the bytes of the word at p that the block may read. *)
+Definition yul_readable_mask_def:
+  yul_readable_mask mem p : bytes32 =
+    word_of_bytes_be
+      (GENLIST (λi. if yul_region_readable mem (p + i) 1 then 255w else 0w) 32)
+End
+
+(* Which bits of a pure builtin's answer are known, from which bits of its
+ * operands are.  and and or fix a bit wherever an operand has a known zero,
+ * or a known one, there; a shift by a known amount, or byte at a known index,
+ * moves each bit to a fixed place and fills the rest with known zeros.  Any
+ * other builtin's answer is unknown once an operand is not all known.
  *)
-Definition yul_unwritten_builtin_def:
-  yul_unwritten_builtin op (vs : bytes32 option list) m =
-    let absorbed = (op = YAnd ∧ MEM (SOME 0w) vs ∨
-                    op = YOr ∧ MEM (SOME UINT_MAXw) vs) in
-      case eval_yul_builtin op
-             (MAP (λv. case v of SOME w => w | NONE => 0w) vs) m of
-        EvalValues ws m' =>
-          EvalValues (MAP (λw. if absorbed then SOME w else NONE) ws) m'
-      | EvalAbrupt c m' => EvalAbrupt c m'
+Definition yul_known_bits_def:
+  yul_known_bits op vs : bytes32 =
+    case (op, MAP yul_value_bits vs) of
+      (YAnd, [(a, ka); (b, kb)]) =>
+        word_or (word_and ka kb)
+          (word_or (word_and ka (word_1comp a)) (word_and kb (word_1comp b)))
+    | (YOr, [(a, ka); (b, kb)]) =>
+        word_or (word_and ka kb) (word_or (word_and ka a) (word_and kb b))
+    | (YShr, [(n, kn); (_, k)]) =>
+        if kn ≠ UINT_MAXw then 0w
+        else word_or (word_lsr k (w2n n)) (word_1comp (word_lsr UINT_MAXw (w2n n)))
+    | (YShl, [(n, kn); (_, k)]) =>
+        if kn ≠ UINT_MAXw then 0w
+        else word_or (word_lsl k (w2n n)) (word_1comp (word_lsl UINT_MAXw (w2n n)))
+    | (YByte, [(i, ki); (_, k)]) =>
+        if ki ≠ UINT_MAXw then 0w
+        else if w2n i < 32 then
+          word_or (word_and (word_lsr k (8 * (31 - w2n i))) 255w) (word_1comp 255w)
+        else UINT_MAXw
+    | _ => 0w
+End
+
+(* A pure builtin with an operand not all of whose bits are known: its answer
+ * is known where yul_known_bits says.  The builtin's own clause runs on the
+ * operands' words, whose unknown bits are zero: it checks the arity, and the
+ * known bits of its answer are the same whatever the unknown ones held.
+ *)
+Definition yul_partial_builtin_def:
+  yul_partial_builtin op vs m =
+    case eval_yul_builtin op (MAP (λv. FST (yul_value_bits v)) vs) m of
+      EvalValues ws m' =>
+        EvalValues (MAP (λw. yul_bits w (yul_known_bits op vs)) ws) m'
+    | EvalAbrupt c m' => EvalAbrupt c m'
 End
 
 (* Termination measures, one per group of the mutual recursion: the relation
@@ -837,7 +879,7 @@ Definition eval_yul_block_def:
      yul_normal m) ∧
   (eval_yul_stmt n fns (YulLet names value) m =
      case value of
-       NONE => yul_bind names (REPLICATE (LENGTH names) (SOME 0w)) m
+       NONE => yul_bind names (REPLICATE (LENGTH names) (YulWord 0w)) m
      | SOME e =>
          (case eval_yul_expr n fns e m of
             EvalAbrupt c m' => yul_abrupt c m'
@@ -849,17 +891,17 @@ Definition eval_yul_block_def:
   (eval_yul_stmt n fns (YulIf c body) m =
      case eval_yul_expr n fns c m of
        EvalAbrupt co m' => yul_abrupt co m'
-     | EvalValues [SOME v] m' =>
+     | EvalValues [YulWord v] m' =>
          if v = 0w then yul_normal m'
          else yul_pop_result (eval_yul_block n fns body (yul_push_scope m'))
-     | EvalValues [NONE] m' =>
+     | EvalValues [YulBits _ _] m' =>
          yul_invalid "assembly read memory it was not given" m'
      | EvalValues _ m' => yul_invalid "condition is not one value" m') ∧
   (eval_yul_stmt n fns (YulSwitch e cases default) m =
      case eval_yul_expr n fns e m of
        EvalAbrupt co m' => yul_abrupt co m'
-     | EvalValues [SOME v] m' => eval_yul_cases n fns v cases default m'
-     | EvalValues [NONE] m' =>
+     | EvalValues [YulWord v] m' => eval_yul_cases n fns v cases default m'
+     | EvalValues [YulBits _ _] m' =>
          yul_invalid "assembly read memory it was not given" m'
      | EvalValues _ m' => yul_invalid "case value is not one value" m') ∧
   (* the prelude runs once, in the loop's own scope *)
@@ -879,7 +921,7 @@ Definition eval_yul_block_def:
 
   (eval_yul_expr n fns (YulLit l) m =
      case yul_literal_value l of
-       SOME v => EvalValues [SOME v] m
+       SOME v => EvalValues [YulWord v] m
      | NONE => EvalAbrupt (YulInvalid "literal out of range") m) ∧
   (eval_yul_expr n fns (YulName x) m =
      case yul_lookup x m.scopes of
@@ -894,8 +936,9 @@ Definition eval_yul_block_def:
           | NONE =>
               EvalAbrupt (YulInvalid "assembly read memory it was not given") m')) ∧
   (* The builtins of inline assembly: gas() reads the observed gas, and a read
-   * of memory the block was not given fails -- except that mload gives an
-   * unknown word, which only an observation of it fails on. *)
+   * of memory the block was not given fails -- except that mload gives a word
+   * whose bytes from there are unknown, which only an observation of them
+   * fails on. *)
   (eval_yul_expr n fns (YulCheckedBuiltin op args) m =
      case eval_yul_args n fns (yul_builtin_value_args op args) m of
        EvalAbrupt c m' => EvalAbrupt c m'
@@ -904,14 +947,14 @@ Definition eval_yul_block_def:
            (case m'.gas_observations of
               GasLeftObservation g :: rest =>
                 if g < 2 ** 256 then
-                  EvalValues [SOME (n2w g)] (m' with gas_observations := rest)
+                  EvalValues [YulWord (n2w g)] (m' with gas_observations := rest)
                 else EvalAbrupt (YulInvalid "missing gas observation") m'
             | _ => EvalAbrupt (YulInvalid "missing gas observation") m')
          else
            (case yul_known vs of
               NONE =>
                 if builtin_effect op = EffectPure then
-                  yul_unwritten_builtin op vs m'
+                  yul_partial_builtin op vs m'
                 else
                   EvalAbrupt (YulInvalid "assembly read memory it was not given") m'
             | SOME ws =>
@@ -919,7 +962,11 @@ Definition eval_yul_block_def:
                   yul_lift_result (eval_yul_builtin_call op args ws m')
                 else if op = YMLoad then
                   (case ws of
-                     [p] => EvalValues [NONE] (yul_memory_touch m' (w2n p) 32)
+                     [p] =>
+                       let (m'', bs) = yul_mload m' (w2n p) in
+                         EvalValues
+                           [yul_bits (word_of_bytes_be bs)
+                              (yul_readable_mask m'.memory (w2n p))] m''
                    | _ => EvalAbrupt (YulInvalid "bad builtin call") m')
                 else
                   EvalAbrupt (YulInvalid "assembly read memory it was not given") m')) ∧
@@ -951,7 +998,7 @@ Definition eval_yul_block_def:
   (eval_yul_loop n fns cond post body m =
      case eval_yul_expr n fns cond m of
        EvalAbrupt c m' => yul_pop_result (yul_abrupt c m')
-     | EvalValues [SOME v] m' =>
+     | EvalValues [YulWord v] m' =>
          if v = 0w then yul_normal (yul_pop_scope m')
          else
            let rb = yul_pop_result (eval_yul_block n fns body (yul_push_scope m')) in
@@ -969,7 +1016,7 @@ Definition eval_yul_block_def:
                  else if n = 0 then
                    yul_abrupt YulOutOfFuel (yul_pop_scope rp.machine)
                  else eval_yul_loop (n - 1) fns cond post body rp.machine
-     | EvalValues [NONE] m' =>
+     | EvalValues [YulBits _ _] m' =>
          yul_invalid "assembly read memory it was not given" (yul_pop_scope m')
      | EvalValues _ m' => yul_invalid "condition is not one value" (yul_pop_scope m')) ∧
 
@@ -1011,7 +1058,7 @@ Definition eval_yul_block_def:
                  (case yul_lookup_names fd.function_results r.machine.scopes of
                     NONE => EvalAbrupt (YulInvalid "missing return binding") m2
                   | SOME vs =>
-                      if EVERY IS_SOME vs then EvalValues vs m2
+                      if EVERY yul_is_word vs then EvalValues vs m2
                       else
                         EvalAbrupt
                           (YulInvalid "assembly read memory it was not given") m2)
@@ -1041,7 +1088,7 @@ End
 Definition run_yul_def:
   run_yul n code m =
     eval_yul_block n (yul_env code) code
-      (m with scopes := (FEMPTY : string |-> bytes32 option) :: m.scopes)
+      (m with scopes := (FEMPTY : string |-> yul_value) :: m.scopes)
 End
 
 (* cv translation, so compiled Yul runs under cv_compute.  The recursive
@@ -1069,6 +1116,9 @@ val () = cv_auto_trans yul_assign_def;
 val () = cv_auto_trans yul_literal_value_def;
 val () = cv_auto_trans yul_lift_result_def;
 val () = cv_auto_trans yul_known_def;
+val () = cv_auto_trans yul_is_word_def;
+val () = cv_auto_trans yul_value_bits_def;
+val () = cv_auto_trans yul_bits_def;
 
 (* CHR is defined only up to 255, so the translation of a byte -> char function
  * carries that bound as a precondition, which cv_auto_trans cannot discharge on
@@ -1126,7 +1176,10 @@ val () = cv_auto_trans yul_read_regions_def;
 val () = cv_auto_trans yul_region_readable_def;
 val () = cv_auto_trans yul_regions_readable_def;
 val () = cv_auto_trans builtin_effect_def;
-val () = cv_auto_trans yul_unwritten_builtin_def;
+val () = cv_auto_trans yul_readable_mask_def;
+val () = cv_auto_trans
+  (REWRITE_RULE [word_lsl_modexp, modular_word_def] yul_known_bits_def);
+val () = cv_auto_trans yul_partial_builtin_def;
 val () = cv_auto_trans yul_env_def;
 
 (* Termination of the translated evaluator: a scaled (fuel, size) order on the

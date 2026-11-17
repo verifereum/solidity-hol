@@ -310,7 +310,7 @@ val evaluator_clauses =
 val helper_defs = [
   yul_normal_def, yul_abrupt_def, yul_invalid_def,
   yul_literal_value_def, yul_sign_extend_def, yul_builtin_value_args_def,
-  yul_known_def, yul_lift_result_def
+  yul_known_def, yul_lift_result_def, yul_is_word_def, yul_value_bits_def
 ]
 
 (* The shaping the frame rule builds with, unfolded unconditionally: it is a
@@ -507,7 +507,7 @@ val frame_update_key =
     (fst (strip_comb
             (lhs (concl (SPEC_ALL yul_machine_scopes_update_self))))))
 
-val vals_shape_keys = [("list", "HD"), ("list", "TL"), ("option", "THE"),
+val vals_shape_keys = [("list", "HD"), ("list", "TL"),
                        ("yulEvaluatorProps", "yul_take_shape")]
 
 (* The number of arguments a term of this type takes. *)
