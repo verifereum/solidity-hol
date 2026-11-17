@@ -1911,8 +1911,9 @@ Proof
 QED
 
 val () = cv_auto_trans normalize_type_name_def;
+(* canonical_storage_identifier is translated above, as a dependency of
+ * decode_type_identifier. *)
 val () = cv_auto_trans storage_type_identifier_def;
-val () = cv_auto_trans canonical_storage_identifier_def;
 val () = cv_auto_trans located_type_identifier_def;
 val () = cv_auto_trans source_type_matches_def;
 val () = cv_auto_trans storage_layout_identifier_def;
