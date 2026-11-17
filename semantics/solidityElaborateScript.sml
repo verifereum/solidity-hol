@@ -57,6 +57,10 @@ Ancestors
 Libs
   cv_transLib wordsLib
 
+(* solidityImport and contractABI each translate num_to_dec_string; keep
+   contractABI's, so every descendant sees one translation. *)
+val () = cv_rep_delete "solidityImport.cv_num_to_dec_string_thm";
+
 (* What an expression or statement sees: the functions callable by id, and
  * those super calls run, by the declaration they name; the struct, enum
  * (member count) and event declarations; the variables in lexical scope; the
