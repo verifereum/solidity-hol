@@ -1899,7 +1899,9 @@ val () = cv_auto_trans decode_type_identifier_def;
 val () = cv_auto_trans identifier_type_def;
 val () = cv_auto_trans identifier_integer_def;
 (* Keccak exports a partial HEX translation; decimal identifiers use the
- * existing total definition, including its out-of-range branch. *)
+ * existing total definition, including its out-of-range branch. HOL keeps
+ * one translation per term, so Keccak's goes first. *)
+val () = cv_rep_delete "keccak.cv_HEX_thm";
 val total_hex_pre_def = cv_trans_pre "total_hex_pre" ASCIInumbersTheory.HEX;
 
 Theorem total_hex_pre[cv_pre,local]:
