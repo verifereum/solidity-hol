@@ -217,6 +217,14 @@ Definition case_tx_def:
     | _ => differential_tx c.case_sender c.case_value data
 End
 
+(* A case's accounts. Translated here, so that the corpus theories and
+ * solidityDifferential share one translation of the record's fields. *)
+Definition case_accounts_of_def:
+  case_accounts_of code c =
+    case_accounts code c.case_storage c.case_sender c.case_peer_code
+      c.case_peer_storage c.case_libraries
+End
+
 (* Observe the called account, or the newly created account's immutable words. *)
 Definition bytecode_execution_def:
   bytecode_execution (accounts, tx, refs) =
@@ -340,4 +348,5 @@ val () = cv_auto_trans expected_logs_def;
 val () = cv_auto_trans differential_tx_def;
 val () = cv_auto_trans case_address_def;
 val () = cv_auto_trans case_tx_def;
+val () = cv_auto_trans case_accounts_of_def;
 val () = cv_auto_trans bytecode_execution_def;
