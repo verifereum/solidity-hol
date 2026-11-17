@@ -433,6 +433,25 @@ Definition yul_create_def:
                       return_data := r.create_return |>)
 End
 
+(* selfdestruct(beneficiary), as Verifereum's SELFDESTRUCT under EIP-6780:
+ * the executing account's balance moves to the beneficiary, and the frame
+ * stops. An account the transaction created -- empty in its original
+ * accounts -- also loses a balance it sent to itself, and is left pending
+ * deletion, which the transaction's end carries out; any other account keeps
+ * its code and storage. The frame has no static mode, as for sstore.
+ *)
+Definition yul_self_destruct_def:
+  yul_self_destruct (m : yul_machine) (beneficiary : address) =
+    let self = lookup_account m.self_address m.accounts;
+        accounts = transfer_value m.self_address beneficiary self.balance
+                     m.accounts in
+      if account_empty (lookup_account m.self_address m.original) then
+        m with <| accounts := update_account m.self_address
+                                (self with balance := 0) accounts;
+                  to_delete := m.to_delete ++ [m.self_address] |>
+      else m with accounts := accounts
+End
+
 (* returndatacopy: the bytes it reads come from return_data, not from memory,
  * so it is not yul_memory_region.  Reading past the end of the buffer is the
  * EVM's OutOfBoundsRead, an exceptional halt rather than a short copy.
@@ -631,6 +650,8 @@ Definition eval_yul_builtin_def:
     | (YCreate2, [v; p; n; salt]) => yul_create m (SOME salt) v p n
     | (YStop, []) => EvalAbrupt (YulReturn []) m
     | (YInvalid, []) => EvalAbrupt YulAbort m
+    | (YSelfDestruct, [b]) =>
+        EvalAbrupt (YulReturn []) (yul_self_destruct m (w2w b))
     | (YReturn, [p; s]) =>
         let (m', bs) = yul_memory_region m (w2n p) (w2n s) in
           EvalAbrupt (YulReturn bs) m'
@@ -1104,6 +1125,7 @@ QED
 val () = cv_auto_trans yul_call_def;
 val () = cv_auto_trans yul_create_def;
 val () = cv_auto_trans yul_return_data_copy_def;
+val () = cv_auto_trans yul_self_destruct_def;
 val block_hash_word_pre_def =
   cv_trans_pre "block_hash_word_pre" block_hash_word_def;
 Theorem block_hash_word_pre[cv_pre]:

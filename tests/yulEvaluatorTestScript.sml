@@ -1445,6 +1445,77 @@ Proof
   CONV_TAC cv_eval
 QED
 
+(* selfdestruct runs for 0x1234, which holds 17 and code; 0x77 holds 29. In
+ * yul_destruct_machine the transaction created 0x1234 (it is empty in the
+ * original accounts); in yul_destruct_existing_machine it did not. *)
+Definition yul_destruct_machine_def:
+  yul_destruct_machine = yul_frame_machine with accounts :=
+    update_account 0x1234w (empty_account_state with <| balance := 17; code := [0w] |>)
+      (update_account 0x77w (empty_account_state with balance := 29)
+        empty_accounts)
+End
+
+Definition yul_destruct_existing_machine_def:
+  yul_destruct_existing_machine =
+    yul_destruct_machine with original := yul_destruct_machine.accounts
+End
+
+(* The completion, the balances of 0x1234 and 0x77, 0x1234's code and the
+ * pending deletions a selfdestruct leaves. *)
+Definition self_destruct_view_def:
+  self_destruct_view args m =
+    case eval_yul_builtin YSelfDestruct args m of
+      EvalAbrupt c m' =>
+        SOME (c, (lookup_account 0x1234w m'.accounts).balance,
+              (lookup_account 0x77w m'.accounts).balance,
+              (lookup_account 0x1234w m'.accounts).code, m'.to_delete)
+    | EvalValues _ _ => NONE
+End
+
+val () = cv_auto_trans yul_destruct_machine_def;
+val () = cv_auto_trans yul_destruct_existing_machine_def;
+val () = cv_auto_trans self_destruct_view_def;
+
+(* EIP-6780: the balance always moves to the beneficiary and the frame stops;
+ * only an account the transaction created is left pending deletion, and one
+ * that names itself as beneficiary then loses its balance. The beneficiary is
+ * the word's low 160 bits. *)
+Theorem self_destruct_moves_balance_and_marks_created_account:
+  self_destruct_view [0x77w] yul_destruct_machine =
+    SOME (YulReturn [], 0, 46, [0w], [0x1234w]) ∧
+  self_destruct_view [n2w (2 ** 160 + 0x77)] yul_destruct_machine =
+    SOME (YulReturn [], 0, 46, [0w], [0x1234w]) ∧
+  self_destruct_view [0x77w] yul_destruct_existing_machine =
+    SOME (YulReturn [], 0, 46, [0w], []) ∧
+  self_destruct_view [0x1234w] yul_destruct_machine =
+    SOME (YulReturn [], 0, 29, [0w], [0x1234w]) ∧
+  self_destruct_view [0x1234w] yul_destruct_existing_machine =
+    SOME (YulReturn [], 17, 29, [0w], []) ∧
+  eval_yul_builtin YSelfDestruct [] yul_destruct_machine =
+    EvalAbrupt (YulInvalid "bad builtin call") yul_destruct_machine
+Proof
+  CONV_TAC cv_eval
+QED
+
+(* selfdestruct(0x77) revert(0, 0): selfdestruct halts like stop, so the
+ * revert never runs, and the frame's account, created by the transaction, is
+ * left pending deletion. *)
+Definition self_destruct_code_def:
+  self_destruct_code =
+    [YulExprStmt (YulBuiltin YSelfDestruct [YulLit (LitNumber 0x77w)]);
+     YulExprStmt (YulBuiltin YRevert
+       [YulLit (LitNumber 0w); YulLit (LitNumber 0w)])]
+End
+
+val () = cv_auto_trans self_destruct_code_def;
+
+Theorem self_destruct_halts_like_stop:
+  (run 20 self_destruct_code).completion = YulReturn [] ∧
+  (run 20 self_destruct_code).machine.to_delete = [0w]
+Proof
+  CONV_TAC cv_eval
+QED
+
 (* An externally owned account hashes its empty code, a contract its code,
  * and an empty or absent account reads 0, as EXTCODEHASH does. *)
 Definition yul_code_hash_machine_def:

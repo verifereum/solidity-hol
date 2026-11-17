@@ -76,6 +76,7 @@ Definition builtin_name_def:
   builtin_name YPrevRandao = "prevrandao" ∧
   builtin_name YStop = "stop" ∧
   builtin_name YInvalid = "invalid" ∧
+  builtin_name YSelfDestruct = "selfdestruct" ∧
   builtin_name YCall = "call" ∧
   builtin_name YStaticCall = "staticcall" ∧
   builtin_name YDelegateCall = "delegatecall" ∧
@@ -162,6 +163,7 @@ Definition builtin_of_name_def:
     else if name = "prevrandao" then SOME YPrevRandao
     else if name = "stop" then SOME YStop
     else if name = "invalid" then SOME YInvalid
+    else if name = "selfdestruct" then SOME YSelfDestruct
     else if name = "call" then SOME YCall
     else if name = "staticcall" then SOME YStaticCall
     else if name = "delegatecall" then SOME YDelegateCall
@@ -209,7 +211,8 @@ Datatype:
                        memory: a touch like any other, so it can raise the
                        frame's memory size *)
   | EffectHalt      (* ends the frame, returning or reverting data from
-                       memory *)
+                       memory, or, selfdestruct, after moving the executing
+                       account's balance *)
   | EffectObject    (* the running code, or the object's data and
                        subobjects *)
 End
@@ -275,6 +278,7 @@ Definition builtin_effect_def:
   builtin_effect YPrevRandao = EffectFrame ∧
   builtin_effect YStop = EffectHalt ∧
   builtin_effect YInvalid = EffectHalt ∧
+  builtin_effect YSelfDestruct = EffectHalt ∧
   builtin_effect YCall = EffectCall ∧
   builtin_effect YStaticCall = EffectCall ∧
   builtin_effect YDelegateCall = EffectCall ∧
