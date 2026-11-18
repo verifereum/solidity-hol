@@ -539,9 +539,7 @@ fun run_bytecode_case {suite, artifact, code, initcode, fixture, declarations, r
     val imms = {names = map (fn (name, id, _) => (name, id)) declarations, refs = refs}
     val case_tm = case_term fixture imms input c
     val words = immutable_words declarations c
-    val accounts = “case_accounts (patch_immutables ^refs ^words ^code)
-                      (^case_tm).case_storage (^case_tm).case_sender
-                      (^case_tm).case_peer_code (^case_tm).case_peer_storage (^case_tm).case_libraries”
+    val accounts = “case_accounts_of (patch_immutables ^refs ^words ^code) ^case_tm”
     val tx = “case_tx ^case_tm ^data”
     val input_def = define (prefix ^ "_input")
       (pairSyntax.list_mk_pair [accounts, tx, refs])
