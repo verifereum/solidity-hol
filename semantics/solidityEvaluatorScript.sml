@@ -2220,7 +2220,28 @@ val () = cv_auto_trans assembly_cell_word_def;
 val () = cv_auto_trans assembly_reference_word_def;
 val () = cv_auto_trans assembly_inputs_def;
 val () = cv_auto_trans yul_prefix_load_def;
-val () = cv_auto_trans yul_substitute_expr_def;
+val yul_substitute_expr_pre_def = cv_auto_trans_pre
+  "yul_substitute_expr_pre yul_substitute_exprs_pre" yul_substitute_expr_def;
+
+Theorem yul_substitute_exprs_pre_all[local]:
+  ∀es sub. EVERY (yul_substitute_expr_pre sub) es ⇒
+    yul_substitute_exprs_pre sub es
+Proof
+  Induct >> simp[Once (cj 2 yul_substitute_expr_pre_def)]
+QED
+
+Theorem yul_substitute_expr_pre[cv_pre,local]:
+  (∀e sub. yul_substitute_expr_pre sub e) ∧
+  (∀es sub. yul_substitute_exprs_pre sub es)
+Proof
+  conj_asm1_tac >-
+    (ho_match_mp_tac yulASTTheory.yul_expr_induction >> rpt strip_tac >>
+     simp[Once (cj 1 yul_substitute_expr_pre_def)] >>
+     rpt conj_tac >> rpt gen_tac >> rpt strip_tac >> gvs[] >>
+     irule yul_substitute_exprs_pre_all >> fs[listTheory.EVERY_MEM]) >>
+  rpt gen_tac >> irule yul_substitute_exprs_pre_all >> simp[listTheory.EVERY_MEM]
+QED
+
 val () = cv_auto_trans yul_unbind_def;
 val () = cv_auto_trans yul_substitute_stmt_def;
 val () = cv_auto_trans object_padding_def;
