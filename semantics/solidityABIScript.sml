@@ -114,6 +114,16 @@ Definition abi_word_def:
   abi_word bs pos = num_of_be_bytes (TAKE 32 (DROP pos bs))
 End
 
+(* n bytes of an input at pos, reading zeros past the bytes held. *)
+Definition input_bytes_def:
+  input_bytes (bs : word8 list) pos n =
+    let xs = TAKE n (DROP pos bs) in xs ++ REPLICATE (n - LENGTH xs) 0w
+End
+
+Definition input_word_def:
+  input_word bs pos = num_of_be_bytes (input_bytes bs pos 32)
+End
+
 (* The bytes an element or field takes in the head of its array or struct. *)
 Definition abi_stride_def:
   abi_stride env ty =
@@ -609,47 +619,47 @@ End
  * the tuple of their elements or fields; free is the free memory pointer.
  * The fuel bounds the struct nesting. *)
 Definition decode_memory_value_def:
-  (decode_memory_value env (fuel : num) ty bs pos free =
+  (decode_memory_value env (fuel : num) ty bs (total : num) pos free =
     if byte_sequence_type ty ∨ (case ty of ArrayT _ _ => T | _ => F) then
-      if pos + 32 > LENGTH bs then INR (RevertCompletion []) else
+      if pos + 32 > total then INR (RevertCompletion []) else
       let (length, data, size) =
         case ty of
           ArrayT element (SOME n) => (n, pos, 32 * n)
         | ArrayT element NONE =>
-            let n = abi_word bs pos in (n, pos + 32, 32 + 32 * n)
-        | _ => let n = abi_word bs pos in (n, pos + 32, 32 + 32 * ((n + 31) DIV 32)) in
+            let n = input_word bs pos in (n, pos + 32, 32 + 32 * n)
+        | _ => let n = input_word bs pos in (n, pos + 32, 32 + 32 * ((n + 31) DIV 32)) in
       if 2 ** 64 ≤ length ∨ 2 ** 64 ≤ free + size then INR (PanicCompletion 65) else
       case ty of
         ArrayT element _ =>
-          if data + length * abi_stride env element > LENGTH bs then
+          if data + length * abi_stride env element > total then
             INR (RevertCompletion [])
           else
-            (case decode_memory_elements env fuel element bs data 0 length (free + size) of
+            (case decode_memory_elements env fuel element bs total data 0 length (free + size) of
                INL (vs, next) => INL (TupleValue vs, next)
              | INR c => INR c)
       | _ =>
-          if data + length > LENGTH bs then INR (RevertCompletion [])
-          else INL (ScalarValue (BytesValue (TAKE length (DROP data bs))), free + size)
+          if data + length > total then INR (RevertCompletion [])
+          else INL (ScalarValue (BytesValue (input_bytes bs data length)), free + size)
     else case ty of
       StructT s =>
         (case lookup_struct env s of
            SOME fields =>
              let tys = MAP SND fields in
              if pos + head_lengths (abi_types env (LENGTH env.type_declarations) tys) 0 >
-                LENGTH bs
+                total
              then INR (RevertCompletion [])
              else if 2 ** 64 ≤ free + 32 * LENGTH tys then INR (PanicCompletion 65)
              else if fuel = 0 then INR (InvalidCompletion "struct nesting")
              else
-               (case decode_memory_fields env (fuel - 1) tys bs pos pos
+               (case decode_memory_fields env (fuel - 1) tys bs total pos pos
                        (free + 32 * LENGTH tys) of
                   INL (vs, next) => INL (TupleValue vs, next)
                 | INR c => INR c)
          | NONE => INR (InvalidCompletion "unknown struct"))
     | _ =>
       let a = abi_type env 0 ty in
-      let word = TAKE 32 (DROP pos bs) in
-      if pos + 32 > LENGTH bs ∨ ¬valid_enc a word then
+      let word = input_bytes bs pos 32 in
+      if pos + 32 > total ∨ ¬valid_enc a word then
         INR (RevertCompletion [])
       else
         case abi_runtime_value ty (dec a word) of
@@ -658,35 +668,35 @@ Definition decode_memory_value_def:
               INR (RevertCompletion [])
             else INL (ScalarValue v, free)
         | _ => INR (InvalidCompletion "bad ABI scalar type")) ∧
-  (decode_memory_elements env fuel element bs data i n free =
+  (decode_memory_elements env fuel element bs total data i n free =
     if n = 0 then INL ([], free) else
-    case decode_memory_part env fuel element bs data
+    case decode_memory_part env fuel element bs total data
            (data + i * abi_stride env element) free of
       INR c => INR c
     | INL (v, next) =>
-        case decode_memory_elements env fuel element bs data (i + 1) (n - 1) next of
+        case decode_memory_elements env fuel element bs total data (i + 1) (n - 1) next of
           INL (vs, last) => INL (v :: vs, last)
         | INR c => INR c) ∧
-  (decode_memory_fields env fuel [] bs base src free = INL ([], free)) ∧
-  (decode_memory_fields env fuel (ty :: tys) bs base src free =
-    case decode_memory_part env fuel ty bs base src free of
+  (decode_memory_fields env fuel [] bs total base src free = INL ([], free)) ∧
+  (decode_memory_fields env fuel (ty :: tys) bs total base src free =
+    case decode_memory_part env fuel ty bs total base src free of
       INR c => INR c
     | INL (v, next) =>
-        case decode_memory_fields env fuel tys bs base (src + abi_stride env ty) next of
+        case decode_memory_fields env fuel tys bs total base (src + abi_stride env ty) next of
           INL (vs, last) => INL (v :: vs, last)
         | INR c => INR c) ∧
   (* An element or field whose head is at src: a dynamic one at the offset
    * there from base. *)
-  (decode_memory_part env fuel ty bs base src free =
+  (decode_memory_part env fuel ty bs total base src free =
     if is_dynamic (abi_type env (LENGTH env.type_declarations) ty) then
-      let offset = abi_word bs src in
+      let offset = input_word bs src in
       if 2 ** 64 ≤ offset then INR (RevertCompletion [])
-      else decode_memory_value env fuel ty bs (base + offset) free
-    else decode_memory_value env fuel ty bs src free)
+      else decode_memory_value env fuel ty bs total (base + offset) free
+    else decode_memory_value env fuel ty bs total src free)
 Termination
   WF_REL_TAC ‘inv_image ($< LEX $< LEX $<) (λx. case x of
     INL (_, fuel, ty, _) => (fuel, sol_type_size ty, 1)
-  | INR (INL (_, fuel, element, _, _, _, n, _)) =>
+  | INR (INL (_, fuel, element, _, _, _, _, n, _)) =>
       (fuel, sol_type_size element, n + 3)
   | INR (INR (INL (_, fuel, tys, _))) =>
       (fuel, list_size sol_type_size tys, 0)
@@ -714,11 +724,11 @@ Definition copy_calldata_array_def:
         else if data + length * abi_stride env element > LENGTH cd then
           INR (RevertCompletion [])
         else (case decode_memory_elements env (LENGTH env.type_declarations) element cd
-                     data 0 length (free + size) of
+                     (LENGTH cd) data 0 length (free + size) of
                 INL (vs, _) => INL (TupleValue vs)
               | INR c => INR c)
     | StructT _ =>
-        (case decode_memory_value env (LENGTH env.type_declarations) ty cd data free of
+        (case decode_memory_value env (LENGTH env.type_declarations) ty cd (LENGTH cd) data free of
            INL (v, _) => INL v
          | INR c => INR c)
     | _ => INR (InvalidCompletion "bad calldata copy")
@@ -729,8 +739,8 @@ End
  * stays in the calldata: a byte sequence or dynamic array with its data in
  * range, any other dynamic value with its heads in range. *)
 Definition decode_abi_argument_def:
-  decode_abi_argument env ty bs head base free =
-    if head + 32 > LENGTH bs then INR (RevertCompletion []) else
+  decode_abi_argument env ty bs (total : num) head base free =
+    if head + 32 > total then INR (RevertCompletion []) else
     case ty of
       LocatedT CalldataLoc element =>
         let a = abi_type env (LENGTH env.type_declarations) element in
@@ -738,41 +748,48 @@ Definition decode_abi_argument_def:
           INL (ReferenceValue (CalldataReference (base + head) (calldata_length element)
                  element), free)
         else
-        let offset = abi_word bs head in
+        let offset = input_word bs head in
         if byte_sequence_type element ∨ (case element of ArrayT _ NONE => T | _ => F) then
-          if 2 ** 64 ≤ offset ∨ offset + 32 > LENGTH bs then
+          if 2 ** 64 ≤ offset ∨ offset + 32 > total then
             INR (RevertCompletion []) else
-          let length = abi_word bs offset in
+          let length = input_word bs offset in
           let stride = case element of ArrayT inner NONE => abi_stride env inner | _ => 1 in
-          if 2 ** 64 ≤ length ∨ offset + 32 + length * stride > LENGTH bs then
+          if 2 ** 64 ≤ length ∨ offset + 32 + length * stride > total then
             INR (RevertCompletion [])
           else INL (ReferenceValue (CalldataReference (base + offset + 32) length element),
                     free)
-        else if 2 ** 64 ≤ offset ∨ offset + abi_head_size a > LENGTH bs then
+        else if 2 ** 64 ≤ offset ∨ offset + abi_head_size a > total then
           INR (RevertCompletion [])
         else INL (ReferenceValue (CalldataReference (base + offset)
                     (calldata_length element) element), free)
     | LocatedT MemoryLoc element =>
-        decode_memory_part env (LENGTH env.type_declarations) element bs 0 head free
-    | _ => decode_memory_value env (LENGTH env.type_declarations) ty bs head free
+        decode_memory_part env (LENGTH env.type_declarations) element bs total 0 head free
+    | _ => decode_memory_value env (LENGTH env.type_declarations) ty bs total head free
 End
 
 Definition decode_abi_arguments_def:
-  (decode_abi_arguments env [] bs head base free = INL []) ∧
-  (decode_abi_arguments env (ty :: tys) bs head base free =
-    case decode_abi_argument env ty bs head base free of
+  (decode_abi_arguments env [] bs total head base free = INL []) ∧
+  (decode_abi_arguments env (ty :: tys) bs total head base free =
+    case decode_abi_argument env ty bs total head base free of
       INR c => INR c
     | INL (v, next) =>
-        case decode_abi_arguments env tys bs (head + abi_stride env ty) base next of
+        case decode_abi_arguments env tys bs total (head + abi_stride env ty) base next of
           INL vs => INL (v :: vs)
         | INR c => INR c)
 End
 
-Definition decode_arguments_def:
-  decode_arguments env tys bs base free =
-    if head_lengths (abi_types env (LENGTH env.type_declarations) tys) 0 > LENGTH bs then
+(* Arguments decoded from an input of total bytes, of which bs holds the
+ * leading ones; the rest read as zeros. Memory is decoded in place this way,
+ * as the compiler's decoder reads only the words it needs. *)
+Definition decode_input_def:
+  decode_input env tys bs total base free =
+    if head_lengths (abi_types env (LENGTH env.type_declarations) tys) 0 > total then
       INR (RevertCompletion [])
-    else decode_abi_arguments env tys bs 0 base free
+    else decode_abi_arguments env tys bs total 0 base free
+End
+
+Definition decode_arguments_def:
+  decode_arguments env tys bs base free = decode_input env tys bs (LENGTH bs) base free
 End
 
 (* A decoded value written to memory as the compiler's abi_decode functions write
@@ -1053,6 +1070,8 @@ QED
 val () = cv_auto_trans abi_runtime_value_def;
 val () = cv_auto_trans abi_runtime_values_def;
 val () = cv_auto_trans abi_word_def;
+val () = cv_auto_trans input_bytes_def;
+val () = cv_auto_trans input_word_def;
 val () = cv_auto_trans abi_stride_def;
 val () = cv_auto_trans abi_head_size_def;
 val () = cv_auto_trans calldata_length_def;
@@ -1167,7 +1186,7 @@ val decode_memory_value_pre_def = cv_auto_trans_pre_rec
   decode_memory_value_def (
   WF_REL_TAC ‘inv_image ($< LEX $< LEX $<) (λx. case x of
     INL (_, fuel, ty, _) => (cv$c2n fuel, cv_size ty, 1)
-  | INR (INL (_, fuel, element, _, _, _, n, _)) =>
+  | INR (INL (_, fuel, element, _, _, _, _, n, _)) =>
       (cv$c2n fuel, cv_size element, cv$c2n n + 3)
   | INR (INR (INL (_, fuel, tys, _))) =>
       (cv$c2n fuel, cv_size tys, 0)
@@ -1177,11 +1196,11 @@ val decode_memory_value_pre_def = cv_auto_trans_pre_rec
 );
 
 Theorem decode_memory_value_pre[cv_pre]:
-  (∀env fuel ty bs pos free. decode_memory_value_pre env fuel ty bs pos free) ∧
-  (∀env fuel element bs data i n free.
-     decode_memory_elements_pre env fuel element bs data i n free) ∧
-  (∀env fuel tys bs base src free. decode_memory_fields_pre env fuel tys bs base src free) ∧
-  (∀env fuel ty bs base src free. decode_memory_part_pre env fuel ty bs base src free)
+  (∀env fuel ty bs total pos free. decode_memory_value_pre env fuel ty bs total pos free) ∧
+  (∀env fuel element bs total data i n free.
+     decode_memory_elements_pre env fuel element bs total data i n free) ∧
+  (∀env fuel tys bs total base src free. decode_memory_fields_pre env fuel tys bs total base src free) ∧
+  (∀env fuel ty bs total base src free. decode_memory_part_pre env fuel ty bs total base src free)
 Proof
   ho_match_mp_tac decode_memory_value_ind >> rpt strip_tac >>
   simp[Once decode_memory_value_pre_def] >> rw[] >> gvs[]
@@ -1189,6 +1208,7 @@ QED
 val () = cv_auto_trans copy_calldata_array_def;
 val () = cv_auto_trans decode_abi_argument_def;
 val () = cv_auto_trans decode_abi_arguments_def;
+val () = cv_auto_trans decode_input_def;
 val () = cv_auto_trans decode_arguments_def;
 val materialize_value_pre_def = cv_auto_trans_pre_rec
   "materialize_value_pre materialize_words_pre" materialize_value_def (

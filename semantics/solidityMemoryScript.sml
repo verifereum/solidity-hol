@@ -435,6 +435,24 @@ Definition byte_contents_def:
     | _ => INR (InvalidCompletion "bad byte sequence reference")
 End
 
+(* A byte sequence as an ABI decoder's input: the bytes it holds and its
+ * length. A memory one holds only its bytes below the memory size; the
+ * bytes past that are zero. *)
+Definition decode_source_def:
+  decode_source (st : source_state) r =
+    case r of
+      MemoryReference p ty =>
+        if byte_sequence_type ty then
+          let (n, st1) = memory_load p st in
+          let held = MIN n (st1.memory_size - (p + 32)) in
+          INL (yul_mem_read st1.memory (p + 32) held, n, st1)
+        else INR (InvalidCompletion "bad byte sequence reference")
+    | _ =>
+        case byte_contents st r of
+          INL (bs, st1) => INL (bs, LENGTH bs, st1)
+        | INR c => INR c
+End
+
 Definition copy_byte_contents_def:
   copy_byte_contents src dst st =
     case dst of
@@ -552,5 +570,6 @@ QED
 val () = cv_auto_trans default_elementary_def;
 val () = cv_auto_trans scratch_write_def;
 val () = cv_auto_trans byte_contents_def;
+val () = cv_auto_trans decode_source_def;
 val () = cv_auto_trans copy_byte_contents_def;
 val () = cv_auto_trans convert_byte_reference_def;

@@ -264,7 +264,7 @@ Theorem deploy_contract_parameterless_ignores_arguments:
   deploy_contract fuel prog (fr with call_data := []) w
 Proof
   rw[deploy_contract_def, deploy_contract_with_gas_def,
-     solidityABITheory.decode_arguments_def,
+     solidityABITheory.decode_arguments_def, solidityABITheory.decode_input_def,
      solidityABITheory.decode_abi_arguments_def, solidityABITheory.abi_type_def,
      contractABITheory.head_lengths_def]
 QED

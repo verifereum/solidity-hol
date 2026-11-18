@@ -1236,13 +1236,16 @@ Definition simple_stmt_def:
                 INL (v', st') => normal_result (define_binding x ty v' st') gas
               | INR c => abrupt_result c st gas)
          | _ => abrupt_result (InvalidCompletion "bad object copy") st gas)
-    (* Decoded memory values are allocated, as external call results are. *)
+    (* Decoded memory values are allocated, as external call results are. A
+     * memory input is decoded in place: only its bytes below the memory size
+     * are read, the rest being zeros, as the compiler's decoder reads only
+     * the words it needs from an input of any length. *)
     | DefineStmt x ty (AbiDecodeOperation tys a) =>
         (case eval_atom st.scopes a of
            SOME (ReferenceValue r) =>
-             (case byte_contents st r of
-                INL (bs, st0) =>
-                  (case decode_arguments env tys bs 0 (FST (memory_load 64 st0)) of
+             (case decode_source st r of
+                INL (bs, input_len, st0) =>
+                  (case decode_input env tys bs input_len 0 (FST (memory_load 64 st0)) of
                      INL vs =>
                        (case materialize_arguments env tys vs st0 of
                           INL (values, st1) =>
