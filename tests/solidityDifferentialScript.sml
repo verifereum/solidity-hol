@@ -565,7 +565,6 @@ Proof
 QED
 
 val () = cv_auto_trans argument_scalar_def;
-val () = cv_auto_trans solidityCoreWfTheory.elementary_scalar_has_type_def;
 val () = cv_auto_trans argument_value_def;
 val () = cv_auto_trans argument_values_def;
 val () = cv_auto_trans argument_env_def;
@@ -576,7 +575,6 @@ val () = cv_auto_trans unit_immutables_def;
 val () = cv_auto_trans immutable_word_def;
 val () = cv_auto_trans case_immutable_values_def;
 val () = cv_auto_trans created_immutable_words_def;
-val () = cv_auto_trans (INST_TYPE [alpha |-> “:num”] listTheory.nub_def);
 val () = cv_auto_trans observed_slots_def;
 val () = cv_auto_trans call_data_def;
 val () = cv_auto_trans constructor_types_def;
