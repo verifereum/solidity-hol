@@ -165,7 +165,7 @@ Definition run_entry_with_gas_def:
         (case (if kind = FallbackEntry then fallback_output r.state vs
                else (case encoded_runtime_values env r.state
                             (MAP SND p.return_bindings) vs of
-                       INL (data, _) => INL data
+                       INL ((data, _), _) => INL data
                      | INR c => INR c)) of
            INL data =>
              if kind = CreationEntry then

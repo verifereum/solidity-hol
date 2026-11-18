@@ -408,6 +408,95 @@ Definition array_copy_value_def:
     | _ => INR (InvalidCompletion "bad array reference")
 End
 
+(* Zero bytes the compiler's encoder writes past the end of an encoding. A
+ * byte sequence copied from memory or calldata is followed by a cleared
+ * word; a stored one writes whole words, so only an empty one leaves a zero
+ * word past its end; a literal writes whole words. Only the encoding's last
+ * dynamic part, recursively, can spill past its end. *)
+Datatype:
+  encoding_source = CopiedBytes | StoredBytes | LiteralBytes
+End
+
+Definition encoding_source_def:
+  encoding_source v =
+    case v of
+      ReferenceValue (StorageReference _ _ _ _ _ _) => StoredBytes
+    | ReferenceValue _ => CopiedBytes
+    | _ => LiteralBytes
+End
+
+Definition padded_bytes_spill_def:
+  padded_bytes_spill src (l : num) =
+    case src of
+      CopiedBytes => if l MOD 32 = 0 then 32 else l MOD 32
+    | StoredBytes => if l = 0 then 32 else 0
+    | LiteralBytes => 0
+End
+
+(* The last dynamic part's spill, NONE when no part is dynamic. *)
+Definition later_spill_def:
+  later_spill t (n : num) rest =
+    case rest of
+      SOME m => SOME m
+    | NONE => if is_dynamic t then SOME n else NONE
+End
+
+Definition abi_spill_def:
+  (abi_spill src (Bytes NONE) (BytesV bs) = padded_bytes_spill src (LENGTH bs)) ∧
+  (abi_spill src String (BytesV bs) = padded_bytes_spill src (LENGTH bs)) ∧
+  (abi_spill src (Array _ t) (ListV vs) =
+    (case parts_spill src (REPLICATE (LENGTH vs) t) vs of SOME n => n | NONE => 0)) ∧
+  (abi_spill src (Tuple ts) (ListV vs) = (case parts_spill src ts vs of SOME n => n | NONE => 0)) ∧
+  (abi_spill src _ _ = 0) ∧
+  (parts_spill src (t :: ts) (v :: vs) =
+    later_spill t (abi_spill src t v) (parts_spill src ts vs)) ∧
+  (parts_spill src _ _ = NONE)
+Termination
+  WF_REL_TAC ‘measure (λx. case x of
+    INL (src, t, v) => abi_value_size v
+  | INR (src, ts, vs) => list_size abi_value_size vs)’ >>
+  rw[contractABITheory.abi_value_size_def, listTheory.list_size_def]
+End
+
+(* abi.encodePacked, the concatenations and indexed topics write a byte
+ * sequence without padding: a copied one is followed by a cleared word, a
+ * stored or literal one is written in whole words. *)
+Definition packed_bytes_spill_def:
+  packed_bytes_spill src (l : num) =
+    case src of
+      CopiedBytes => 32
+    | StoredBytes => if l < 32 then 32 - l else (32 - l MOD 32) MOD 32
+    | LiteralBytes => (32 - l MOD 32) MOD 32
+End
+
+(* The last part's left-aligned word or cleared word reaches past the end. *)
+Definition packed_spill_def:
+  packed_spill ty v (bs : byte list) =
+    case ty of
+      LocatedT _ (ArrayT _ _) => 0
+    | LocatedT _ _ => packed_bytes_spill (encoding_source v) (LENGTH bs)
+    | _ => 32 - LENGTH bs
+End
+
+(* An in-place encoding (indexed_data) ends with its last part, so only that
+ * part, recursively, can spill past its end. *)
+Definition inplace_spill_def:
+  (inplace_spill src (Bytes NONE) (BytesV bs) = padded_bytes_spill src (LENGTH bs)) ∧
+  (inplace_spill src String (BytesV bs) = padded_bytes_spill src (LENGTH bs)) ∧
+  (inplace_spill src (Array _ t) (ListV vs) =
+    last_inplace_spill src (REPLICATE (LENGTH vs) t) vs) ∧
+  (inplace_spill src (Tuple ts) (ListV vs) = last_inplace_spill src ts vs) ∧
+  (inplace_spill src _ _ = 0) ∧
+  (last_inplace_spill src [t] [v] = inplace_spill src t v) ∧
+  (last_inplace_spill src (t :: ts) (v :: vs) = last_inplace_spill src ts vs) ∧
+  (last_inplace_spill src _ _ = 0)
+Termination
+  WF_REL_TAC ‘measure (λx. case x of
+    INL (src, t, v) => abi_value_size v
+  | INR (src, ts, vs) => list_size abi_value_size vs)’ >>
+  rw[contractABITheory.abi_value_size_def, listTheory.list_size_def]
+End
+
 (* The ABI value of v, of type ty, and its encoding. A storage value is
  * encoded in place (storage_abi_value); any other reference is read into its
  * value tree, then encoded. Reading memory raises its active size. *)
@@ -433,14 +522,18 @@ End
 
 Definition runtime_abi_values_def:
   (runtime_abi_values env (st : source_state) [] [] =
-     (INL ([], st) : ((contractABI$abi_type # byte list) list # source_state) + source_completion)) ∧
+     (INL (([], NONE), st) :
+        (((contractABI$abi_type # byte list) list # num option) # source_state) +
+        source_completion)) ∧
   (runtime_abi_values env st (ty :: tys) (v :: vs) =
     case runtime_abi_value env st ty v of
       INR c => INR c
     | INL ((a, encoded_body), st1) =>
       (case runtime_abi_values env st1 tys vs of
-         INL (encoded, st2) =>
-           INL ((abi_type env (LENGTH env.type_declarations) ty, encoded_body) :: encoded, st2)
+         INL ((encoded, spill), st2) =>
+           let t = abi_type env (LENGTH env.type_declarations) ty in
+           INL (((t, encoded_body) :: encoded,
+                 later_spill t (abi_spill (encoding_source v) t a) spill), st2)
        | INR c => INR c)) ∧
   (runtime_abi_values _ _ _ _ = INR (InvalidCompletion "bad ABI arguments"))
 End
@@ -448,7 +541,7 @@ End
 Definition encoded_runtime_values_def:
   encoded_runtime_values env st tys vs =
     case runtime_abi_values env st tys vs of
-      INL (parts, st1) => INL (encoded_abi_tuple parts, st1)
+      INL ((parts, spill), st1) => INL ((encoded_abi_tuple parts, (case spill of SOME n => n | NONE => 0)), st1)
     | INR c => INR c
 End
 
@@ -482,13 +575,15 @@ Definition packed_value_def:
 End
 
 Definition packed_values_def:
-  (packed_values env st [] [] = (INL ([], st) : (byte list # source_state) + source_completion)) ∧
+  (packed_values env st [] [] =
+     (INL (([], 0), st) : ((byte list # num) # source_state) + source_completion)) ∧
   (packed_values env st (ty :: tys) (v :: vs) =
     case packed_value env st ty v of
       INR c => INR c
     | INL (bs, st1) =>
       case packed_values env st1 tys vs of
-        INL (rest, st2) => INL (bs ++ rest, st2)
+        INL ((rest, spill), st2) =>
+          INL ((bs ++ rest, if tys = [] then packed_spill ty v bs else spill), st2)
       | INR c => INR c) ∧
   (packed_values _ _ _ _ = INR (InvalidCompletion "bad packed values"))
 End
@@ -881,38 +976,45 @@ End
  * struct hashes its in-place encoding, a byte sequence its bytes; a scalar
  * topic is its ABI word. *)
 Definition event_parts_def:
-  (event_parts env st [] = INL (([], []), st)) ∧
+  (event_parts env st [] = INL (([], [], NONE, []), st)) ∧
   (event_parts env st ((ty, indexed, v) :: args) =
     case runtime_abi_value env st ty v of
       INR c => INR c
     | INL ((a, encoded_body), st1) =>
       (case event_parts env st1 args of
          INR c => INR c
-       | INL ((topics, parts), st2) =>
+       | INL ((topics, parts, spill, temps), st2) =>
         let t = abi_type env (LENGTH env.type_declarations) ty in
         if indexed then
+          let src = encoding_source v in
+          (* the topic, and the bytes hashed for it at the free memory pointer *)
           let topic =
             if (case t of Array _ _ => T | Tuple _ => T | _ => F) then
-              OPTION_MAP (λbs. word_of_bytes_be (Keccak_256_w64 bs))
+              OPTION_MAP (λbs. (word_of_bytes_be (Keccak_256_w64 bs),
+                                [bs ++ REPLICATE (inplace_spill src t a) 0w]))
                 (indexed_data t a encoded_body)
             else case a of
               BytesV bs =>
-                SOME (if is_dynamic t then word_of_bytes_be (Keccak_256_w64 bs)
-                      else word_of_bytes T (0w : bytes32) encoded_body)
-            | _ => SOME (word_of_bytes T (0w : bytes32) encoded_body) in
+                SOME (if is_dynamic t then
+                        (word_of_bytes_be (Keccak_256_w64 bs),
+                         [bs ++ REPLICATE (packed_bytes_spill src (LENGTH bs)) 0w])
+                      else (word_of_bytes T (0w : bytes32) encoded_body, []))
+            | _ => SOME (word_of_bytes T (0w : bytes32) encoded_body, []) in
           (case topic of
-             SOME word => INL ((word :: topics, parts), st2)
+             SOME (word, temp) => INL ((word :: topics, parts, spill, temp ++ temps), st2)
            | NONE => INR (InvalidCompletion "bad indexed event argument"))
-        else INL ((topics, (t, encoded_body) :: parts), st2)))
+        else INL ((topics, (t, encoded_body) :: parts,
+                   later_spill t (abi_spill (encoding_source v) t a) spill, temps), st2)))
 End
 
 Definition event_log_def:
   event_log env st logger topic0 args =
     case event_parts env st args of
-      INL ((topics, parts), st1) =>
-        INL (<| logger := logger;
-                topics := (case topic0 of SOME t => t :: topics | NONE => topics);
-                data := encoded_abi_tuple parts |>, st1)
+      INL ((topics, parts, spill, temps), st1) =>
+        INL ((<| logger := logger;
+                 topics := (case topic0 of SOME t => t :: topics | NONE => topics);
+                 data := encoded_abi_tuple parts |>,
+               (case spill of SOME n => n | NONE => 0), temps), st1)
     | INR c => INR c
 End
 
@@ -1005,6 +1107,39 @@ Proof
   simp[Once storage_abi_value_pre_def] >> rw[] >> gvs[]
 QED
 val () = cv_auto_trans array_copy_value_def;
+val () = cv_auto_trans encoding_source_def;
+val () = cv_auto_trans padded_bytes_spill_def;
+val () = cv_auto_trans later_spill_def;
+val abi_spill_pre_def = cv_auto_trans_pre_rec "abi_spill_pre parts_spill_pre" abi_spill_def (
+  WF_REL_TAC ‘measure (λx. case x of
+    INL (src, t, v) => cv_size v
+  | INR (src, ts, vs) => cv_size vs)’ >>
+  cv_termination_tac
+);
+
+Theorem abi_spill_pre[cv_pre]:
+  (∀src t v. abi_spill_pre src t v) ∧ (∀src ts vs. parts_spill_pre src ts vs)
+Proof
+  ho_match_mp_tac abi_spill_ind >> rpt strip_tac >>
+  simp[Once abi_spill_pre_def] >> rw[] >> gvs[]
+QED
+
+val () = cv_auto_trans packed_bytes_spill_def;
+val () = cv_auto_trans packed_spill_def;
+val inplace_spill_pre_def = cv_auto_trans_pre_rec
+  "inplace_spill_pre last_inplace_spill_pre" inplace_spill_def (
+  WF_REL_TAC ‘measure (λx. case x of
+    INL (src, t, v) => cv_size v
+  | INR (src, ts, vs) => cv_size vs)’ >>
+  cv_termination_tac
+);
+
+Theorem inplace_spill_pre[cv_pre]:
+  (∀src t v. inplace_spill_pre src t v) ∧ (∀src ts vs. last_inplace_spill_pre src ts vs)
+Proof
+  ho_match_mp_tac inplace_spill_ind >> rpt strip_tac >>
+  simp[Once inplace_spill_pre_def] >> rw[] >> gvs[]
+QED
 val () = cv_auto_trans runtime_abi_value_def;
 val runtime_abi_values_pre_def =
   cv_auto_trans_pre "runtime_abi_values_pre" runtime_abi_values_def;

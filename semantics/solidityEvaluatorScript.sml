@@ -753,6 +753,12 @@ Definition eval_event_args_def:
     | _ => NONE)
 End
 
+(* Temporaries written one after another at the same address. *)
+Definition write_at_each_def:
+  (write_at_each p [] st = st) ∧
+  (write_at_each p (bs :: rest) st = write_at_each p rest (memory_write p bs st))
+End
+
 (* A log of the executing account, appended to the world's logs, so a revert
  * of the frame discards it with the rest of the world. As with storage
  * writes, an emit in a static frame fails. The compiler encodes the log's
@@ -764,13 +770,15 @@ Definition emit_event_def:
       NONE => abrupt_result (InvalidCompletion "unbound atom") st gas
     | SOME vs =>
         case event_log env st st.frame.self_address topic vs of
-          INL (e, st1) =>
+          INL ((e, spill, temps), st1) =>
             if st.frame.static_context then
               abrupt_result (InvalidCompletion "emit in static frame") st gas
             else
               let (p, st2) = memory_load 64 st1 in
+              let st3 = write_at_each p temps st2 in
               normal_result
-                (memory_write p e.data st2 with
+                (memory_write (p + LENGTH e.data) (REPLICATE spill 0w)
+                   (memory_write p e.data st3) with
                    world := st2.world with logs := st2.world.logs ++ [e]) gas
         | INR c => abrupt_result c st gas
 End
@@ -842,8 +850,9 @@ Definition call_create_def:
         if 2 ** 64 ≤ p + LENGTH code then abrupt_result (PanicCompletion 65) st gas else
         (case encoded_runtime_values env st0 params vs of
            INR c => abrupt_result c st gas
-         | INL (data, st1) =>
-             let st2 = memory_write p (code ++ data) st1 in
+         | INL ((data, spill), st1) =>
+             let st2 = memory_write (p + LENGTH code + LENGTH data) (REPLICATE spill 0w)
+                         (memory_write p (code ++ data) st1) in
              case run_create_call st.frame.self_address salt (code ++ data)
                     (Num v) external_call_gas st2.world.accounts
                     st2.world.original st2.world.transient
@@ -889,8 +898,9 @@ Definition call_external_mode_def:
         let (p, st0) = memory_load 64 st in
         (case encoded_runtime_values env st0 params vs of
            INR c => abrupt_result c st gas
-         | INL (data, st1) =>
-           let st2 = write_call_data p selector data st1 in
+         | INL ((data, spill), st1) =>
+           let st2 = memory_write (p + LENGTH selector + LENGTH data) (REPLICATE spill 0w)
+                       (write_call_data p selector data st1) in
            let static = (kind = ExternalStaticCall ∨ st.frame.static_context) in
            if static ∧ v ≠ 0 then
              abrupt_result (InvalidCompletion "value in static frame") st gas
@@ -1106,11 +1116,12 @@ End
  * encoding at p + 32, the length at p, then the free memory pointer moved
  * past them, Panic(0x41) past 2^64 - 1. *)
 Definition allocate_encoding_def:
-  allocate_encoding x ty prefix bs st gas =
+  allocate_encoding x ty prefix bs spill st gas =
     let (p, st1) = memory_load 64 st in
     let n = LENGTH prefix + LENGTH bs in
     case finalize_allocation p (32 + n)
-           (memory_store p n (write_call_data (p + 32) prefix bs st1)) of
+           (memory_store p n (memory_write (p + 32 + n) (REPLICATE spill 0w)
+              (write_call_data (p + 32) prefix bs st1))) of
       INR c => abrupt_result c st gas
     | INL st2 =>
         let element = if ty = SingleType (LocatedT MemoryLoc StringT) then StringT
@@ -1124,7 +1135,7 @@ Definition abi_encode_def:
     case (selector_bytes st.scopes selector, eval_atoms st.scopes args) of
       (SOME prefix, SOME vs) =>
         (case encoded_runtime_values env st tys vs of
-           INL (bs, st1) => allocate_encoding x ty prefix bs st1 gas
+           INL ((bs, spill), st1) => allocate_encoding x ty prefix bs spill st1 gas
          | INR c => abrupt_result c st gas)
     | _ => abrupt_result (InvalidCompletion "bad abi.encode operands") st gas
 End
@@ -1134,7 +1145,7 @@ Definition abi_encode_packed_def:
     case eval_atoms st.scopes args of
       SOME vs =>
         (case packed_values env st tys vs of
-           INL (bs, st1) => allocate_encoding x ty [] bs st1 gas
+           INL ((bs, spill), st1) => allocate_encoding x ty [] bs spill st1 gas
          | INR c => abrupt_result c st gas)
     | NONE => abrupt_result (InvalidCompletion "bad abi.encodePacked operands") st gas
 End
@@ -1366,10 +1377,11 @@ Definition simple_stmt_def:
         (case eval_atoms st.scopes args of
            SOME vs =>
              (case encoded_runtime_values env st params vs of
-                INL (data, st1) =>
+                INL ((data, spill), st1) =>
                   let (p, st2) = memory_load 64 st1 in
                   abrupt_result (RevertCompletion (selector ++ data))
-                    (write_call_data p selector data st2) gas
+                    (memory_write (p + LENGTH selector + LENGTH data) (REPLICATE spill 0w)
+                      (write_call_data p selector data st2)) gas
               | INR c => abrupt_result c st gas)
          | NONE =>
              abrupt_result
