@@ -302,9 +302,9 @@ Definition programs_state_def:
                   prevHashes := []; blobHashes := []; chainId := 0;
                   authRefund := 0 |> |>;
     scopes := [];
-    heap := FEMPTY;
-    next_heap_id := 0; immutables := FEMPTY;
-    memory_allocated := 0;
+    (* the free memory pointer at 0x40 holds 0x80, as the prologue leaves it *)
+    memory := FEMPTY |+ (0x5F, 0x80w); memory_size := 96;
+    immutables := FEMPTY;
     targets := FEMPTY; return_data := SOME []
   |>
 End

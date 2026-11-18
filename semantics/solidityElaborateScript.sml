@@ -2884,14 +2884,9 @@ Definition elab_assembly_reference_def:
         else
           (case ty of
              LocatedT MemoryLoc t =>
-               (case elab_type_declarations ctx.enums ctx.structs of
-                  SOME decls =>
-                    if assembly_memory_type
-                         <| procedures := []; state_variables := []; immutables := [];
-                            struct_layouts := []; type_declarations := decls |> t
-                    then INL (([], AssemblyMemory (AstId x) t), n)
-                    else INR [(id, "assembly reference of this type")]
-                | NONE => INR [(id, "assembly reference of this type")])
+               if located_object_shape MemoryLoc t
+               then INL (([], AssemblyMemory (AstId x) t), n)
+               else INR [(id, "assembly reference of this type")]
            | LocatedT CalldataLoc t =>
                if located_object_shape CalldataLoc t ∧ ¬calldata_slice_type t then
                  INL (([], AssemblyCalldataOffset (AstId x)), n)
@@ -3249,8 +3244,6 @@ Definition elab_stmts_def:
                ¬assembly_stmts_ok (YReturn :: YStop :: assembly_unsupported) code
        then [(info.node_id, "assembly halt in a constructor")]
        else []) ++
-      (if assembly_memory_ok code then []
-       else [(info.node_id, "unsupported assembly memory use")]) ++
       (if assembly_gas_ok code then []
        else [(info.node_id, "unsupported assembly gas or return data use")]) ++
       (if ALL_DISTINCT (MAP FST refs) then []

@@ -107,7 +107,10 @@ Definition fallback_output_def:
   fallback_output st vs =
     case vs of
       [] => INL []
-    | [ReferenceValue r] => byte_contents st r
+    | [ReferenceValue r] =>
+        (case byte_contents st r of
+           INL (bs, _) => INL bs
+         | INR c => INR c)
     | _ => INR (InvalidCompletion "bad fallback return")
 End
 
@@ -118,6 +121,21 @@ Definition settle_source_world_def:
               to_delete := [] |>
 End
 
+(* The memory a frame starts with, as the compiler's prologue leaves it: the
+ * free memory pointer at 0x40, past the reserved memory (a creation frame's
+ * immutables); then, for a constructor with parameters, its arguments copied
+ * to memory allocated for them. *)
+Definition entry_memory_def:
+  entry_memory reserved copy (st : source_state) =
+    let st1 = memory_store 64 (128 + reserved) st in
+    case copy of
+      NONE => INL st1
+    | SOME bs =>
+        case allocate_memory (LENGTH bs) st1 of
+          INL (p, st2) => INL (memory_write p bs st2)
+        | INR c => INR c
+End
+
 (* One frame running procedure p on its arguments, with the values imm of
  * the immutables. An inline assembly halt returns its bytes as the frame's
  * data; in a creation frame those bytes would be the deployed code, which the
@@ -126,23 +144,29 @@ End
  *)
 Definition run_entry_with_gas_def:
   run_entry_with_gas fuel env p args (fr : source_frame) (w : source_world) imm reserved
-            kind gas =
+            copy kind gas =
     let w0 = if kind = CreationEntry then
                w with original :=
                  update_account fr.self_address empty_account_state w.original
              else w in
     let st = <| world := w0; frame := fr; immutables := imm; scopes := [];
-                heap := FEMPTY; next_heap_id := 0; memory_allocated := reserved;
+                memory := FEMPTY; memory_size := 0;
                 targets := FEMPTY; return_data := SOME [] |> in
-    let r = case materialize_arguments env (MAP SND p.parameters) args st of
-      SOME (values, st1) => invoke_source fuel env p.procedure_id values st1 gas
-    | NONE => abrupt_result (InvalidCompletion "bad entry arguments") st gas in
+    let r = case entry_memory reserved copy st of
+      INR c => abrupt_result c st gas
+    | INL st0 =>
+      case materialize_arguments env (MAP SND p.parameters) args st0 of
+        INL (values, st1) => invoke_source fuel env p.procedure_id values st1 gas
+      | INR c => abrupt_result c st0 gas in
     if r.unused_gas_evidence ≠ [] then
       ContractInvalid "unconsumed gas observation"
     else case finish_source_frame w r.state.world r.completion of
       FrameSuccess vs w' =>
         (case (if kind = FallbackEntry then fallback_output r.state vs
-               else encoded_runtime_values env r.state (MAP SND p.return_bindings) vs) of
+               else (case encoded_runtime_values env r.state
+                            (MAP SND p.return_bindings) vs of
+                       INL (data, _) => INL data
+                     | INR c => INR c)) of
            INL data =>
              if kind = CreationEntry then
                ContractCreated r.state.immutables (settle_source_world w')
@@ -161,8 +185,8 @@ Definition run_entry_with_gas_def:
 End
 
 Definition run_entry_def:
-  run_entry fuel env p args fr w imm reserved kind =
-    run_entry_with_gas fuel env p args fr w imm reserved kind []
+  run_entry fuel env p args fr w imm reserved copy kind =
+    run_entry_with_gas fuel env p args fr w imm reserved copy kind []
 End
 
 (* Dispatch can end a frame before its body reads any evidence. *)
@@ -181,7 +205,7 @@ Definition call_contract_with_gas_def:
       DispatchRevert => unconsumed_gas_result gas (ContractReverted [] w)
     | DispatchPanic n => unconsumed_gas_result gas (ContractReverted (panic_data n) w)
     | DispatchInvalid reason => unconsumed_gas_result gas (ContractInvalid reason)
-    | DispatchCall p args kind => run_entry_with_gas fuel env p args fr w imm 0 kind gas
+    | DispatchCall p args kind => run_entry_with_gas fuel env p args fr w imm 0 NONE kind gas
 End
 
 Definition call_contract_def:
@@ -220,7 +244,9 @@ Definition deploy_contract_with_gas_def:
               INR (PanicCompletion n) => unconsumed_gas_result gas (ContractReverted (panic_data n) w)
             | INR _ => unconsumed_gas_result gas (ContractReverted [] w)
             | INL args => run_entry_with_gas fuel env p args (fr with call_data := []) w
-                FEMPTY reserved CreationEntry gas
+                FEMPTY (32 * LENGTH prog.immutables)
+                (if p.parameters = [] then NONE else SOME fr.call_data)
+                CreationEntry gas
 End
 
 Definition deploy_contract_def:

@@ -10,10 +10,6 @@ Datatype:
 End
 
 Datatype:
-  heap_id = HeapId num
-End
-
-Datatype:
   storage_backend = PersistentStorage | TransientStorage
 End
 
@@ -21,11 +17,16 @@ End
  * the struct layout used by subsequent field navigation; layout_id preserves
  * the root declaration's identity through navigation. An immutable is named
  * by its declaration: its value lives in the deployed code, not in storage.
+ * A memory reference is a memory address and the type of what is there: an
+ * object (a byte sequence, array or struct) as the compiler lays it out, or,
+ * of type bytes1, one byte of a byte sequence. A memory word reference is the
+ * address of the word holding an array element or struct field, and its type.
  *)
 Datatype:
   reference
   = StorageReference storage_backend address bytes32 num sol_type layout_id
-  | MemoryReference heap_id num sol_type
+  | MemoryReference num sol_type
+  | MemoryWordReference num sol_type
   | CalldataReference num num sol_type
   | ImmutableReference ast_id
 End
@@ -47,9 +48,6 @@ Datatype:
   = ScalarValue scalar
   | ReferenceValue reference
   | TupleValue (runtime_value list)
-  (* A full-word assembly local whose word inline assembly loaded from memory
-   * the source never gave it: any read of it fails. *)
-  | UnwrittenValue
 End
 
 (* Operands are pure: effects and intermediate results have already been named.
@@ -88,15 +86,11 @@ Datatype:
   navigation = FieldNavigation ast_id | IndexNavigation core_atom
 End
 
-(* BindTarget includes local variables and temporaries. ReferenceFieldTarget
- * is an element of a memory array or a field of a memory struct (its heap
- * object, cell index and type): a write stores a scalar or rebinds a reference, never copies contents.
- *)
+(* BindTarget includes local variables and temporaries. *)
 Datatype:
   captured_target
   = BindTarget ast_id
   | ValueTarget reference
-  | ReferenceFieldTarget heap_id num sol_type
 End
 
 Datatype:

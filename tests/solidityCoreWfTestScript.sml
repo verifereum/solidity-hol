@@ -1418,34 +1418,12 @@ Proof
 QED
 
 (* codesize and codecopy pass the static check (a creation frame refuses
- * them at run time); extcodecopy writes like the other copies, and a literal
- * region it writes is readable after it. *)
+ * them at run time). *)
 Theorem assembly_code_builtins_are_supported:
   assembly_expr_ok assembly_unsupported (YulBuiltin YCodeSize []) ∧
   assembly_expr_ok assembly_unsupported
     (YulBuiltin YCodeCopy
-      [YulLit (LitNumber 0w); YulLit (LitNumber 0w); YulLit (LitNumber 32w)]) ∧
-  assembly_memory_ok
-    [YulExprStmt (YulBuiltin YExtCodeCopy
-       [YulName "a"; YulLit (LitNumber 0w); YulLit (LitNumber 0w);
-        YulLit (LitNumber 32w)]);
-     YulAssign ["x"] (YulBuiltin YMLoad [YulLit (LitNumber 0w)])] ∧
-  ¬assembly_memory_ok
-    [YulExprStmt (YulBuiltin YExtCodeCopy
-       [YulName "a"; YulLit (LitNumber 0x80w); YulLit (LitNumber 0w);
-        YulLit (LitNumber 32w)])] ∧
-  ¬assembly_memory_ok
-    [YulExprStmt (YulBuiltin YExtCodeCopy [YulName "a"; YulLit (LitNumber 0w)])] ∧
-  assembly_memory_ok
-    [YulExprStmt (YulBuiltin YCodeCopy
-       [YulLit (LitNumber 0w); YulLit (LitNumber 0w); YulLit (LitNumber 32w)]);
-     YulAssign ["x"] (YulBuiltin YMLoad [YulLit (LitNumber 0w)])] ∧
-  ¬assembly_memory_ok
-    [YulExprStmt (YulBuiltin YCodeCopy
-       [YulLit (LitNumber 0x80w); YulLit (LitNumber 0w);
-        YulLit (LitNumber 32w)])] ∧
-  ¬assembly_memory_ok
-    [YulExprStmt (YulBuiltin YCodeCopy [YulLit (LitNumber 0w)])]
+      [YulLit (LitNumber 0w); YulLit (LitNumber 0w); YulLit (LitNumber 32w)])
 Proof
   EVAL_TAC
 QED

@@ -393,48 +393,55 @@ End
 Definition array_copy_value_def:
   array_copy_value env (st : source_state) ty r =
     case r of
-      MemoryReference _ _ _ =>
-        memory_array_value env (LENGTH env.type_declarations) st ty (ReferenceValue r)
+      MemoryReference _ _ =>
+        memory_value env (LENGTH env.type_declarations) ty (ReferenceValue r) st
     | CalldataReference data n rty =>
         if rty ≠ ty then INR (InvalidCompletion "bad calldata array reference")
-        else calldata_value env (LENGTH env.type_declarations) st.frame.call_data ty data n
+        else (case calldata_value env (LENGTH env.type_declarations)
+                     st.frame.call_data ty data n of
+                INL v => INL (v, st)
+              | INR c => INR c)
     | StorageReference PersistentStorage addr slot 0 rty _ =>
         if rty ≠ ty then INR (InvalidCompletion "bad storage array reference")
-        else storage_array_value env (LENGTH env.type_declarations)
-               st.world.accounts addr slot ty
+        else (case storage_array_value env (LENGTH env.type_declarations)
+                     st.world.accounts addr slot ty of
+                INL v => INL (v, st)
+              | INR c => INR c)
     | _ => INR (InvalidCompletion "bad array reference")
 End
 
 (* The ABI value of v, of type ty, and its encoding. A storage value is
  * encoded in place (storage_abi_value); any other reference is read into its
- * value tree, then encoded. *)
+ * value tree, then encoded. Reading memory raises its active size. *)
 Definition runtime_abi_value_def:
   runtime_abi_value env st ty v =
     let ty' = case ty of LocatedT _ t => t | t => t in
     case v of
       ReferenceValue (StorageReference PersistentStorage addr slot 0 rty _) =>
         if rty ≠ ty' then INR (InvalidCompletion "bad ABI value")
-        else storage_abi_value env (LENGTH env.type_declarations)
-               st.world.accounts addr slot rty
+        else (case storage_abi_value env (LENGTH env.type_declarations)
+                     st.world.accounts addr slot rty of
+                INL (a, bs) => INL ((a, bs), st)
+              | INR c => INR c)
     | _ =>
-      case (case v of ReferenceValue r => array_copy_value env st ty' r | _ => INL v) of
+      case (case v of ReferenceValue r => array_copy_value env st ty' r | _ => INL (v, st)) of
         INR c => INR c
-      | INL tree =>
+      | INL (tree, st1) =>
         case value_abi_value env ty' tree of
-          SOME a => INL (a, enc (abi_type env (LENGTH env.type_declarations) ty') a)
+          SOME a => INL ((a, enc (abi_type env (LENGTH env.type_declarations) ty') a), st1)
         | NONE => INR (InvalidCompletion "bad ABI value")
 End
 
 Definition runtime_abi_values_def:
   (runtime_abi_values env (st : source_state) [] [] =
-     (INL [] : (contractABI$abi_type # byte list) list + source_completion)) ∧
+     (INL ([], st) : ((contractABI$abi_type # byte list) list # source_state) + source_completion)) ∧
   (runtime_abi_values env st (ty :: tys) (v :: vs) =
     case runtime_abi_value env st ty v of
       INR c => INR c
-    | INL (a, encoded_body) =>
-      (case runtime_abi_values env st tys vs of
-         INL encoded =>
-           INL ((abi_type env (LENGTH env.type_declarations) ty, encoded_body) :: encoded)
+    | INL ((a, encoded_body), st1) =>
+      (case runtime_abi_values env st1 tys vs of
+         INL (encoded, st2) =>
+           INL ((abi_type env (LENGTH env.type_declarations) ty, encoded_body) :: encoded, st2)
        | INR c => INR c)) ∧
   (runtime_abi_values _ _ _ _ = INR (InvalidCompletion "bad ABI arguments"))
 End
@@ -442,7 +449,7 @@ End
 Definition encoded_runtime_values_def:
   encoded_runtime_values env st tys vs =
     case runtime_abi_values env st tys vs of
-      INL parts => INL (encoded_abi_tuple parts)
+      INL (parts, st1) => INL (encoded_abi_tuple parts, st1)
     | INR c => INR c
 End
 
@@ -457,31 +464,32 @@ Definition packed_value_def:
           INR (InvalidCompletion "bad packed array")
         else
           (case runtime_abi_value env st ty v of
-             INL (_, bs) => INL (case length of NONE => DROP 32 bs | SOME _ => bs)
+             INL ((_, bs), st1) =>
+               INL ((case length of NONE => DROP 32 bs | SOME _ => bs), st1)
            | INR c => INR c)
     | LocatedT _ _ =>
         (case v of
            ReferenceValue r => byte_contents st r
-         | ScalarValue (BytesValue bs) => INL bs
+         | ScalarValue (BytesValue bs) => INL (bs, st)
          | _ => INR (InvalidCompletion "bad packed value"))
     | _ =>
       case (abi_value ty v, storage_bytes ty) of
         (SOME a, SOME width) =>
           let word = enc (abi_type env 0 ty) a in
-          INL (case ty of
-                 FixedBytesT _ => TAKE width word
-               | _ => DROP (32 - width) word)
+          INL ((case ty of
+                  FixedBytesT _ => TAKE width word
+                | _ => DROP (32 - width) word), st)
       | _ => INR (InvalidCompletion "bad packed value")
 End
 
 Definition packed_values_def:
-  (packed_values env st [] [] = (INL [] : byte list + source_completion)) ∧
+  (packed_values env st [] [] = (INL ([], st) : (byte list # source_state) + source_completion)) ∧
   (packed_values env st (ty :: tys) (v :: vs) =
     case packed_value env st ty v of
       INR c => INR c
-    | INL bs =>
-      case packed_values env st tys vs of
-        INL rest => INL (bs ++ rest)
+    | INL (bs, st1) =>
+      case packed_values env st1 tys vs of
+        INL (rest, st2) => INL (bs ++ rest, st2)
       | INR c => INR c) ∧
   (packed_values _ _ _ _ = INR (InvalidCompletion "bad packed values"))
 End
@@ -493,12 +501,6 @@ Definition abi_runtime_values_def:
       (SOME v, SOME vs) => SOME (v :: vs)
     | _ => NONE) ∧
   (abi_runtime_values _ _ = NONE)
-End
-
-(* The source heap tracks allocations; an external call also reserves its
- * returndata buffer before decoding dynamic return values. *)
-Definition memory_free_pointer_def:
-  memory_free_pointer st = 128 + st.memory_allocated
 End
 
 (* A memory value decoded at pos, as the pinned decoder does: a scalar
@@ -628,37 +630,6 @@ Definition copy_calldata_array_def:
     | _ => INR (InvalidCompletion "bad calldata copy")
 End
 
-(* The memory a value of type ty takes once materialized: each array's
- * elements and length word, each struct's fields, and each byte sequence's
- * length and data. *)
-Definition memory_value_size_def:
-  (memory_value_size env ty v =
-    case (ty, v) of
-      (ArrayT element length, TupleValue vs) =>
-        (if length = NONE then 32 else 0) + 32 * LENGTH vs +
-        memory_values_size env element vs
-    | (StructT s, TupleValue vs) =>
-        32 * LENGTH vs +
-        (case lookup_struct env s of
-           SOME fields => memory_fields_size env (MAP SND fields) vs
-         | NONE => 0)
-    | (_, ScalarValue (BytesValue bs)) =>
-        if byte_sequence_type ty then 32 + 32 * ((LENGTH bs + 31) DIV 32) else 0
-    | _ => 0) ∧
-  (memory_values_size env element [] = 0) ∧
-  (memory_values_size env element (v :: vs) =
-    memory_value_size env element v + memory_values_size env element vs) ∧
-  (memory_fields_size env (ty :: tys) (v :: vs) =
-    memory_value_size env ty v + memory_fields_size env tys vs) ∧
-  (memory_fields_size env _ _ = 0)
-Termination
-  WF_REL_TAC ‘measure (λx. case x of
-    INL (env, ty, v) => runtime_value_size v
-  | INR (INL (env, element, vs)) => list_size runtime_value_size vs
-  | INR (INR (env, tys, vs)) => list_size runtime_value_size vs)’ >>
-  rw[solidityCoreTheory.runtime_value_size_def, listTheory.list_size_def]
-End
-
 (* An argument at head: a scalar, static array or static struct in place, any
  * other value at the offset the head holds, below 2^64. A calldata argument
  * stays in the calldata: a byte sequence or dynamic array with its data in
@@ -710,85 +681,71 @@ Definition decode_arguments_def:
     else decode_abi_arguments env tys bs 0 base free
 End
 
-(* A decoded memory value as heap objects, allocated in decoding order: an
- * array or struct before its elements or fields. Storage byte copies retain
- * unknown padding; calldata copies zero it. Keep the source location through
- * nested arrays and structs. *)
+(* A decoded value written to memory as the compiler's abi_decode functions write
+ * it, allocating in decoding order: an array or struct, its length word if
+ * dynamic, then each element or field, a reference one allocated before its
+ * pointer is stored; a byte sequence copied with cleanup. *)
 Definition materialize_value_def:
-  (materialize_value env loc ty v (st : source_state) =
+  (materialize_value env ty v (st : source_state) =
     case (ty, v) of
       (ArrayT element length, TupleValue vs) =>
         let n = LENGTH vs in
-        let id = st.next_heap_id + 1 in
-        let obj = <| object_type := ty; object_length := n;
-                     object_cells := FEMPTY;
-                     object_address := 128 + st.memory_allocated;
-                     object_padded := T |> in
-        let st1 = st with <| heap := st.heap |+ (id, obj); next_heap_id := id;
-                     memory_allocated := st.memory_allocated +
-                       (if length = NONE then 32 else 0) + 32 * n |> in
-        (case materialize_values env loc element 0 vs FEMPTY st1 of
-           SOME (cells, st2) =>
-             SOME (ReferenceValue (MemoryReference (HeapId id) 0 ty),
-                   st2 with heap := st2.heap |+ (id, obj with object_cells := cells))
-         | NONE => NONE)
+        (case allocate_memory ((if length = NONE then 32 else 0) + 32 * n) st of
+           INR c => INR c
+         | INL (p, st1) =>
+             let st2 = if length = NONE then memory_store p n st1 else st1 in
+             (case materialize_words env (REPLICATE n element) vs
+                     (if length = NONE then p + 32 else p) st2 of
+                INL st3 => INL (ReferenceValue (MemoryReference p ty), st3)
+              | INR c => INR c))
     | (StructT s, TupleValue vs) =>
         (case lookup_struct env s of
            SOME fields =>
-             let n = LENGTH vs in
-             let id = st.next_heap_id + 1 in
-             let obj = <| object_type := ty; object_length := n;
-                          object_cells := FEMPTY;
-                          object_address := 128 + st.memory_allocated;
-                          object_padded := T |> in
-             let st1 = st with <| heap := st.heap |+ (id, obj); next_heap_id := id;
-                          memory_allocated := st.memory_allocated + 32 * n |> in
-             (case materialize_fields env loc (MAP SND fields) 0 vs FEMPTY st1 of
-                SOME (cells, st2) =>
-                  SOME (ReferenceValue (MemoryReference (HeapId id) 0 ty),
-                        st2 with heap := st2.heap |+ (id, obj with object_cells := cells))
-              | NONE => NONE)
-         | NONE => NONE)
+             (case allocate_memory (32 * LENGTH vs) st of
+                INR c => INR c
+              | INL (p, st1) =>
+                  (case materialize_words env (MAP SND fields) vs p st1 of
+                     INL st2 => INL (ReferenceValue (MemoryReference p ty), st2)
+                   | INR c => INR c))
+         | NONE => INR (InvalidCompletion "unknown struct"))
     | (_, ScalarValue (BytesValue bs)) =>
-        if byte_sequence_type ty then SOME (allocate_bytes (loc ≠ StorageLoc) ty bs st)
-        else SOME (v, st)
-    | (_, ScalarValue _) => SOME (v, st)
-    | _ => NONE) ∧
-  (materialize_values env loc element i [] cells st = SOME (cells, st)) ∧
-  (materialize_values env loc element i (v :: vs) cells st =
-    case materialize_value env loc element v st of
-      SOME (value, st1) =>
-        materialize_values env loc element (i + 1) vs (cells |+ (i, value)) st1
-    | NONE => NONE) ∧
-  (materialize_fields env loc [] i [] cells st = SOME (cells, st)) ∧
-  (materialize_fields env loc (ty :: tys) i (v :: vs) cells st =
-    case materialize_value env loc ty v st of
-      SOME (value, st1) =>
-        materialize_fields env loc tys (i + 1) vs (cells |+ (i, value)) st1
-    | NONE => NONE) ∧
-  (materialize_fields env loc _ i _ cells st = NONE)
+        if byte_sequence_type ty then
+          (case new_byte_array bs st of
+             INL (p, st1) => INL (ReferenceValue (MemoryReference p ty), st1)
+           | INR c => INR c)
+        else INL (v, st)
+    | (_, ScalarValue _) => INL (v, st)
+    | _ => INR (InvalidCompletion "bad decoded value")) ∧
+  (materialize_words env [] [] p st = INL st) ∧
+  (materialize_words env (ty :: tys) (v :: vs) p st =
+    case materialize_value env ty v st of
+      INR c => INR c
+    | INL (value, st1) =>
+        case write_memory_word env ty p value st1 of
+          INR c => INR c
+        | INL st2 => materialize_words env tys vs (p + 32) st2) ∧
+  (materialize_words env _ _ p st = INR (InvalidCompletion "bad decoded value"))
 Termination
   WF_REL_TAC ‘measure (λx. case x of
-    INL (env, loc, ty, v, st) => runtime_value_size v
-  | INR (INL (env, loc, element, i, vs, cells, st)) => list_size runtime_value_size vs
-  | INR (INR (env, loc, tys, i, vs, cells, st)) => list_size runtime_value_size vs)’ >>
+    INL (env, ty, v, st) => runtime_value_size v
+  | INR (env, tys, vs, p, st) => list_size runtime_value_size vs)’ >>
   rw[solidityCoreTheory.runtime_value_size_def, listTheory.list_size_def]
 End
 
-(* Decoded memory payloads become heap objects before a procedure sees them.
+(* Decoded memory payloads are written to memory before a procedure sees them.
  * Calldata payloads retain slices into the frame's original call_data. *)
 Definition materialize_arguments_def:
-  (materialize_arguments env [] [] st = SOME ([], st)) ∧
+  (materialize_arguments env [] [] st = INL ([], st)) ∧
   (materialize_arguments env (ty :: tys) (v :: vs) st =
     case (case ty of
-            LocatedT MemoryLoc element => materialize_value env CalldataLoc element v st
-          | _ => SOME (v, st)) of
-      SOME (value, st1) =>
+            LocatedT MemoryLoc element => materialize_value env element v st
+          | _ => INL (v, st)) of
+      INL (value, st1) =>
         (case materialize_arguments env tys vs st1 of
-           SOME (values, st2) => SOME (value :: values, st2)
-         | NONE => NONE)
-    | NONE => NONE) ∧
-  (materialize_arguments _ _ _ _ = NONE)
+           INL (values, st2) => INL (value :: values, st2)
+         | INR c => INR c)
+    | INR c => INR c) ∧
+  (materialize_arguments _ _ _ _ = INR (InvalidCompletion "bad decoded arguments"))
 End
 
 (* Revert data of Panic(uint256), selector 0x4e487b71. *)
@@ -831,14 +788,14 @@ End
  * struct hashes its in-place encoding, a byte sequence its bytes; a scalar
  * topic is its ABI word. *)
 Definition event_parts_def:
-  (event_parts env st [] = INL ([], [])) ∧
+  (event_parts env st [] = INL (([], []), st)) ∧
   (event_parts env st ((ty, indexed, v) :: args) =
     case runtime_abi_value env st ty v of
       INR c => INR c
-    | INL (a, encoded_body) =>
-      (case event_parts env st args of
+    | INL ((a, encoded_body), st1) =>
+      (case event_parts env st1 args of
          INR c => INR c
-       | INL (topics, parts) =>
+       | INL ((topics, parts), st2) =>
         let t = abi_type env (LENGTH env.type_declarations) ty in
         if indexed then
           let topic =
@@ -851,18 +808,18 @@ Definition event_parts_def:
                       else word_of_bytes T (0w : bytes32) encoded_body)
             | _ => SOME (word_of_bytes T (0w : bytes32) encoded_body) in
           (case topic of
-             SOME word => INL (word :: topics, parts)
+             SOME word => INL ((word :: topics, parts), st2)
            | NONE => INR (InvalidCompletion "bad indexed event argument"))
-        else INL (topics, (t, encoded_body) :: parts)))
+        else INL ((topics, (t, encoded_body) :: parts), st2)))
 End
 
 Definition event_log_def:
   event_log env st logger topic0 args =
     case event_parts env st args of
-      INL (topics, parts) =>
-        INL <| logger := logger;
-               topics := (case topic0 of SOME t => t :: topics | NONE => topics);
-               data := encoded_abi_tuple parts |>
+      INL ((topics, parts), st1) =>
+        INL (<| logger := logger;
+                topics := (case topic0 of SOME t => t :: topics | NONE => topics);
+                data := encoded_abi_tuple parts |>, st1)
     | INR c => INR c
 End
 
@@ -977,7 +934,6 @@ Proof
   ho_match_mp_tac packed_values_ind >> rpt strip_tac >>
   simp[Once packed_values_pre_def] >> rw[] >> gvs[]
 QED
-val () = cv_auto_trans memory_free_pointer_def;
 val decode_memory_value_pre_def = cv_auto_trans_pre_rec
   "decode_memory_value_pre decode_memory_elements_pre decode_memory_fields_pre decode_memory_part_pre"
   decode_memory_value_def (
@@ -1003,46 +959,25 @@ Proof
   simp[Once decode_memory_value_pre_def] >> rw[] >> gvs[]
 QED
 val () = cv_auto_trans copy_calldata_array_def;
-val memory_value_size_pre_def = cv_auto_trans_pre_rec
-  "memory_value_size_pre memory_values_size_pre memory_fields_size_pre" memory_value_size_def (
-  WF_REL_TAC ‘measure (λx. case x of
-    INL (env, ty, v) => cv_size v
-  | INR (INL (env, element, vs)) => cv_size vs
-  | INR (INR (env, tys, vs)) => cv_size vs)’ >>
-  cv_termination_tac
-);
-
-Theorem memory_value_size_pre[cv_pre]:
-  (∀env ty v. memory_value_size_pre env ty v) ∧
-  (∀env element vs. memory_values_size_pre env element vs) ∧
-  (∀env tys vs. memory_fields_size_pre env tys vs)
-Proof
-  ho_match_mp_tac memory_value_size_ind >> rpt strip_tac >>
-  simp[Once memory_value_size_pre_def] >> rw[] >> gvs[]
-QED
-
 val () = cv_auto_trans decode_abi_argument_def;
 val () = cv_auto_trans decode_abi_arguments_def;
 val () = cv_auto_trans decode_arguments_def;
-val materialize_value_pre_def = cv_auto_trans_pre_rec "materialize_value_pre materialize_values_pre materialize_fields_pre" materialize_value_def (
+val materialize_value_pre_def = cv_auto_trans_pre_rec
+  "materialize_value_pre materialize_words_pre" materialize_value_def (
   WF_REL_TAC ‘measure (λx. case x of
-    INL (env, loc, ty, v, st) => cv_size v
-  | INR (INL (env, loc, element, i, vs, cells, st)) => cv_size vs
-  | INR (INR (env, loc, tys, i, vs, cells, st)) => cv_size vs)’ >>
+    INL (env, ty, v, st) => cv_size v
+  | INR (env, tys, vs, p, st) => cv_size vs)’ >>
   cv_termination_tac
 );
 
 Theorem materialize_value_pre[cv_pre]:
-  (∀env loc ty v st. materialize_value_pre env loc ty v st) ∧
-  (∀env loc element i vs cells st. materialize_values_pre env loc element i vs cells st) ∧
-  (∀env loc tys i vs cells st. materialize_fields_pre env loc tys i vs cells st)
+  (∀env ty v st. materialize_value_pre env ty v st) ∧
+  (∀env tys vs p st. materialize_words_pre env tys vs p st)
 Proof
   ho_match_mp_tac materialize_value_ind >> rpt strip_tac >>
-  simp[Once materialize_value_pre_def] >> rw[] >> gvs[] >>
-  (* record updates appear as cases on the state *)
-  Cases_on ‘st’ >>
-  gvs[solidityStateTheory.source_state_fn_updates, solidityMemoryTheory.heap_object_literal]
+  simp[Once materialize_value_pre_def] >> rw[] >> gvs[]
 QED
+
 val materialize_arguments_pre_def =
   cv_auto_trans_pre "materialize_arguments_pre" materialize_arguments_def;
 
