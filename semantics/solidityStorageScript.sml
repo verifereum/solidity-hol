@@ -698,6 +698,28 @@ Definition navigate_storage_def:
     | _ => ValueAbrupt (InvalidCompletion "unsupported storage navigation")
 End
 
+(* The scratch words [0, 0x40) solc writes for a navigation step that
+ * succeeds: a mapping with a value key hashes key | slot there, and a dynamic
+ * array or long byte array hashes its slot there to find its data area. A
+ * byte-sequence key is hashed at the free memory pointer instead (the
+ * caller writes it), and other steps write nothing. *)
+Definition navigation_scratch_def:
+  navigation_scratch env accounts r s =
+    case r of
+      StorageReference PersistentStorage addr slot 0 (MappingT key value) _ =>
+        if byte_sequence_type key then [] else
+        (case mapping_key_bytes env key s of
+           SOME bs => bs ++ num_to_bytes 32 (w2n slot)
+         | NONE => [])
+    | StorageReference PersistentStorage addr slot 0 (ArrayT _ NONE) _ =>
+        num_to_bytes 32 (w2n slot)
+    | StorageReference PersistentStorage addr slot 0 BytesT _ =>
+        (case storage_byte_length accounts addr slot of
+           INL length => if 32 ≤ length then num_to_bytes 32 (w2n slot) else []
+         | INR _ => [])
+    | _ => []
+End
+
 (* Access and navigation consume concrete references, independently of atoms,
  * bindings, scopes and evaluator control flow.
  *)
@@ -838,6 +860,7 @@ QED
 
 val () = cv_auto_trans copy_to_storage_def;
 val () = cv_auto_trans navigate_storage_def;
+val () = cv_auto_trans navigation_scratch_def;
 val () = cv_auto_trans read_storage_reference_def;
 val () = cv_auto_trans storage_array_length_def;
 val () = cv_auto_trans navigate_storage_field_def;

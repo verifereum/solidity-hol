@@ -328,6 +328,15 @@ Definition outcome_result_def:
     | ValueAbrupt c => INR c
 End
 
+(* A storage navigation step, with the scratch words solc writes for it. *)
+Definition navigate_result_def:
+  navigate_result env r s st =
+    case navigate_storage env st.world.accounts r s of
+      ValueOk v =>
+        INL (v, memory_write 0 (navigation_scratch env st.world.accounts r s) st)
+    | ValueAbrupt c => INR c
+End
+
 (* Operations without nested code, and the state after them: reading memory
  * raises its active size. Calls and array mutations are handled by
  * statements. *)
@@ -414,11 +423,11 @@ Definition eval_operation_def:
                    StorageReference _ _ _ _ ty _ =>
                      (case indexed_element_type (LocatedT StorageLoc ty) of
                         SOME element =>
-                          (case navigate_storage env st.world.accounts r (IntegerValue i) of
-                             ValueOk (ReferenceValue r') =>
-                               outcome_result st (read_storage_reference env st.world
+                          (case navigate_result env r (IntegerValue i) st of
+                             INL (ReferenceValue r', st1) =>
+                               outcome_result st1 (read_storage_reference env st1.world
                                  (case element of LocatedT _ t => t | _ => element) r')
-                           | ValueAbrupt c => INR c
+                           | INR c => INR c
                            | _ => INR (InvalidCompletion "bad storage array element"))
                       | NONE => INR (InvalidCompletion "bad indexed storage type"))
                  | CalldataReference data n (ArrayT element _) =>
@@ -495,7 +504,7 @@ Definition eval_operation_def:
                 INL (q, st1) => INL (ReferenceValue (MemoryReference q (FixedBytesT 1)), st1)
               | INR c => INR c)
          | (SOME (ReferenceValue r), SOME (ScalarValue s)) =>
-             outcome_result st (navigate_storage env st.world.accounts r s)
+             navigate_result env r s st
          (* packed_hashed: the key's bytes, then the slot, at the free memory
           * pointer, which is not raised *)
          | (SOME (ReferenceValue (StorageReference PersistentStorage addr slot 0
@@ -506,9 +515,9 @@ Definition eval_operation_def:
                 INL (bs, st1) =>
                   let (p, st2) = memory_load 64 st1 in
                   let st3 = memory_store (p + LENGTH bs) (w2n slot) (memory_write p bs st2) in
-                  outcome_result st3 (navigate_storage env st.world.accounts
+                  navigate_result env
                     (StorageReference PersistentStorage addr slot 0 (MappingT key value) layout)
-                    (BytesValue bs))
+                    (BytesValue bs) st3
               | INR c => INR c)
          | _ => INR (InvalidCompletion "bad index operands"))
     | EnvironmentOperation f =>
