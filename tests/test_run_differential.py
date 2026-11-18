@@ -338,6 +338,17 @@ class CorpusTests(unittest.TestCase):
             failed = [(c["check"], c["subject"]) for c in checks if c["status"] != "pass"]
             self.assertEqual(failed, [("source-fresh", f"{ARTIFACT}:testdata/base.sol")])
 
+    def test_detects_imported_source_without_recorded_input(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            fake = FakeRoot(Path(temporary))
+            artifact = json.loads((fake.root / ARTIFACT).read_text(encoding="utf-8"))
+            artifact["output"]["sources"] = {SOURCE: {}, "testdata/base.sol": {}}
+            fake.write(ARTIFACT, json.dumps(artifact))
+            fake.write("testdata/base.sol", "contract B {}\n")
+            checks = driver.check_artifacts(fake.root, corpus())
+            failed = [(c["check"], c["subject"]) for c in checks if c["status"] != "pass"]
+            self.assertEqual(failed, [("source-fresh", f"{ARTIFACT}:testdata/base.sol")])
+
     def test_detects_unstaged_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             fake = FakeRoot(Path(temporary))
