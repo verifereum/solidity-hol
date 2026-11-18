@@ -9,6 +9,7 @@ val () = holbuild_extra_deps [
   "../../profiles/solc-0.8.37-via-ir-osaka.json",
   "../../testdata/differential/expected/hashes.json",
   "../../testdata/differential/hashes.sol",
+  "../../testdata/differential/hashes_base.sol",
   "../../testdata/differential/suites/hashes.json"
 ]
 fun holbuild_extra_outputs (_ : string list) = ()
