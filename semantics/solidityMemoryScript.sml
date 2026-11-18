@@ -404,6 +404,15 @@ Definition default_elementary_def:
     | _ => NONE
 End
 
+(* The compiler's storage helpers hash a data area's slot in scratch word 0;
+ * see read_scratch. *)
+Definition scratch_write_def:
+  scratch_write (w : bytes32 option) st =
+    case w of
+      NONE => st
+    | SOME w => memory_write 0 (num_to_bytes 32 (w2n w)) st
+End
+
 (* The bytes of a byte sequence wherever it is. A calldata one reads zeros
  * past the end of the calldata, as calldatacopy does; its offset and length
  * were checked when decoded. Storage byte access propagates malformed-header
@@ -411,9 +420,10 @@ End
 Definition byte_contents_def:
   byte_contents (st : source_state) r =
     case r of
-      StorageReference _ _ _ _ _ _ =>
+      StorageReference _ addr slot _ _ _ =>
         (case storage_byte_contents st.world.accounts r of
-           INL bs => INL (bs, st)
+           INL bs =>
+             INL (bs, scratch_write (long_bytes_scratch st.world.accounts addr slot) st)
          | INR c => INR c)
     | MemoryReference p ty =>
         if byte_sequence_type ty then INL (memory_bytes p st)
@@ -428,17 +438,27 @@ End
 Definition copy_byte_contents_def:
   copy_byte_contents src dst st =
     case dst of
-      StorageReference PersistentStorage _ _ _ _ _ =>
+      StorageReference PersistentStorage dst_addr dst_slot _ _ _ =>
         (case src of
-           StorageReference PersistentStorage _ _ _ _ _ =>
+           StorageReference PersistentStorage src_addr src_slot _ _ _ =>
              (case copy_storage_bytes st.world.accounts src dst st.frame.static_context of
-                INL accounts => INL (st with world := st.world with accounts := accounts)
+                INL accounts =>
+                  let accounts0 = st.world.accounts in
+                  INL (scratch_write
+                    (if IS_SOME (long_bytes_scratch accounts0 src_addr src_slot)
+                     then SOME dst_slot
+                     else long_bytes_scratch accounts0 dst_addr dst_slot)
+                    (st with world := st.world with accounts := accounts))
               | INR c => INR c)
          | _ => case byte_contents st src of
              INR c => INR c
            | INL (bs, st1) =>
                case store_storage_bytes st1.world.accounts dst bs st1.frame.static_context of
-                 INL accounts => INL (st1 with world := st1.world with accounts := accounts)
+                 INL accounts =>
+                   INL (scratch_write
+                     (if 32 ≤ LENGTH bs then SOME dst_slot
+                      else long_bytes_scratch st1.world.accounts dst_addr dst_slot)
+                     (st1 with world := st1.world with accounts := accounts))
                | INR c => INR c)
     | _ => INR (InvalidCompletion "bad storage byte copy")
 End
@@ -530,6 +550,7 @@ Proof
 QED
 
 val () = cv_auto_trans default_elementary_def;
+val () = cv_auto_trans scratch_write_def;
 val () = cv_auto_trans byte_contents_def;
 val () = cv_auto_trans copy_byte_contents_def;
 val () = cv_auto_trans convert_byte_reference_def;

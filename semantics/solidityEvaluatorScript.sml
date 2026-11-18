@@ -408,7 +408,8 @@ Definition eval_operation_def:
                    else (case storage_byte_length st.world.accounts addr slot of
                      INR c => INR c
                    | INL length => INL (storage_byte_range
-                       st.world.accounts addr slot length 0 (MIN k length), st))
+                       st.world.accounts addr slot length 0 (MIN k length),
+                       scratch_write (long_bytes_scratch st.world.accounts addr slot) st))
                | _ => byte_contents st r) of
                 INL (bs, st1) => INL (ScalarValue (BytesValue (take_pad_0 k bs)), st1)
               | INR c => INR c)
@@ -631,7 +632,10 @@ Definition reset_target_def:
           (case clear_storage_value env (n + LENGTH env.type_declarations)
                   st.world.accounts addr slot offset stored_ty of
              INL accounts =>
-               normal_result (st with world := st.world with accounts := accounts) gas
+               normal_result (scratch_write
+                 (clear_scratch env (n + LENGTH env.type_declarations)
+                    st.world.accounts addr slot stored_ty)
+                 (st with world := st.world with accounts := accounts)) gas
            | INR c => abrupt_result c st gas)
     | _ =>
         let zero =
@@ -678,7 +682,8 @@ Definition push_storage_array_def:
                     (define_binding x annotation
                       (ReferenceValue (StorageReference PersistentStorage addr
                          data_slot offset element layout))
-                      (st with world := st.world with accounts := accounts)) gas
+                      (scratch_write (SOME slot)
+                        (st with world := st.world with accounts := accounts))) gas
               | NONE => abrupt_result (InvalidCompletion "bad array length write") st gas)
          | _ => abrupt_result (InvalidCompletion "bad array push element") st gas)
     | SOME (ReferenceValue
@@ -689,7 +694,11 @@ Definition push_storage_array_def:
                (define_binding x annotation
                  (ReferenceValue (StorageReference PersistentStorage addr
                     data_slot offset (FixedBytesT 1) layout))
-                 (st with world := st.world with accounts := accounts)) gas
+                 (scratch_write
+                   (case storage_byte_length st.world.accounts addr slot of
+                      INL length => if 31 ≤ length then SOME slot else NONE
+                    | INR _ => NONE)
+                   (st with world := st.world with accounts := accounts))) gas
          | INR c => abrupt_result c st gas)
     | _ => abrupt_result (InvalidCompletion "bad dynamic array reference") st gas
 End
@@ -716,7 +725,11 @@ Definition pop_storage_array_def:
                      SOME accounts' =>
                        normal_result
                          (define_binding x annotation (TupleValue [])
-                           (st with world := st.world with accounts := accounts')) gas
+                           (scratch_write
+                             (later_scratch (SOME slot)
+                               (clear_scratch env (n + LENGTH env.type_declarations)
+                                  st.world.accounts addr data_slot element))
+                             (st with world := st.world with accounts := accounts'))) gas
                    | NONE => abrupt_result (InvalidCompletion "bad array length write") st gas)
               | INR c => abrupt_result c st gas)
          | _ => abrupt_result (InvalidCompletion "bad array pop element") st gas)
@@ -726,7 +739,8 @@ Definition pop_storage_array_def:
            INL accounts =>
              normal_result
                (define_binding x annotation (TupleValue [])
-                 (st with world := st.world with accounts := accounts)) gas
+                 (scratch_write (long_bytes_scratch st.world.accounts addr slot)
+                   (st with world := st.world with accounts := accounts))) gas
          | INR c => abrupt_result c st gas)
     | _ => abrupt_result (InvalidCompletion "bad dynamic array reference") st gas
 End
@@ -1187,12 +1201,11 @@ Definition simple_stmt_def:
                    | INR c => abrupt_result c st gas)
               | INR c => abrupt_result c st gas)
          | SOME (ReferenceValue (StorageReference PersistentStorage addr slot 0 rty _)) =>
-             (case storage_array_value env (LENGTH env.type_declarations)
-                     st.world.accounts addr slot rty of
-                INL v =>
-                  (case materialize_value env rty v st of
-                     INL (v', st') => normal_result (define_binding x ty v' st') gas
-                   | INR c => abrupt_result c st gas)
+             (case materialize_storage env (LENGTH env.type_declarations)
+                     st.world.accounts addr slot rty
+                     (scratch_write (read_scratch env (LENGTH env.type_declarations)
+                        st.world.accounts addr slot rty) st) of
+                INL (v', st') => normal_result (define_binding x ty v' st') gas
               | INR c => abrupt_result c st gas)
          | _ => abrupt_result (InvalidCompletion "bad object copy") st gas)
     (* Decoded memory values are allocated, as external call results are. *)
@@ -1321,7 +1334,12 @@ Definition simple_stmt_def:
                        (case copy_to_storage env st1.world.accounts cty v
                                dst st.frame.static_context of
                           INL accounts =>
-                            normal_result (st1 with world := st1.world with accounts := accounts) gas
+                            normal_result (scratch_write
+                              (case dst of
+                                 StorageReference _ addr slot _ ty _ =>
+                                   store_scratch env st1.world.accounts addr slot ty v
+                               | _ => NONE)
+                              (st1 with world := st1.world with accounts := accounts)) gas
                         | INR c => abrupt_result c st gas)
                    | INR c => abrupt_result c st gas)
               | NONE =>

@@ -304,11 +304,8 @@ Definition storage_abi_value_def:
          INR c => INR c
        | INL length =>
          if 2 ** 64 ≤ length then INR (PanicCompletion 65) else
-         let padded = storage_byte_range accounts addr slot length 0
-                        (32 * ((length + 31) DIV 32)) in
-         let data = if 0 < length ∧ length < 32 then TAKE 31 padded ++ [0w]
-                    else padded in
-         case abi_value ty (ScalarValue (BytesValue (TAKE length padded))) of
+         let data = storage_byte_data accounts addr slot length in
+         case abi_value ty (ScalarValue (BytesValue (TAKE length data))) of
            SOME a => INL (a, enc (Uint 256) (NumV length) ++ data)
          | NONE => INR (InvalidCompletion "bad ABI value"))
     else case ty of
@@ -405,7 +402,8 @@ Definition array_copy_value_def:
         if rty ≠ ty then INR (InvalidCompletion "bad storage array reference")
         else (case storage_array_value env (LENGTH env.type_declarations)
                      st.world.accounts addr slot ty of
-                INL v => INL (v, st)
+                INL v => INL (v, scratch_write (read_scratch env
+                  (LENGTH env.type_declarations) st.world.accounts addr slot ty) st)
               | INR c => INR c)
     | _ => INR (InvalidCompletion "bad array reference")
 End
@@ -421,7 +419,8 @@ Definition runtime_abi_value_def:
         if rty ≠ ty' then INR (InvalidCompletion "bad ABI value")
         else (case storage_abi_value env (LENGTH env.type_declarations)
                      st.world.accounts addr slot rty of
-                INL (a, bs) => INL ((a, bs), st)
+                INL (a, bs) => INL ((a, bs), scratch_write (read_scratch env
+                  (LENGTH env.type_declarations) st.world.accounts addr slot rty) st)
               | INR c => INR c)
     | _ =>
       case (case v of ReferenceValue r => array_copy_value env st ty' r | _ => INL (v, st)) of
@@ -732,6 +731,100 @@ Termination
   rw[solidityCoreTheory.runtime_value_size_def, listTheory.list_size_def]
 End
 
+(* A storage array, struct or byte sequence copied to new memory, as the
+ * compiler's storage-to-memory copies do: each object is allocated before
+ * its members, scalars are read cleaned, and a byte sequence keeps whole
+ * data words (storage_byte_data); an empty one still writes a zero word
+ * after its length, past the allocation. The fuel bounds the struct
+ * nesting. *)
+Definition materialize_storage_def:
+  (materialize_storage env (fuel : num) accounts addr slot ty st =
+    if byte_sequence_type ty then
+      (case storage_byte_length accounts addr slot of
+         INR c => INR c
+       | INL length =>
+           case allocate_byte_array length st of
+             INR c => INR c
+           | INL (p, st1) =>
+               INL (ReferenceValue (MemoryReference p ty),
+                    memory_write (p + 32)
+                      (if length = 0 then REPLICATE 32 0w
+                       else storage_byte_data accounts addr slot length) st1))
+    else case ty of
+      ArrayT element l =>
+        (case storage_array_data accounts addr slot ty of
+           (length, data) =>
+             if 2 ** 64 ≤ length then INR (PanicCompletion 65) else
+             case allocate_memory ((if l = NONE then 32 else 0) + 32 * length) st of
+               INR c => INR c
+             | INL (p, st1) =>
+                 let st2 = if l = NONE then memory_store p length st1 else st1 in
+                 case materialize_storage_elements env fuel accounts addr data element
+                        0 length (if l = NONE then p + 32 else p) st2 of
+                   INL st3 => INL (ReferenceValue (MemoryReference p ty), st3)
+                 | INR c => INR c)
+    | StructT s =>
+        (case (lookup_struct env s, lookup_struct_layout env s) of
+           (SOME fields, SOME layout) =>
+             if fuel = 0 then INR (InvalidCompletion "struct nesting") else
+             (case allocate_memory (32 * LENGTH fields) st of
+                INR c => INR c
+              | INL (p, st1) =>
+                  case materialize_storage_fields env (fuel - 1) accounts addr slot
+                         layout.struct_fields fields p st1 of
+                    INL st2 => INL (ReferenceValue (MemoryReference p ty), st2)
+                  | INR c => INR c)
+         | _ => INR (InvalidCompletion "missing struct layout"))
+    | _ => INR (InvalidCompletion "bad storage array type")) ∧
+  (materialize_storage_elements env fuel accounts addr data element i n q st =
+    if n = 0 then INL st else
+    case storage_element_location env data element i of
+      NONE => INR (InvalidCompletion "bad array element type")
+    | SOME (s, offset) =>
+        let value =
+          if is_stored_scalar_type element then
+            (case read_storage env accounts addr s offset element of
+               SOME v => INL (ScalarValue v, st)
+             | NONE => INR (InvalidCompletion "bad storage read"))
+          else materialize_storage env fuel accounts addr s element st in
+        case value of
+          INR c => INR c
+        | INL (v, st1) =>
+            case write_memory_word env element q v st1 of
+              INR c => INR c
+            | INL st2 =>
+                materialize_storage_elements env fuel accounts addr data element
+                  (i + 1) (n - 1) (q + 32) st2) ∧
+  (materialize_storage_fields env fuel accounts addr slot layout [] q st = INL st) ∧
+  (materialize_storage_fields env fuel accounts addr slot layout ((f, ty) :: fields) q st =
+    case ALOOKUP (MAP (λv. (v.state_id, v)) layout) f of
+      NONE => INR (InvalidCompletion "missing field layout")
+    | SOME v =>
+        let s = slot + v.state_slot in
+        let value =
+          if is_stored_scalar_type ty then
+            (case read_storage env accounts addr s v.state_offset ty of
+               SOME x => INL (ScalarValue x, st)
+             | NONE => INR (InvalidCompletion "bad storage read"))
+          else materialize_storage env fuel accounts addr s ty st in
+        case value of
+          INR c => INR c
+        | INL (x, st1) =>
+            case write_memory_word env ty q x st1 of
+              INR c => INR c
+            | INL st2 =>
+                materialize_storage_fields env fuel accounts addr slot layout fields
+                  (q + 32) st2)
+Termination
+  WF_REL_TAC ‘inv_image ($< LEX $< LEX $<) (λx. case x of
+    INL (env, fuel, accounts, addr, slot, ty, st) => (fuel, sol_type_size ty, 0)
+  | INR (INL (env, fuel, accounts, addr, data, element, i, n, q, st)) =>
+      (fuel, sol_type_size element, n + 1)
+  | INR (INR (env, fuel, accounts, addr, slot, layout, fields, q, st)) =>
+      (fuel, list_size (sol_type_size o SND) fields, 1))’ >>
+  rw[solidityASTTheory.sol_type_size_def, listTheory.list_size_def]
+End
+
 (* Decoded memory payloads are written to memory before a procedure sees them.
  * Calldata payloads retain slices into the frame's original call_data. *)
 Definition materialize_arguments_def:
@@ -976,6 +1069,30 @@ Theorem materialize_value_pre[cv_pre]:
 Proof
   ho_match_mp_tac materialize_value_ind >> rpt strip_tac >>
   simp[Once materialize_value_pre_def] >> rw[] >> gvs[]
+QED
+
+val materialize_storage_pre_def = cv_auto_trans_pre_rec
+  "materialize_storage_pre materialize_storage_elements_pre materialize_storage_fields_pre"
+  materialize_storage_def (
+  WF_REL_TAC ‘inv_image ($< LEX $< LEX $<) (λx. case x of
+    INL (env, fuel, accounts, addr, slot, ty, st) => (cv$c2n fuel, cv_size ty, 0)
+  | INR (INL (env, fuel, accounts, addr, data, element, i, n, q, st)) =>
+      (cv$c2n fuel, cv_size element, cv$c2n n + 1)
+  | INR (INR (env, fuel, accounts, addr, slot, layout, fields, q, st)) =>
+      (cv$c2n fuel, cv_size fields, 1))’ >>
+  cv_termination_tac
+);
+
+Theorem materialize_storage_pre[cv_pre]:
+  (∀env fuel accounts addr slot ty st.
+     materialize_storage_pre env fuel accounts addr slot ty st) ∧
+  (∀env fuel accounts addr data element i n q st.
+     materialize_storage_elements_pre env fuel accounts addr data element i n q st) ∧
+  (∀env fuel accounts addr slot layout fields q st.
+     materialize_storage_fields_pre env fuel accounts addr slot layout fields q st)
+Proof
+  ho_match_mp_tac materialize_storage_ind >> rpt strip_tac >>
+  simp[Once materialize_storage_pre_def] >> rw[] >> gvs[]
 QED
 
 val materialize_arguments_pre_def =

@@ -146,6 +146,16 @@ Definition storage_byte_range_def:
       storage_byte_range accounts addr slot length (i + 1) n)
 End
 
+(* The data words of a stored byte sequence as the compiler's copies read
+ * them: whole words, keeping unused dirty bytes, except the length byte of a
+ * short one. *)
+Definition storage_byte_data_def:
+  storage_byte_data accounts addr slot length =
+    let padded = storage_byte_range accounts addr slot length 0
+                   (32 * ((length + 31) DIV 32)) in
+    if 0 < length ∧ length < 32 then TAKE 31 padded ++ [0w] else padded
+End
+
 Definition storage_byte_contents_def:
   storage_byte_contents accounts r =
     case r of
@@ -667,6 +677,166 @@ Definition copy_to_storage_def:
     | _ => INR (InvalidCompletion "bad storage array reference")
 End
 
+(* The compiler's storage helpers find a dynamic array's or a long byte
+ * array's data area by hashing its slot in scratch word 0 (mstore(0, slot)).
+ * Only the last such hash of an operation stays visible, so each operation
+ * below gives the slot it hashes last, in the compiler's order, or NONE when
+ * it hashes none. *)
+Definition later_scratch_def:
+  later_scratch (a : bytes32 option) b = case b of NONE => a | SOME _ => b
+End
+
+Definition long_bytes_scratch_def:
+  long_bytes_scratch accounts addr slot =
+    case storage_byte_length accounts addr slot of
+      INL length => if 32 ≤ length then SOME slot else NONE
+    | INR _ => NONE
+End
+
+(* Reading a whole storage value, as a copy to memory and the encoder do: a
+ * dynamic array hashes its slot even when empty, then reads its elements in
+ * order; a byte sequence hashes only when long; a struct reads its fields in
+ * order. *)
+Definition read_scratch_def:
+  (read_scratch env (fuel : num) accounts addr slot ty =
+    if byte_sequence_type ty then long_bytes_scratch accounts addr slot
+    else case ty of
+      ArrayT element l =>
+        (case storage_array_data accounts addr slot ty of
+           (length, data) =>
+             later_scratch (if l = NONE then SOME slot else NONE)
+               (if is_stored_scalar_type element then NONE
+                else read_elements_scratch env fuel accounts addr data element 0 length))
+    | StructT s =>
+        (case (lookup_struct env s, lookup_struct_layout env s) of
+           (SOME fields, SOME layout) =>
+             if fuel = 0 then NONE else
+             read_fields_scratch env (fuel - 1) accounts addr slot layout.struct_fields fields
+         | _ => NONE)
+    | _ => NONE) ∧
+  (read_elements_scratch env fuel accounts addr data element i n =
+    if n = 0 then NONE else
+    later_scratch
+      (case storage_element_location env data element i of
+         SOME (s, _) => read_scratch env fuel accounts addr s element
+       | NONE => NONE)
+      (read_elements_scratch env fuel accounts addr data element (i + 1) (n - 1))) ∧
+  (read_fields_scratch env fuel accounts addr slot layout [] = NONE) ∧
+  (read_fields_scratch env fuel accounts addr slot layout ((f, ty) :: fields) =
+    later_scratch
+      (case ALOOKUP (MAP (λv. (v.state_id, v)) layout) f of
+         SOME v =>
+           if is_stored_scalar_type ty then NONE
+           else read_scratch env fuel accounts addr (slot + v.state_slot) ty
+       | NONE => NONE)
+      (read_fields_scratch env fuel accounts addr slot layout fields))
+Termination
+  WF_REL_TAC ‘inv_image ($< LEX $< LEX $<) (λx. case x of
+    INL (env, fuel, accounts, addr, slot, ty) => (fuel, sol_type_size ty, 0)
+  | INR (INL (env, fuel, accounts, addr, data, element, i, n)) =>
+      (fuel, sol_type_size element, n + 1)
+  | INR (INR (env, fuel, accounts, addr, slot, layout, fields)) =>
+      (fuel, list_size (sol_type_size o SND) fields, 1))’ >>
+  rw[solidityASTTheory.sol_type_size_def, listTheory.list_size_def]
+End
+
+(* Clearing, as delete and pop do: a nonempty dynamic array hashes its slot,
+ * then clears its elements in order; an empty one hashes nothing. *)
+Definition clear_scratch_def:
+  (clear_scratch env (fuel : num) accounts addr slot ty =
+    if byte_sequence_type ty then long_bytes_scratch accounts addr slot
+    else case ty of
+      ArrayT element l =>
+        (case storage_array_data accounts addr slot ty of
+           (length, data) =>
+             if l = NONE ∧ length = 0 then NONE else
+             later_scratch (if l = NONE then SOME slot else NONE)
+               (if is_stored_scalar_type element then NONE
+                else clear_elements_scratch env fuel accounts addr data element 0 length))
+    | StructT s =>
+        (case (lookup_struct env s, lookup_struct_layout env s) of
+           (SOME fields, SOME layout) =>
+             if fuel = 0 then NONE else
+             clear_fields_scratch env (fuel - 1) accounts addr slot layout.struct_fields fields
+         | _ => NONE)
+    | _ => NONE) ∧
+  (clear_elements_scratch env fuel accounts addr data element i n =
+    if n = 0 then NONE else
+    later_scratch
+      (case storage_element_location env data element i of
+         SOME (s, _) => clear_scratch env fuel accounts addr s element
+       | NONE => NONE)
+      (clear_elements_scratch env fuel accounts addr data element (i + 1) (n - 1))) ∧
+  (clear_fields_scratch env fuel accounts addr slot layout [] = NONE) ∧
+  (clear_fields_scratch env fuel accounts addr slot layout ((f, ty) :: fields) =
+    later_scratch
+      (case ALOOKUP (MAP (λv. (v.state_id, v)) layout) f of
+         SOME v =>
+           if is_stored_scalar_type ty then NONE
+           else clear_scratch env fuel accounts addr (slot + v.state_slot) ty
+       | NONE => NONE)
+      (clear_fields_scratch env fuel accounts addr slot layout fields))
+Termination
+  WF_REL_TAC ‘inv_image ($< LEX $< LEX $<) (λx. case x of
+    INL (env, fuel, accounts, addr, slot, ty) => (fuel, sol_type_size ty, 0)
+  | INR (INL (env, fuel, accounts, addr, data, element, i, n)) =>
+      (fuel, sol_type_size element, n + 1)
+  | INR (INR (env, fuel, accounts, addr, slot, layout, fields)) =>
+      (fuel, list_size (sol_type_size o SND) fields, 1))’ >>
+  rw[solidityASTTheory.sol_type_size_def, listTheory.list_size_def]
+End
+
+(* Storing v, as an assignment does. Clearing a shrunk tail comes first and
+ * every later hash overrides it: a dynamic array hashes its slot even when
+ * empty, then stores its elements in order; a byte sequence hashes when
+ * its old or new contents are long; a struct stores its fields in order. *)
+Definition store_scratch_def:
+  (store_scratch env accounts addr slot ty v =
+    if byte_sequence_type ty then
+      (case v of
+         ScalarValue (BytesValue bs) =>
+           if 32 ≤ LENGTH bs then SOME slot
+           else long_bytes_scratch accounts addr slot
+       | _ => NONE)
+    else case (ty, v) of
+      (ArrayT element l, TupleValue vs) =>
+        later_scratch (if l = NONE then SOME slot else NONE)
+          (if is_stored_scalar_type element then NONE else
+           store_elements_scratch env accounts addr
+             (SND (storage_array_data accounts addr slot ty)) element 0 vs)
+    | (StructT s, TupleValue vs) =>
+        (case (lookup_struct env s, lookup_struct_layout env s) of
+           (SOME fields, SOME layout) =>
+             store_fields_scratch env accounts addr slot layout.struct_fields fields vs
+         | _ => NONE)
+    | _ => NONE) ∧
+  (store_elements_scratch env accounts addr data element i [] = NONE) ∧
+  (store_elements_scratch env accounts addr data element i (v :: vs) =
+    later_scratch
+      (case storage_element_location env data element i of
+         SOME (s, _) => store_scratch env accounts addr s element v
+       | NONE => NONE)
+      (store_elements_scratch env accounts addr data element (i + 1) vs)) ∧
+  (store_fields_scratch env accounts addr slot layout [] vs = NONE) ∧
+  (store_fields_scratch env accounts addr slot layout _ [] = NONE) ∧
+  (store_fields_scratch env accounts addr slot layout ((f, ty) :: fields) (v :: vs) =
+    later_scratch
+      (case ALOOKUP (MAP (λv. (v.state_id, v)) layout) f of
+         SOME l =>
+           if is_stored_scalar_type ty then NONE
+           else store_scratch env accounts addr (slot + l.state_slot) ty v
+       | NONE => NONE)
+      (store_fields_scratch env accounts addr slot layout fields vs))
+Termination
+  WF_REL_TAC ‘measure (λx. case x of
+    INL (env, accounts, addr, slot, ty, v) => runtime_value_size v
+  | INR (INL (env, accounts, addr, data, element, i, vs)) =>
+      list_size runtime_value_size vs
+  | INR (INR (env, accounts, addr, slot, layout, fields, vs)) =>
+      list_size runtime_value_size vs)’ >>
+  rw[solidityCoreTheory.runtime_value_size_def, listTheory.list_size_def]
+End
+
 (* Navigation consumes already evaluated atoms and returns a concrete location.
  * A nested mapping starts at the preceding mapping's hashed slot.
  *)
@@ -778,6 +948,7 @@ val () = cv_auto_trans storage_byte_length_def;
 val () = cv_auto_trans storage_byte_location_def;
 val () = cv_auto_trans navigate_storage_byte_def;
 val () = cv_auto_trans storage_byte_range_def;
+val () = cv_auto_trans storage_byte_data_def;
 val () = cv_auto_trans storage_byte_contents_def;
 val () = cv_auto_trans set_storage_word_def;
 val () = cv_auto_trans clear_byte_slots_def;
@@ -859,6 +1030,73 @@ Proof
 QED
 
 val () = cv_auto_trans copy_to_storage_def;
+val () = cv_auto_trans later_scratch_def;
+val () = cv_auto_trans long_bytes_scratch_def;
+
+val read_scratch_pre_def = cv_auto_trans_pre_rec
+  "read_scratch_pre read_elements_scratch_pre read_fields_scratch_pre" read_scratch_def (
+  WF_REL_TAC ‘inv_image ($< LEX $< LEX $<) (λx. case x of
+    INL (env, fuel, accounts, addr, slot, ty) => (cv$c2n fuel, cv_size ty, 0)
+  | INR (INL (env, fuel, accounts, addr, data, element, i, n)) =>
+      (cv$c2n fuel, cv_size element, cv$c2n n + 1)
+  | INR (INR (env, fuel, accounts, addr, slot, layout, fields)) =>
+      (cv$c2n fuel, cv_size fields, 1))’ >>
+  cv_termination_tac
+);
+
+Theorem read_scratch_pre[cv_pre]:
+  (∀env fuel accounts addr slot ty. read_scratch_pre env fuel accounts addr slot ty) ∧
+  (∀env fuel accounts addr data element i n.
+     read_elements_scratch_pre env fuel accounts addr data element i n) ∧
+  (∀env fuel accounts addr slot layout fields.
+     read_fields_scratch_pre env fuel accounts addr slot layout fields)
+Proof
+  ho_match_mp_tac read_scratch_ind >> rpt strip_tac >>
+  simp[Once read_scratch_pre_def] >> rw[] >> gvs[]
+QED
+
+val clear_scratch_pre_def = cv_auto_trans_pre_rec
+  "clear_scratch_pre clear_elements_scratch_pre clear_fields_scratch_pre" clear_scratch_def (
+  WF_REL_TAC ‘inv_image ($< LEX $< LEX $<) (λx. case x of
+    INL (env, fuel, accounts, addr, slot, ty) => (cv$c2n fuel, cv_size ty, 0)
+  | INR (INL (env, fuel, accounts, addr, data, element, i, n)) =>
+      (cv$c2n fuel, cv_size element, cv$c2n n + 1)
+  | INR (INR (env, fuel, accounts, addr, slot, layout, fields)) =>
+      (cv$c2n fuel, cv_size fields, 1))’ >>
+  cv_termination_tac
+);
+
+Theorem clear_scratch_pre[cv_pre]:
+  (∀env fuel accounts addr slot ty. clear_scratch_pre env fuel accounts addr slot ty) ∧
+  (∀env fuel accounts addr data element i n.
+     clear_elements_scratch_pre env fuel accounts addr data element i n) ∧
+  (∀env fuel accounts addr slot layout fields.
+     clear_fields_scratch_pre env fuel accounts addr slot layout fields)
+Proof
+  ho_match_mp_tac clear_scratch_ind >> rpt strip_tac >>
+  simp[Once clear_scratch_pre_def] >> rw[] >> gvs[]
+QED
+
+val store_scratch_pre_def = cv_auto_trans_pre_rec
+  "store_scratch_pre store_elements_scratch_pre store_fields_scratch_pre" store_scratch_def (
+  WF_REL_TAC ‘measure (λx. case x of
+    INL (env, accounts, addr, slot, ty, v) => cv_size v
+  | INR (INL (env, accounts, addr, data, element, i, vs)) => cv_size vs
+  | INR (INR (env, accounts, addr, slot, layout, fields, vs)) => cv_size vs)’ >>
+  cv_termination_tac
+);
+
+Theorem store_scratch_pre[cv_pre]:
+  (∀env accounts addr slot ty v. store_scratch_pre env accounts addr slot ty v) ∧
+  (∀env accounts addr data element i vs.
+     store_elements_scratch_pre env accounts addr data element i vs) ∧
+  (∀env accounts addr slot layout fields vs.
+     store_fields_scratch_pre env accounts addr slot layout fields vs)
+Proof
+  ho_match_mp_tac store_scratch_ind >> rpt strip_tac >>
+  simp[Once store_scratch_pre_def] >> rw[] >> gvs[]
+QED
+
 val () = cv_auto_trans navigate_storage_def;
 val () = cv_auto_trans navigation_scratch_def;
 val () = cv_auto_trans read_storage_reference_def;
