@@ -578,6 +578,17 @@ End
 (* A storage write in a static frame fails; the EVM would halt exceptionally,
  * which no source completion models yet.
  *)
+(* A constructor keeps the contract's immutables in its reserved memory,
+ * a word each from 0x80, in declaration order, base contracts first. *)
+Definition immutable_offset_def:
+  (immutable_offset x [] = NONE) ∧
+  (immutable_offset x ((y, ty) :: rest) =
+    if x = y then SOME (128 : num, ty : sol_type) else
+    case immutable_offset x rest of
+      SOME (a, t) => SOME (a + 32, t)
+    | NONE => NONE)
+End
+
 Definition write_target_value_def:
   write_target_value env t v (st : source_state) =
     case (FLOOKUP st.targets (ast_key t), v) of
@@ -592,7 +603,13 @@ Definition write_target_value_def:
            INL st1 => SOME st1
          | INR _ => NONE)
     | (SOME (ValueTarget (ImmutableReference x)), ScalarValue s) =>
-        SOME (st with immutables := st.immutables |+ (ast_key x, s))
+        (case immutable_offset x env.immutables of
+           SOME (a, ty) =>
+             (case write_memory_word env ty a (ScalarValue s)
+                     (st with immutables := st.immutables |+ (ast_key x, s)) of
+                INL st1 => SOME st1
+              | INR _ => NONE)
+         | NONE => NONE)
     | (SOME (ValueTarget (StorageReference PersistentStorage addr slot offset
                             ty _)), ScalarValue s) =>
         if st.frame.static_context then NONE else
