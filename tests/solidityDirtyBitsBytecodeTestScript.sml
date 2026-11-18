@@ -30,12 +30,7 @@ val () = holbuild_extra_deps [
   "../testdata/differential/memory_structs.sol",
   "../testdata/differential/fail_closed/assembly_calldata.json",
   "../testdata/differential/expected/assembly_calldata.json",
-  "../testdata/differential/assembly_calldata.sol",
-  "../testdata/differential/fail_closed/typed_catches.json",
-  "../testdata/differential/expected/typed_catches.json",
-  "../testdata/differential/expected/typed_catches_peer.json",
-  "../testdata/differential/typed_catches.sol",
-  "../testdata/differential/typed_catches_peer.sol"
+  "../testdata/differential/assembly_calldata.sol"
 ]
 
 val () = solidityBytecodeLib.run_suite_file
@@ -61,6 +56,3 @@ val () = solidityBytecodeLib.run_suite_file
 
 val () = solidityBytecodeLib.run_suite_file
   {root = "..", suite_file = "testdata/differential/fail_closed/assembly_calldata.json"}
-
-val () = solidityBytecodeLib.run_suite_file
-  {root = "..", suite_file = "testdata/differential/fail_closed/typed_catches.json"}

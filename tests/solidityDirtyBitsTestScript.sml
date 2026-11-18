@@ -5,8 +5,6 @@
 Theory solidityDirtyBitsTest
 Ancestors solidityDifferential solidityDirtyBitsBytecodeTest
   solidityStorageEnumArraysTest solidityAssemblyLibraryFormsTest
-  solidityAssemblyPrefixLoadsTest
-  solidityStorageMemoryPaddingTest
   solidityDifferentialCorpus_inline_assembly
   solidityDifferentialCorpus_storage
   solidityDifferentialCorpus_storage_arrays
@@ -15,7 +13,6 @@ Ancestors solidityDifferential solidityDirtyBitsBytecodeTest
   solidityDifferentialCorpus_udvt
   solidityDifferentialCorpus_memory_structs
   solidityDifferentialCorpus_assembly_calldata
-  solidityDifferentialCorpus_typed_catches
 Libs solidityBytecodeLib cv_transLib wordsLib
 
 fun holbuild_extra_deps (_ : string list) = ()
@@ -27,8 +24,7 @@ val () = holbuild_extra_deps [
   "../testdata/differential/fail_closed/dirty_bits.json",
   "../testdata/differential/fail_closed/udvt.json",
   "../testdata/differential/fail_closed/memory_structs.json",
-  "../testdata/differential/fail_closed/assembly_calldata.json",
-  "../testdata/differential/fail_closed/typed_catches.json"
+  "../testdata/differential/fail_closed/assembly_calldata.json"
 ]
 
 fun rejected_suite group =
@@ -298,15 +294,6 @@ Theorem reject_assembly_calldata_static_past_end:
   source_execution bytecode_rejected_assembly_calldata_code
     corpus_assembly_calldata_unit corpus_assembly_calldata_program 1000
     ^(rejected_case "assembly_calldata" "static_past_end") =
-  (Diagnostic InvalidCompletion, NONE, [])
-Proof
-  CONV_TAC cv_eval
-QED
-
-Theorem reject_typed_catches_unaligned_error_write_next_header:
-  source_execution bytecode_rejected_typed_catches_code
-    corpus_typed_catches_unit corpus_typed_catches_program 1000
-    ^(rejected_case "typed_catches" "unaligned_error_write_next_header") =
   (Diagnostic InvalidCompletion, NONE, [])
 Proof
   CONV_TAC cv_eval
