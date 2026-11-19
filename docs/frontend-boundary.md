@@ -233,6 +233,22 @@ reads them from there with the same cleanup, and the created contract's
 immutables are those words when it ends; a word its immutable's type cannot
 hold (one assembly left dirty) fails closed.
 
+Where the compiled code's memory behaviour depends on something the model
+does not track, execution stops with an `unsupported:` completion naming the
+case, rather than guessing:
+
+- an encoder input at or above the free memory pointer, which the compiled
+  encoder overwrites before it reads it;
+- an indexed event argument that is a stored array or struct whose in-place
+  encoding ends in an empty byte sequence;
+- an `abi.decode` memory input reaching past the free memory pointer, where
+  the compiled decoder allocates while it reads;
+- an `abi.decode` that fails on a memory input reaching past the memory size,
+  since its failure does not say how far it read;
+- an internal function word that no function's dispatch number matches;
+- an immutable's reserved word that its type cannot hold, when a constructor
+  ends.
+
 Inline assembly's `call`, `staticcall` and `delegatecall` (`assembly_calls.sol`,
 `assembly_delegate.sol`) run the callee on Verifereum through `externalCall`,
 as high-level and low-level calls do; `delegatecall` runs the callee's code

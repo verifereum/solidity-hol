@@ -126,7 +126,7 @@ output at all and still read what came back.
 | `extcodesize(a)` | `EffectCall` | `LENGTH (lookup_account a accounts).code` |
 | `returndatasize()` | `EffectFrame` | `LENGTH return_data` |
 | `returndatacopy(d, o, s)` | `EffectMemory` | none |
-| `gas()` | `EffectFrame` | `gas_limit` |
+| `gas()` | `EffectFrame` | the next gas observation; `gas_limit` as a call's gas operand |
 
 The effects are the ones `semantics/yulDialectScript.sml` already gave these
 names; this work changes the evaluator, not the classification. `extcodesize`
@@ -156,8 +156,11 @@ follow the same table as `call`'s.
 ## What the model does not do
 
 - **Gas is not charged.** No step in the Yul evaluator costs gas, so
-  `gas_limit` never falls and `gas()` reports the frame's whole budget. A
-  call's own gas argument is what the callee gets, capped at the frame's
+  `gas_limit` never falls. A value-position `gas()` consumes the frame's next
+  `GasLeftObservation`, the gas the bytecode observed there, and fails with
+  `missing gas observation` when there is none; a bare `gas()` written as a
+  call's gas operand means the frame's whole budget. A call's own gas
+  argument is what the callee gets, capped at the frame's
   budget, since the frame cannot hand on more than it holds; solc writes
   `gas()` there unless the source names a limit, in which case the limit is
   what the callee runs with. Since the

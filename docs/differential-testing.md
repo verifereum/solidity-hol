@@ -60,6 +60,15 @@ accounts. No extra suite field is needed. The library's source body is not
 executed by the source evaluator. Storage-reference arguments cross the ABI as
 slot words, while ordinary arguments and results use the shared ABI codec.
 
+A case may give `"memory_size": n`, the memory size in bytes the frame has
+when it halts, as the compiled code's trace shows it (the size before its
+`RETURN` or `REVERT`, raised to cover the region that instruction reads). The
+source's final memory size, Verifereum's outermost frame's memory length after
+the transaction's last step and, in the Yul run, the Yul evaluator's must all
+equal it; otherwise the case is a `memory-size-mismatch`. A creation that
+returns its runtime code gives none, since the deployed-code copy is not
+modelled.
+
 A case with `"deploy": true` and the constructor's `args` (or, as
 `calldata`, their raw encoding) is a creation instead: Verifereum runs a creation transaction whose data is the artifact's
 initcode followed by the encoded arguments, and the evaluator runs the

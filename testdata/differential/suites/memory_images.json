@@ -485,6 +485,147 @@
       "memory_size": 96
     },
     {
+      "name": "bytes_key_write_short_probe",
+      "function": "bytesKeyWrite",
+      "args": [
+        "0x0102"
+      ],
+      "immutables": {
+        "seed": 7
+      },
+      "storage": {
+        "7": "1"
+      },
+      "expect": {
+        "revert": "0x"
+      },
+      "memory_size": 192
+    },
+    {
+      "name": "blob_store_short_probe",
+      "function": "blobStore",
+      "args": [
+        "0x010203"
+      ],
+      "immutables": {
+        "seed": 7
+      },
+      "storage": {
+        "7": "1"
+      },
+      "expect": {
+        "revert": "0x"
+      },
+      "memory_size": 96
+    },
+    {
+      "name": "blob_store_31_probe",
+      "function": "blobStore",
+      "args": [
+        "0x0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+      ],
+      "immutables": {
+        "seed": 7
+      },
+      "storage": {
+        "7": "1"
+      },
+      "expect": {
+        "revert": "0x"
+      },
+      "memory_size": 96
+    },
+    {
+      "name": "record_copy_short_probe",
+      "function": "recordCopy",
+      "args": [
+        9,
+        "0x0102030405"
+      ],
+      "immutables": {
+        "seed": 7
+      },
+      "storage": {
+        "7": "1"
+      },
+      "expect": {
+        "revert": "0x"
+      },
+      "memory_size": 352
+    },
+    {
+      "name": "encode_aligned_probe",
+      "function": "encodeOdd",
+      "args": [
+        "0x0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
+        9
+      ],
+      "immutables": {
+        "seed": 7
+      },
+      "storage": {
+        "7": "1"
+      },
+      "expect": {
+        "revert": "0x"
+      },
+      "memory_size": 384
+    },
+    {
+      "name": "encode_packed_aligned_probe",
+      "function": "encodePacked",
+      "args": [
+        "0x0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40",
+        4660
+      ],
+      "immutables": {
+        "seed": 7
+      },
+      "storage": {
+        "7": "1"
+      },
+      "expect": {
+        "revert": "0x"
+      },
+      "memory_size": 352
+    },
+    {
+      "name": "emit_plain_empty_probe",
+      "function": "emitPlain",
+      "args": [
+        1,
+        "0x"
+      ],
+      "immutables": {
+        "seed": 7
+      },
+      "storage": {
+        "7": "1"
+      },
+      "expect": {
+        "revert": "0x"
+      },
+      "memory_size": 256
+    },
+    {
+      "name": "emit_indexed_long_probe",
+      "function": "emitIndexed",
+      "args": [
+        "0x0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728",
+        2
+      ],
+      "immutables": {
+        "seed": 7
+      },
+      "storage": {
+        "7": "1"
+      },
+      "expect": {
+        "revert": "0x"
+      },
+      "memory_size": 352
+    },
+    {
       "name": "bytes_key_write_long_probe",
       "function": "bytesKeyWrite",
       "args": [
