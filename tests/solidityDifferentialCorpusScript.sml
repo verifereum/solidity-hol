@@ -88,6 +88,7 @@ Ancestors
   solidityDifferentialCorpus_mappings
   solidityDifferentialCorpus_memory_arrays
   solidityDifferentialCorpus_memory_bytes
+  solidityDifferentialCorpus_memory_forwarding
   solidityDifferentialCorpus_memory_images
   solidityDifferentialCorpus_memory_structs
   solidityDifferentialCorpus_modifiers

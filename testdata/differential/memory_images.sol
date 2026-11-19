@@ -256,18 +256,7 @@ contract MemoryImages {
         this.failing(n);
     }
 
-    // A failed creation forwards the constructor's revert data the same way.
-    function forwardCreate() external {
-        new Doomed();
-    }
-
-    // So does a failed transfer.
-    function forwardTransfer() external {
-        Refuser r = new Refuser();
-        payable(address(r)).transfer(0);
-    }
-
-    // And a try whose clauses do not match the failure.
+    // A try whose clauses do not match the failure forwards it the same way.
     function forwardTry(uint256 n) external view {
         try this.failing(n) returns (bytes memory) {
         } catch Panic(uint256) {
@@ -281,5 +270,22 @@ contract MemoryImages {
             mstore(add(mload(0x40), 0xe0), add(a, c))
             return(0, add(mload(0x40), 0x100))
         }
+    }
+}
+
+// Forwarded revert data after a failed creation or transfer. A contract that
+// creates others has creation objects inside its Yul object, so these live
+// apart from MemoryImages, whose Yul runs in the three-way check.
+contract MemoryForwarding {
+    // A failed creation copies the constructor's revert data to the free
+    // memory pointer and reverts with it.
+    function forwardCreate() external {
+        new Doomed();
+    }
+
+    // So does a failed transfer.
+    function forwardTransfer() external {
+        Refuser r = new Refuser();
+        payable(address(r)).transfer(0);
     }
 }
