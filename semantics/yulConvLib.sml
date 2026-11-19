@@ -622,11 +622,15 @@ fun let_conv tm =
  * Applied at the top only, repeatedly, since the pushed-out inner case is at
  * the top again and may itself be one.  The conditional is in the list for
  * the same reason: a guard the evaluator leaves undecided, because the call in
- * it is folded, leaves the case in the test, where nothing else reaches it. *)
+ * it is folded, leaves the case in the test, where nothing else reaches it.
+ * And a conditional as the scrutinee: at a fuel that is a variable, each call
+ * is under the evaluator's own `n = 0` test, and the call's case on it is
+ * pushed into the branches, where the frame rule and the prune see the call. *)
 val push_lemmas = [yul_expr_result_CASE_cond,
                    yul_expr_result_CASE_CASE,
                    yul_expr_result_CASE_option,
-                   yul_expr_result_CASE_list]
+                   yul_expr_result_CASE_list,
+                   yul_expr_result_CASE_if]
 
 fun push_conv tm =
   let

@@ -9,7 +9,9 @@
  * Expressions return a yul_expr_result rather than a yul_result, so the "did
  * not stop for fuel" side condition is yul_running instead of a completion
  * test.  The conjuncts are in the definition's order: block, stmt, expr, args,
- * loop, cases, call.
+ * loop, cases, call.  The whole mutual fact is exported as
+ * `eval_yul_fuel_stable`, for proofs about a statement, block or loop; the
+ * per-case lemmas behind it stay local.
  *)
 Theory yulEvaluatorProps
 Ancestors
@@ -361,7 +363,7 @@ Proof
   simp[Abbr `rp`]
 QED
 
-Theorem eval_yul_fuel_stable[local]:
+Theorem eval_yul_fuel_stable:
   (∀n fns ss m k.
      (eval_yul_block n fns ss m).completion ≠ YulOutOfFuel ∧ n ≤ k ⇒
      eval_yul_block k fns ss m = eval_yul_block n fns ss m) ∧
@@ -473,6 +475,19 @@ Theorem yul_expr_result_CASE_list:
       (λh t. yul_expr_result_CASE (c h t) b1 b2)
 Proof
   rw [] >> Cases_on `l` >> simp [listTheory.list_case_def]
+QED
+
+(* A case on a conditional, pushed into its branches.  At a symbolic fuel each
+ * call the body makes is `if n = 0 then EvalAbrupt YulOutOfFuel m else
+ * invoke_yul (n - 1) ...`, and the case on it reaches the call only once it
+ * is inside the else branch. *)
+Theorem yul_expr_result_CASE_if:
+  ∀g t e b1 b2.
+    yul_expr_result_CASE (if g then t else e) b1 b2 =
+    if g then yul_expr_result_CASE t b1 b2
+    else yul_expr_result_CASE e b1 b2
+Proof
+  rw []
 QED
 
 (* The case in a conditional's *test*, pushed in: the case comes to the top and
