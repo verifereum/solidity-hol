@@ -20,7 +20,8 @@ interface IImagePeer {
 // dispatch. Mode 3 overwrites that word with a number no function has, and
 // the call through it panics with 0x51; mode 4 reads that word into a local,
 // overwrites the reserved word again, assigns the local back to the immutable
-// and dumps memory, which holds the first word.
+// and dumps memory, which holds the first word; mode 5 does the same and
+// reverts with no data instead of dumping.
 contract Doomed {
     constructor() {
         revert("a reason longer than one memory word, forwarded");
@@ -49,6 +50,7 @@ contract MemoryImages {
     event Indexed(bytes indexed key, uint256[] items);
     event Stored(bytes data, bytes indexed tag);
     event Paired(Pair indexed p);
+    event Tagged(bytes indexed key, uint256 value);
 
     uint256 immutable seed;
     function(uint256) internal pure returns (uint256) immutable op;
@@ -79,6 +81,13 @@ contract MemoryImages {
             assembly { mstore(0xa0, 0x77) }
             op = kept;
             assembly { revert(0, add(mload(0x40), 0x100)) }
+        }
+        if (mode == 5) {
+            assembly { mstore(0xa0, 0x99) }
+            function(uint256) internal pure returns (uint256) kept = op;
+            assembly { mstore(0xa0, 0x77) }
+            op = kept;
+            assembly { revert(0, 0) }
         }
     }
 
@@ -346,6 +355,18 @@ contract MemoryImages {
     function forwardTry(uint256 n) external view {
         try this.failing(n) returns (bytes memory) {
         } catch Panic(uint256) {
+        }
+    }
+
+    // With the free memory pointer at 0x20, the indexed key's hash preimage
+    // overwrites the pointer, which the emit reads again before it encodes
+    // the log's data.
+    function emitLow(bytes calldata k, uint256 x) external {
+        assembly { mstore(0x40, 0x20) }
+        emit Tagged(k, x);
+        assembly {
+            if sload(probe.slot) { revert(0, 0) }
+            return(0, add(mload(0x40), 0x100))
         }
     }
 

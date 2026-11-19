@@ -241,14 +241,22 @@ hold (one assembly left dirty) fails closed.
 
 Where the compiled code's memory behaviour depends on something the model
 does not track, execution stops with an `unsupported:` completion naming the
-case, rather than guessing. There are six such cases:
+case, rather than guessing. There are eight such cases:
 
 - an encoder input at or above the free memory pointer, which the compiled
   encoder overwrites before it reads it;
 - an indexed event argument that is a stored array or struct whose in-place
   encoding ends in an empty byte sequence;
+- an event that reads an argument from memory and whose indexed arguments'
+  hash preimages overwrite the free memory pointer: the compiled emit reads
+  the pointer anew for each preimage and for the log's data, so a later
+  preimage can land on that argument before it is read;
 - an `abi.decode` of memory that reads at or past the free memory pointer,
   where the compiled decoder allocates while it reads;
+- a decoding into memory (from calldata, an `abi.decode` or a call's
+  results) that allocates with the free memory pointer below 96, where an
+  allocated object can cover the pointer's word, which the compiled decoder
+  reads again for each object it allocates;
 - an `abi.decode` that fails on a memory input reaching past the memory size
   or the free memory pointer, since its failure does not say how far it read;
 - an immutable's reserved word that its type cannot hold, when a constructor

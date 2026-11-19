@@ -694,8 +694,11 @@ End
  * and reach the end of the input the decoder has read, as its mloads and
  * mcopys reach. A byte sequence or array whose data reaches past bound is
  * left unsupported: a memory input's bound is where the free memory pointer
- * was, past which the compiled decoder's own allocations may lie. The fuel
- * bounds the struct nesting. *)
+ * was, past which the compiled decoder's own allocations may lie. The
+ * compiled decoder reads the free memory pointer anew for each object it
+ * allocates, where free here only advances: an allocation below 96, whose
+ * object can cover the pointer's word, is left unsupported. The fuel bounds
+ * the struct nesting. *)
 Definition decode_memory_value_def:
   (decode_memory_value env (fuel : num) ty bs (total : num) (bound : num) pos free (reach : num) =
     if byte_sequence_type ty ∨ (case ty of ArrayT _ _ => T | _ => F) then
@@ -708,6 +711,7 @@ Definition decode_memory_value_def:
         | _ => let n = input_word bs pos in
                (n, pos + 32, 32 + 32 * ((n + 31) DIV 32), MAX reach (pos + 32)) in
       if 2 ** 64 ≤ length ∨ 2 ** 64 ≤ free + size then INR (PanicCompletion 65) else
+      if free < 96 then INR (InvalidCompletion "unsupported: decoding into memory below the free memory pointer word's end") else
       case ty of
         ArrayT element _ =>
           if data + length * abi_stride env element > total then
@@ -734,6 +738,7 @@ Definition decode_memory_value_def:
                 total
              then INR (RevertCompletion [])
              else if 2 ** 64 ≤ free + 32 * LENGTH tys then INR (PanicCompletion 65)
+             else if free < 96 then INR (InvalidCompletion "unsupported: decoding into memory below the free memory pointer word's end")
              else if fuel = 0 then INR (InvalidCompletion "struct nesting")
              else
                (case decode_memory_fields env (fuel - 1) tys bs total bound pos pos
@@ -809,6 +814,7 @@ Definition copy_calldata_array_def:
       ArrayT element l =>
         let size = (if l = NONE then 32 else 0) + 32 * length in
         if 2 ** 64 ≤ free + size then INR (PanicCompletion 65)
+        else if free < 96 then INR (InvalidCompletion "unsupported: decoding into memory below the free memory pointer word's end")
         else if data + length * abi_stride env element > LENGTH cd then
           INR (RevertCompletion [])
         else (case decode_memory_elements env (LENGTH env.type_declarations) element cd

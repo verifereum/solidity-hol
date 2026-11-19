@@ -1884,6 +1884,31 @@ Proof
   CONV_TAC cv_eval
 QED
 
+(* A bare gas() as create's or create2's value is a gas reading, not the
+ * budget a call's first operand means: it consumes an observation. *)
+Definition creation_gas_read_def:
+  creation_gas_read op gas =
+    invoke_source 20 (asm_env [YulAssign ["x"]
+        (YulBuiltin op ([YulBuiltin YGas []; ylit 0w; ylit 0w] ++
+                        (if op = YCreate2 then [ylit 0w] else [])))])
+      (AstId 110) [ScalarValue (IntegerValue 7)] initial_state gas
+End
+
+val () = cv_auto_trans creation_gas_read_def;
+
+Theorem creation_value_gas_is_an_observation:
+  (creation_gas_read YCreate []).completion =
+    InvalidCompletion "missing gas observation" ∧
+  (creation_gas_read YCreate2 []).completion =
+    InvalidCompletion "missing gas observation" ∧
+  (creation_gas_read YCreate [GasLeftObservation 0; GasLeftObservation 5]).unused_gas_evidence =
+    [GasLeftObservation 5] ∧
+  (creation_gas_read YCreate2 [GasLeftObservation 0; GasLeftObservation 5]).unused_gas_evidence =
+    [GasLeftObservation 5]
+Proof
+  CONV_TAC cv_eval
+QED
+
 Definition abort_code_def:
   abort_code =
     [store_x;
