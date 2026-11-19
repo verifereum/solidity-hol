@@ -337,6 +337,17 @@ Definition navigate_result_def:
     | ValueAbrupt c => INR c
 End
 
+(* A constructor keeps the contract's immutables in its reserved memory,
+ * a word each from 0x80, in declaration order, base contracts first. *)
+Definition immutable_offset_def:
+  (immutable_offset x [] = NONE) ∧
+  (immutable_offset x ((y, ty) :: rest) =
+    if x = y then SOME (128 : num, ty : sol_type) else
+    case immutable_offset x rest of
+      SOME (a, t) => SOME (a + 32, t)
+    | NONE => NONE)
+End
+
 (* Operations without nested code, and the state after them: reading memory
  * raises its active size. Calls and array mutations are handled by
  * statements. *)
@@ -380,12 +391,18 @@ Definition eval_operation_def:
                 | INR c => INR c)
              else INL (ReferenceValue (CalldataReference head n rty), st)
          | SOME (ReferenceValue (ImmutableReference x)) =>
-             (case FLOOKUP st.immutables (ast_key x) of
-                SOME s => INL (ScalarValue s, st)
-              | NONE =>
-                  case default_elementary ty of
+             (case st.immutables of
+                NONE =>
+                  (case immutable_offset x env.immutables of
+                     SOME (p, ity) => read_memory_word env ity p st
+                   | NONE => INR (InvalidCompletion "bad immutable reference"))
+              | SOME imm =>
+                  case FLOOKUP imm (ast_key x) of
                     SOME s => INL (ScalarValue s, st)
-                  | NONE => INR (InvalidCompletion "bad immutable type"))
+                  | NONE =>
+                      case default_elementary ty of
+                        SOME s => INL (ScalarValue s, st)
+                      | NONE => INR (InvalidCompletion "bad immutable type"))
          | SOME (ReferenceValue r) => outcome_result st (read_storage_reference env st.world ty r)
          | _ => INR (InvalidCompletion "bad storage reference"))
     (* convert_bytes_to_fixedbytes: a memory byte sequence's length word and
@@ -576,19 +593,9 @@ Definition define_binding_def:
 End
 
 (* A storage write in a static frame fails; the EVM would halt exceptionally,
- * which no source completion models yet.
+ * which no source completion models yet. An immutable is assigned only during
+ * creation, in its reserved word.
  *)
-(* A constructor keeps the contract's immutables in its reserved memory,
- * a word each from 0x80, in declaration order, base contracts first. *)
-Definition immutable_offset_def:
-  (immutable_offset x [] = NONE) ∧
-  (immutable_offset x ((y, ty) :: rest) =
-    if x = y then SOME (128 : num, ty : sol_type) else
-    case immutable_offset x rest of
-      SOME (a, t) => SOME (a + 32, t)
-    | NONE => NONE)
-End
-
 Definition write_target_value_def:
   write_target_value env t v (st : source_state) =
     case (FLOOKUP st.targets (ast_key t), v) of
@@ -603,13 +610,12 @@ Definition write_target_value_def:
            INL st1 => SOME st1
          | INR _ => NONE)
     | (SOME (ValueTarget (ImmutableReference x)), ScalarValue s) =>
-        (case immutable_offset x env.immutables of
-           SOME (a, ty) =>
-             (case write_memory_word env ty a (ScalarValue s)
-                     (st with immutables := st.immutables |+ (ast_key x, s)) of
+        (case (st.immutables, immutable_offset x env.immutables) of
+           (NONE, SOME (a, ty)) =>
+             (case write_memory_word env ty a (ScalarValue s) st of
                 INL st1 => SOME st1
               | INR _ => NONE)
-         | NONE => NONE)
+         | _ => NONE)
     | (SOME (ValueTarget (StorageReference PersistentStorage addr slot offset
                             ty _)), ScalarValue s) =>
         if st.frame.static_context then NONE else
@@ -1156,7 +1162,7 @@ Definition abi_encode_packed_def:
   abi_encode_packed env x ty tys args st gas =
     case eval_atoms st.scopes args of
       SOME vs =>
-        (case packed_values env st tys vs of
+        (case packed_encoding env st tys vs of
            INL ((bs, spill), st1) => allocate_encoding x ty [] bs spill st1 gas
          | INR c => abrupt_result c st gas)
     | NONE => abrupt_result (InvalidCompletion "bad abi.encodePacked operands") st gas
@@ -1744,6 +1750,8 @@ Definition assembly_return_data_def:
     else SOME m.return_data
 End
 
+(* The frame after an inline assembly block. A halting block leaves the
+ * frame its memory, as the halt does in the compiled code. *)
 Definition assembly_result_def:
   assembly_result env refs (st : source_state) (r : yul_result) gas =
     let gas = r.machine.gas_observations in
@@ -1765,8 +1773,13 @@ Definition assembly_result_def:
          | NONE =>
              abrupt_result (InvalidCompletion "assembly write-back failed") st gas)
     | YulReturn data =>
-        abrupt_result (HaltCompletion data) (st with world := world) gas
-    | YulRevert data => abrupt_result (RevertCompletion data) st gas
+        abrupt_result (HaltCompletion data)
+          (st with <| world := world; memory := r.machine.memory;
+                      memory_size := r.machine.memory_size |>) gas
+    | YulRevert data =>
+        abrupt_result (RevertCompletion data)
+          (st with <| memory := r.machine.memory;
+                      memory_size := r.machine.memory_size |>) gas
     | YulAbort => abrupt_result AbortCompletion st gas
     | YulInvalid reason => abrupt_result (InvalidCompletion reason) st gas
     | YulOutOfFuel => abrupt_result FuelExhausted st gas

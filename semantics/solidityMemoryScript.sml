@@ -23,8 +23,7 @@ Libs
 
 Definition memory_touch_def:
   memory_touch a n (st : source_state) =
-    st with memory_size :=
-      MAX st.memory_size (if n = 0 then 0 else word_size (a + n) * 32)
+    st with memory_size := touched_size st.memory_size a n
 End
 
 Definition memory_read_def:
@@ -114,14 +113,14 @@ Definition scalar_word_def:
     | NONE => NONE
 End
 
-(* The word a value of type ty is held in memory as; an internal function is
- * the id of its declaration, as the compiler's dispatch numbers it, and an
- * external one its address then its selector, left-aligned. *)
+(* The word a value of type ty is held in memory as; an external function is
+ * its address then its selector, left-aligned. An internal function has
+ * none: the compiler's word for it is a number of its own dispatch, which the
+ * source does not model. *)
 Definition memory_word_def:
   memory_word env ty v =
     case v of
-      ScalarValue (InternalFunctionValue f) =>
-        SOME (case f of NONE => 0 | SOME (AstId n) => n)
+      ScalarValue (InternalFunctionValue f) => NONE
     | ScalarValue (ExternalFunctionValue a selector) =>
         if LENGTH selector = 4 then
           SOME (w2n a * 2 ** 96 + num_of_be_bytes selector * 2 ** 64)
@@ -144,7 +143,8 @@ End
 (* The value a word of type ty stands for after the compiler's cleanup
  * (read_from_memory): a bool any nonzero word, an integer, address or fixed
  * bytes its own bits, an enum word outside the enum's members Panic(0x21),
- * as its validator does; a reference the object at that address. *)
+ * as its validator does; a reference the object at that address. An
+ * internal function word is unsupported, as in memory_word. *)
 Definition word_value_def:
   word_value env ty (w : num) =
     if memory_object_type ty then INL (ReferenceValue (MemoryReference w ty)) else
@@ -156,8 +156,7 @@ Definition word_value_def:
              else INR (PanicCompletion 33)
          | NONE => INR (InvalidCompletion "unknown enum"))
     | FunctionT InternalFn _ _ _ =>
-        INL (ScalarValue (InternalFunctionValue
-               (if w = 0 then NONE else SOME (AstId w))))
+        INR (InvalidCompletion "unsupported: internal function in memory")
     | FunctionT ExternalFn _ _ _ =>
         INL (ScalarValue (ExternalFunctionValue (n2w (w DIV 2 ** 96))
                (num_to_bytes 4 (w DIV 2 ** 64))))

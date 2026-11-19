@@ -25,7 +25,7 @@ Definition initial_state_def:
                   authRefund := 0 |> |>;
     scopes := [];
     memory := FEMPTY |+ (0x5F, 0x80w); memory_size := 96;
-    immutables := FEMPTY;
+    immutables := SOME FEMPTY;
     targets := FEMPTY; return_data := SOME []
   |>
 End
@@ -506,7 +506,7 @@ End
 Definition run_halt_def:
   run_halt kind =
     run_entry 20 (asm_env []) halt_proc [] initial_state.frame
-      initial_state.world FEMPTY 0 NONE kind
+      initial_state.world (SOME FEMPTY) 0 NONE kind
 End
 
 val () = cv_auto_trans asm_env_def;
@@ -1895,7 +1895,7 @@ val () = cv_auto_trans abort_code_def;
 
 Theorem invalid_restores_complete_world:
   run_entry 20 (asm_env abort_code) (asm_proc abort_code)
-    [ScalarValue (IntegerValue 7)] initial_state.frame initial_state.world FEMPTY 0 NONE CallEntry =
+    [ScalarValue (IntegerValue 7)] initial_state.frame initial_state.world (SOME FEMPTY) 0 NONE CallEntry =
     ContractAborted initial_state.world
 Proof
   CONV_TAC cv_eval
@@ -1903,7 +1903,7 @@ QED
 
 Theorem unused_observation_fails_on_halt:
   run_entry_with_gas 20 (asm_env []) halt_proc [] initial_state.frame
-    initial_state.world FEMPTY 0 NONE CallEntry [GasLeftObservation 1] =
+    initial_state.world (SOME FEMPTY) 0 NONE CallEntry [GasLeftObservation 1] =
     ContractInvalid "unconsumed gas observation"
 Proof
   CONV_TAC cv_eval

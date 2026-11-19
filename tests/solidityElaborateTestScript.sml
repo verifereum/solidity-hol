@@ -96,7 +96,7 @@ Definition initial_state_def:
     scopes := [];
     (* the free memory pointer at 0x40 holds 0x80, as the prologue leaves it *)
     memory := FEMPTY |+ (0x5F, 0x80w); memory_size := 96;
-    immutables := FEMPTY;
+    immutables := SOME FEMPTY;
     targets := FEMPTY; return_data := SOME []
   |>
 End

@@ -231,12 +231,16 @@ Definition yul_mem_write_def:
      yul_mem_write (mem |+ (offset, b)) (offset + 1) bs)
 End
 
+(* The active memory size after an access of sz bytes at offset: raised to
+ * the words covering them, unless sz is zero. *)
+Definition touched_size_def:
+  touched_size size offset sz =
+    MAX size (if sz = 0 then 0 else word_size (offset + sz) * 32)
+End
 
 Definition yul_memory_touch_def:
   yul_memory_touch m offset sz =
-    m with memory_size :=
-      MAX m.memory_size
-          (if sz = 0 then 0 else word_size (offset + sz) * 32)
+    m with memory_size := touched_size m.memory_size offset sz
 End
 
 (* The touched machine and the bytes read from it. *)

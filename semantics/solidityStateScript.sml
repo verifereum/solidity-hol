@@ -48,9 +48,10 @@ End
  * byte per address (absent bytes are zero) with its active size, as the
  * compiled code sees it: the free memory pointer is the word at 0x40, and
  * memory references are addresses in it. Scopes are innermost
- * first. The immutables are the values of the contract's immutables, keyed by
- * their declarations: those the deployed code holds, or, during creation, those
- * the constructor has assigned so far; one not there is zero. The return
+ * first. The immutables are the values of the contract's immutables the
+ * deployed code holds, keyed by their declarations (one not there is zero);
+ * NONE during creation, where they are words in the frame's reserved memory
+ * instead, as the compiled constructor keeps them. The return
  * data is the frame's return data buffer, the last message call's return or
  * revert bytes, where the source knows it: NONE after a call whose return data
  * the source computes no bytes for (the ecrecover precompile).
@@ -59,7 +60,7 @@ Datatype:
   source_state = <|
     world : source_world;
     frame : source_frame;
-    immutables : num |-> scalar;
+    immutables : (num |-> scalar) option;
     scopes : (num |-> source_binding) list;
     memory : num |-> word8;
     memory_size : num;

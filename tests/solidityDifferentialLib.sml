@@ -194,6 +194,22 @@ fun run_case {suite, code, initcode, fixture, immutables, unit, program, fuel, b
                        logs_json other)]);
         false
       end
+    else if is_con "MemorySizeMismatch" result then
+      let
+        fun size tm = if optionSyntax.is_some tm then
+                        json_string (term_to_string (optionSyntax.dest_some tm))
+                      else json_string "none"
+        val (bytecode, source, expected) =
+          case snd (strip_comb result) of
+            [b, s, e] => (b, s, e)
+          | _ => raise ERR "run_case" "unexpected verdict"
+      in
+        emit (base @ [("status", json_string "memory-size-mismatch"),
+                      ("bytecode_memory_size", size bytecode),
+                      ("source_memory_size", size source),
+                      ("expected_memory_size", json_string (term_to_string expected))]);
+        false
+      end
     else if is_con "StorageMismatch" result orelse is_con "StorageUnexpected" result
     then
       let

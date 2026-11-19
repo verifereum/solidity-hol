@@ -51,7 +51,7 @@ Definition named_call_def:
     <| case_sender := 0x2000w; case_value := 0; case_input := NamedCall name args;
        case_storage := storage; case_peer_code := []; case_peer_storage := []; case_libraries := [];
        case_expect := expect; case_final := final; case_gas := []; case_logs := [];
-       case_immutables := []; case_immutable_refs := [] |>
+       case_immutables := []; case_immutable_refs := []; case_memory_size := NONE |>
 End
 
 val () = cv_auto_trans named_call_def;
@@ -242,7 +242,8 @@ Definition mint_call_def:
          [(2, 5);
           (68113724183316182233052564790125915752421945217496801851705428207216635038832,
            5)];
-       case_gas := []; case_logs := logs; case_immutables := []; case_immutable_refs := [] |>
+       case_gas := []; case_logs := logs; case_immutables := []; case_immutable_refs := [];
+       case_memory_size := NONE |>
 End
 
 val () = cv_auto_trans mint_call_def;

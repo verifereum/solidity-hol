@@ -548,10 +548,28 @@ Definition runtime_abi_values_def:
   (runtime_abi_values _ _ _ _ = INR (InvalidCompletion "bad ABI arguments"))
 End
 
+(* An encoder writes at the free memory pointer, and the compiled one reads
+ * each input only when it reaches it, after writing what comes before it.
+ * The encoders here read their inputs first, from memory as it was, which
+ * gives the same bytes when every input lies below the free pointer. The
+ * reads run from a memory size of zero, so the size they leave covers what
+ * they read; an input read at or above the free pointer is unsupported and
+ * fails closed. Otherwise the size is what reading from st leaves. *)
+Definition encoder_state_def:
+  encoder_state (st : source_state) (st1 : source_state) =
+    if FST (memory_load 64 st) < st1.memory_size then
+      INR (InvalidCompletion "unsupported: encoder input at or above the free memory pointer")
+    else INL (st1 with memory_size := MAX st.memory_size st1.memory_size)
+End
+
 Definition encoded_runtime_values_def:
   encoded_runtime_values env st tys vs =
-    case runtime_abi_values env st tys vs of
-      INL ((parts, spill), st1) => INL ((encoded_abi_tuple parts, (case spill of SOME n => n | NONE => 0)), st1)
+    case runtime_abi_values env (st with memory_size := 0) tys vs of
+      INL ((parts, spill), st1) =>
+        (case encoder_state st st1 of
+           INL st2 =>
+             INL ((encoded_abi_tuple parts, (case spill of SOME n => n | NONE => 0)), st2)
+         | INR c => INR c)
     | INR c => INR c
 End
 
@@ -596,6 +614,16 @@ Definition packed_values_def:
           INL ((bs ++ rest, if tys = [] then packed_spill ty v bs else spill), st2)
       | INR c => INR c) ∧
   (packed_values _ _ _ _ = INR (InvalidCompletion "bad packed values"))
+End
+
+Definition packed_encoding_def:
+  packed_encoding env st tys vs =
+    case packed_values env (st with memory_size := 0) tys vs of
+      INL (r, st1) =>
+        (case encoder_state st st1 of
+           INL st2 => INL (r, st2)
+         | INR c => INR c)
+    | INR c => INR c
 End
 
 Definition abi_runtime_values_def:
@@ -1026,12 +1054,15 @@ End
 
 Definition event_log_def:
   event_log env st logger topic0 args =
-    case event_parts env st args of
+    case event_parts env (st with memory_size := 0) args of
       INL ((topics, parts, spill, temps), st1) =>
-        INL ((<| logger := logger;
-                 topics := (case topic0 of SOME t => t :: topics | NONE => topics);
-                 data := encoded_abi_tuple parts |>,
-               (case spill of SOME n => n | NONE => 0), temps), st1)
+        (case encoder_state st st1 of
+           INL st2 =>
+             INL ((<| logger := logger;
+                      topics := (case topic0 of SOME t => t :: topics | NONE => topics);
+                      data := encoded_abi_tuple parts |>,
+                   (case spill of SOME n => n | NONE => 0), temps), st2)
+         | INR c => INR c)
     | INR c => INR c
 End
 
@@ -1170,6 +1201,7 @@ Proof
   simp[Once runtime_abi_values_pre_def] >> rw[] >> gvs[]
 QED
 
+val () = cv_auto_trans encoder_state_def;
 val () = cv_auto_trans encoded_runtime_values_def;
 val () = cv_auto_trans packed_value_def;
 val packed_values_pre_def =
@@ -1181,6 +1213,8 @@ Proof
   ho_match_mp_tac packed_values_ind >> rpt strip_tac >>
   simp[Once packed_values_pre_def] >> rw[] >> gvs[]
 QED
+
+val () = cv_auto_trans packed_encoding_def;
 val decode_memory_value_pre_def = cv_auto_trans_pre_rec
   "decode_memory_value_pre decode_memory_elements_pre decode_memory_fields_pre decode_memory_part_pre"
   decode_memory_value_def (

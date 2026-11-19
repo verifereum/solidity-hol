@@ -1196,7 +1196,6 @@ Definition assembly_expr_ok_def:
   (assembly_expr_ok bad (YulBuiltin b es) ⇔
     ¬MEM b bad ∧ assembly_exprs_ok bad es) ∧
   (assembly_expr_ok bad (YulApply _ es) ⇔ assembly_exprs_ok bad es) ∧
-  (* only the evaluator builds a checked call; source code has none *)
   (assembly_exprs_ok bad [] ⇔ T) ∧
   (assembly_exprs_ok bad (e :: es) ⇔
     assembly_expr_ok bad e ∧ assembly_exprs_ok bad es)
