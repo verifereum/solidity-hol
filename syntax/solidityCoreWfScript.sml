@@ -469,14 +469,15 @@ Definition elementary_scalar_has_type_def:
 End
 
 (* An internal function value names a procedure with the type's parameter
- * and return types, or is the zero value. *)
+ * and return types, or is a dispatch word (below 2 ** 256) no function has. *)
 Definition scalar_has_type_def:
   scalar_has_type env ty s ⇔
     case ty of
       FunctionT InternalFn _ ps rs =>
         (case s of
-           InternalFunctionValue NONE => T
-         | InternalFunctionValue (SOME f) =>
+           InternalFunctionValue (INR w) =>
+             w < 2 ** 256 ∧ ¬MEM w (MAP SND env.function_ids)
+         | InternalFunctionValue (INL f) =>
              (case lookup_procedure env f of
                 SOME p =>
                   MAP SND p.parameters = ps ∧ MAP SND p.return_bindings = rs

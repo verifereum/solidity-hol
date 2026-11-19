@@ -1515,7 +1515,7 @@ Definition elab_expr_def:
                      (case function_value_type callee tid of
                         SOME ty =>
                           INL (([], ConstantAtom (InternalFunctionValue
-                                      (SOME (AstId callee.fn_info.node_id))),
+                                      (INL (AstId callee.fn_info.node_id))),
                                 ElabType ty), n)
                       | NONE => INR [(info.node_id, "unsupported function value")])
                  | NONE => unknown_reference ctx info.node_id "unsupported identifier" x)

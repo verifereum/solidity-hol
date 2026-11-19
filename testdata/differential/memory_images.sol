@@ -15,7 +15,12 @@ interface IImagePeer {
 // with no data where its assembly starts, so the memory size the operation
 // left is observed before the dump raises it. The constructor can do the
 // same during creation (mode 1 dumps, mode 2 probes), where an immutable's
-// value sits in memory reserved after the zero slot.
+// value sits in memory reserved after the zero slot; an internal function
+// immutable's word there is the function's number in the compiler's internal
+// dispatch. Mode 3 overwrites that word with a number no function has, and
+// the call through it panics with 0x51; mode 4 reads that word into a local,
+// overwrites the reserved word again, assigns the local back to the immutable
+// and dumps memory, which holds the first word.
 contract MemoryImages {
     struct Record {
         uint128 small;
@@ -28,6 +33,7 @@ contract MemoryImages {
     event Stored(bytes data, bytes indexed tag);
 
     uint256 immutable seed;
+    function(uint256) internal pure returns (uint256) immutable op;
     mapping(uint256 => uint256) values;
     mapping(bytes => uint256) byKey;
     uint256[] items;
@@ -38,12 +44,28 @@ contract MemoryImages {
 
     constructor(uint256 s, uint8 mode) {
         seed = s;
+        op = twice;
         if (mode == 1) {
             assembly { revert(0, add(mload(0x40), 0x100)) }
         }
         if (mode == 2) {
             assembly { revert(0, 0) }
         }
+        if (mode == 3) {
+            assembly { mstore(0xa0, 0x99) }
+            seed = op(s);
+        }
+        if (mode == 4) {
+            assembly { mstore(0xa0, 0x99) }
+            function(uint256) internal pure returns (uint256) kept = op;
+            assembly { mstore(0xa0, 0x77) }
+            op = kept;
+            assembly { revert(0, add(mload(0x40), 0x100)) }
+        }
+    }
+
+    function twice(uint256 x) internal pure returns (uint256) {
+        return 2 * x;
     }
 
     function mappingRead(uint256 k) external view {
