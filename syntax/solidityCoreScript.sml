@@ -322,7 +322,9 @@ End
  * contract's immutables, unread ones included, with their types: creation
  * reserves a memory word for each. The unsupported procedures are those of
  * functions the frontend could not model: they have no procedure, so the
- * dispatch entries naming them refuse, and no procedure can call them. *)
+ * dispatch entries naming them refuse, and no procedure can call them. The
+ * function ids give each procedure an internal function value can name the
+ * number the compiler holds that value as. *)
 Datatype:
   core_program = <|
     procedures : core_procedure list;
@@ -335,7 +337,8 @@ Datatype:
     external_functions : core_external_function list;
     receive_procedure : ast_id option;
     fallback_procedure : (ast_id # bool) option;
-    creation_procedure : (ast_id # bool) option
+    creation_procedure : (ast_id # bool) option;
+    function_ids : (ast_id # num) list
   |>
 End
 

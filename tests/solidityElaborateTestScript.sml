@@ -512,7 +512,8 @@ val empty_contract =
       contract_base_arguments := []; contract_static_calls := []; contract_storage := [];
       contract_structs := []; contract_enums := []; contract_events := [];
       contract_modifiers := []; contract_functions := [];
-      contract_library_functions := []; contract_getters := [] |>”;
+      contract_library_functions := []; contract_getters := [];
+      contract_function_ids := [] |>”;
 fun function_of ps rs ss =
   “<| fn_info := ^(at 1); fn_name := "f"; fn_scope := 0;
       fn_kind := FunctionKind; fn_visibility := InternalVisibility;

@@ -391,7 +391,7 @@
       "deploy": true,
       "args": [
         7,
-        true
+        1
       ],
       "expect": {
         "revert": "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000070000000000000000000000000000000000000000000000000000000000000007000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
@@ -403,11 +403,251 @@
       "deploy": true,
       "args": [
         7,
-        false
+        0
       ],
       "expect": {
         "returned": "0x0000000000000000000000000000000000000000000000000000000000000007"
       }
+    },
+    {
+      "name": "creation_probe",
+      "deploy": true,
+      "args": [
+        7,
+        2
+      ],
+      "expect": {
+        "revert": "0x"
+      },
+      "memory_size": 224
+    },
+    {
+      "name": "mapping_read_probe",
+      "function": "mappingRead",
+      "args": [
+        5
+      ],
+      "immutables": {
+        "seed": 7
+      },
+      "storage": {
+        "7": "1"
+      },
+      "expect": {
+        "revert": "0x"
+      },
+      "memory_size": 96
+    },
+    {
+      "name": "bytes_key_write_long_probe",
+      "function": "bytesKeyWrite",
+      "args": [
+        "0x0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728"
+      ],
+      "immutables": {
+        "seed": 7
+      },
+      "storage": {
+        "7": "1"
+      },
+      "expect": {
+        "revert": "0x"
+      },
+      "memory_size": 224
+    },
+    {
+      "name": "array_push_read_probe",
+      "function": "arrayPushRead",
+      "args": [
+        3
+      ],
+      "immutables": {
+        "seed": 7
+      },
+      "storage": {
+        "7": "1"
+      },
+      "expect": {
+        "revert": "0x"
+      },
+      "memory_size": 96
+    },
+    {
+      "name": "blob_store_empty_probe",
+      "function": "blobStore",
+      "args": [
+        "0x"
+      ],
+      "immutables": {
+        "seed": 7
+      },
+      "storage": {
+        "7": "1"
+      },
+      "expect": {
+        "revert": "0x"
+      },
+      "memory_size": 96
+    },
+    {
+      "name": "blob_store_long_probe",
+      "function": "blobStore",
+      "args": [
+        "0x0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f2021"
+      ],
+      "immutables": {
+        "seed": 7
+      },
+      "storage": {
+        "7": "1"
+      },
+      "expect": {
+        "revert": "0x"
+      },
+      "memory_size": 96
+    },
+    {
+      "name": "record_copy_long_probe",
+      "function": "recordCopy",
+      "args": [
+        1361129467683753853853498429727072845833,
+        "0x0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d"
+      ],
+      "immutables": {
+        "seed": 7
+      },
+      "storage": {
+        "7": "1"
+      },
+      "expect": {
+        "revert": "0x"
+      },
+      "memory_size": 384
+    },
+    {
+      "name": "encode_odd_probe",
+      "function": "encodeOdd",
+      "args": [
+        "0x0102030405",
+        9
+      ],
+      "immutables": {
+        "seed": 7
+      },
+      "storage": {
+        "7": "1"
+      },
+      "expect": {
+        "revert": "0x"
+      },
+      "memory_size": 384
+    },
+    {
+      "name": "encode_empty_probe",
+      "function": "encodeOdd",
+      "args": [
+        "0x",
+        9
+      ],
+      "immutables": {
+        "seed": 7
+      },
+      "storage": {
+        "7": "1"
+      },
+      "expect": {
+        "revert": "0x"
+      },
+      "memory_size": 320
+    },
+    {
+      "name": "encode_packed_odd_probe",
+      "function": "encodePacked",
+      "args": [
+        "0x010203",
+        4660
+      ],
+      "immutables": {
+        "seed": 7
+      },
+      "storage": {
+        "7": "1"
+      },
+      "expect": {
+        "revert": "0x"
+      },
+      "memory_size": 288
+    },
+    {
+      "name": "hash_packed_probe",
+      "function": "hashPacked",
+      "args": [
+        1,
+        2
+      ],
+      "immutables": {
+        "seed": 7
+      },
+      "storage": {
+        "7": "1"
+      },
+      "expect": {
+        "revert": "0x"
+      },
+      "memory_size": 224
+    },
+    {
+      "name": "emit_plain_odd_probe",
+      "function": "emitPlain",
+      "args": [
+        1,
+        "0x010203"
+      ],
+      "immutables": {
+        "seed": 7
+      },
+      "storage": {
+        "7": "1"
+      },
+      "expect": {
+        "revert": "0x"
+      },
+      "memory_size": 320
+    },
+    {
+      "name": "emit_indexed_odd_probe",
+      "function": "emitIndexed",
+      "args": [
+        "0x0102030405",
+        2
+      ],
+      "immutables": {
+        "seed": 7
+      },
+      "storage": {
+        "7": "1"
+      },
+      "expect": {
+        "revert": "0x"
+      },
+      "memory_size": 352
+    },
+    {
+      "name": "peer_data_probe",
+      "function": "peerData",
+      "args": [
+        4
+      ],
+      "immutables": {
+        "seed": 7
+      },
+      "storage": {
+        "7": "1"
+      },
+      "expect": {
+        "revert": "0x"
+      },
+      "memory_size": 224
     }
   ]
 }

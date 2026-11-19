@@ -52,7 +52,7 @@ Theorem dynamic_enum_array_abi_value:
     (differential_accounts [] [(0, 2); (w2n (mapping_slot [] 0w), 512)] 0x2000w)
     contract_address 0w (ArrayT (EnumT (AstId 5)) NONE) =
   INL (ListV [NumV 0; NumV 2],
-       enc (Uint 256) (NumV 2) ++ enc (Uint 8) (NumV 0) ++ enc (Uint 8) (NumV 2))
+       enc (Uint 256) (NumV 2) ++ enc (Uint 8) (NumV 0) ++ enc (Uint 8) (NumV 2), [])
 Proof
   CONV_TAC cv_eval
 QED
@@ -61,7 +61,7 @@ Theorem fixed_enum_array_abi_value:
   storage_abi_value (core_program_environment corpus_storage_enum_arrays_program) 0
     (differential_accounts [] [(2, 512)] 0x2000w)
     contract_address 2w (ArrayT (EnumT (AstId 5)) (SOME 2)) =
-  INL (ListV [NumV 0; NumV 2], enc (Uint 8) (NumV 0) ++ enc (Uint 8) (NumV 2))
+  INL (ListV [NumV 0; NumV 2], enc (Uint 8) (NumV 0) ++ enc (Uint 8) (NumV 2), [])
 Proof
   CONV_TAC cv_eval
 QED

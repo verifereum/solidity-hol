@@ -302,11 +302,22 @@ Definition encoded_abi_tuple_def:
     heads ++ tails
 End
 
+(* The bytes an encoding's last dynamic part writes past its end, given each
+ * part's ABI type and those bytes: none when no part is dynamic. *)
+Definition last_spill_def:
+  (last_spill ([] : (abi_type # byte list) list) = []) ∧
+  (last_spill ((t, sp) :: ps) =
+    if EXISTS (λ(t, sp). is_dynamic t) ps then last_spill ps
+    else if is_dynamic t then sp else [])
+End
+
 (* A storage value encoded in place, as the pinned encoder does: its ABI
- * value and its encoding. Scalars are read cleaned; a byte sequence copies
- * whole data words, keeping unused dirty bytes, except the length byte of a
- * short one. A length of 2^64 or more panics with 0x41, as the memory for the
- * encoding cannot be allocated. The fuel bounds the struct nesting. *)
+ * value, its encoding, and the bytes written past its end. Scalars are read
+ * cleaned; a byte sequence copies whole data words, keeping unused dirty
+ * bytes, except the length byte of a short one (storage_byte_data), and an
+ * empty one still writes its slot's word past its end. A length of 2^64 or
+ * more panics with 0x41, as the memory for the encoding cannot be
+ * allocated. The fuel bounds the struct nesting. *)
 Definition storage_abi_value_def:
   (storage_abi_value env (fuel : num) accounts addr slot ty =
     if byte_sequence_type ty then
@@ -316,7 +327,9 @@ Definition storage_abi_value_def:
          if 2 ** 64 ≤ length then INR (PanicCompletion 65) else
          let data = storage_byte_data accounts addr slot length in
          case abi_value ty (ScalarValue (BytesValue (TAKE length data))) of
-           SOME a => INL (a, enc (Uint 256) (NumV length) ++ data)
+           SOME a =>
+             if length = 0 then INL (a, enc (Uint 256) (NumV 0), data)
+             else INL (a, enc (Uint 256) (NumV length) ++ data, [])
          | NONE => INR (InvalidCompletion "bad ABI value"))
     else case ty of
       ArrayT element l =>
@@ -325,11 +338,11 @@ Definition storage_abi_value_def:
              if 2 ** 64 ≤ length then INR (PanicCompletion 65) else
              case storage_abi_elements env fuel accounts addr data element 0 length of
                INL parts =>
+                 let t = abi_type env (LENGTH env.type_declarations) element in
                  INL (ListV (MAP FST parts),
                       (if l = NONE then enc (Uint 256) (NumV length) else []) ++
-                      encoded_abi_tuple
-                        (MAP (λp. (abi_type env (LENGTH env.type_declarations) element,
-                                   SND p)) parts))
+                      encoded_abi_tuple (MAP (λ(a, bs, sp). (t, bs)) parts),
+                      last_spill (MAP (λ(a, bs, sp). (t, sp)) parts))
              | INR c => INR c)
     | StructT s =>
         (case (lookup_struct env s, lookup_struct_layout env s) of
@@ -337,7 +350,10 @@ Definition storage_abi_value_def:
              if fuel = 0 then INR (InvalidCompletion "struct nesting") else
              (case storage_abi_fields env (fuel - 1) accounts addr slot
                      layout.struct_fields fields of
-                INL parts => INL (ListV (MAP FST parts), encoded_abi_tuple (MAP SND parts))
+                INL parts =>
+                  INL (ListV (MAP FST parts),
+                       encoded_abi_tuple (MAP (λ(a, (t, bs), sp). (t, bs)) parts),
+                       last_spill (MAP (λ(a, (t, bs), sp). (t, sp)) parts))
               | INR c => INR c)
          | _ => INR (InvalidCompletion "missing struct layout"))
     | _ => INR (InvalidCompletion "bad storage ABI type")) ∧
@@ -351,7 +367,7 @@ Definition storage_abi_value_def:
             (case read_storage env accounts addr s offset element of
                SOME v =>
                  (case abi_value element (ScalarValue v) of
-                    SOME a => INL (a, enc (abi_type env 0 element) a)
+                    SOME a => INL (a, enc (abi_type env 0 element) a, [])
                   | NONE => INR (InvalidCompletion "bad ABI value"))
              | NONE => INR (InvalidCompletion "bad storage read"))
           else storage_abi_value env fuel accounts addr s element in
@@ -372,16 +388,17 @@ Definition storage_abi_value_def:
             (case read_storage env accounts addr s v.state_offset ty of
                SOME x =>
                  (case abi_value ty (ScalarValue x) of
-                    SOME a => INL (a, enc (abi_type env 0 ty) a)
+                    SOME a => INL (a, enc (abi_type env 0 ty) a, [])
                   | NONE => INR (InvalidCompletion "bad ABI value"))
              | NONE => INR (InvalidCompletion "bad storage read"))
           else storage_abi_value env fuel accounts addr s ty in
         case value of
           INR c => INR c
-        | INL (a, encoded) =>
+        | INL (a, encoded, sp) =>
             case storage_abi_fields env fuel accounts addr slot layout fields of
               INL parts =>
-                INL ((a, (abi_type env (LENGTH env.type_declarations) ty, encoded)) :: parts)
+                INL ((a, (abi_type env (LENGTH env.type_declarations) ty, encoded), sp)
+                     :: parts)
             | INR c => INR c)
 Termination
   WF_REL_TAC ‘inv_image ($< LEX $< LEX $<) (λx. case x of
@@ -418,11 +435,11 @@ Definition array_copy_value_def:
     | _ => INR (InvalidCompletion "bad array reference")
 End
 
-(* Zero bytes the compiler's encoder writes past the end of an encoding. A
+(* Zero bytes the compiler's encoder writes past the end of an encoding of a
+ * value not in storage (a stored one gives its own, storage_abi_value). A
  * byte sequence copied from memory or calldata is followed by a cleared
- * word; a stored one writes whole words, so only an empty one leaves a zero
- * word past its end; a literal writes whole words. Only the encoding's last
- * dynamic part, recursively, can spill past its end. *)
+ * word; a literal writes whole words. Only the encoding's last dynamic part,
+ * recursively, can spill past its end. *)
 Datatype:
   encoding_source = CopiedBytes | StoredBytes | LiteralBytes
 End
@@ -445,7 +462,7 @@ End
 
 (* The last dynamic part's spill, NONE when no part is dynamic. *)
 Definition later_spill_def:
-  later_spill t (n : num) rest =
+  later_spill t n rest =
     case rest of
       SOME m => SOME m
     | NONE => if is_dynamic t then SOME n else NONE
@@ -469,23 +486,26 @@ Termination
 End
 
 (* abi.encodePacked, the concatenations and indexed topics write a byte
- * sequence without padding: a copied one is followed by a cleared word, a
- * stored or literal one is written in whole words. *)
-Definition packed_bytes_spill_def:
-  packed_bytes_spill src (l : num) =
-    case src of
-      CopiedBytes => 32
-    | StoredBytes => if l < 32 then 32 - l else (32 - l MOD 32) MOD 32
-    | LiteralBytes => (32 - l MOD 32) MOD 32
+ * sequence v without padding, and these bytes past its contents bs: a copied
+ * one is followed by a cleared word, a literal one fills its last word with
+ * zeros, and a stored one is written in whole storage words
+ * (storage_byte_data), which keep what its slots hold past its length. *)
+Definition packed_bytes_tail_def:
+  packed_bytes_tail accounts v (bs : byte list) =
+    case v of
+      ReferenceValue (StorageReference _ addr slot _ _ _) =>
+        DROP (LENGTH bs) (storage_byte_data accounts addr slot (LENGTH bs))
+    | ReferenceValue _ => REPLICATE 32 0w
+    | _ => REPLICATE ((32 - LENGTH bs MOD 32) MOD 32) 0w
 End
 
-(* The last part's left-aligned word or cleared word reaches past the end. *)
-Definition packed_spill_def:
-  packed_spill ty v (bs : byte list) =
+(* What a packed part writes past its end: a value its word's other bytes. *)
+Definition packed_tail_def:
+  packed_tail accounts ty v (bs : byte list) =
     case ty of
-      LocatedT _ (ArrayT _ _) => 0
-    | LocatedT _ _ => packed_bytes_spill (encoding_source v) (LENGTH bs)
-    | _ => 32 - LENGTH bs
+      LocatedT _ (ArrayT _ _) => []
+    | LocatedT _ _ => packed_bytes_tail accounts v bs
+    | _ => REPLICATE (32 - LENGTH bs) 0w : byte list
 End
 
 (* An in-place encoding (indexed_data) ends with its last part, so only that
@@ -507,9 +527,10 @@ Termination
   rw[contractABITheory.abi_value_size_def, listTheory.list_size_def]
 End
 
-(* The ABI value of v, of type ty, and its encoding. A storage value is
- * encoded in place (storage_abi_value); any other reference is read into its
- * value tree, then encoded. Reading memory raises its active size. *)
+(* The ABI value of v, of type ty, its encoding, and the bytes the encoder
+ * writes past its end. A storage value is encoded in place
+ * (storage_abi_value); any other reference is read into its value tree, then
+ * encoded. Reading memory raises its active size. *)
 Definition runtime_abi_value_def:
   runtime_abi_value env st ty v =
     let ty' = case ty of LocatedT _ t => t | t => t in
@@ -518,32 +539,33 @@ Definition runtime_abi_value_def:
         if rty ≠ ty' then INR (InvalidCompletion "bad ABI value")
         else (case storage_abi_value env (LENGTH env.type_declarations)
                      st.world.accounts addr slot rty of
-                INL (a, bs) => INL ((a, bs), scratch_write (read_scratch env
+                INL (a, bs, sp) => INL ((a, bs, sp), scratch_write (read_scratch env
                   (LENGTH env.type_declarations) st.world.accounts addr slot rty) st)
               | INR c => INR c)
     | _ =>
       case (case v of ReferenceValue r => array_copy_value env st ty' r | _ => INL (v, st)) of
         INR c => INR c
       | INL (tree, st1) =>
+        let t = abi_type env (LENGTH env.type_declarations) ty' in
         case value_abi_value env ty' tree of
-          SOME a => INL ((a, enc (abi_type env (LENGTH env.type_declarations) ty') a), st1)
+          SOME a =>
+            INL ((a, enc t a, REPLICATE (abi_spill (encoding_source v) t a) 0w), st1)
         | NONE => INR (InvalidCompletion "bad ABI value")
 End
 
 Definition runtime_abi_values_def:
   (runtime_abi_values env (st : source_state) [] [] =
      (INL (([], NONE), st) :
-        (((contractABI$abi_type # byte list) list # num option) # source_state) +
+        (((contractABI$abi_type # byte list) list # byte list option) # source_state) +
         source_completion)) ∧
   (runtime_abi_values env st (ty :: tys) (v :: vs) =
     case runtime_abi_value env st ty v of
       INR c => INR c
-    | INL ((a, encoded_body), st1) =>
+    | INL ((a, encoded_body, sp), st1) =>
       (case runtime_abi_values env st1 tys vs of
          INL ((encoded, spill), st2) =>
            let t = abi_type env (LENGTH env.type_declarations) ty in
-           INL (((t, encoded_body) :: encoded,
-                 later_spill t (abi_spill (encoding_source v) t a) spill), st2)
+           INL (((t, encoded_body) :: encoded, later_spill t sp spill), st2)
        | INR c => INR c)) ∧
   (runtime_abi_values _ _ _ _ = INR (InvalidCompletion "bad ABI arguments"))
 End
@@ -568,7 +590,7 @@ Definition encoded_runtime_values_def:
       INL ((parts, spill), st1) =>
         (case encoder_state st st1 of
            INL st2 =>
-             INL ((encoded_abi_tuple parts, (case spill of SOME n => n | NONE => 0)), st2)
+             INL ((encoded_abi_tuple parts, (case spill of SOME sp => sp | NONE => [])), st2)
          | INR c => INR c)
     | INR c => INR c
 End
@@ -584,7 +606,7 @@ Definition packed_value_def:
           INR (InvalidCompletion "bad packed array")
         else
           (case runtime_abi_value env st ty v of
-             INL ((_, bs), st1) =>
+             INL ((_, bs, _), st1) =>
                INL ((case length of NONE => DROP 32 bs | SOME _ => bs), st1)
            | INR c => INR c)
     | LocatedT _ _ =>
@@ -602,16 +624,20 @@ Definition packed_value_def:
       | _ => INR (InvalidCompletion "bad packed value")
 End
 
+(* The parts written one after another, and the bytes left past their end:
+ * the later parts' own, then what of a part's tail reaches past those. *)
 Definition packed_values_def:
   (packed_values env st [] [] =
-     (INL (([], 0), st) : ((byte list # num) # source_state) + source_completion)) ∧
+     (INL (([], []), st) : ((byte list # byte list) # source_state) + source_completion)) ∧
   (packed_values env st (ty :: tys) (v :: vs) =
     case packed_value env st ty v of
       INR c => INR c
     | INL (bs, st1) =>
       case packed_values env st1 tys vs of
         INL ((rest, spill), st2) =>
-          INL ((bs ++ rest, if tys = [] then packed_spill ty v bs else spill), st2)
+          let tail = packed_tail st1.world.accounts ty v bs in
+          INL ((bs ++ rest,
+                spill ++ DROP (LENGTH rest + LENGTH spill) tail), st2)
       | INR c => INR c) ∧
   (packed_values _ _ _ _ = INR (InvalidCompletion "bad packed values"))
 End
@@ -874,7 +900,7 @@ End
 (* A storage array, struct or byte sequence copied to new memory, as the
  * compiler's storage-to-memory copies do: each object is allocated before
  * its members, scalars are read cleaned, and a byte sequence keeps whole
- * data words (storage_byte_data); an empty one still writes a zero word
+ * data words (storage_byte_data); an empty one still writes its slot's word
  * after its length, past the allocation. The fuel bounds the struct
  * nesting. *)
 Definition materialize_storage_def:
@@ -888,8 +914,7 @@ Definition materialize_storage_def:
            | INL (p, st1) =>
                INL (ReferenceValue (MemoryReference p ty),
                     memory_write (p + 32)
-                      (if length = 0 then REPLICATE 32 0w
-                       else storage_byte_data accounts addr slot length) st1))
+                      (storage_byte_data accounts addr slot length) st1))
     else case ty of
       ArrayT element l =>
         (case storage_array_data accounts addr slot ty of
@@ -1025,16 +1050,21 @@ Definition event_parts_def:
   (event_parts env st ((ty, indexed, v) :: args) =
     case runtime_abi_value env st ty v of
       INR c => INR c
-    | INL ((a, encoded_body), st1) =>
+    | INL ((a, encoded_body, sp), st1) =>
       (case event_parts env st1 args of
          INR c => INR c
        | INL ((topics, parts, spill, temps), st2) =>
         let t = abi_type env (LENGTH env.type_declarations) ty in
+        let composite = (case t of Array _ _ => T | Tuple _ => T | _ => F) in
         if indexed then
           let src = encoding_source v in
+          if composite ∧ src = StoredBytes ∧ inplace_spill src t a ≠ 0 then
+            INR (InvalidCompletion
+                   "unsupported: an indexed stored array or struct ending in empty bytes")
+          else
           (* the topic, and the bytes hashed for it at the free memory pointer *)
           let topic =
-            if (case t of Array _ _ => T | Tuple _ => T | _ => F) then
+            if composite then
               OPTION_MAP (λbs. (word_of_bytes_be (Keccak_256_w64 bs),
                                 [bs ++ REPLICATE (inplace_spill src t a) 0w]))
                 (indexed_data t a encoded_body)
@@ -1042,14 +1072,13 @@ Definition event_parts_def:
               BytesV bs =>
                 SOME (if is_dynamic t then
                         (word_of_bytes_be (Keccak_256_w64 bs),
-                         [bs ++ REPLICATE (packed_bytes_spill src (LENGTH bs)) 0w])
+                         [bs ++ packed_bytes_tail st1.world.accounts v bs])
                       else (word_of_bytes T (0w : bytes32) encoded_body, []))
             | _ => SOME (word_of_bytes T (0w : bytes32) encoded_body, []) in
           (case topic of
              SOME (word, temp) => INL ((word :: topics, parts, spill, temp ++ temps), st2)
            | NONE => INR (InvalidCompletion "bad indexed event argument"))
-        else INL ((topics, (t, encoded_body) :: parts,
-                   later_spill t (abi_spill (encoding_source v) t a) spill, temps), st2)))
+        else INL ((topics, (t, encoded_body) :: parts, later_spill t sp spill, temps), st2)))
 End
 
 Definition event_log_def:
@@ -1061,7 +1090,7 @@ Definition event_log_def:
              INL ((<| logger := logger;
                       topics := (case topic0 of SOME t => t :: topics | NONE => topics);
                       data := encoded_abi_tuple parts |>,
-                   (case spill of SOME n => n | NONE => 0), temps), st2)
+                   (case spill of SOME sp => sp | NONE => []), temps), st2)
          | INR c => INR c)
     | INR c => INR c
 End
@@ -1134,6 +1163,14 @@ Proof
 QED
 val () = cv_auto_trans encoded_abi_parts_def;
 val () = cv_auto_trans encoded_abi_tuple_def;
+val last_spill_pre_def = cv_auto_trans_pre "last_spill_pre" last_spill_def;
+
+Theorem last_spill_pre[cv_pre,local]:
+  ∀ps. last_spill_pre ps
+Proof
+  Induct >> rw[Once last_spill_pre_def]
+QED
+
 val storage_abi_value_pre_def = cv_auto_trans_pre_rec
   "storage_abi_value_pre storage_abi_elements_pre storage_abi_fields_pre"
   storage_abi_value_def (
@@ -1174,8 +1211,8 @@ Proof
   simp[Once abi_spill_pre_def] >> rw[] >> gvs[]
 QED
 
-val () = cv_auto_trans packed_bytes_spill_def;
-val () = cv_auto_trans packed_spill_def;
+val () = cv_auto_trans packed_bytes_tail_def;
+val () = cv_auto_trans packed_tail_def;
 val inplace_spill_pre_def = cv_auto_trans_pre_rec
   "inplace_spill_pre last_inplace_spill_pre" inplace_spill_def (
   WF_REL_TAC ‘measure (λx. case x of

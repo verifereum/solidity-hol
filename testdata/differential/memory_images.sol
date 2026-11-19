@@ -11,8 +11,11 @@ interface IImagePeer {
 // past their output are all observed. A value the operation produced is
 // stored at 0xe0 past the free memory pointer. (msize() would show the
 // memory size too, but solc rejects it whenever the Yul optimizer runs,
-// which via-IR always does.) The constructor can do the same during creation, where an
-// immutable's value sits in memory reserved after the zero slot.
+// which via-IR always does.) With probe set, each function instead reverts
+// with no data where its assembly starts, so the memory size the operation
+// left is observed before the dump raises it. The constructor can do the
+// same during creation (mode 1 dumps, mode 2 probes), where an immutable's
+// value sits in memory reserved after the zero slot.
 contract MemoryImages {
     struct Record {
         uint128 small;
@@ -29,17 +32,22 @@ contract MemoryImages {
     uint256[] items;
     bytes blob;
     Record record;
+    bool probe;
 
-    constructor(uint256 s, bool dump) {
+    constructor(uint256 s, uint8 mode) {
         seed = s;
-        if (dump) {
+        if (mode == 1) {
             assembly { revert(0, add(mload(0x40), 0x100)) }
+        }
+        if (mode == 2) {
+            assembly { revert(0, 0) }
         }
     }
 
     function mappingRead(uint256 k) external view {
         uint256 v = values[k];
         assembly {
+            if sload(probe.slot) { revert(0, 0) }
             mstore(add(mload(0x40), 0xe0), v)
             return(0, add(mload(0x40), 0x100))
         }
@@ -47,13 +55,17 @@ contract MemoryImages {
 
     function bytesKeyWrite(bytes calldata k) external {
         byKey[k] = seed;
-        assembly { return(0, add(mload(0x40), 0x100)) }
+        assembly {
+            if sload(probe.slot) { revert(0, 0) }
+            return(0, add(mload(0x40), 0x100))
+        }
     }
 
     function arrayPushRead(uint256 x) external {
         items.push(x);
         uint256 y = items[items.length - 1];
         assembly {
+            if sload(probe.slot) { revert(0, 0) }
             mstore(add(mload(0x40), 0xe0), y)
             return(0, add(mload(0x40), 0x100))
         }
@@ -61,7 +73,10 @@ contract MemoryImages {
 
     function blobStore(bytes calldata b) external {
         blob = b;
-        assembly { return(0, add(mload(0x40), 0x100)) }
+        assembly {
+            if sload(probe.slot) { revert(0, 0) }
+            return(0, add(mload(0x40), 0x100))
+        }
     }
 
     function recordCopy(uint256 x, bytes calldata b) external {
@@ -70,32 +85,36 @@ contract MemoryImages {
         record.blob = b;
         Record memory r = record;
         assembly {
+            if sload(probe.slot) { revert(0, 0) }
             mstore(add(mload(0x40), 0xe0), mload(r))
             return(0, add(mload(0x40), 0x100))
         }
     }
 
-    function encodeOdd(bytes calldata b, uint256 x) external pure {
+    function encodeOdd(bytes calldata b, uint256 x) external view {
         bytes memory m = b;
         bytes memory e = abi.encode(x, m);
         assembly {
+            if sload(probe.slot) { revert(0, 0) }
             mstore(add(mload(0x40), 0xe0), mload(e))
             return(0, add(mload(0x40), 0x100))
         }
     }
 
-    function encodePacked(bytes calldata b, uint16 x) external pure {
+    function encodePacked(bytes calldata b, uint16 x) external view {
         bytes memory m = b;
         bytes memory e = abi.encodePacked(m, x);
         assembly {
+            if sload(probe.slot) { revert(0, 0) }
             mstore(add(mload(0x40), 0xe0), mload(e))
             return(0, add(mload(0x40), 0x100))
         }
     }
 
-    function hashPacked(uint256 x, uint8 y) external pure {
+    function hashPacked(uint256 x, uint8 y) external view {
         bytes32 h = keccak256(abi.encodePacked(x, y));
         assembly {
+            if sload(probe.slot) { revert(0, 0) }
             mstore(add(mload(0x40), 0xe0), byte(0, h))
             return(0, add(mload(0x40), 0x100))
         }
@@ -104,7 +123,10 @@ contract MemoryImages {
     function emitPlain(uint256 id, bytes calldata b) external {
         bytes memory m = b;
         emit Plain(id, m);
-        assembly { return(0, add(mload(0x40), 0x100)) }
+        assembly {
+            if sload(probe.slot) { revert(0, 0) }
+            return(0, add(mload(0x40), 0x100))
+        }
     }
 
     function emitIndexed(bytes calldata k, uint256 x) external {
@@ -112,12 +134,16 @@ contract MemoryImages {
         xs[0] = x;
         xs[1] = seed;
         emit Indexed(k, xs);
-        assembly { return(0, add(mload(0x40), 0x100)) }
+        assembly {
+            if sload(probe.slot) { revert(0, 0) }
+            return(0, add(mload(0x40), 0x100))
+        }
     }
 
     function peerData(uint256 n) external view {
         (uint256 a, , uint256 c) = IImagePeer(address(0x5000)).data(n);
         assembly {
+            if sload(probe.slot) { revert(0, 0) }
             mstore(add(mload(0x40), 0xe0), add(a, c))
             return(0, add(mload(0x40), 0x100))
         }

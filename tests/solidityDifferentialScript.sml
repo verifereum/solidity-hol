@@ -87,7 +87,7 @@ End
 Definition argument_env_def:
   argument_env = <|
     procedures := []; state_variables := []; immutables := [];
-    struct_layouts := []; type_declarations := [] |> : core_environment
+    struct_layouts := []; function_ids := []; type_declarations := [] |> : core_environment
 End
 
 Definition encoded_values_def:

@@ -24,7 +24,8 @@ Datatype:
     state_variables : (ast_id # core_state_variable) list;
     immutables : (ast_id # sol_type) list;
     struct_layouts : (ast_id # core_struct_layout) list;
-    type_declarations : (ast_id # core_type_declaration) list
+    type_declarations : (ast_id # core_type_declaration) list;
+    function_ids : (ast_id # num) list
   |>
 End
 
@@ -34,7 +35,8 @@ Definition core_program_environment_def:
     state_variables := MAP (λv. (v.state_id, v)) prog.state_variables;
     immutables := prog.immutables;
     struct_layouts := MAP (λs. (s.struct_id, s)) prog.struct_layouts;
-    type_declarations := prog.type_declarations
+    type_declarations := prog.type_declarations;
+    function_ids := prog.function_ids
   |>
 End
 

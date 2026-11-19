@@ -210,24 +210,35 @@ End
 
 (* A case's call: the same calldata the bytecode run is given, so an
  * unencodable argument or an unknown function is the same diagnostic on both
- * sides.
+ * sides. A call also gives the active memory size it ends with.
  *)
-Definition yul_case_execution_def:
-  yul_case_execution (evm_code : byte list) ycode u c fuel =
+Definition yul_case_frame_def:
+  yul_case_frame (evm_code : byte list) ycode u c fuel =
     case (input_call u c.case_input, case_immutable_values u c.case_immutables) of
-      (INL d, _) => (Diagnostic d, NONE, [])
-    | (_, NONE) => (Diagnostic UnencodableArguments, NONE, [])
+      (INL d, _) => ((Diagnostic d, NONE, []), NONE)
+    | (_, NONE) => ((Diagnostic UnencodableArguments, NONE, []), NONE)
     | (INR (data, _), SOME imm) =>
         (case c.case_input of
            Deploy _ _ =>
-             (case ycode.creation_program of
-                NONE => (Diagnostic InvalidCompletion, NONE, [])
-              | SOME p => yul_creation_execution p c data fuel)
+             ((case ycode.creation_program of
+                 NONE => (Diagnostic InvalidCompletion, NONE, [])
+               | SOME p => yul_creation_execution p c data fuel), NONE)
          | _ =>
              let m = yul_differential_machine ycode.runtime_bytes imm
                        (c with case_immutable_refs := ycode.runtime_refs) data in
              let r = run_yul fuel ycode.runtime_body m in
-             yul_frame_observation (yul_transaction_frame m r.machine r.completion))
+             (yul_frame_observation (yul_transaction_frame m r.machine r.completion),
+              SOME r.machine.memory_size))
+End
+
+Definition yul_case_execution_def:
+  yul_case_execution evm_code ycode u c fuel =
+    FST (yul_case_frame evm_code ycode u c fuel)
+End
+
+Definition yul_memory_size_def:
+  yul_memory_size evm_code ycode u c fuel =
+    SND (yul_case_frame evm_code ycode u c fuel)
 End
 
 Definition yul_observation_def:
@@ -259,7 +270,15 @@ Definition yul_case_verdict_def:
           LogMismatch (SND (SND evm_run)) (SND (SND yul_run))
         else if SND (SND evm_run) ≠ expected_logs c.case_logs then
           LogUnexpected (SND (SND evm_run)) (expected_logs c.case_logs)
-        else Agree outcome
+        else
+          (case c.case_memory_size of
+             NONE => Agree outcome
+           | SOME n =>
+               if evm_memory_size code u c = SOME n ∧
+                  yul_memory_size code ycode u c yfuel = SOME n
+               then Agree outcome
+               else MemorySizeMismatch (evm_memory_size code u c)
+                      (yul_memory_size code ycode u c yfuel) n)
     | other => other
 End
 
@@ -267,26 +286,6 @@ Definition yul_agrees_def:
   yul_agrees code u prog c yfuel ycode ⇔
     is_agreement (yul_case_verdict code u prog c yfuel ycode)
 End
-
-(* The complete-storage and complete-log checks of yul_case_verdict cannot
- * turn an agreement into a disagreement: what holds when compare_observations
- * agrees is what the verdict's own checks leave alone.
- *)
-Theorem complete_check_agreement[local]:
-  is_agreement
-    (case verdict of
-       Agree outcome =>
-         if b1 then StorageMismatch s1 s2
-         else if b2 then StorageUnexpected s3 s4
-         else if b3 then LogMismatch l1 l2
-         else if b4 then LogUnexpected l3 l4
-         else Agree outcome
-     | other => other) ⇒
-  is_agreement verdict
-Proof
-  Cases_on ‘verdict’ >> simp[is_agreement_def] >>
-  rpt IF_CASES_TAC >> simp[is_agreement_def]
-QED
 
 (* What an agreement establishes: the Yul run returns or reverts what the case
  * expects, and it is never a diagnostic. The bytecode run's side is
@@ -301,8 +300,10 @@ Theorem yul_agrees_outcomes:
      expected_storage c.case_storage c.case_final slots)
 Proof
   rw[yul_agrees_def, yul_case_verdict_def, yul_observation_def] >>
-  drule complete_check_agreement >> strip_tac >>
-  drule compare_observations_agree >> simp[]
+  qmatch_asmsub_abbrev_tac ‘compare_observations ex ev yr’ >>
+  ‘is_agreement (compare_observations ex ev yr)’
+    by (Cases_on ‘compare_observations ex ev yr’ >> gvs[is_agreement_def]) >>
+  drule compare_observations_agree >> simp[Abbr ‘ex’]
 QED
 
 (* And it is at the complete storage the case expects, not just the slots it
@@ -332,7 +333,9 @@ val () = cv_auto_trans yul_frame_observation_def;
 val () = cv_auto_trans yul_creation_machine_def;
 val () = cv_auto_trans yul_created_code_def;
 val () = cv_auto_trans yul_creation_execution_def;
+val () = cv_auto_trans yul_case_frame_def;
 val () = cv_auto_trans yul_case_execution_def;
+val () = cv_auto_trans yul_memory_size_def;
 val () = cv_auto_trans yul_observation_def;
 val () = cv_auto_trans yul_case_verdict_def;
 val () = cv_auto_trans yul_agrees_def;

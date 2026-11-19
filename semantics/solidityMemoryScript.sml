@@ -114,16 +114,14 @@ Definition scalar_word_def:
 End
 
 (* The word a value of type ty is held in memory as; an external function is
- * its address then its selector, left-aligned. An internal function is the id
- * of its declaration, where the compiler's word is the function's number in
- * its internal dispatch (the artifact's internalFunctionIDs, which the
- * importer does not read yet): the two differ only to code that reads the
- * word itself. *)
+ * its address then its selector, left-aligned. An internal function is its
+ * number in the compiler's internal dispatch, which starts at 1, and the
+ * zero value 0; a function without a number has no word. *)
 Definition memory_word_def:
   memory_word env ty v =
     case v of
       ScalarValue (InternalFunctionValue f) =>
-        SOME (case f of NONE => 0 | SOME (AstId n) => n)
+        (case f of NONE => SOME 0 | SOME x => ALOOKUP env.function_ids x)
     | ScalarValue (ExternalFunctionValue a selector) =>
         if LENGTH selector = 4 then
           SOME (w2n a * 2 ** 96 + num_of_be_bytes selector * 2 ** 64)
@@ -147,7 +145,9 @@ End
  * (read_from_memory): a bool any nonzero word, an integer, address or fixed
  * bytes its own bits, an enum word outside the enum's members Panic(0x21),
  * as its validator does; a reference the object at that address; an
- * internal function the declaration with that id, as in memory_word. *)
+ * internal function the function with that dispatch number, as in
+ * memory_word. A nonzero word no function has is left unsupported: the
+ * compiler panics only once it is called. *)
 Definition word_value_def:
   word_value env ty (w : num) =
     if memory_object_type ty then INL (ReferenceValue (MemoryReference w ty)) else
@@ -159,8 +159,11 @@ Definition word_value_def:
              else INR (PanicCompletion 33)
          | NONE => INR (InvalidCompletion "unknown enum"))
     | FunctionT InternalFn _ _ _ =>
-        INL (ScalarValue (InternalFunctionValue
-               (if w = 0 then NONE else SOME (AstId w))))
+        if w = 0 then INL (ScalarValue (InternalFunctionValue NONE)) else
+        (case FILTER (λ(x, n). n = w) env.function_ids of
+           (x, _) :: _ => INL (ScalarValue (InternalFunctionValue (SOME x)))
+         | [] => INR (InvalidCompletion
+                        "unsupported: an internal function word no function has"))
     | FunctionT ExternalFn _ _ _ =>
         INL (ScalarValue (ExternalFunctionValue (n2w (w DIV 2 ** 96))
                (num_to_bytes 4 (w DIV 2 ** 64))))
@@ -216,14 +219,15 @@ Definition memory_data_def:
 End
 
 (* The word of element i of the memory array at p, and its type;
- * Panic(0x32) when i is out of bounds. *)
+ * Panic(0x32) when i is out of bounds. Addresses wrap at 2^256, as the
+ * compiler's word arithmetic does. *)
 Definition memory_array_element_def:
   memory_array_element ty p (i : int) st =
     case ty of
       ArrayT element _ =>
         let (n, st1) = memory_length ty p st in
         if i < 0 ∨ &n ≤ i then INR (PanicCompletion 50)
-        else INL (memory_data ty p + 32 * Num i, element, st1)
+        else INL ((memory_data ty p + 32 * Num i) MOD 2 ** 256, element, st1)
     | _ => INR (InvalidCompletion "bad memory array reference")
 End
 
@@ -232,7 +236,7 @@ Definition memory_byte_element_def:
   memory_byte_element p (i : int) st =
     let (n, st1) = memory_load p st in
     if i < 0 ∨ &n ≤ i then INR (PanicCompletion 50)
-    else INL (p + 32 + Num i, st1)
+    else INL ((p + 32 + Num i) MOD 2 ** 256, st1)
 End
 
 (* The position and type of field f among a struct's fields. *)
@@ -440,13 +444,18 @@ End
 
 (* A byte sequence as an ABI decoder's input: the bytes it holds and its
  * length. A memory one holds only its bytes below the memory size; the
- * bytes past that are zero. *)
+ * bytes past that are zero. One reaching past the free memory pointer is
+ * left unsupported: the compiler's decoder allocates there as it reads. *)
 Definition decode_source_def:
   decode_source (st : source_state) r =
     case r of
       MemoryReference p ty =>
         if byte_sequence_type ty then
           let (n, st1) = memory_load p st in
+          if FST (memory_load 64 st1) < p + 32 + n then
+            INR (InvalidCompletion
+                   "unsupported: abi.decode input past the free memory pointer")
+          else
           let held = MIN n (st1.memory_size - (p + 32)) in
           INL (yul_mem_read st1.memory (p + 32) held, n, st1)
         else INR (InvalidCompletion "bad byte sequence reference")
@@ -456,12 +465,15 @@ Definition decode_source_def:
         | INR c => INR c
 End
 
+(* A byte copy into storage; one from the slot it targets changes nothing,
+ * since the compiler's copy returns before it writes or uses its scratch. *)
 Definition copy_byte_contents_def:
   copy_byte_contents src dst st =
     case dst of
       StorageReference PersistentStorage dst_addr dst_slot _ _ _ =>
         (case src of
            StorageReference PersistentStorage src_addr src_slot _ _ _ =>
+             if src_addr = dst_addr ∧ src_slot = dst_slot then INL st else
              (case copy_storage_bytes st.world.accounts src dst st.frame.static_context of
                 INL accounts =>
                   let accounts0 = st.world.accounts in

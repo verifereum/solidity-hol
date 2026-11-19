@@ -146,14 +146,14 @@ Definition storage_byte_range_def:
       storage_byte_range accounts addr slot length (i + 1) n)
 End
 
-(* The data words of a stored byte sequence as the compiler's copies read
- * them: whole words, keeping unused dirty bytes, except the length byte of a
- * short one. *)
+(* The data words of a stored byte sequence as the compiler's encoder and
+ * copies write them: whole words, keeping unused dirty bytes; a short one,
+ * empty included, is its slot's word with the length byte cleared. *)
 Definition storage_byte_data_def:
   storage_byte_data accounts addr slot length =
-    let padded = storage_byte_range accounts addr slot length 0
-                   (32 * ((length + 31) DIV 32)) in
-    if 0 < length ∧ length < 32 then TAKE 31 padded ++ [0w] else padded
+    if length < 32 then
+      TAKE 31 (storage_byte_range accounts addr slot length 0 32) ++ [0w]
+    else storage_byte_range accounts addr slot length 0 (32 * ((length + 31) DIV 32))
 End
 
 Definition storage_byte_contents_def:

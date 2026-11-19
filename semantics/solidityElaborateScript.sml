@@ -1060,7 +1060,7 @@ Definition computed_struct_layouts_def:
   (computed_struct_layouts (SUC n) structs =
     let layouts = computed_struct_layouts n structs in
     let env = <| procedures := []; state_variables := []; immutables := [];
-                 type_declarations := [];
+                 function_ids := []; type_declarations := [];
                  struct_layouts := MAP (λs. (s.struct_id, s)) layouts |> in
     FLAT (MAP (λs.
       case computed_struct_fields env 0 0 s.struct_members of
@@ -1112,13 +1112,13 @@ Definition located_binding_ok_def:
            (SOME decls, SOME layouts) =>
              storage_type_ok <| procedures := []; state_variables := []; immutables := [];
                                 struct_layouts := MAP (λs. (s.struct_id, s)) layouts;
-                                type_declarations := decls |> element
+                                function_ids := []; type_declarations := decls |> element
          | _ => F)
     | LocatedT _ element =>
         (case elab_type_declarations enums structs of
            SOME decls =>
              memory_type_ok <| procedures := []; state_variables := []; immutables := [];
-                               struct_layouts := []; type_declarations := decls |>
+                               struct_layouts := []; function_ids := []; type_declarations := decls |>
                (LENGTH decls) element
          | NONE => F)
     | _ => T
@@ -1140,7 +1140,7 @@ Definition abi_binding_ok_def:
     case elab_type_declarations enums structs of
       SOME decls =>
         abi_type_ok <| procedures := []; state_variables := []; immutables := [];
-                       struct_layouts := []; type_declarations := decls |> ty
+                       struct_layouts := []; function_ids := []; type_declarations := decls |> ty
     | NONE => F
 End
 
@@ -1151,7 +1151,7 @@ Definition static_binding_ok_def:
     case elab_type_declarations enums structs of
       SOME decls =>
         static_object_type <| procedures := []; state_variables := []; immutables := [];
-                              struct_layouts := []; type_declarations := decls |>
+                              struct_layouts := []; function_ids := []; type_declarations := decls |>
           (LENGTH decls) ty
     | NONE => F
 End
@@ -2871,7 +2871,7 @@ Definition elab_enum_environment_def:
   elab_enum_environment ctx =
     <| procedures := []; state_variables := []; immutables := [];
        struct_layouts := [];
-       type_declarations :=
+       function_ids := []; type_declarations :=
          MAP (λ(id, members). (AstId id, EnumDeclaration members)) ctx.enums |>
 End
 
@@ -3913,6 +3913,8 @@ Definition elaborate_contract_def:
                 state_variables := cvs;
                 immutables := MAP (λ(x, ty). (AstId x, ty)) immutables;
                 struct_layouts := layouts; type_declarations := decls;
+                function_ids :=
+                  MAP (λ(x, n). (AstId x, n)) c.contract_function_ids;
                 entry_procedure :=
                   (case ps of
                      p :: _ => p.procedure_id
