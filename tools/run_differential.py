@@ -609,7 +609,8 @@ def write_reproduction(root: Path, directory: Path, suite: dict[str, Any],
                    if key in suite})
     if case is not None:
         inputs.update({"case": case["name"],
-                       **{key: case[key] for key in ("function", "deploy", "args", "calldata")
+                       **{key: case[key] for key in ("function", "deploy", "args", "calldata",
+                                                     "immutables", "gas")
                           if key in case},
                        "sender": case.get("sender", "0x2000"),
                        "value": case.get("value", 0),

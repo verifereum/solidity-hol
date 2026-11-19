@@ -208,6 +208,42 @@ contract MemoryImages {
         }
     }
 
+    // The precompile reads its input after the scratch word is zeroed, so
+    // with the free memory pointer below 32 it sees a digest with zeroed bytes
+    // (and the encoding overwrites the free memory pointer itself).
+    function recover(bytes32 h, uint8 v, bytes32 r, bytes32 s, bool low) external view {
+        if (low) {
+            assembly { mstore(0x40, 0x10) }
+        }
+        address a = ecrecover(h, v, r, s);
+        assembly {
+            if sload(probe.slot) { revert(0, 0) }
+            if low {
+                mstore(0, a)
+                return(0, 0x20)
+            }
+            mstore(add(mload(0x40), 0xe0), a)
+            return(0, add(mload(0x40), 0x100))
+        }
+    }
+
+    // An ordinary return: the dispatcher encodes the value at the free memory
+    // pointer, so the memory size covers it.
+    function plainReturn(uint256 x) external pure returns (uint256) {
+        return x + 1;
+    }
+
+    function failing(uint256 n) external pure returns (bytes memory) {
+        require(n == 0, "a reason longer than one memory word, forwarded");
+        return "";
+    }
+
+    // An uncaught failed call: the compiled code copies the callee's revert
+    // data to the free memory pointer and reverts with it.
+    function forwardRevert(uint256 n) external view {
+        this.failing(n);
+    }
+
     function peerData(uint256 n) external view {
         (uint256 a, , uint256 c) = IImagePeer(address(0x5000)).data(n);
         assembly {

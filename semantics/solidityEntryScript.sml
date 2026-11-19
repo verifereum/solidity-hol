@@ -114,13 +114,16 @@ Definition fallback_output_def:
     | _ => INR (InvalidCompletion "bad fallback return")
 End
 
-(* A frame's output, and the state after the encoding of its return values,
- * which the compiled code writes at the free memory pointer. *)
+(* A frame's output, and the state after the compiled code writes the
+ * encoding of its return values, and the encoder's spill past it, at the free
+ * memory pointer. *)
 Definition entry_output_def:
   entry_output env p kind st vs =
     if kind = FallbackEntry then (fallback_output st vs, st)
     else case encoded_runtime_values env st (MAP SND p.return_bindings) vs of
-      INL ((data, _), st1) => (INL data, st1)
+      INL ((data, spill), st1) =>
+        (INL data, let q = FST (memory_load 64 st1) in
+                   memory_write (q + LENGTH data) spill (memory_write q data st1))
     | INR c => (INR c, st)
 End
 

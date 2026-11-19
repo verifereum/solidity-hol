@@ -263,7 +263,8 @@ End
  * place. sha256 and ecrecover call their precompile on an encoding at the
  * free memory pointer, which they do not raise, and read its output from the
  * scratch word at 0: ecrecover zeroes it first, as an invalid signature
- * returns nothing, which reads as address(0). a.code allocates memory bytes
+ * returns nothing, which reads as address(0), and the precompile reads its
+ * input from memory after that. a.code allocates memory bytes
  * and copies the code there. *)
 Definition eval_builtin_def:
   eval_builtin st op vs =
@@ -279,8 +280,11 @@ Definition eval_builtin_def:
         let (p, st1) = memory_load 64 st in
         let st2 = memory_write p (hb ++ num_to_bytes 32 (Num vi) ++ rb ++ sb) st1 in
         let st3 = memory_store 0 0 st2 in
-        let result = ecrecover (word_of_bytes_be hb) (Num vi)
-                       (num_of_be_bytes rb) (num_of_be_bytes sb) in
+        let input = FST (memory_read p 128 st3) in
+        let result = ecrecover (word_of_bytes_be (TAKE 32 input))
+                       (num_of_be_bytes (TAKE 32 (DROP 32 input)))
+                       (num_of_be_bytes (TAKE 32 (DROP 64 input)))
+                       (num_of_be_bytes (DROP 96 input)) in
         INL (ScalarValue (AddressValue (case result of SOME a => a | NONE => 0w)),
              case result of
                SOME a => memory_store 0 (w2n a) st3
@@ -827,6 +831,12 @@ Definition write_call_data_def:
        else memory_write p (selector ++ REPLICATE 28 0w) st)
 End
 
+(* The compiler's revert_forward: the return data copied to the free memory
+ * pointer, then reverted with. *)
+Definition forward_revert_def:
+  forward_revert data st = memory_write (FST (memory_load 64 st)) data st
+End
+
 (* A call's output region [p, p + size): the CALL opcode expands memory to
  * it and copies the first size bytes of the callee's return or revert data
  * there. *)
@@ -885,7 +895,8 @@ Definition call_create_def:
                                original := r.create_original;
                                to_delete := st2.world.to_delete ++ r.create_to_delete |> |> in
                  case r.create_address of
-                   NONE => abrupt_result (RevertCompletion r.create_return) st3 gas
+                   NONE => abrupt_result (RevertCompletion r.create_return)
+                             (forward_revert r.create_return st3) gas
                  | SOME addr => normal_result
                      (define_binding x ty (ScalarValue (AddressValue addr)) st3) gas)
     | _ => abrupt_result (InvalidCompletion "bad creation operands") st gas
@@ -942,7 +953,9 @@ Definition call_external_mode_def:
                let st3 = call_output p out r.call_return
                            (st2 with return_data := SOME r.call_return) in
                if ¬r.call_success then
-                 if ¬catching then abrupt_result (RevertCompletion r.call_return) st3 gas
+                 if ¬catching then
+                   abrupt_result (RevertCompletion r.call_return)
+                     (forward_revert r.call_return st3) gas
                  else
                    (case default_call_results rets of
                       NONE => abrupt_result (InvalidCompletion "bad try return types") st3 gas
@@ -1048,7 +1061,9 @@ Definition call_transfer_def:
                  st.world.transient st.frame.tx_params of
             NONE => abrupt_result (InvalidCompletion "call outside the model") st gas
           | SOME res =>
-              if ¬res.call_success then abrupt_result (RevertCompletion res.call_return) st gas
+              if ¬res.call_success then
+                abrupt_result (RevertCompletion res.call_return)
+                  (forward_revert res.call_return st) gas
               else
                 let st' = st with
                   <| world := st.world with <| accounts := res.call_accounts;
@@ -1427,7 +1442,7 @@ Definition simple_stmt_def:
     | RevertStmt a =>
         (case eval_atom st.scopes a of
            SOME (ScalarValue (BytesValue data)) =>
-             abrupt_result (RevertCompletion data) st gas
+             abrupt_result (RevertCompletion data) (forward_revert data st) gas
          | _ => abrupt_result (InvalidCompletion "bad revert payload") st gas)
     | _ => abrupt_result (InvalidCompletion "unsupported statement") st gas
 End
