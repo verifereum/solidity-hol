@@ -756,6 +756,14 @@ Definition encoded_as_def:
   (encoded_as (ty :: tys) = EncodedAs ty :: encoded_as tys)
 End
 
+(* A builtin's operands as conversion targets: a value operand to its type,
+ * one read in place as encoded for its type. *)
+Definition builtin_targets_def:
+  (builtin_targets [] = []) ∧
+  (builtin_targets (ValueOperand ty :: ops) = ValueOf ty :: builtin_targets ops) ∧
+  (builtin_targets (InPlaceOperand ty :: ops) = EncodedAs ty :: builtin_targets ops)
+End
+
 Definition expr_ids_def:
   (expr_ids [] = []) ∧
   (expr_ids (e :: es) = expr_id e :: expr_ids es)
@@ -838,19 +846,17 @@ Definition convert_operands_def:
   (convert_operands n id _ _ _ = INR [(id, "value count mismatch")])
 End
 
-(* A builtin on its operands' values, each converted to its operand type.
+(* A builtin on its operands' values, each converted to its operand's target.
  * The hash of a literal is a constant, as the compiler folds it without
- * allocating memory. sha256's operand is encoded where it is, as the
- * compiler packs it for the precompile without converting it to memory. *)
+ * allocating memory. *)
 Definition elab_builtin_def:
   elab_builtin n id ids op vs =
-    let (operand_tys, result) = builtin_signature op in
+    let (operands, result) = builtin_signature op in
     case (op, vs) of
       (Keccak256Builtin, [(ConstantAtom (BytesValue bs), ElabBytesLiteral)]) =>
         INL (([], ConstantAtom (BytesValue (Keccak_256_w64 bs))), n)
     | _ =>
-      case convert_operands n id ids
-             (if op = Sha256Builtin then [Encoded T] else values_of operand_tys) vs of
+      case convert_operands n id ids (builtin_targets operands) vs of
         INL (cs, _, atoms, n1) =>
           let (rs, r) = bind_value n1 result (BuiltinOperation op atoms) in
           INL ((cs ++ rs, r), n1 + 1)
@@ -4162,6 +4168,7 @@ val () = cv_auto_trans builtin_result_def;
 
 val () = cv_auto_trans values_of_def;
 val () = cv_auto_trans encoded_as_def;
+val () = cv_auto_trans builtin_targets_def;
 val () = cv_auto_trans expr_ids_def;
 val () = cv_auto_trans abi_argument_def;
 val () = cv_auto_trans convert_operand_def;

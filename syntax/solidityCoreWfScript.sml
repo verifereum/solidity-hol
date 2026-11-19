@@ -588,6 +588,20 @@ Definition wf_abi_atom_def:
     | _ => wf_core_atom env ctx (SingleType ty) a
 End
 
+(* How a builtin takes an operand: converted to the value of a type
+ * (ValueOperand), or read where it is, in any location, as the bytes it
+ * encodes to (InPlaceOperand), as the compiler packs a precompile's input. *)
+Datatype:
+  builtin_operand = ValueOperand sol_type | InPlaceOperand sol_type
+End
+
+(* A builtin's operand: a value of its type, or one read where it is. *)
+Definition wf_builtin_operand_def:
+  (wf_builtin_operand env ctx (ValueOperand ty) a ⇔
+    wf_core_atom env ctx (SingleType ty) a) ∧
+  (wf_builtin_operand env ctx (InPlaceOperand ty) a ⇔ wf_abi_atom env ctx ty a)
+End
+
 (* Operations *)
 
 Definition wf_core_atoms_def:
@@ -662,27 +676,29 @@ Definition scalar_operator_signature_def:
     | BoolNotOp => if ty = BoolT then SOME ([ty], ty) else NONE
 End
 
-(* Each builtin's operand types and result type. Elaboration converts each
+(* Each builtin's operands and result type. Elaboration converts each value
  * operand to its type, so a payable address reaches an address operand
  * through a ConvertOperation.
  *)
 Definition builtin_signature_def:
   (builtin_signature Keccak256Builtin =
-    ([LocatedT MemoryLoc BytesT], FixedBytesT 32)) ∧
+    ([ValueOperand (LocatedT MemoryLoc BytesT)], FixedBytesT 32)) ∧
   (builtin_signature EcrecoverBuiltin =
-    ([FixedBytesT 32; UintT 8; FixedBytesT 32; FixedBytesT 32],
+    ([ValueOperand (FixedBytesT 32); ValueOperand (UintT 8);
+      ValueOperand (FixedBytesT 32); ValueOperand (FixedBytesT 32)],
      AddressT NonpayableAddress)) ∧
   (builtin_signature CodeLengthBuiltin =
-    ([AddressT NonpayableAddress], UintT 256)) ∧
+    ([ValueOperand (AddressT NonpayableAddress)], UintT 256)) ∧
   (builtin_signature BalanceBuiltin =
-    ([AddressT NonpayableAddress], UintT 256)) ∧
+    ([ValueOperand (AddressT NonpayableAddress)], UintT 256)) ∧
   (builtin_signature CodeHashBuiltin =
-    ([AddressT NonpayableAddress], FixedBytesT 32)) ∧
+    ([ValueOperand (AddressT NonpayableAddress)], FixedBytesT 32)) ∧
   (builtin_signature Sha256Builtin =
-    ([LocatedT MemoryLoc BytesT], FixedBytesT 32)) ∧
-  (builtin_signature BlockhashBuiltin = ([UintT 256], FixedBytesT 32)) ∧
+    ([InPlaceOperand (LocatedT MemoryLoc BytesT)], FixedBytesT 32)) ∧
+  (builtin_signature BlockhashBuiltin =
+    ([ValueOperand (UintT 256)], FixedBytesT 32)) ∧
   (builtin_signature CodeBuiltin =
-    ([AddressT NonpayableAddress], LocatedT MemoryLoc BytesT))
+    ([ValueOperand (AddressT NonpayableAddress)], LocatedT MemoryLoc BytesT))
 End
 
 (* An internal function converts implicitly to one with the same parameters
@@ -981,11 +997,9 @@ Definition wf_core_operation_def:
              copy_convertible (loc, src) (MemoryLoc, ty)
          | _ => F)
     | _ => F) ∧
-  (* sha256's byte sequence is encoded where it is, in any location. *)
   (wf_core_operation env ctx annotation (BuiltinOperation op args) ⇔
-    let (operand_tys, result) = builtin_signature op in
-    (if op = Sha256Builtin then LIST_REL (wf_abi_atom env ctx) operand_tys args
-     else wf_core_atoms env ctx (MAP SingleType operand_tys) args) ∧
+    let (operands, result) = builtin_signature op in
+    LIST_REL (wf_builtin_operand env ctx) operands args ∧
     annotation = SingleType result) ∧
   (wf_core_operation env ctx annotation (AbiEncodeOperation selector tys args) ⇔
     annotation = SingleType (LocatedT MemoryLoc BytesT) ∧
@@ -1766,6 +1780,7 @@ QED
 val () = cv_auto_trans packed_type_def;
 val () = cv_auto_trans environment_type_def;
 val () = cv_auto_trans wf_abi_atom_def;
+val () = cv_auto_trans wf_builtin_operand_def;
 val () = cv_auto_trans catch_parameter_type_def;
 val () = cv_auto_trans wf_gas_atom_def;
 val () = cv_auto_trans (SPEC_ALL wf_core_operation_def);

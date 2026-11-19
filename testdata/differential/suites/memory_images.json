@@ -1144,6 +1144,27 @@
       "memory_size": 352
     },
     {
+      "name": "recover_plain_probe",
+      "function": "recover",
+      "args": [
+        "0x0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
+        27,
+        "0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "0x0000000000000000000000000000000000000000000000000000000000000001",
+        false
+      ],
+      "immutables": {
+        "seed": 7
+      },
+      "storage": {
+        "7": "1"
+      },
+      "expect": {
+        "revert": "0x"
+      },
+      "memory_size": 256
+    },
+    {
       "name": "recover_low_probe",
       "function": "recover",
       "args": [
