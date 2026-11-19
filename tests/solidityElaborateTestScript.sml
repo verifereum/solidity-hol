@@ -706,13 +706,92 @@ Theorem statement_operands_all_report:
                   <| error_selector := [0w; 0w; 0w; 0w]; error_parameters := [] |>
                   [^(bad_at 32); ^(bad_at 33)] [])”
      (“(30, "revert does not match the error")” :: bad_32_33)) ∧
-  LENGTH (FILTER ($= (31, "string literal conversion"))
-    (blockers (elab_stmt (^ctx0 with <| returns := [(1, UintT 256); (2, UintT 256)];
-                                        returns_id := 3 |>) 10
-                 (SrcReturn ^(at 30) 3
-                    (SOME (SrcTupleExpression ^(at 31)
-                             [SOME ^(string_at 32); SOME ^(string_at 33)]
-                             "t_tuple$_t_uint256_$_t_uint256_$")))))) = 2
+  ^(reports “elab_stmt (^ctx0 with <| returns := [(1, UintT 256); (2, UintT 256)];
+                                      returns_id := 3 |>) 10
+                (SrcReturn ^(at 30) 3
+                   (SOME (SrcTupleExpression ^(at 31)
+                            [SOME ^(string_at 32); SOME ^(string_at 33)]
+                            "t_tuple$_t_uint256_$_t_uint256_$")))”
+     string_32_33)
+Proof
+  EVAL_TAC
+QED
+
+(* A node whose sibling operands fail differently still reports both: one
+ * operand fails to elaborate (32 or 33), another elaborates and fails to
+ * convert. *)
+val mixed_string = [“(32, "string literal conversion")”, “(33, "bad")”];
+
+Theorem modular_mixed_operands_report:
+  ^(reports “elab_expr ^ctx0 10
+               (SrcModular ^(at 30) ^(at 31) AddModOp
+                  [^(string_at 32); ^(bad_at 33); ^(one_at 34)] "t_uint256")”
+     mixed_string)
+Proof
+  EVAL_TAC
+QED
+
+Theorem ecrecover_mixed_operands_report:
+  ^(reports “elab_expr ^ctx0 10
+               (SrcBuiltinOperation ^(at 30) (SOME ^(at 31)) EcrecoverBuiltin
+                  [SrcLiteral ^(at 32) StringLiteral
+                     "0123456789abcdef0123456789abcdef0" "t_stringliteral_x";
+                   ^(one_at 34); ^(bad_at 33); ^(one_at 35)]
+                  "t_address")”
+     mixed_string)
+Proof
+  EVAL_TAC
+QED
+
+Theorem abi_encode_mixed_operands_report:
+  ^(reports “elab_expr ^ctx0 10
+               (SrcAbiEncode ^(at 30) ^(at 31) AbiPacked [^(one_at 32); ^(bad_at 33)]
+                  "t_bytes_memory_ptr")”
+     [“(32, "packed encoding of a number literal")”, “(33, "bad")”])
+Proof
+  EVAL_TAC
+QED
+
+Theorem internal_call_mixed_operands_report:
+  ^(reports “elab_expr (^ctx0 with functions := [(1, ^two_parameters)]) 10
+               (SrcFunctionCall ^(at 30) (SrcIdentifier ^(at 31) "f" 1 "t_function")
+                  [^(string_at 32); ^(bad_at 33)] [] "t_tuple$__$")”
+     mixed_string)
+Proof
+  EVAL_TAC
+QED
+
+Theorem external_call_mixed_operands_report:
+  ^(reports “elab_expr ^ctx0 10
+               (SrcExternalCall ^(at 30)
+                  <| ext_selector := [0w; 0w; 0w; 0w]; ext_mutability := NonpayableMut; ext_kind := ExternalCall; ext_bound := F;
+                     ext_signature := FunctionSignature [^supported_y; ^supported_y] [] |>
+                  [] [^(bad_at 33); ^(string_at 32); ^(one_at 34)] [] "t_tuple$__$")”
+     mixed_string)
+Proof
+  EVAL_TAC
+QED
+
+(* The members of a dynamic storage array that the elaborator doesn't take
+ * still report their arguments. *)
+val array_ctx = “^ctx0 with state := [(5, ArrayT (UintT 256) NONE)]”;
+fun array_call member args order =
+  “SrcFunctionCall ^(at 30)
+     (SrcArrayMember ^(at 31) ^member
+        (SrcIdentifier ^(at 35) "a" 5 "t_array$_t_uint256_$dyn_storage") "t_function")
+     ^args ^order "t_tuple$__$"”;
+val array_reports = [“(30, "unsupported array member call")”, “(32, "bad")”];
+
+Theorem array_member_arguments_report:
+  ^(reports “elab_expr ^array_ctx 10
+               ^(array_call “"pop"” “[^(bad_at 32)]” “[] : num list”)”
+     array_reports) ∧
+  ^(reports “elab_expr ^array_ctx 10
+               ^(array_call “"push"” “[^(bad_at 32); ^(bad_at 33)]” “[] : num list”)”
+     (“(33, "bad")” :: array_reports)) ∧
+  ^(reports “elab_expr ^array_ctx 10
+               ^(array_call “"push"” “[^(bad_at 32)]” “[0]”)”
+     array_reports)
 Proof
   EVAL_TAC
 QED
