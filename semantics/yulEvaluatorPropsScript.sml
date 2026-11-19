@@ -9,7 +9,9 @@
  * Expressions return a yul_expr_result rather than a yul_result, so the "did
  * not stop for fuel" side condition is yul_running instead of a completion
  * test.  The conjuncts are in the definition's order: block, stmt, expr, args,
- * loop, cases, call.
+ * loop, cases, call.  The whole mutual fact is exported as
+ * `eval_yul_fuel_stable`, for proofs about a statement, block or loop; the
+ * per-case lemmas behind it stay local.
  *)
 Theory yulEvaluatorProps
 Ancestors
@@ -383,7 +385,7 @@ Proof
   simp[Abbr `rp`]
 QED
 
-Theorem eval_yul_fuel_stable[local]:
+Theorem eval_yul_fuel_stable:
   (∀n fns ss m k.
      (eval_yul_block n fns ss m).completion ≠ YulOutOfFuel ∧ n ≤ k ⇒
      eval_yul_block k fns ss m = eval_yul_block n fns ss m) ∧
