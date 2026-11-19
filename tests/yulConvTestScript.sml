@@ -615,9 +615,10 @@ val () = print ("yulConvTest: checked_exp_helper's entry " ^ Int.toString
  * shape a caller proving a function for every fuel converts.  At `SUC n` the
  * body runs at `n`, so each call it makes is under the evaluator's own `n = 0`
  * test, and `checked_exp_signed`'s form came back within no clock until the
- * conversion pushed each call's case into that test's branches.  The form is held to the suite's checks and printed beside the
- * one at `SUC (SUC n)`, where the test is decided and the calls are folded at
- * `n`. *)
+ * conversion pushed each call's case into that test's branches.  The form is
+ * held to the suite's checks, and its size and time are printed beside the
+ * ones at `SUC (SUC n)`, where the test is decided and the calls are folded at
+ * `n`; the times are printed, not asserted, as above. *)
 val () =
   let
     val f as (nm, _, body) =
@@ -630,23 +631,24 @@ val () =
         val t = list_mk_comb (invoke_c,
                   [fuel, el 2 args, el 3 args, el 4 args, m])
         val what = nm ^ " at " ^ term_to_string fuel
-        val form =
+        val t0 = Timer.startRealTimer ()
+        val th =
           case under_clock 60.0
                  (fn () => yulConvLib.yul_invoke_conv table_defs t) of
             NONE => fail (what ^ " did not come back within 60s")
-          | SOME th => rhs (concl (checked_form (what, body) t th))
-        val size = size_of form
+          | SOME th => th
+        val secs = Time.toReal (Timer.checkRealTimer t0)
+        val size = size_of (rhs (concl (checked_form (what, body) t th)))
       in
         if size >= 200000 then
           fail (what ^ " is " ^ Int.toString size ^ " nodes, at or over the line")
-        else size
+        else Int.toString size ^ " nodes in " ^ Real.toString secs ^ "s"
       end
     val at_suc = form_at (numSyntax.mk_suc n)
     val at_suc_suc = form_at (numSyntax.mk_suc (numSyntax.mk_suc n))
   in
     print ("yulConvTest: " ^ nm ^ " on a symbolic machine at SUC n "
-           ^ Int.toString at_suc ^ " nodes; at SUC (SUC n) "
-           ^ Int.toString at_suc_suc ^ " nodes\n")
+           ^ at_suc ^ "; at SUC (SUC n) " ^ at_suc_suc ^ "\n")
   end
 
 (* A loop with statements after it.  `checked_exp_helper`'s loop is the last
