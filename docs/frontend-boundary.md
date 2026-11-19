@@ -241,10 +241,10 @@ case, rather than guessing:
   encoder overwrites before it reads it;
 - an indexed event argument that is a stored array or struct whose in-place
   encoding ends in an empty byte sequence;
-- an `abi.decode` memory input reaching past the free memory pointer, where
-  the compiled decoder allocates while it reads;
-- an `abi.decode` that fails on a memory input reaching past the memory size,
-  since its failure does not say how far it read;
+- an `abi.decode` of memory that reads at or past the free memory pointer,
+  where the compiled decoder allocates while it reads;
+- an `abi.decode` that fails on a memory input reaching past the memory size
+  or the free memory pointer, since its failure does not say how far it read;
 - an internal function word that no function's dispatch number matches;
 - an immutable's reserved word that its type cannot hold, when a constructor
   ends.

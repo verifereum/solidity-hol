@@ -446,18 +446,13 @@ End
 
 (* A byte sequence as an ABI decoder's input: the bytes it holds and its
  * length. A memory one holds only its bytes below the memory size; the
- * bytes past that are zero. One reaching past the free memory pointer is
- * left unsupported: the compiler's decoder allocates there as it reads. *)
+ * bytes past that are zero. *)
 Definition decode_source_def:
   decode_source (st : source_state) r =
     case r of
       MemoryReference p ty =>
         if byte_sequence_type ty then
           let (n, st1) = memory_load p st in
-          if FST (memory_load 64 st1) < p + 32 + n then
-            INR (InvalidCompletion
-                   "unsupported: abi.decode input past the free memory pointer")
-          else
           let held = MIN n (st1.memory_size - (p + 32)) in
           INL (yul_mem_read st1.memory (p + 32) held, n, st1)
         else INR (InvalidCompletion "bad byte sequence reference")
@@ -473,6 +468,16 @@ Definition decode_reads_def:
     case r of
       MemoryReference p _ => memory_touch (p + 32) reach st
     | _ => st
+End
+
+(* How far into r's n bytes a decoder may read before it reaches the free
+ * memory pointer free, where the compiled decoder allocates, and so may read
+ * what its own allocations wrote. *)
+Definition decode_bound_def:
+  decode_bound r free (n : num) =
+    case r of
+      MemoryReference p _ => free - (p + 32)
+    | _ => n
 End
 
 (* A byte copy into storage; one from the slot it targets changes nothing,
@@ -597,5 +602,6 @@ val () = cv_auto_trans scratch_write_def;
 val () = cv_auto_trans byte_contents_def;
 val () = cv_auto_trans decode_source_def;
 val () = cv_auto_trans decode_reads_def;
+val () = cv_auto_trans decode_bound_def;
 val () = cv_auto_trans copy_byte_contents_def;
 val () = cv_auto_trans convert_byte_reference_def;

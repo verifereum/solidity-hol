@@ -672,9 +672,12 @@ End
  * ignored. Byte sequences decode to their bytes, and arrays and structs to
  * the tuple of their elements or fields; free is the free memory pointer,
  * and reach the end of the input the decoder has read, as its mloads and
- * mcopys reach. The fuel bounds the struct nesting. *)
+ * mcopys reach. A byte sequence or array whose data reaches past bound is
+ * left unsupported: a memory input's bound is where the free memory pointer
+ * was, past which the compiled decoder's own allocations may lie. The fuel
+ * bounds the struct nesting. *)
 Definition decode_memory_value_def:
-  (decode_memory_value env (fuel : num) ty bs (total : num) pos free (reach : num) =
+  (decode_memory_value env (fuel : num) ty bs (total : num) (bound : num) pos free (reach : num) =
     if byte_sequence_type ty ∨ (case ty of ArrayT _ _ => T | _ => F) then
       if pos + 32 > total then INR (RevertCompletion []) else
       let (length, data, size, reach1) =
@@ -689,13 +692,17 @@ Definition decode_memory_value_def:
         ArrayT element _ =>
           if data + length * abi_stride env element > total then
             INR (RevertCompletion [])
+          else if data + length * abi_stride env element > bound then
+            INR (InvalidCompletion "unsupported: abi.decode reading at the free memory pointer")
           else
-            (case decode_memory_elements env fuel element bs total data 0 length (free + size)
+            (case decode_memory_elements env fuel element bs total bound data 0 length (free + size)
                     reach1 of
                INL (vs, next, reach2) => INL (TupleValue vs, next, reach2)
              | INR c => INR c)
       | _ =>
           if data + length > total then INR (RevertCompletion [])
+          else if data + length > bound then
+            INR (InvalidCompletion "unsupported: abi.decode reading at the free memory pointer")
           else INL (ScalarValue (BytesValue (input_bytes bs data length)), free + size,
                     MAX reach1 (data + length))
     else case ty of
@@ -709,7 +716,7 @@ Definition decode_memory_value_def:
              else if 2 ** 64 ≤ free + 32 * LENGTH tys then INR (PanicCompletion 65)
              else if fuel = 0 then INR (InvalidCompletion "struct nesting")
              else
-               (case decode_memory_fields env (fuel - 1) tys bs total pos pos
+               (case decode_memory_fields env (fuel - 1) tys bs total bound pos pos
                        (free + 32 * LENGTH tys) reach of
                   INL (vs, next, reach1) => INL (TupleValue vs, next, reach1)
                 | INR c => INR c)
@@ -726,38 +733,38 @@ Definition decode_memory_value_def:
               INR (RevertCompletion [])
             else INL (ScalarValue v, free, MAX reach (pos + 32))
         | _ => INR (InvalidCompletion "bad ABI scalar type")) ∧
-  (decode_memory_elements env fuel element bs total data i n free reach =
+  (decode_memory_elements env fuel element bs total bound data i n free reach =
     if n = 0 then INL ([], free, reach) else
-    case decode_memory_part env fuel element bs total data
+    case decode_memory_part env fuel element bs total bound data
            (data + i * abi_stride env element) free reach of
       INR c => INR c
     | INL (v, next, reach1) =>
-        case decode_memory_elements env fuel element bs total data (i + 1) (n - 1) next
+        case decode_memory_elements env fuel element bs total bound data (i + 1) (n - 1) next
                reach1 of
           INL (vs, last, reach2) => INL (v :: vs, last, reach2)
         | INR c => INR c) ∧
-  (decode_memory_fields env fuel [] bs total base src free reach = INL ([], free, reach)) ∧
-  (decode_memory_fields env fuel (ty :: tys) bs total base src free reach =
-    case decode_memory_part env fuel ty bs total base src free reach of
+  (decode_memory_fields env fuel [] bs total bound base src free reach = INL ([], free, reach)) ∧
+  (decode_memory_fields env fuel (ty :: tys) bs total bound base src free reach =
+    case decode_memory_part env fuel ty bs total bound base src free reach of
       INR c => INR c
     | INL (v, next, reach1) =>
-        case decode_memory_fields env fuel tys bs total base (src + abi_stride env ty) next
+        case decode_memory_fields env fuel tys bs total bound base (src + abi_stride env ty) next
                reach1 of
           INL (vs, last, reach2) => INL (v :: vs, last, reach2)
         | INR c => INR c) ∧
   (* An element or field whose head is at src: a dynamic one at the offset
    * there from base. *)
-  (decode_memory_part env fuel ty bs total base src free reach =
+  (decode_memory_part env fuel ty bs total bound base src free reach =
     if is_dynamic (abi_type env (LENGTH env.type_declarations) ty) then
       let offset = input_word bs src in
       if 2 ** 64 ≤ offset then INR (RevertCompletion [])
-      else decode_memory_value env fuel ty bs total (base + offset) free
+      else decode_memory_value env fuel ty bs total bound (base + offset) free
              (MAX reach (src + 32))
-    else decode_memory_value env fuel ty bs total src free reach)
+    else decode_memory_value env fuel ty bs total bound src free reach)
 Termination
   WF_REL_TAC ‘inv_image ($< LEX $< LEX $<) (λx. case x of
     INL (_, fuel, ty, _) => (fuel, sol_type_size ty, 1)
-  | INR (INL (_, fuel, element, _, _, _, _, n, _)) =>
+  | INR (INL (_, fuel, element, _, _, _, _, _, n, _)) =>
       (fuel, sol_type_size element, n + 3)
   | INR (INR (INL (_, fuel, tys, _))) =>
       (fuel, list_size sol_type_size tys, 0)
@@ -785,11 +792,11 @@ Definition copy_calldata_array_def:
         else if data + length * abi_stride env element > LENGTH cd then
           INR (RevertCompletion [])
         else (case decode_memory_elements env (LENGTH env.type_declarations) element cd
-                     (LENGTH cd) data 0 length (free + size) 0 of
+                     (LENGTH cd) (LENGTH cd) data 0 length (free + size) 0 of
                 INL (vs, _) => INL (TupleValue vs)
               | INR c => INR c)
     | StructT _ =>
-        (case decode_memory_value env (LENGTH env.type_declarations) ty cd (LENGTH cd) data free 0 of
+        (case decode_memory_value env (LENGTH env.type_declarations) ty cd (LENGTH cd) (LENGTH cd) data free 0 of
            INL (v, _) => INL v
          | INR c => INR c)
     | _ => INR (InvalidCompletion "bad calldata copy")
@@ -800,7 +807,7 @@ End
  * stays in the calldata: a byte sequence or dynamic array with its data in
  * range, any other dynamic value with its heads in range. *)
 Definition decode_abi_argument_def:
-  decode_abi_argument env ty bs (total : num) head base free reach =
+  decode_abi_argument env ty bs (total : num) (bound : num) head base free reach =
     if head + 32 > total then INR (RevertCompletion []) else
     case ty of
       LocatedT CalldataLoc element =>
@@ -824,18 +831,18 @@ Definition decode_abi_argument_def:
         else INL (ReferenceValue (CalldataReference (base + offset)
                     (calldata_length element) element), free, MAX reach (head + 32))
     | LocatedT MemoryLoc element =>
-        decode_memory_part env (LENGTH env.type_declarations) element bs total 0 head free
+        decode_memory_part env (LENGTH env.type_declarations) element bs total bound 0 head free
           reach
-    | _ => decode_memory_value env (LENGTH env.type_declarations) ty bs total head free reach
+    | _ => decode_memory_value env (LENGTH env.type_declarations) ty bs total bound head free reach
 End
 
 Definition decode_abi_arguments_def:
-  (decode_abi_arguments env [] bs total head base free reach = INL ([], reach)) ∧
-  (decode_abi_arguments env (ty :: tys) bs total head base free reach =
-    case decode_abi_argument env ty bs total head base free reach of
+  (decode_abi_arguments env [] bs total bound head base free reach = INL ([], reach)) ∧
+  (decode_abi_arguments env (ty :: tys) bs total bound head base free reach =
+    case decode_abi_argument env ty bs total bound head base free reach of
       INR c => INR c
     | INL (v, next, reach1) =>
-        case decode_abi_arguments env tys bs total (head + abi_stride env ty) base next
+        case decode_abi_arguments env tys bs total bound (head + abi_stride env ty) base next
                reach1 of
           INL (vs, reach2) => INL (v :: vs, reach2)
         | INR c => INR c)
@@ -844,17 +851,18 @@ End
 (* Arguments decoded from an input of total bytes, of which bs holds the
  * leading ones; the rest read as zeros. Memory is decoded in place this way,
  * as the compiler's decoder reads only the words it needs; with the
- * arguments comes the end of the input it read. *)
+ * arguments comes the end of the input it read. Data reaching past bound is
+ * left unsupported (decode_memory_value). *)
 Definition decode_input_def:
-  decode_input env tys bs total base free =
+  decode_input env tys bs total bound base free =
     if head_lengths (abi_types env (LENGTH env.type_declarations) tys) 0 > total then
       INR (RevertCompletion [])
-    else decode_abi_arguments env tys bs total 0 base free 0
+    else decode_abi_arguments env tys bs total bound 0 base free 0
 End
 
 Definition decode_arguments_def:
   decode_arguments env tys bs base free =
-    case decode_input env tys bs (LENGTH bs) base free of
+    case decode_input env tys bs (LENGTH bs) (LENGTH bs) base free of
       INL (vs, _) => INL vs
     | INR c => INR c
 End
@@ -1274,7 +1282,7 @@ val decode_memory_value_pre_def = cv_auto_trans_pre_rec
   decode_memory_value_def (
   WF_REL_TAC ‘inv_image ($< LEX $< LEX $<) (λx. case x of
     INL (_, fuel, ty, _) => (cv$c2n fuel, cv_size ty, 1)
-  | INR (INL (_, fuel, element, _, _, _, _, n, _)) =>
+  | INR (INL (_, fuel, element, _, _, _, _, _, n, _)) =>
       (cv$c2n fuel, cv_size element, cv$c2n n + 3)
   | INR (INR (INL (_, fuel, tys, _))) =>
       (cv$c2n fuel, cv_size tys, 0)
@@ -1284,14 +1292,14 @@ val decode_memory_value_pre_def = cv_auto_trans_pre_rec
 );
 
 Theorem decode_memory_value_pre[cv_pre]:
-  (∀env fuel ty bs total pos free reach.
-     decode_memory_value_pre env fuel ty bs total pos free reach) ∧
-  (∀env fuel element bs total data i n free reach.
-     decode_memory_elements_pre env fuel element bs total data i n free reach) ∧
-  (∀env fuel tys bs total base src free reach.
-     decode_memory_fields_pre env fuel tys bs total base src free reach) ∧
-  (∀env fuel ty bs total base src free reach.
-     decode_memory_part_pre env fuel ty bs total base src free reach)
+  (∀env fuel ty bs total bound pos free reach.
+     decode_memory_value_pre env fuel ty bs total bound pos free reach) ∧
+  (∀env fuel element bs total bound data i n free reach.
+     decode_memory_elements_pre env fuel element bs total bound data i n free reach) ∧
+  (∀env fuel tys bs total bound base src free reach.
+     decode_memory_fields_pre env fuel tys bs total bound base src free reach) ∧
+  (∀env fuel ty bs total bound base src free reach.
+     decode_memory_part_pre env fuel ty bs total bound base src free reach)
 Proof
   ho_match_mp_tac decode_memory_value_ind >> rpt strip_tac >>
   simp[Once decode_memory_value_pre_def] >> rw[] >> gvs[]

@@ -1241,23 +1241,33 @@ Definition simple_stmt_def:
      * memory input is decoded in place: only its bytes below the memory size
      * are read, the rest being zeros, as the compiler's decoder reads only
      * the words it needs from an input of any length, and its reads touch
-     * memory up to the last of them. A decoder failing on such an input is
-     * left unsupported, as its failure does not say how far it read. *)
+     * memory up to the last of them. The compiled decoder allocates at the
+     * free memory pointer as it reads, so a decode that reads there is left
+     * unsupported, as is a failing one whose input reaches past the memory
+     * size or the free memory pointer, since its failure does not say how
+     * far it read. *)
     | DefineStmt x ty (AbiDecodeOperation tys a) =>
         (case eval_atom st.scopes a of
            SOME (ReferenceValue r) =>
              (case decode_source st r of
                 INL (bs, input_len, st0) =>
-                  (case decode_input env tys bs input_len 0 (FST (memory_load 64 st0)) of
+                  let free = FST (memory_load 64 st0) in
+                  let bound = decode_bound r free input_len in
+                  (case decode_input env tys bs input_len bound 0 free of
                      INL (vs, reach) =>
+                       if bound < reach then
+                         abrupt_result (InvalidCompletion
+                           "unsupported: abi.decode reading at the free memory pointer")
+                           st gas
+                       else
                        (case materialize_arguments env tys vs (decode_reads r reach st0) of
                           INL (values, st1) =>
                             normal_result (define_binding x ty (pack_results values) st1) gas
                         | INR c => abrupt_result c st gas)
                    | INR c =>
-                       if LENGTH bs < input_len then
+                       if LENGTH bs < input_len ∨ bound < input_len then
                          abrupt_result (InvalidCompletion
-                           "unsupported: abi.decode failing on an input past the memory size")
+                           "unsupported: abi.decode failing on an input past the memory size or the free memory pointer")
                            st gas
                        else abrupt_result c st gas)
               | INR c => abrupt_result c st gas)
