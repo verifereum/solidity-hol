@@ -1114,15 +1114,6 @@ Definition call_transfer_def:
     | _ => abrupt_result (InvalidCompletion "bad transfer operands") st gas
 End
 
-(* A low-level target.call(data), target.staticcall(data) or
- * target.delegatecall(data), as the compiler makes it: the data passed where
- * it is in memory, a literal written at the free memory pointer first; no
- * check that the target has code, no output region, and a failure returned
- * rather than reverted. A delegate call runs the target's code in this
- * contract's account, with this frame's sender and value. The return data is
- * materialized as extract_returndata does, and is also the frame's return
- * data from then on.
- *)
 (* A low-level call's data other than a memory byte sequence (a literal, a
  * calldata or storage byte sequence), packed at the free memory pointer as
  * the compiled bare call encodes it; a memory byte sequence is sent from
@@ -1139,6 +1130,15 @@ Definition packed_call_data_def:
     | INR c => INR c
 End
 
+(* A low-level target.call(data), target.staticcall(data) or
+ * target.delegatecall(data), as the compiler makes it: memory data sent from
+ * where it is, any other data packed at the free memory pointer first
+ * (packed_call_data); no check that the target has code, no output region,
+ * and a failure returned rather than reverted. A delegate call runs the
+ * target's code in this contract's account, with this frame's sender and
+ * value. The return data is materialized as extract_returndata does, and is
+ * also the frame's return data from then on.
+ *)
 Definition call_low_level_def:
   call_low_level x ty kind target value g data (st : source_state) gas =
     case (eval_atom st.scopes target, eval_atom st.scopes value,

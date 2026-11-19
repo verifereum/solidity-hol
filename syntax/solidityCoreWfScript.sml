@@ -1014,8 +1014,9 @@ Definition wf_core_operation_def:
      annotation = SingleType (LocatedT MemoryLoc StringT)) ∧
     EVERY packed_type tys ∧
     LIST_REL (wf_abi_atom env ctx) tys args) ∧
-  (* Only call moves value. The data is packed where it is, so a bytes
-     literal, calldata or storage bytes needs no memory copy. *)
+  (* Only call moves value. Memory data is sent from where it is; a bytes
+     literal, calldata or storage bytes is packed at the free memory
+     pointer when the call runs. *)
   (wf_core_operation env ctx annotation
      (LowLevelCallOperation kind target value gas data) ⇔
     annotation = call_result_type [BoolT; LocatedT MemoryLoc BytesT] ∧
@@ -1247,17 +1248,18 @@ Definition assembly_stmt_ok_def:
 End
 
 (* Gas and return data. The source keeps no gas: a bare gas() as a call's gas
- * argument stands for the budget every call from the source gets, and a
- * gas() anywhere else reads a gas observation. call_stmts_ok F F also has returndatasize and returndatacopy come only
- * after a statement of the block that calls (a let, assignment or expression
- * statement whose expression has a call, staticcall or delegatecall in it),
- * earlier in their statement list or an enclosing one, or inside an if,
- * switch or for whose condition calls, or in an argument left of one that
- * calls, since arguments run right to left. A Yul function's body starts as
- * the block does, since it may be called before the block's calls. The
- * evaluator asks for that order only where the source does not know the
- * return data (assembly_calls_ok); the static rule is assembly_gas_ok, which
- * admits return data reads before the block's own calls. *)
+ * argument stands for the budget every call from the source gets, and a gas()
+ * anywhere else reads a gas observation. call_stmts_ok F F has returndatasize
+ * and returndatacopy come only after a statement of the block that calls (a
+ * let, assignment or expression statement whose expression has a call,
+ * staticcall or delegatecall in it), earlier in their statement list or an
+ * enclosing one, or inside an if, switch or for whose condition calls, or in
+ * an argument left of one that calls, since arguments run right to left. A
+ * Yul function's body starts as the block does, since it may be called before
+ * the block's calls. The evaluator asks for that order only where the source
+ * does not know the return data (assembly_calls_ok); the static rule is
+ * assembly_gas_ok, which admits return data reads before the block's own
+ * calls. *)
 Definition is_call_builtin_def:
   is_call_builtin b ⇔ b = YCall ∨ b = YStaticCall ∨ b = YDelegateCall ∨
                        b = YCreate ∨ b = YCreate2
@@ -1279,7 +1281,8 @@ Definition stmt_calls_def:
   (stmt_calls _ ⇔ F)
 End
 
-(* called: a call has been made; gas: the first argument may be gas(). *)
+(* called: a call has been made; gas: the first argument is a call's gas,
+ * where a bare gas() is admitted as it is anywhere else. *)
 Definition call_expr_ok_def:
   (call_expr_ok called (YulBuiltin b es) ⇔
     (called ∨ exprs_calls es ∨ b ≠ YReturnDataSize ∧ b ≠ YReturnDataCopy) ∧

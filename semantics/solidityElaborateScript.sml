@@ -624,8 +624,9 @@ Definition low_level_external_kind_def:
   (low_level_external_kind LowLevelDelegateCall = ExternalDelegateCall)
 End
 
-(* The data of a low-level call is packed where it is: a memory, calldata
- * or storage bytes or a bytes literal, never copied into allocated memory. *)
+(* The data of a low-level call: a memory, calldata or storage bytes or a
+ * bytes literal. Memory data is sent from where it is; the evaluator packs
+ * any other at the free memory pointer, as the compiled call does. *)
 Definition low_level_data_def:
   low_level_data a vt =
     case (a, vt) of
