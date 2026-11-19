@@ -104,8 +104,9 @@ These cases are outside the agreement corpus.
 Each suite has two committed theories under `tests/corpus/`:
 
 - `solidityBytecodeCorpus_<suite>` encodes calls from the artifact's ABI and
-  method selectors, runs Verifereum, and proves the expected complete observation
-  for every case. It depends on the suite and compiler artifacts, not the source
+  method selectors, runs Verifereum, and proves the expected outcome, storage
+  and logs for every case. A case's memory size is not checked there: the
+  combined verdict checks it, reading Verifereum's final memory size. It depends on the suite and compiler artifacts, not the source
   frontend or evaluator.
 - `solidityDifferentialCorpus_<suite>` prepares the source and proves that its
   calldata, initial accounts and transaction equal the bytecode theory's inputs.

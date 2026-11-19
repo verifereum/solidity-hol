@@ -563,8 +563,8 @@ Definition wf_gas_atom_def:
 End
 
 (* ABI serialization consumes a value from its original location. Literal
- * bytes are already available and need no heap object for encoding. An array
- * or struct is encoded from its object in any valid location. *)
+ * bytes are encoded from the literal, with no copy in memory first. An array
+ * or struct is encoded from where it is, in any valid location. *)
 Definition wf_abi_atom_def:
   wf_abi_atom env ctx ty a ⇔
     case ty of
