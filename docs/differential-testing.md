@@ -64,8 +64,10 @@ A case may give `"memory_size": n`, the memory size in bytes the frame has
 when it halts, as the compiled code's trace shows it (the size before its
 `RETURN` or `REVERT`, raised to cover the region that instruction reads). The
 source's final memory size, Verifereum's outermost frame's memory length after
-the transaction's last step and, in the Yul run, the Yul evaluator's must all
-equal it; otherwise the case is a `memory-size-mismatch`. A creation that
+the transaction's last step and, in the Yul run's optimizer-off stages, the
+Yul evaluator's must all equal it; otherwise the case is a
+`memory-size-mismatch`. The optimized stage does not check it, since the
+optimizer can leave a different active memory. A creation that
 returns its runtime code gives none, since the deployed-code copy is not
 modelled.
 

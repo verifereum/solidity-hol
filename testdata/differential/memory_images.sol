@@ -21,6 +21,18 @@ interface IImagePeer {
 // the call through it panics with 0x51; mode 4 reads that word into a local,
 // overwrites the reserved word again, assigns the local back to the immutable
 // and dumps memory, which holds the first word.
+contract Doomed {
+    constructor() {
+        revert("a reason longer than one memory word, forwarded");
+    }
+}
+
+contract Refuser {
+    receive() external payable {
+        revert("refused, with a reason past one word");
+    }
+}
+
 contract MemoryImages {
     struct Record {
         uint128 small;
@@ -242,6 +254,24 @@ contract MemoryImages {
     // data to the free memory pointer and reverts with it.
     function forwardRevert(uint256 n) external view {
         this.failing(n);
+    }
+
+    // A failed creation forwards the constructor's revert data the same way.
+    function forwardCreate() external {
+        new Doomed();
+    }
+
+    // So does a failed transfer.
+    function forwardTransfer() external {
+        Refuser r = new Refuser();
+        payable(address(r)).transfer(0);
+    }
+
+    // And a try whose clauses do not match the failure.
+    function forwardTry(uint256 n) external view {
+        try this.failing(n) returns (bytes memory) {
+        } catch Panic(uint256) {
+        }
     }
 
     function peerData(uint256 n) external view {

@@ -102,16 +102,19 @@ Definition dispatch_def:
         | _ => DispatchRevert
 End
 
-(* The return data of a fallback's values: nothing, or its bytes. *)
+(* The return data of a fallback's values, nothing or its bytes, and the
+ * state after reading them: the compiled fallback returns
+ * [retval + 32, retval + 32 + mload(retval)), which raises the memory size
+ * as that read does. *)
 Definition fallback_output_def:
   fallback_output st vs =
     case vs of
-      [] => INL []
+      [] => (INL [], st)
     | [ReferenceValue r] =>
         (case byte_contents st r of
-           INL (bs, _) => INL bs
-         | INR c => INR c)
-    | _ => INR (InvalidCompletion "bad fallback return")
+           INL (bs, st1) => (INL bs, st1)
+         | INR c => (INR c, st))
+    | _ => (INR (InvalidCompletion "bad fallback return"), st)
 End
 
 (* A frame's output, and the state after the compiled code writes the
@@ -119,7 +122,7 @@ End
  * memory pointer. *)
 Definition entry_output_def:
   entry_output env p kind st vs =
-    if kind = FallbackEntry then (fallback_output st vs, st)
+    if kind = FallbackEntry then fallback_output st vs
     else case encoded_runtime_values env st (MAP SND p.return_bindings) vs of
       INL ((data, spill), st1) =>
         (INL data, let q = FST (memory_load 64 st1) in
@@ -206,6 +209,7 @@ Definition run_entry_frame_def:
              else ContractReturned data (settle_source_world w')
          | INR (PanicCompletion code) => ContractReverted (panic_data code) w
          | INR (RevertCompletion data) => ContractReverted data w
+         | INR (InvalidCompletion reason) => ContractInvalid reason
          | INR _ => ContractInvalid "unencodable return values")
     | FrameRevert data w' => ContractReverted data w'
     | FrameAbort w' => ContractAborted w'

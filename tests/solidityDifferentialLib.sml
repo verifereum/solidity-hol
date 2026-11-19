@@ -532,9 +532,23 @@ fun run_yul_stage env (stage_tag, json_tag, ycode) =
                 ("stage", json_string json_tag)]
     fun emit_status status extra =
       emit_yul (base @ [("status", json_string status)] @ extra)
+    (* The expected memory size is the optimizer-off code's; the optimizer
+     * can leave a different active memory, so the optimized stage does not
+     * check it. *)
+    val case_tm =
+      if json_tag = "optimized" then
+        let
+          val c = #case_tm env
+          val fupd = prim_mk_const {Thy = "solidityBytecode",
+                                    Name = "differential_case_case_memory_size_fupd"}
+          val none = optionSyntax.mk_none numSyntax.num
+        in
+          list_mk_comb (fupd, [combinSyntax.mk_K_1 (none, type_of none), c])
+        end
+      else #case_tm env
     val tm = yul_verdict_term
       {code = #code env, unit = #unit env, program = #program env,
-       case_tm = #case_tm env, ycode = ycode}
+       case_tm = case_tm, ycode = ycode}
     val th = cv_eval tm
     val verdict = rhs (concl th)
     fun both_sides () =
