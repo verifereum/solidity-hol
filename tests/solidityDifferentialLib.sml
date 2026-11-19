@@ -537,14 +537,7 @@ fun run_yul_stage env (stage_tag, json_tag, ycode) =
      * check it. *)
     val case_tm =
       if json_tag = "optimized" then
-        let
-          val c = #case_tm env
-          val fupd = prim_mk_const {Thy = "solidityBytecode",
-                                    Name = "differential_case_case_memory_size_fupd"}
-          val none = optionSyntax.mk_none numSyntax.num
-        in
-          list_mk_comb (fupd, [combinSyntax.mk_K_1 (none, type_of none), c])
-        end
+        let val c = #case_tm env in “^c with case_memory_size := NONE” end
       else #case_tm env
     val tm = yul_verdict_term
       {code = #code env, unit = #unit env, program = #program env,
