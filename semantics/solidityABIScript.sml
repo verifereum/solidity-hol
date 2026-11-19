@@ -411,14 +411,15 @@ Termination
 End
 
 (* The value tree of a memory, calldata or storage array, struct or byte
- * sequence of type ty, as a copy to storage and the encoder read it. Calldata
+ * sequence of type ty, as a copy to storage (copying) and the encoder read
+ * it. Calldata
  * is read through the calldata accessors; a calldata array's own data span
  * was checked when it was decoded. *)
 Definition array_copy_value_def:
-  array_copy_value env (st : source_state) ty r =
+  array_copy_value env copying (st : source_state) ty r =
     case r of
       MemoryReference _ _ =>
-        memory_value env (LENGTH env.type_declarations) ty (ReferenceValue r) st
+        memory_value env copying (LENGTH env.type_declarations) ty (ReferenceValue r) st
     | CalldataReference data n rty =>
         if rty ≠ ty then INR (InvalidCompletion "bad calldata array reference")
         else (case calldata_value env (LENGTH env.type_declarations)
@@ -562,7 +563,7 @@ Definition runtime_abi_value_def:
                   (LENGTH env.type_declarations) st.world.accounts addr slot rty) st)
               | INR c => INR c)
     | _ =>
-      case (case v of ReferenceValue r => array_copy_value env st ty' r | _ => INL (v, st)) of
+      case (case v of ReferenceValue r => array_copy_value env F st ty' r | _ => INL (v, st)) of
         INR c => INR c
       | INL (tree, st1) =>
         let t = abi_type env (LENGTH env.type_declarations) ty' in

@@ -776,7 +776,7 @@ Definition run_asm_array_def:
         let r = invoke_source 20 env (AstId 140)
                   [ReferenceValue (MemoryReference 0x80 ty)] st [] in
         (r.completion,
-         case memory_value env 0 ty (ReferenceValue (MemoryReference 0x80 ty)) r.state of
+         case memory_value env F 0 ty (ReferenceValue (MemoryReference 0x80 ty)) r.state of
            INL (TupleValue us, _) => us
          | _ => [])
     | _ => (InvalidCompletion "not an array", [])
@@ -891,7 +891,7 @@ Definition asm_alloc_object_def:
   asm_alloc_object env (st : source_state) v =
     case v of
       ReferenceValue (MemoryReference p ty) =>
-        (case memory_value env 0 ty v st of
+        (case memory_value env F 0 ty v st of
            INL (u, _) => SOME (p, u)
          | INR _ => NONE)
     | _ => NONE
@@ -1292,10 +1292,11 @@ Proof
 QED
 
 (* Callees at 0x5003 (returns the bytes 01 02 03) and 0x5004 (reverts with
- * them): return data shorter than a word. *)
+ * them): return data shorter than a word. Memory holds 0xee at 0xc3, where
+ * the copied bytes' padding begins. *)
 Definition short_return_state_def:
   short_return_state =
-    initial_state with world := (initial_state.world with accounts :=
+    (memory_write 0xc3 [0xeew] initial_state) with world := (initial_state.world with accounts :=
       update_account 0x5004w
         (empty_account_state with
            code := [0x62w; 1w; 2w; 3w; 0x60w; 0w; 0x52w; 0x60w; 3w; 0x60w; 0x1dw; 0xfdw])
@@ -1379,15 +1380,15 @@ val () = cv_auto_trans copy_data_def;
 val () = cv_auto_trans run_return_bytes_def;
 
 (* Bytes copied from return data, a staticcall's or a caught revert's, leave
- * their padding as memory held it, here zeros: nothing wrote there, the
- * call's selector having gone below the copy's data. *)
+ * their padding as memory held it, here the 0xee at 0xc3: nothing wrote
+ * there, the call's selector having gone below the copy's data. *)
 Theorem asm_return_data_padding:
   run_return_bytes short_static read_last_word =
-    ReturnCompletion [ScalarValue (IntegerValue (0x010203 * 2 ** 232))] ∧
+    ReturnCompletion [ScalarValue (IntegerValue (0x010203ee * 2 ** 224))] ∧
   run_return_bytes short_static copy_data =
     ReturnCompletion [ScalarValue (IntegerValue 0x010203)] ∧
   run_return_bytes short_try read_last_word =
-    ReturnCompletion [ScalarValue (IntegerValue (0x010203 * 2 ** 232))] ∧
+    ReturnCompletion [ScalarValue (IntegerValue (0x010203ee * 2 ** 224))] ∧
   run_return_bytes short_try copy_data =
     ReturnCompletion [ScalarValue (IntegerValue 0x010203)]
 Proof

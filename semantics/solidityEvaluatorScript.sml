@@ -357,9 +357,6 @@ Definition immutable_offset_def:
     | NONE => NONE)
 End
 
-(* Operations without nested code, and the state after them: reading memory
- * raises its active size. Calls and array mutations are handled by
- * statements. *)
 (* A byte sequence mapping key's hash preimage, as the compiler's
  * packed_hashed writes it: the key's bytes, then the slot, at the free memory
  * pointer, which is not raised. *)
@@ -369,6 +366,10 @@ Definition key_preimage_write_def:
     memory_store (p + LENGTH bs) (w2n slot) (memory_write p bs st)
 End
 
+
+(* Operations without nested code, and the state after them: reading memory
+ * raises its active size. Calls and array mutations are handled by
+ * statements. *)
 Definition eval_operation_def:
   eval_operation env (st : source_state) op =
     case op of
@@ -1414,7 +1415,7 @@ Definition simple_stmt_def:
                           src_addr = dst_addr ∧ src_slot = dst_slot
                       | _ => F)
                   then normal_result st gas else
-                  (case array_copy_value env st cty src of
+                  (case array_copy_value env T st cty src of
                      INL (v, st1) =>
                        (case copy_to_storage env st1.world.accounts cty v
                                dst st.frame.static_context of

@@ -146,6 +146,25 @@ contract MemoryImages {
         }
     }
 
+    // A struct copied into storage copies each byte sequence member with the
+    // same whole-word loop, so an unaligned member touches the word after
+    // its last byte too.
+    function recordStoreUnaligned() external {
+        Record memory r;
+        bytes memory m;
+        assembly {
+            m := add(mload(0x40), 1)
+            mstore(m, 1)
+            mstore8(add(m, 0x20), 0xab)
+        }
+        r.blob = m;
+        record = r;
+        assembly {
+            if sload(probe.slot) { revert(0, 0) }
+            return(0, add(mload(0x40), 0x100))
+        }
+    }
+
     function recordCopy(uint256 x, bytes calldata b) external {
         record.small = uint128(x);
         record.items.push(x);

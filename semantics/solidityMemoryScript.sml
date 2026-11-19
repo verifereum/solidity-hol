@@ -346,16 +346,27 @@ Definition new_memory_array_def:
         | _ => INL (p, memory_write (p + 32) (REPLICATE size 0w) st2)
 End
 
+(* The compiler's copy into storage reads a memory source's data in whole
+ * words, the last one too. *)
+Definition copy_source_reads_def:
+  copy_source_reads src n st =
+    case src of
+      MemoryReference p _ => memory_touch (p + 32) (32 * ((n + 31) DIV 32)) st
+    | _ => st
+End
+
 (* The value of a memory array or struct, as a copy reads it: the tuple of
  * its elements or fields, byte sequences as their bytes. The fuel bounds the
- * struct nesting. *)
+ * struct nesting. A copy into storage (copying) reads each byte sequence in
+ * whole words, as the compiler's copy loop does; the encoder reads its
+ * bytes. *)
 Definition memory_value_def:
-  (memory_value env (fuel : num) ty v st =
+  (memory_value env copying (fuel : num) ty v st =
     case (ty, v) of
       (ArrayT element length, ReferenceValue (MemoryReference p rty)) =>
         if rty ≠ ty then INR (InvalidCompletion "bad memory array reference") else
         let (n, st1) = memory_length ty p st in
-        (case memory_elements env fuel element (memory_data ty p) n st1 of
+        (case memory_elements env copying fuel element (memory_data ty p) n st1 of
            INL (vs, st2) => INL (TupleValue vs, st2)
          | INR c => INR c)
     | (StructT s, ReferenceValue (MemoryReference p rty)) =>
@@ -363,43 +374,46 @@ Definition memory_value_def:
         (case lookup_struct env s of
            SOME fields =>
              if fuel = 0 then INR (InvalidCompletion "struct nesting") else
-             (case memory_fields env (fuel - 1) (MAP SND fields) p st of
+             (case memory_fields env copying (fuel - 1) (MAP SND fields) p st of
                 INL (vs, st1) => INL (TupleValue vs, st1)
               | INR c => INR c)
          | NONE => INR (InvalidCompletion "unknown struct"))
     | (_, ReferenceValue (MemoryReference p rty)) =>
         if byte_sequence_type rty then
-          let (bs, st1) = memory_bytes p st in INL (ScalarValue (BytesValue bs), st1)
+          let (bs, st1) = memory_bytes p st in
+          INL (ScalarValue (BytesValue bs),
+               if copying then copy_source_reads (MemoryReference p rty) (LENGTH bs) st1
+               else st1)
         else INR (InvalidCompletion "bad memory value")
     | (_, ScalarValue _) => INL (v, st)
     | _ => INR (InvalidCompletion "bad memory value")) ∧
-  (memory_elements env fuel element p n st =
+  (memory_elements env copying fuel element p n st =
     if n = 0 then INL ([], st) else
     case read_memory_word env element p st of
       INR c => INR c
     | INL (w, st1) =>
-        case memory_value env fuel element w st1 of
+        case memory_value env copying fuel element w st1 of
           INR c => INR c
         | INL (v, st2) =>
-            case memory_elements env fuel element (p + 32) (n - 1) st2 of
+            case memory_elements env copying fuel element (p + 32) (n - 1) st2 of
               INL (vs, st3) => INL (v :: vs, st3)
             | INR c => INR c) ∧
-  (memory_fields env fuel [] p st = INL ([], st)) ∧
-  (memory_fields env fuel (ty :: tys) p st =
+  (memory_fields env copying fuel [] p st = INL ([], st)) ∧
+  (memory_fields env copying fuel (ty :: tys) p st =
     case read_memory_word env ty p st of
       INR c => INR c
     | INL (w, st1) =>
-        case memory_value env fuel ty w st1 of
+        case memory_value env copying fuel ty w st1 of
           INR c => INR c
         | INL (v, st2) =>
-            case memory_fields env fuel tys (p + 32) st2 of
+            case memory_fields env copying fuel tys (p + 32) st2 of
               INL (vs, st3) => INL (v :: vs, st3)
             | INR c => INR c)
 Termination
   WF_REL_TAC ‘inv_image ($< LEX $< LEX $<) (λx. case x of
-    INL (env, fuel, ty, v, st) => (fuel, sol_type_size ty, 0n)
-  | INR (INL (env, fuel, element, p, n, st)) => (fuel, sol_type_size element, n + 1)
-  | INR (INR (env, fuel, tys, p, st)) => (fuel, list_size sol_type_size tys, 1))’ >>
+    INL (env, copying, fuel, ty, v, st) => (fuel, sol_type_size ty, 0n)
+  | INR (INL (env, copying, fuel, element, p, n, st)) => (fuel, sol_type_size element, n + 1)
+  | INR (INR (env, copying, fuel, tys, p, st)) => (fuel, list_size sol_type_size tys, 1))’ >>
   rw[solidityASTTheory.sol_type_size_def, listTheory.list_size_def] >>
   qpat_x_assum ‘(_, _) = _’ (assume_tac o SYM) >> gvs[]
 End
@@ -483,15 +497,6 @@ Definition decode_bound_def:
     case r of
       MemoryReference p _ => free - (p + 32)
     | _ => n
-End
-
-(* The compiler's copy into storage reads a memory source's data in whole
- * words, the last one too. *)
-Definition copy_source_reads_def:
-  copy_source_reads src n st =
-    case src of
-      MemoryReference p _ => memory_touch (p + 32) (32 * ((n + 31) DIV 32)) st
-    | _ => st
 End
 
 (* A byte copy into storage; one from the slot it targets changes nothing,
@@ -596,17 +601,17 @@ val () = cv_auto_trans new_memory_array_def;
 val memory_value_pre_def = cv_auto_trans_pre_rec
   "memory_value_pre memory_elements_pre memory_fields_pre" memory_value_def (
   WF_REL_TAC ‘inv_image ($< LEX $< LEX $<) (λx. case x of
-    INL (env, fuel, ty, v, st) => (cv$c2n fuel, cv_size ty, 0)
-  | INR (INL (env, fuel, element, p, n, st)) =>
+    INL (env, copying, fuel, ty, v, st) => (cv$c2n fuel, cv_size ty, 0)
+  | INR (INL (env, copying, fuel, element, p, n, st)) =>
       (cv$c2n fuel, cv_size element, cv$c2n n + 1)
-  | INR (INR (env, fuel, tys, p, st)) => (cv$c2n fuel, cv_size tys, 1))’ >>
+  | INR (INR (env, copying, fuel, tys, p, st)) => (cv$c2n fuel, cv_size tys, 1))’ >>
   cv_termination_tac
 );
 
 Theorem memory_value_pre[cv_pre]:
-  (∀env fuel ty v st. memory_value_pre env fuel ty v st) ∧
-  (∀env fuel element p n st. memory_elements_pre env fuel element p n st) ∧
-  (∀env fuel tys p st. memory_fields_pre env fuel tys p st)
+  (∀env copying fuel ty v st. memory_value_pre env copying fuel ty v st) ∧
+  (∀env copying fuel element p n st. memory_elements_pre env copying fuel element p n st) ∧
+  (∀env copying fuel tys p st. memory_fields_pre env copying fuel tys p st)
 Proof
   ho_match_mp_tac memory_value_ind >> rpt strip_tac >>
   simp[Once memory_value_pre_def] >> rw[] >> gvs[]
