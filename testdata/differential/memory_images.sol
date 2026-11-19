@@ -25,6 +25,7 @@ contract MemoryImages {
 
     event Plain(uint256 indexed id, bytes data);
     event Indexed(bytes indexed key, uint256[] items);
+    event Stored(bytes data, bytes indexed tag);
 
     uint256 immutable seed;
     mapping(uint256 => uint256) values;
@@ -33,6 +34,7 @@ contract MemoryImages {
     bytes blob;
     Record record;
     bool probe;
+    bytes tag;
 
     constructor(uint256 s, uint8 mode) {
         seed = s;
@@ -136,6 +138,33 @@ contract MemoryImages {
         emit Indexed(k, xs);
         assembly {
             if sload(probe.slot) { revert(0, 0) }
+            return(0, add(mload(0x40), 0x100))
+        }
+    }
+
+    // The indexed argument is read for its topic before the other is encoded.
+    function emitStored(bytes calldata d, bytes calldata t) external {
+        blob = d;
+        tag = t;
+        emit Stored(blob, tag);
+        assembly {
+            if sload(probe.slot) { revert(0, 0) }
+            return(0, add(mload(0x40), 0x100))
+        }
+    }
+
+    // An input longer than the memory written: the decoder's reads raise the
+    // memory size to the last word it reads.
+    function decodeFar(uint256 x) external view {
+        bytes memory b = abi.encode(x);
+        assembly {
+            mstore(b, 0x400)
+            mstore(0x40, add(b, 0x420))
+        }
+        (uint256 y, uint256 z) = abi.decode(b, (uint256, uint256));
+        assembly {
+            if sload(probe.slot) { revert(0, 0) }
+            mstore(add(mload(0x40), 0xe0), add(y, z))
             return(0, add(mload(0x40), 0x100))
         }
     }

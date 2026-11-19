@@ -221,9 +221,9 @@ free memory pointer, and leave a memory local at any address; whatever it
 leaves is what the Solidity code after it reads, with the compiler's cleanup
 of the words it reads (`bool` normalised, integers and addresses masked or
 sign-extended, `bytesN` high-masked, an out-of-range enum Panic `0x21`).
-Under `memoryguard` the compiler may start its free memory pointer higher
-than the model does, so a block that returns, stores or compares a raw
-pointer value is outside the boundary. An internal function pointer's word
+Under the pinned profile (via-IR, optimizer off) the free memory pointer
+starts at `0x80`, past a creation frame's reserved immutable words, where the
+model's does; the `memory_images` suite compares it byte for byte. An internal function pointer's word
 is the function's number in the compiler's internal dispatch, which the
 importer reads from `ContractDefinition.internalFunctionIDs` in the analyzed
 AST, and 0 for the zero value; reading a nonzero word no function has fails
@@ -255,12 +255,9 @@ empty buffer keeps it unknown. A Yul function's body may read return data
 where the block may at its start (`assembly_library_forms.sol`): anywhere
 while the source knows the buffer, and otherwise only after a call of its
 own, since the function may be called before any of the block's calls. A block in a static frame that names `call` or
-`delegatecall` fails closed; `staticcall` runs. A block that leaves an
-object's padding (the bytes past its length, in its last word) unwritten or
-not zero leaves it out of later blocks' memory, where reading it fails closed.
-solc lets a block assign a memory
-reference (`b := ...`); the elaborator rejects it, since the block reads the
-name as a literal.
+`delegatecall` fails closed; `staticcall` runs. A block may assign a memory
+reference (`b := ...`): the reference then holds the address the block left
+in it.
 
 ## Storage layout
 

@@ -2611,9 +2611,12 @@ fun contract external_structs contracts declared v = within v (fn v =>
           (case optional_field v "internalFunctionIDs" of
              NONE => []
            | SOME ids =>
-               map (fn (k, n) => pairSyntax.mk_pair
-                      (mk_num (valOf (IntInf.fromString k)),
-                       mk_num (JSONUtil.asIntInf n)))
+               map (fn (k, n) =>
+                      if size k > 0 andalso CharVector.all Char.isDigit k then
+                        pairSyntax.mk_pair (mk_num (valOf (IntInf.fromString k)),
+                                            mk_num (JSONUtil.asIntInf n))
+                      else raise MalformedInput
+                        (describe v ^ ": internalFunctionIDs key " ^ k))
                  (object ids),
            pairSyntax.mk_prod (numSyntax.num, numSyntax.num)))]
   end)

@@ -114,6 +114,16 @@ Definition fallback_output_def:
     | _ => INR (InvalidCompletion "bad fallback return")
 End
 
+(* A frame's output, and the state after the encoding of its return values,
+ * which the compiled code writes at the free memory pointer. *)
+Definition entry_output_def:
+  entry_output env p kind st vs =
+    if kind = FallbackEntry then (fallback_output st vs, st)
+    else case encoded_runtime_values env st (MAP SND p.return_bindings) vs of
+      INL ((data, _), st1) => (INL data, st1)
+    | INR c => (INR c, st)
+End
+
 (* The end of the transaction: its pending deletions happen. *)
 Definition settle_source_world_def:
   settle_source_world (w : source_world) =
@@ -176,15 +186,15 @@ Definition run_entry_frame_def:
       case materialize_arguments env (MAP SND p.parameters) args st0 of
         INL (values, st1) => invoke_source fuel env p.procedure_id values st1 gas
       | INR c => abrupt_result c st0 gas in
+    let fin = finish_source_frame w r.state.world r.completion in
+    let out = case fin of
+        FrameSuccess vs _ => entry_output env p kind r.state vs
+      | _ => (INL [], r.state) in
     (if r.unused_gas_evidence ≠ [] then
       ContractInvalid "unconsumed gas observation"
-    else (case finish_source_frame w r.state.world r.completion of
+    else (case fin of
       FrameSuccess vs w' =>
-        (case (if kind = FallbackEntry then fallback_output r.state vs
-               else (case encoded_runtime_values env r.state
-                            (MAP SND p.return_bindings) vs of
-                       INL ((data, _), _) => INL data
-                     | INR c => INR c)) of
+        (case FST out of
            INL data =>
              if kind = CreationEntry then
                (case memory_immutables env 128 env.immutables r.state of
@@ -202,7 +212,7 @@ Definition run_entry_frame_def:
     | FramePanic code w' => ContractReverted (panic_data code) w'
     | FrameInvalid reason => ContractInvalid reason
     | FrameResourceLimit => ContractOutOfFuel),
-     r.state.memory_size)
+     (SND out).memory_size)
 End
 
 Definition run_entry_with_gas_def:
@@ -365,7 +375,7 @@ Theorem call_contract_revert_restores_world:
   call_contract fuel prog imm fr w = ContractReverted data w' ⇒ w' = w
 Proof
   rw[call_contract_def, call_contract_with_gas_thm,
-     run_entry_with_gas_def, run_entry_frame_def,
+     run_entry_with_gas_def, run_entry_frame_def, entry_output_def,
      unconsumed_gas_result_def,
      solidityStateTheory.finish_source_frame_def, AllCaseEqs()] >> simp[]
 QED
@@ -390,6 +400,7 @@ val () = cv_auto_trans dispatch_procedure_def;
 val () = cv_auto_trans fallback_arguments_def;
 val () = cv_auto_trans dispatch_def;
 val () = cv_auto_trans fallback_output_def;
+val () = cv_auto_trans entry_output_def;
 val () = cv_auto_trans settle_source_world_def;
 val memory_immutables_pre_def =
   cv_auto_trans_pre "memory_immutables_pre" memory_immutables_def;

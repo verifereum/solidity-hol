@@ -1240,19 +1240,26 @@ Definition simple_stmt_def:
     (* Decoded memory values are allocated, as external call results are. A
      * memory input is decoded in place: only its bytes below the memory size
      * are read, the rest being zeros, as the compiler's decoder reads only
-     * the words it needs from an input of any length. *)
+     * the words it needs from an input of any length, and its reads touch
+     * memory up to the last of them. A decoder failing on such an input is
+     * left unsupported, as its failure does not say how far it read. *)
     | DefineStmt x ty (AbiDecodeOperation tys a) =>
         (case eval_atom st.scopes a of
            SOME (ReferenceValue r) =>
              (case decode_source st r of
                 INL (bs, input_len, st0) =>
                   (case decode_input env tys bs input_len 0 (FST (memory_load 64 st0)) of
-                     INL vs =>
-                       (case materialize_arguments env tys vs st0 of
+                     INL (vs, reach) =>
+                       (case materialize_arguments env tys vs (decode_reads r reach st0) of
                           INL (values, st1) =>
                             normal_result (define_binding x ty (pack_results values) st1) gas
                         | INR c => abrupt_result c st gas)
-                   | INR c => abrupt_result c st gas)
+                   | INR c =>
+                       if LENGTH bs < input_len then
+                         abrupt_result (InvalidCompletion
+                           "unsupported: abi.decode failing on an input past the memory size")
+                           st gas
+                       else abrupt_result c st gas)
               | INR c => abrupt_result c st gas)
          | _ => abrupt_result (InvalidCompletion "bad abi.decode operand") st gas)
     | DefineStmt x ty (AbiEncodeOperation selector tys args) =>
@@ -1436,46 +1443,13 @@ End
  * its own (assembly_calls_ok) fails closed.
  *)
 
-(* The elementary type a value type's word is kept as: a user-defined value
- * type's underlying type, and any other type itself. *)
-Definition assembly_word_type_def:
-  assembly_word_type env ty =
-    case ty of
-      UserValueT id => lookup_user_value env id
-    | _ => SOME ty
-End
-
-(* A value-type scalar as the stack word the compiler keeps it in: integers
- * and enums in two's complement, fixed bytes left-aligned. *)
-Definition assembly_word_def:
-  assembly_word env ty s =
-    case assembly_word_type env ty of
-      SOME (FixedBytesT k) =>
-        OPTION_MAP (λn. n * 2 ** (8 * (32 - k))) (stored_number k s)
-    | SOME _ => stored_number 32 s
-    | NONE => NONE
-End
-
-(* The value of type ty a word written to a local stands for; an enum word
- * outside its members stands for none. *)
+(* The value of type ty a word written to a local stands for, with memory's
+ * word cleanup; an enum word outside its members stands for none. *)
 Definition assembly_value_def:
   assembly_value env ty (w : num) =
-    case ty of
-      EnumT id =>
-        (case lookup_enum env id of
-           SOME members =>
-             if w < members then SOME (IntegerValue (&w)) else NONE
-         | NONE => NONE)
-    | _ =>
-      case assembly_word_type env ty of
-        SOME BoolT => SOME (BoolValue (w ≠ 0))
-      | SOME (FixedBytesT k) =>
-          stored_value (FixedBytesT k) (w DIV 2 ** (8 * (32 - k)))
-      | SOME u =>
-          (case storage_bytes u of
-             SOME b => stored_value u (w MOD 2 ** (8 * b))
-           | NONE => NONE)
-      | NONE => NONE
+    case word_value env ty w of
+      INL (ScalarValue s) => SOME s
+    | _ => NONE
 End
 
 Definition assembly_reference_word_def:
@@ -1485,7 +1459,7 @@ Definition assembly_reference_word_def:
         (case lookup_binding x st.scopes of
            SOME b =>
              (case b.binding_value of
-                ScalarValue s => assembly_word env ty s
+                ScalarValue s => scalar_word env ty s
               | _ => NONE)
          | NONE => NONE)
     | AssemblySlot x =>
@@ -1524,7 +1498,7 @@ Definition assembly_reference_word_def:
          | NONE => NONE)
     | AssemblyConstant a ty =>
         (case eval_atom st.scopes a of
-           SOME (ScalarValue s) => assembly_word env ty s
+           SOME (ScalarValue s) => scalar_word env ty s
          | _ => NONE)
     | AssemblyMemory x _ =>
         (case lookup_binding x st.scopes of
@@ -1655,7 +1629,7 @@ Definition assembly_write_one_def:
              case assembly_value env ty (w2n w) of
                NONE => NONE
              | SOME s =>
-                 if assembly_word env ty s = SOME (w2n w) then
+                 if scalar_word env ty s = SOME (w2n w) then
                    update_binding x (ScalarValue s) scopes
                  else NONE)
     | AssemblyMemory x ty =>
@@ -1963,8 +1937,6 @@ val () = cv_auto_trans write_target_value_def;
 val () = cv_auto_trans write_target_def;
 val () = cv_auto_trans reset_target_def;
 val () = cv_auto_trans simple_stmt_def;
-val () = cv_auto_trans assembly_word_type_def;
-val () = cv_auto_trans assembly_word_def;
 val () = cv_auto_trans assembly_value_def;
 val () = cv_auto_trans assembly_reference_word_def;
 val () = cv_auto_trans assembly_inputs_def;

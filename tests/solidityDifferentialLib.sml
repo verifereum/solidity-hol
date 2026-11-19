@@ -598,6 +598,22 @@ fun run_yul_stage env (stage_tag, json_tag, ycode) =
             logs_json other_logs)];
         false
       end
+    else if is_con "MemorySizeMismatch" verdict then
+      let
+        fun size tm = if optionSyntax.is_some tm then
+                        json_string (term_to_string (optionSyntax.dest_some tm))
+                      else json_string "none"
+        val (bytecode, yul, expected) =
+          case snd (strip_comb verdict) of
+            [b, y, e] => (b, y, e)
+          | _ => raise ERR "run_yul_stage" "unexpected verdict"
+      in
+        emit_status "memory-size-mismatch"
+          [("bytecode_memory_size", size bytecode),
+           ("yul_memory_size", size yul),
+           ("expected_memory_size", json_string (term_to_string expected))];
+        false
+      end
     else
       (emit_status
          (String.map Char.toLower (fst (dest_const (fst (strip_comb verdict)))))

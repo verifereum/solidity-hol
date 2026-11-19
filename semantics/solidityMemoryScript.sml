@@ -19,21 +19,23 @@ Ancestors
 Libs
   cv_transLib wordsLib intLib
 
-(* Byte access *)
+(* Byte access. An address is a word: the compiled code computes addresses
+ * with word arithmetic, so one past 2^256 wraps. *)
 
 Definition memory_touch_def:
   memory_touch a n (st : source_state) =
-    st with memory_size := touched_size st.memory_size a n
+    st with memory_size := touched_size st.memory_size (a MOD 2 ** 256) n
 End
 
 Definition memory_read_def:
   memory_read a n (st : source_state) =
-    (yul_mem_read st.memory a n, memory_touch a n st)
+    (yul_mem_read st.memory (a MOD 2 ** 256) n, memory_touch a n st)
 End
 
 Definition memory_write_def:
   memory_write a bs (st : source_state) =
-    memory_touch a (LENGTH bs) st with memory := yul_mem_write st.memory a bs
+    memory_touch a (LENGTH bs) st with
+      memory := yul_mem_write st.memory (a MOD 2 ** 256) bs
 End
 
 (* mload and mstore *)
@@ -465,6 +467,14 @@ Definition decode_source_def:
         | INR c => INR c
 End
 
+(* The memory a decoder's reads of r's bytes touch, up to reach bytes in. *)
+Definition decode_reads_def:
+  decode_reads r reach (st : source_state) =
+    case r of
+      MemoryReference p _ => memory_touch (p + 32) reach st
+    | _ => st
+End
+
 (* A byte copy into storage; one from the slot it targets changes nothing,
  * since the compiler's copy returns before it writes or uses its scratch. *)
 Definition copy_byte_contents_def:
@@ -586,5 +596,6 @@ val () = cv_auto_trans default_elementary_def;
 val () = cv_auto_trans scratch_write_def;
 val () = cv_auto_trans byte_contents_def;
 val () = cv_auto_trans decode_source_def;
+val () = cv_auto_trans decode_reads_def;
 val () = cv_auto_trans copy_byte_contents_def;
 val () = cv_auto_trans convert_byte_reference_def;
