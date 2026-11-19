@@ -18,8 +18,9 @@ interface IImagePeer {
 // value sits in memory reserved after the zero slot; an internal function
 // immutable's word there is the function's number in the compiler's internal
 // dispatch. Mode 3 overwrites that word with a number no function has, and
-// the call through it panics with 0x51; mode 4 reads that word into the
-// immutable again and dumps memory, which still holds it.
+// the call through it panics with 0x51; mode 4 reads that word into a local,
+// overwrites the reserved word again, assigns the local back to the immutable
+// and dumps memory, which holds the first word.
 contract MemoryImages {
     struct Record {
         uint128 small;
@@ -56,7 +57,9 @@ contract MemoryImages {
         }
         if (mode == 4) {
             assembly { mstore(0xa0, 0x99) }
-            op = op;
+            function(uint256) internal pure returns (uint256) kept = op;
+            assembly { mstore(0xa0, 0x77) }
+            op = kept;
             assembly { revert(0, add(mload(0x40), 0x100)) }
         }
     }
