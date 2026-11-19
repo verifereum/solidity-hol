@@ -485,6 +485,15 @@ Definition decode_bound_def:
     | _ => n
 End
 
+(* The compiler's copy into storage reads a memory source's data in whole
+ * words, the last one too. *)
+Definition copy_source_reads_def:
+  copy_source_reads src n st =
+    case src of
+      MemoryReference p _ => memory_touch (p + 32) (32 * ((n + 31) DIV 32)) st
+    | _ => st
+End
+
 (* A byte copy into storage; one from the slot it targets changes nothing,
  * since the compiler's copy returns before it writes or uses its scratch. *)
 Definition copy_byte_contents_def:
@@ -505,7 +514,8 @@ Definition copy_byte_contents_def:
               | INR c => INR c)
          | _ => case byte_contents st src of
              INR c => INR c
-           | INL (bs, st1) =>
+           | INL (bs, st0) =>
+               let st1 = copy_source_reads src (LENGTH bs) st0 in
                case store_storage_bytes st1.world.accounts dst bs st1.frame.static_context of
                  INL accounts =>
                    INL (scratch_write

@@ -360,6 +360,15 @@ End
 (* Operations without nested code, and the state after them: reading memory
  * raises its active size. Calls and array mutations are handled by
  * statements. *)
+(* A byte sequence mapping key's hash preimage, as the compiler's
+ * packed_hashed writes it: the key's bytes, then the slot, at the free memory
+ * pointer, which is not raised. *)
+Definition key_preimage_write_def:
+  key_preimage_write bs slot st =
+    let p = FST (memory_load 64 st) in
+    memory_store (p + LENGTH bs) (w2n slot) (memory_write p bs st)
+End
+
 Definition eval_operation_def:
   eval_operation env (st : source_state) op =
     case op of
@@ -530,21 +539,25 @@ Definition eval_operation_def:
              (case memory_byte_element p i st of
                 INL (q, st1) => INL (ReferenceValue (MemoryReference q (FixedBytesT 1)), st1)
               | INR c => INR c)
+         (* packed_hashed: a byte sequence key's bytes, then the slot, at the
+          * free memory pointer, which is not raised; a literal key too *)
+         | (SOME (ReferenceValue (StorageReference PersistentStorage addr slot 0
+                   (MappingT key value) layout)), SOME (ScalarValue (BytesValue bs))) =>
+             navigate_result env
+               (StorageReference PersistentStorage addr slot 0 (MappingT key value) layout)
+               (BytesValue bs)
+               (if byte_sequence_type key then key_preimage_write bs slot st else st)
          | (SOME (ReferenceValue r), SOME (ScalarValue s)) =>
              navigate_result env r s st
-         (* packed_hashed: the key's bytes, then the slot, at the free memory
-          * pointer, which is not raised *)
          | (SOME (ReferenceValue (StorageReference PersistentStorage addr slot 0
                    (MappingT key value) layout)), SOME (ReferenceValue key_ref)) =>
              if ¬byte_sequence_type key then
                INR (InvalidCompletion "bad mapping key")
              else (case byte_contents st key_ref of
                 INL (bs, st1) =>
-                  let (p, st2) = memory_load 64 st1 in
-                  let st3 = memory_store (p + LENGTH bs) (w2n slot) (memory_write p bs st2) in
                   navigate_result env
                     (StorageReference PersistentStorage addr slot 0 (MappingT key value) layout)
-                    (BytesValue bs) st3
+                    (BytesValue bs) (key_preimage_write bs slot st1)
               | INR c => INR c)
          | _ => INR (InvalidCompletion "bad index operands"))
     | EnvironmentOperation f =>

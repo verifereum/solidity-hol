@@ -241,7 +241,7 @@ hold (one assembly left dirty) fails closed.
 
 Where the compiled code's memory behaviour depends on something the model
 does not track, execution stops with an `unsupported:` completion naming the
-case, rather than guessing:
+case, rather than guessing. There are six such cases:
 
 - an encoder input at or above the free memory pointer, which the compiled
   encoder overwrites before it reads it;
@@ -252,7 +252,10 @@ case, rather than guessing:
 - an `abi.decode` that fails on a memory input reaching past the memory size
   or the free memory pointer, since its failure does not say how far it read;
 - an immutable's reserved word that its type cannot hold, when a constructor
-  ends.
+  ends;
+- an internal function word, read from memory, of a function of another type:
+  the compiled code calls it when the number of stack slots its parameters
+  and returns take matches, and panics otherwise.
 
 Inline assembly's `call`, `staticcall` and `delegatecall` (`assembly_calls.sol`,
 `assembly_delegate.sol`) run the callee on Verifereum through `externalCall`,

@@ -526,9 +526,6 @@ Definition eval_yul_builtin_def:
     | (YMLoad, [p]) =>
         let (m', bs) = yul_mload m (w2n p) in
           EvalValues [word_of_bytes_be bs] m'
-    | (YMLoad, [p; _]) =>
-        let (m', bs) = yul_mload m (w2n p) in
-          EvalValues [word_of_bytes_be bs] m'
     | (YMStore, [p; v]) => EvalValues [] (yul_mstore m (w2n p) v)
     | (YMStore8, [p; v]) =>
         EvalValues [] (yul_memory_write (yul_memory_touch m (w2n p) 1)

@@ -103,6 +103,15 @@ contract MemoryImages {
         }
     }
 
+    // A literal key is packed for its hash at the free memory pointer too.
+    function literalKeyWrite() external {
+        byKey["a literal key longer than one memory word"] = seed;
+        assembly {
+            if sload(probe.slot) { revert(0, 0) }
+            return(0, add(mload(0x40), 0x100))
+        }
+    }
+
     function arrayPushRead(uint256 x) external {
         items.push(x);
         uint256 y = items[items.length - 1];
@@ -115,6 +124,22 @@ contract MemoryImages {
 
     function blobStore(bytes calldata b) external {
         blob = b;
+        assembly {
+            if sload(probe.slot) { revert(0, 0) }
+            return(0, add(mload(0x40), 0x100))
+        }
+    }
+
+    // The copy into storage reads a memory source in whole words, so from
+    // an unaligned one-byte array it touches the word after the byte too.
+    function blobStoreUnaligned() external {
+        bytes memory m;
+        assembly {
+            m := 161
+            mstore(161, 1)
+            mstore8(193, 0xab)
+        }
+        blob = m;
         assembly {
             if sload(probe.slot) { revert(0, 0) }
             return(0, add(mload(0x40), 0x100))
