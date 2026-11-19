@@ -261,7 +261,8 @@ End
 (* A builtin's value on its operands' values, and the state after it, with
  * the memory the compiler's code uses for it. keccak256 hashes the bytes in
  * place. sha256 and ecrecover call their precompile on an encoding at the
- * free memory pointer, which they do not raise, and read its output from the
+ * free memory pointer, which they do not raise (sha256's bytes packed from
+ * wherever they are, with the tail packing writes after them), and read its output from the
  * scratch word at 0: ecrecover zeroes it first, as an invalid signature
  * returns nothing, which reads as address(0), and the precompile reads its
  * input from memory after that. a.code allocates memory bytes
@@ -298,13 +299,17 @@ Definition eval_builtin_def:
     | (CodeHashBuiltin, [ScalarValue (AddressValue address)]) =>
         INL (ScalarValue (BytesValue (num_to_bytes 32
           (w2n (ext_code_hash st.world.accounts address)))), st)
-    | (Sha256Builtin, [ReferenceValue r]) =>
-        (case byte_contents st r of
+    | (Sha256Builtin, [v]) =>
+        (case (case v of
+                 ReferenceValue r => byte_contents st r
+               | ScalarValue (BytesValue bs) => INL (bs, st)
+               | _ => INR (InvalidCompletion "bad sha256 operand")) of
            INL (bs, st1) =>
              let (p, st2) = memory_load 64 st1 in
              let hash = num_to_bytes 32 (w2n (SHA_256_bytes bs)) in
              INL (ScalarValue (BytesValue hash),
-                  memory_write 0 hash (copy_with_cleanup p bs st2))
+                  memory_write 0 hash
+                    (memory_write p (bs ++ packed_bytes_tail st2.world.accounts v bs) st2))
          | INR c => INR c)
     | (BlockhashBuiltin, [ScalarValue (IntegerValue n)]) =>
         INL (ScalarValue (BytesValue (num_to_bytes 32

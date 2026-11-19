@@ -981,9 +981,11 @@ Definition wf_core_operation_def:
              copy_convertible (loc, src) (MemoryLoc, ty)
          | _ => F)
     | _ => F) ∧
+  (* sha256's byte sequence is encoded where it is, in any location. *)
   (wf_core_operation env ctx annotation (BuiltinOperation op args) ⇔
     let (operand_tys, result) = builtin_signature op in
-    wf_core_atoms env ctx (MAP SingleType operand_tys) args ∧
+    (if op = Sha256Builtin then LIST_REL (wf_abi_atom env ctx) operand_tys args
+     else wf_core_atoms env ctx (MAP SingleType operand_tys) args) ∧
     annotation = SingleType result) ∧
   (wf_core_operation env ctx annotation (AbiEncodeOperation selector tys args) ⇔
     annotation = SingleType (LocatedT MemoryLoc BytesT) ∧

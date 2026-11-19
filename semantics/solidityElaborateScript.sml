@@ -840,7 +840,8 @@ End
 
 (* A builtin on its operands' values, each converted to its operand type.
  * The hash of a literal is a constant, as the compiler folds it without
- * allocating memory. *)
+ * allocating memory. sha256's operand is encoded where it is, as the
+ * compiler packs it for the precompile without converting it to memory. *)
 Definition elab_builtin_def:
   elab_builtin n id ids op vs =
     let (operand_tys, result) = builtin_signature op in
@@ -848,7 +849,8 @@ Definition elab_builtin_def:
       (Keccak256Builtin, [(ConstantAtom (BytesValue bs), ElabBytesLiteral)]) =>
         INL (([], ConstantAtom (BytesValue (Keccak_256_w64 bs))), n)
     | _ =>
-      case convert_operands n id ids (values_of operand_tys) vs of
+      case convert_operands n id ids
+             (if op = Sha256Builtin then [Encoded T] else values_of operand_tys) vs of
         INL (cs, _, atoms, n1) =>
           let (rs, r) = bind_value n1 result (BuiltinOperation op atoms) in
           INL ((cs ++ rs, r), n1 + 1)

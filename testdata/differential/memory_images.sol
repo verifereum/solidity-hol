@@ -256,6 +256,36 @@ contract MemoryImages {
         this.failing(n);
     }
 
+    // sha256 packs its operand for the precompile where the operand is,
+    // without copying it to memory first.
+    function digestCalldata(bytes calldata d) external view {
+        bytes32 h = sha256(d);
+        assembly {
+            if sload(probe.slot) { revert(0, 0) }
+            mstore(add(mload(0x40), 0xe0), h)
+            return(0, add(mload(0x40), 0x100))
+        }
+    }
+
+    function digestLiteral() external view {
+        bytes32 h = sha256("a literal longer than one word, packed in place");
+        assembly {
+            if sload(probe.slot) { revert(0, 0) }
+            mstore(add(mload(0x40), 0xe0), h)
+            return(0, add(mload(0x40), 0x100))
+        }
+    }
+
+    function digestStored(bytes calldata d) external {
+        blob = d;
+        bytes32 h = sha256(blob);
+        assembly {
+            if sload(probe.slot) { revert(0, 0) }
+            mstore(add(mload(0x40), 0xe0), h)
+            return(0, add(mload(0x40), 0x100))
+        }
+    }
+
     // A try whose clauses do not match the failure forwards it the same way.
     function forwardTry(uint256 n) external view {
         try this.failing(n) returns (bytes memory) {
