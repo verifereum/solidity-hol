@@ -508,18 +508,37 @@ Definition packed_tail_def:
     | _ => REPLICATE (32 - LENGTH bs) 0w : byte list
 End
 
-(* An in-place encoding (indexed_data) ends with its last part, so only that
- * part, recursively, can spill past its end. *)
+(* The length of v's in-place encoding (indexed_data): a byte sequence padded
+ * to whole words, an array or struct its parts in place, a scalar one word. *)
+Definition inplace_length_def:
+  (inplace_length (Bytes NONE) (BytesV bs) = 32 * ((LENGTH bs + 31) DIV 32)) ∧
+  (inplace_length String (BytesV bs) = 32 * ((LENGTH bs + 31) DIV 32)) ∧
+  (inplace_length (Array _ t) (ListV vs) =
+    inplace_lengths (REPLICATE (LENGTH vs) t) vs) ∧
+  (inplace_length (Tuple ts) (ListV vs) = inplace_lengths ts vs) ∧
+  (inplace_length _ _ = 32) ∧
+  (inplace_lengths (t :: ts) (v :: vs) = inplace_length t v + inplace_lengths ts vs) ∧
+  (inplace_lengths _ _ = 0)
+Termination
+  WF_REL_TAC ‘measure (λx. case x of
+    INL (t, v) => abi_value_size v
+  | INR (ts, vs) => list_size abi_value_size vs)’ >>
+  rw[contractABITheory.abi_value_size_def, listTheory.list_size_def]
+End
+
+(* How far an in-place encoding's writes reach past its end: each part's
+ * spill, less the length of the parts after it. *)
 Definition inplace_spill_def:
   (inplace_spill src (Bytes NONE) (BytesV bs) = padded_bytes_spill src (LENGTH bs)) ∧
   (inplace_spill src String (BytesV bs) = padded_bytes_spill src (LENGTH bs)) ∧
   (inplace_spill src (Array _ t) (ListV vs) =
-    last_inplace_spill src (REPLICATE (LENGTH vs) t) vs) ∧
-  (inplace_spill src (Tuple ts) (ListV vs) = last_inplace_spill src ts vs) ∧
+    inplace_parts_spill src (REPLICATE (LENGTH vs) t) vs) ∧
+  (inplace_spill src (Tuple ts) (ListV vs) = inplace_parts_spill src ts vs) ∧
   (inplace_spill src _ _ = 0) ∧
-  (last_inplace_spill src [t] [v] = inplace_spill src t v) ∧
-  (last_inplace_spill src (t :: ts) (v :: vs) = last_inplace_spill src ts vs) ∧
-  (last_inplace_spill src _ _ = 0)
+  (inplace_parts_spill src (t :: ts) (v :: vs) =
+    MAX (inplace_spill src t v - inplace_lengths ts vs)
+        (inplace_parts_spill src ts vs)) ∧
+  (inplace_parts_spill src _ _ = 0)
 Termination
   WF_REL_TAC ‘measure (λx. case x of
     INL (src, t, v) => abi_value_size v
@@ -1238,8 +1257,23 @@ QED
 
 val () = cv_auto_trans packed_bytes_tail_def;
 val () = cv_auto_trans packed_tail_def;
+val inplace_length_pre_def = cv_auto_trans_pre_rec
+  "inplace_length_pre inplace_lengths_pre" inplace_length_def (
+  WF_REL_TAC ‘measure (λx. case x of
+    INL (t, v) => cv_size v
+  | INR (ts, vs) => cv_size vs)’ >>
+  cv_termination_tac
+);
+
+Theorem inplace_length_pre[cv_pre]:
+  (∀t v. inplace_length_pre t v) ∧ (∀ts vs. inplace_lengths_pre ts vs)
+Proof
+  ho_match_mp_tac inplace_length_ind >> rpt strip_tac >>
+  simp[Once inplace_length_pre_def] >> rw[] >> gvs[]
+QED
+
 val inplace_spill_pre_def = cv_auto_trans_pre_rec
-  "inplace_spill_pre last_inplace_spill_pre" inplace_spill_def (
+  "inplace_spill_pre inplace_parts_spill_pre" inplace_spill_def (
   WF_REL_TAC ‘measure (λx. case x of
     INL (src, t, v) => cv_size v
   | INR (src, ts, vs) => cv_size vs)’ >>
@@ -1247,7 +1281,7 @@ val inplace_spill_pre_def = cv_auto_trans_pre_rec
 );
 
 Theorem inplace_spill_pre[cv_pre]:
-  (∀src t v. inplace_spill_pre src t v) ∧ (∀src ts vs. last_inplace_spill_pre src ts vs)
+  (∀src t v. inplace_spill_pre src t v) ∧ (∀src ts vs. inplace_parts_spill_pre src ts vs)
 Proof
   ho_match_mp_tac inplace_spill_ind >> rpt strip_tac >>
   simp[Once inplace_spill_pre_def] >> rw[] >> gvs[]

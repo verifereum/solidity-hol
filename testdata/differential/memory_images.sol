@@ -28,9 +28,15 @@ contract MemoryImages {
         bytes blob;
     }
 
+    struct Pair {
+        bytes b;
+        uint256[] a;
+    }
+
     event Plain(uint256 indexed id, bytes data);
     event Indexed(bytes indexed key, uint256[] items);
     event Stored(bytes data, bytes indexed tag);
+    event Paired(Pair indexed p);
 
     uint256 immutable seed;
     function(uint256) internal pure returns (uint256) immutable op;
@@ -169,6 +175,17 @@ contract MemoryImages {
         blob = d;
         tag = t;
         emit Stored(blob, tag);
+        assembly {
+            if sload(probe.slot) { revert(0, 0) }
+            return(0, add(mload(0x40), 0x100))
+        }
+    }
+
+    // An indexed struct hashes its in-place encoding; the word cleared after
+    // copying b lies past the encoding when the array after it is empty.
+    function emitPair(bytes calldata b) external {
+        Pair memory p = Pair(b, new uint256[](0));
+        emit Paired(p);
         assembly {
             if sload(probe.slot) { revert(0, 0) }
             return(0, add(mload(0x40), 0x100))

@@ -65,7 +65,7 @@
       }
     },
     {
-      "name": "short_zero_padding_still_unknown",
+      "name": "short_zero_padding",
       "calldata": "0x2f64d386",
       "storage": {
         "0": "452312848583266388373324160190187140051835877600158453279131187530910662658"
