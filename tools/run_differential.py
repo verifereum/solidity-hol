@@ -406,7 +406,15 @@ def check_artifacts(root: Path, corpus: dict[str, Any]) -> list[dict[str, str]]:
         if source not in recorded_sources:
             checks.append(check("source-fresh", subject, "the artifact was not compiled from this source"))
             continue
-        for name, recorded in sorted(recorded_sources.items()):
+        compiled_sources = artifact.get("output", {}).get("sources", {})
+        for name in sorted(set(recorded_sources) | set(compiled_sources)):
+            recorded = recorded_sources.get(name)
+            if recorded is None:
+                checks.append(check(
+                    "source-fresh", f"{path}:{name}",
+                    "the artifact compiled this source but recorded no input content; regenerate it",
+                ))
+                continue
             try:
                 current = (root / name).read_text(encoding="utf-8")
             except OSError as error:

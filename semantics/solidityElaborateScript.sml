@@ -4135,13 +4135,23 @@ Proof
   Induct >> simp[Once snapshot_values_pre_def] >> rw[] >> fs[]
 QED
 
-val () = cv_auto_trans_rec expr_assigns_def (
+val expr_assigns_pre_def = cv_auto_trans_pre_rec
+  "expr_assigns_pre components_assign_pre exprs_assign_pre" expr_assigns_def (
   WF_REL_TAC ‘measure (λx. case x of
                  INL e => cv_size e
                | INR (INL cs) => cv_size cs
                | INR (INR es) => cv_size es)’ >>
   cv_termination_tac
 );
+
+Theorem expr_assigns_pre[cv_pre,local]:
+  (∀e. expr_assigns_pre e) ∧
+  (∀cs. components_assign_pre cs) ∧
+  (∀es. exprs_assign_pre es)
+Proof
+  ho_match_mp_tac expr_assigns_ind >> rpt strip_tac >>
+  simp[Once expr_assigns_pre_def] >> rw[AllCaseEqs()] >> fs[]
+QED
 
 val () = cv_auto_trans builtin_failure_def;
 val () = cv_auto_trans builtin_result_def;
