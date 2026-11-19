@@ -184,33 +184,38 @@ Definition yul_created_code_def:
         code offsets) p.deployed_bytes p.creation_refs
 End
 
-Definition yul_creation_execution_def:
-  yul_creation_execution p c data fuel =
+Definition yul_creation_frame_def:
+  yul_creation_frame p c data fuel =
     if p.deployed_offset + LENGTH p.deployed_bytes > LENGTH p.creation_bytes ∨
        TAKE (LENGTH p.deployed_bytes) (DROP p.deployed_offset p.creation_bytes)
          ≠ p.deployed_bytes then
-      (Diagnostic InvalidCompletion, NONE, [])
+      ((Diagnostic InvalidCompletion, NONE, []), NONE)
     else
       let m = yul_creation_machine p c data in
       let r = run_yul fuel p.creation_body m in
-      case yul_transaction_frame m r.machine r.completion of
-        YulFrameSuccess out w =>
-          if out = yul_created_code p r.machine.immutables then
-            (Returned (code_immutable_words p.creation_refs out),
+      ((case yul_transaction_frame m r.machine r.completion of
+          YulFrameSuccess out w =>
+            if out = yul_created_code p r.machine.immutables then
+              (Returned (code_immutable_words p.creation_refs out),
+               SOME (lookup_account (case_address c) w.accounts).storage, w.logs)
+            else (Diagnostic InvalidCompletion, NONE, [])
+        | YulFrameRevert out w =>
+            (Reverted out,
              SOME (lookup_account (case_address c) w.accounts).storage, w.logs)
-          else (Diagnostic InvalidCompletion, NONE, [])
-      | YulFrameRevert out w =>
-          (Reverted out,
-           SOME (lookup_account (case_address c) w.accounts).storage, w.logs)
-      | YulFrameAbort w =>
-          (Aborted, SOME (lookup_account (case_address c) w.accounts).storage, w.logs)
-      | YulFrameInvalid _ => (Diagnostic InvalidCompletion, NONE, [])
-      | YulFrameResourceLimit => (Diagnostic OutOfFuel, NONE, [])
+        | YulFrameAbort w =>
+            (Aborted, SOME (lookup_account (case_address c) w.accounts).storage, w.logs)
+        | YulFrameInvalid _ => (Diagnostic InvalidCompletion, NONE, [])
+        | YulFrameResourceLimit => (Diagnostic OutOfFuel, NONE, [])),
+       SOME r.machine.memory_size)
+End
+
+Definition yul_creation_execution_def:
+  yul_creation_execution p c data fuel = FST (yul_creation_frame p c data fuel)
 End
 
 (* A case's call: the same calldata the bytecode run is given, so an
  * unencodable argument or an unknown function is the same diagnostic on both
- * sides. A call also gives the active memory size it ends with.
+ * sides. Each run also gives the active memory size it ends with.
  *)
 Definition yul_case_frame_def:
   yul_case_frame (evm_code : byte list) ycode u c fuel =
@@ -220,9 +225,9 @@ Definition yul_case_frame_def:
     | (INR (data, _), SOME imm) =>
         (case c.case_input of
            Deploy _ _ =>
-             ((case ycode.creation_program of
-                 NONE => (Diagnostic InvalidCompletion, NONE, [])
-               | SOME p => yul_creation_execution p c data fuel), NONE)
+             (case ycode.creation_program of
+                NONE => ((Diagnostic InvalidCompletion, NONE, []), NONE)
+              | SOME p => yul_creation_frame p c data fuel)
          | _ =>
              let m = yul_differential_machine ycode.runtime_bytes imm
                        (c with case_immutable_refs := ycode.runtime_refs) data in
@@ -332,6 +337,7 @@ val () = cv_auto_trans yul_differential_machine_def;
 val () = cv_auto_trans yul_frame_observation_def;
 val () = cv_auto_trans yul_creation_machine_def;
 val () = cv_auto_trans yul_created_code_def;
+val () = cv_auto_trans yul_creation_frame_def;
 val () = cv_auto_trans yul_creation_execution_def;
 val () = cv_auto_trans yul_case_frame_def;
 val () = cv_auto_trans yul_case_execution_def;
