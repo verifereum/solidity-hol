@@ -1991,3 +1991,22 @@ Theorem storage_reference_defaults:
 Proof
   EVAL_TAC
 QED
+
+(* Event hash preimages written one after another at the free memory pointer,
+ * which starts at p. *)
+Definition preimages_moved_def:
+  preimages_moved p temps =
+    FST (write_at_each temps (memory_store 64 p initial_state))
+End
+
+val () = cv_auto_trans preimages_moved_def;
+
+(* A preimage that moves the pointer counts even when the next one, written
+ * where it moved, moves it back. *)
+Theorem preimage_restoring_the_pointer_still_moved_it:
+  preimages_moved 64 [REPLICATE 32 0w; REPLICATE 64 0w ++ num_to_bytes 32 64] ∧
+  ¬preimages_moved 128 [REPLICATE 64 1w; REPLICATE 32 2w]
+Proof
+  CONV_TAC cv_eval
+QED
+

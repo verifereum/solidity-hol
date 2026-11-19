@@ -796,12 +796,15 @@ End
 
 (* Temporaries written one after another, each at the free memory pointer
  * as memory holds it when the temporary is written: the compiler reads the
- * pointer anew for each, which an earlier temporary may have overwritten. *)
+ * pointer anew for each, which an earlier temporary may have overwritten.
+ * Also says whether any temporary changed the pointer. *)
 Definition write_at_each_def:
-  (write_at_each [] st = st) ∧
+  (write_at_each [] st = (F, st)) ∧
   (write_at_each (bs :: rest) st =
      let (p, st1) = memory_load 64 st in
-     write_at_each rest (memory_write p bs st1))
+     let st2 = memory_write p bs st1 in
+     let (moved, st3) = write_at_each rest st2 in
+     (moved ∨ FST (memory_load 64 st2) ≠ p, st3))
 End
 
 (* Whether an event reads an argument from memory. *)
@@ -817,8 +820,9 @@ End
  * writes, an emit in a static frame fails. The compiler encodes the log's
  * data at the free memory pointer, which it does not move, reading the
  * pointer after the indexed arguments' hash preimages are written. A
- * preimage that changes the pointer moves where the next one goes, which
- * may be over a memory argument the model read before: that fails closed.
+ * preimage that changes the pointer, even one a later preimage changes
+ * back, moves where the next write goes, which may be over a memory
+ * argument the model read before: that fails closed.
  *)
 Definition emit_event_def:
   emit_event env topic args (st : source_state) gas =
@@ -830,9 +834,9 @@ Definition emit_event_def:
             if st.frame.static_context then
               abrupt_result (InvalidCompletion "emit in static frame") st gas
             else
-              let st2 = write_at_each temps st1 in
+              let (moved, st2) = write_at_each temps st1 in
               let (p, st3) = memory_load 64 st2 in
-              if p ≠ FST (memory_load 64 st1) ∧ has_memory_argument vs then
+              if moved ∧ has_memory_argument vs then
                 abrupt_result (InvalidCompletion
                   "unsupported: an event's hash preimage moved the free memory pointer") st gas
               else

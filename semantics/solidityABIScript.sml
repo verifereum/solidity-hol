@@ -945,35 +945,47 @@ Termination
 End
 
 (* A storage array, struct or byte sequence copied to new memory, as the
- * compiler's storage-to-memory copies do: each object is allocated before
- * its members, scalars are read cleaned, and a byte sequence keeps whole
- * data words (storage_byte_data); an empty one still writes its slot's word
- * after its length, past the allocation. The fuel bounds the struct
- * nesting. *)
+ * compiler's storage-to-memory copies do. A byte sequence or an array of
+ * scalars is written at the free memory pointer first and its allocation
+ * finalized after, as the compiled copy encodes at allocate_unbounded() and
+ * then calls finalize_allocation; an array of references or a struct is
+ * allocated before its members. Scalars are read cleaned, and a byte
+ * sequence keeps whole data words (storage_byte_data); an empty one still
+ * writes its slot's word after its length, past the allocation. The fuel
+ * bounds the struct nesting. *)
 Definition materialize_storage_def:
   (materialize_storage env (fuel : num) accounts addr slot ty st =
     if byte_sequence_type ty then
       (case storage_byte_length accounts addr slot of
          INR c => INR c
        | INL length =>
-           case allocate_byte_array length st of
+           if 2 ** 64 ≤ length then INR (PanicCompletion 65) else
+           let (p, st1) = memory_load 64 st in
+           case finalize_allocation p ((length + 31) DIV 32 * 32 + 32)
+                  (memory_write (p + 32)
+                     (storage_byte_data accounts addr slot length)
+                     (memory_store p length st1)) of
              INR c => INR c
-           | INL (p, st1) =>
-               INL (ReferenceValue (MemoryReference p ty),
-                    memory_write (p + 32)
-                      (storage_byte_data accounts addr slot length) st1))
+           | INL st2 => INL (ReferenceValue (MemoryReference p ty), st2))
     else case ty of
       ArrayT element l =>
         (case storage_array_data accounts addr slot ty of
            (length, data) =>
              if 2 ** 64 ≤ length then INR (PanicCompletion 65) else
-             case allocate_memory ((if l = NONE then 32 else 0) + 32 * length) st of
+             let size = (if l = NONE then 32 else 0) + 32 * length;
+                 scalars = is_stored_scalar_type element in
+             case (if scalars then INL (memory_load 64 st)
+                   else allocate_memory size st) of
                INR c => INR c
              | INL (p, st1) =>
                  let st2 = if l = NONE then memory_store p length st1 else st1 in
                  case materialize_storage_elements env fuel accounts addr data element
                         0 length (if l = NONE then p + 32 else p) st2 of
-                   INL st3 => INL (ReferenceValue (MemoryReference p ty), st3)
+                   INL st3 =>
+                     (case (if scalars then finalize_allocation p size st3
+                            else INL st3) of
+                        INL st4 => INL (ReferenceValue (MemoryReference p ty), st4)
+                      | INR c => INR c)
                  | INR c => INR c)
     | StructT s =>
         (case (lookup_struct env s, lookup_struct_layout env s) of

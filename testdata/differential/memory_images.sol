@@ -391,6 +391,24 @@ contract MemoryImages {
         }
     }
 
+    // With the free memory pointer at 0x40, a storage array of scalars or a
+    // byte sequence copied to memory is written at the pointer before its
+    // allocation is finalized, so the pointer word ends past the copy rather
+    // than holding its length.
+    function copyLow(bytes calldata b) external {
+        items.push(5);
+        blob = b;
+        assembly { mstore(0x40, 0x40) }
+        uint256[] memory xs = items;
+        bytes memory ys = blob;
+        assembly {
+            if sload(probe.slot) { revert(0, 0) }
+            mstore(add(mload(0x40), 0xc0), xs)
+            mstore(add(mload(0x40), 0xe0), ys)
+            return(0, add(mload(0x40), 0x100))
+        }
+    }
+
     // A call's results are decoded from memory after the free memory pointer
     // moves past them, so with the pointer set into the return data the new
     // pointer overwrites returned words before they are decoded.
