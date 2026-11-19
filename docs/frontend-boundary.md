@@ -834,7 +834,8 @@ annotations, at the node whose type it computes:
   list; `break` and `continue` occur in loop bodies; conditions are boolean;
   modifier bodies make no super call, and modifier arguments see the
   function's parameters but not its return variables;
-- a fallback takes no parameters and returns nothing, as the core's does;
+- a fallback takes no parameters and returns nothing, or takes `bytes calldata`
+  and returns `bytes memory`, as the core's does;
 - `delete` captures its destination once. Scalar resets preserve neighboring
   packed storage; storage objects clear their contents while preserving mapping
   members. Memory references are rebound to their zero value, leaving aliases
@@ -850,10 +851,11 @@ function overrides, and that functions come most derived first).
 ## Partial admission
 
 A contract is admitted per function. When a function's body or the body of
-one of its modifiers falls outside the subset, or a fallback has parameters or
-returns, import keeps the function with its header and the reason
-(`fn_unsupported`) rather than rejecting the unit (a fallback with parameters
-or returns keeps an empty body). Import goes on past what it cannot represent,
+one of its modifiers falls outside the subset, import keeps the function with
+its header and the reason (`fn_unsupported`) rather than rejecting the unit;
+elaboration rejects a fallback of any other signature (not none, and not
+`bytes calldata` returning `bytes memory`) the same way, with the reason
+`fallback with parameters or returns`. Import goes on past what it cannot represent,
 leaving a placeholder (`SrcUnsupportedTypeName`, `SrcUnsupportedExpr`,
 `SrcUnsupportedStmt`) with the children it could import, so the reason has a
 line for every unsupported node, each naming it. `solidityPrepareLib` then marks, until nothing changes,
