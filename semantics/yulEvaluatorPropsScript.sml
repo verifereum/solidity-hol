@@ -500,6 +500,19 @@ Proof
   rw [] >> Cases_on `l` >> simp [listTheory.list_case_def]
 QED
 
+(* A case on a conditional, pushed into its branches.  At a symbolic fuel each
+ * call the body makes is `if n = 0 then EvalAbrupt YulOutOfFuel m else
+ * invoke_yul (n - 1) ...`, and the case on it reaches the call only once it
+ * is inside the else branch. *)
+Theorem yul_expr_result_CASE_if:
+  ∀g t e b1 b2.
+    yul_expr_result_CASE (if g then t else e) b1 b2 =
+    if g then yul_expr_result_CASE t b1 b2
+    else yul_expr_result_CASE e b1 b2
+Proof
+  rw []
+QED
+
 (* The case in a conditional's *test*, pushed in: the case comes to the top and
  * each of its branches carries the conditional, on what that branch holds.
  *
