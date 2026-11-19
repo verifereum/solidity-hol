@@ -901,6 +901,19 @@ Definition abi_targets_def:
                       | NONE => []))
 End
 
+(* The call-level blocker of abi_encoding that its operands do not decide:
+ * the parameter types of abi.encodeCall name a type that has no ABI
+ * encoding. *)
+Definition abi_form_blockers_def:
+  abi_form_blockers form (id : num) =
+    case form of
+      AbiCall tids =>
+        (case all_some (MAP abi_call_parameter tids) of
+           NONE => [(id, "abi encoding of this type")]
+         | SOME _ => [])
+    | _ => []
+End
+
 (* The ids of the values of a returned tuple: those of its components, or
  * that of the whole expression when it isn't a tuple expression. *)
 Definition return_ids_def:
@@ -2271,7 +2284,8 @@ Definition elab_expr_def:
                    INL ((ss ++ cs ++ es, r, ElabType ty), n2 + 1)
                | INR bs => INR bs)
           | INR _ =>
-              INR (elab_arg_failures ctx n (abi_targets form (expr_ids args)) args)))
+              INR (abi_form_blockers form info.node_id ++
+                   elab_arg_failures ctx n (abi_targets form (expr_ids args)) args)))
     (* The operands are the target, the call options in source order and
        the data, evaluated in that order. Only call sends value. *)
     | SrcLowLevelCall info _ kind opts operands tid =>
@@ -4288,6 +4302,7 @@ val () = cv_auto_trans suffix_target_def;
 val () = cv_auto_trans operand_targets_def;
 val () = cv_auto_trans source_targets_def;
 val () = cv_auto_trans abi_targets_def;
+val () = cv_auto_trans abi_form_blockers_def;
 val () = cv_auto_trans return_ids_def;
 val () = cv_auto_trans elab_builtin_def;
 val () = cv_auto_trans selector_encoding_def;

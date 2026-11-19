@@ -764,6 +764,33 @@ Proof
   EVAL_TAC
 QED
 
+(* A call that names its arguments converts each to its own parameter's type:
+ * with the parameters (uint256, bytes1) taken in the order [1; 0], the string
+ * literal is converted to uint256 in the first call and to bytes1 in the
+ * second, where it converts. *)
+Theorem named_call_mixed_operands_report:
+  ^(reports “elab_args ^ctx0 10 30 0 [1; 0] [ValueOf (UintT 256); ValueOf (FixedBytesT 1)]
+               [^(bad_at 32); ^(string_at 33)]”
+     [“(32, "bad")”, “(33, "string literal conversion")”]) ∧
+  ¬MEM (32, "string literal conversion")
+     (blockers (elab_args ^ctx0 10 30 0 [1; 0] [ValueOf (UintT 256); ValueOf (FixedBytesT 1)]
+                  [^(string_at 32); ^(bad_at 33)])) ∧
+  MEM (33, "bad")
+     (blockers (elab_args ^ctx0 10 30 0 [1; 0] [ValueOf (UintT 256); ValueOf (FixedBytesT 1)]
+                  [^(string_at 32); ^(bad_at 33)]))
+Proof
+  EVAL_TAC
+QED
+
+Theorem abi_call_mixed_operands_report:
+  ^(reports “elab_expr ^ctx0 10
+               (SrcAbiEncode ^(at 30) ^(at 31) (AbiCall ["t_bad"])
+                  [^(string_at 32); ^(bad_at 33)] "t_bytes_memory_ptr")”
+     [“(30, "abi encoding of this type")”, “(33, "bad")”])
+Proof
+  EVAL_TAC
+QED
+
 (* The arguments after an attached one, whose elaboration (first) or
  * conversion (second) fails. *)
 Theorem attached_call_mixed_operands_report:
