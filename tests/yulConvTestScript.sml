@@ -611,6 +611,44 @@ val () = print ("yulConvTest: checked_exp_helper's entry " ^ Int.toString
                 ^ Int.toString (size_of (rhs (concl loop_iteration)))
                 ^ " nodes\n")
 
+(* A fuel nobody knows, on a machine and arguments nobody knows either: the
+ * shape a caller proving a function for every fuel converts.  At `SUC n` the
+ * body runs at `n`, so each call it makes is under the evaluator's own `n = 0`
+ * test, and `checked_exp_signed`'s form came back within no clock until the
+ * conversion pushed each call's case into that test's branches.  The form is held to the suite's checks and printed beside the
+ * one at `SUC (SUC n)`, where the test is decided and the calls are folded at
+ * `n`. *)
+val () =
+  let
+    val f as (nm, _, body) =
+      valOf (List.find (fn (n, _, _) => n = "checked_exp_signed") functions)
+    val (_, args) = strip_comb (call_term f)
+    val m = mk_var ("m", type_of yul_conv_machine_term)
+    val n = mk_var ("n", numSyntax.num)
+    fun form_at fuel =
+      let
+        val t = list_mk_comb (invoke_c,
+                  [fuel, el 2 args, el 3 args, el 4 args, m])
+        val what = nm ^ " at " ^ term_to_string fuel
+        val form =
+          case under_clock 60.0
+                 (fn () => yulConvLib.yul_invoke_conv table_defs t) of
+            NONE => fail (what ^ " did not come back within 60s")
+          | SOME th => rhs (concl (checked_form (what, body) t th))
+        val size = size_of form
+      in
+        if size >= 200000 then
+          fail (what ^ " is " ^ Int.toString size ^ " nodes, at or over the line")
+        else size
+      end
+    val at_suc = form_at (numSyntax.mk_suc n)
+    val at_suc_suc = form_at (numSyntax.mk_suc (numSyntax.mk_suc n))
+  in
+    print ("yulConvTest: " ^ nm ^ " on a symbolic machine at SUC n "
+           ^ Int.toString at_suc ^ " nodes; at SUC (SUC n) "
+           ^ Int.toString at_suc_suc ^ " nodes\n")
+  end
+
 (* A loop with statements after it.  `checked_exp_helper`'s loop is the last
  * statement of its body, so the rest after it is empty; here it is not: `f`'s
  * loop is followed by an assignment, and `g`'s is the same loop in a block of
