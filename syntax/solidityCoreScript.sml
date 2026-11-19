@@ -37,9 +37,10 @@ Datatype:
   | IntegerValue int
   | AddressValue address
   | BytesValue (byte list)
-  (* An internal function value: SOME f calls procedure f; NONE is the zero
-   * value, whose call panics. *)
-  | InternalFunctionValue (ast_id option)
+  (* An internal function value: INL f calls procedure f; INR w is a word in
+   * the compiler's internal dispatch that no function has, such as the zero
+   * value INR 0, whose call panics. *)
+  | InternalFunctionValue (ast_id + num)
   | ExternalFunctionValue address (byte list)
 End
 

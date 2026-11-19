@@ -1858,13 +1858,13 @@ Definition eval_block_def:
     | NONE =>
         abrupt_result
           (InvalidCompletion "unbound atom") st gas) ∧
-  (* The zero function value panics after the arguments are evaluated, as the
-   * compiler's internal dispatch does for an unknown function. *)
+  (* A function value no function has, the zero value included, panics after
+   * the arguments are evaluated, as the compiler's internal dispatch does. *)
   (eval_stmt n env (DefineStmt x ty (FunctionValueCallOperation g atoms)) st gas =
     case (eval_atom st.scopes g, eval_atoms st.scopes atoms) of
-      (SOME (ScalarValue (InternalFunctionValue (SOME f))), SOME args) =>
+      (SOME (ScalarValue (InternalFunctionValue (INL f))), SOME args) =>
         bind_call_result x ty (invoke_source n env f args st gas)
-    | (SOME (ScalarValue (InternalFunctionValue NONE)), SOME _) =>
+    | (SOME (ScalarValue (InternalFunctionValue (INR _))), SOME _) =>
         abrupt_result (PanicCompletion panic_zero_function) st gas
     | _ => abrupt_result (InvalidCompletion "bad function value call") st gas) ∧
   (eval_stmt n env (IfStmt c ts es) st gas =

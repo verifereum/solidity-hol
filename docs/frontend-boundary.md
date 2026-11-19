@@ -226,8 +226,9 @@ starts at `0x80`, past a creation frame's reserved immutable words, where the
 model's does; the `memory_images` suite compares it byte for byte. An internal function pointer's word
 is the function's number in the compiler's internal dispatch, which the
 importer reads from `ContractDefinition.internalFunctionIDs` in the analyzed
-AST, and 0 for the zero value; reading a nonzero word no function has fails
-closed. A constructor keeps the
+AST, and 0 for the zero value. A word no function has reads as itself and
+panics with 0x51 when called, as the compiler's internal dispatch does; a word
+of a function of another type fails closed. A constructor keeps the
 immutables only in their reserved words, as the compiled constructor does: it
 reads them from there with the same cleanup, and the created contract's
 immutables are those words when it ends; a word its immutable's type cannot
@@ -245,7 +246,6 @@ case, rather than guessing:
   the compiled decoder allocates while it reads;
 - an `abi.decode` that fails on a memory input reaching past the memory size,
   since its failure does not say how far it read;
-- an internal function word that no function's dispatch number matches;
 - an immutable's reserved word that its type cannot hold, when a constructor
   ends.
 
@@ -459,8 +459,9 @@ its most derived override. Its type keeps the declared mutability, and a
 pure function converts implicitly to view and nonpayable function types, a
 view one to nonpayable. A call through a value evaluates the callee
 expression first and copies its value, then the arguments in order; the zero
-value, held by a local or named return never assigned, panics with 0x51
-after the arguments, as the compiler's internal dispatch does. Parameters
+value, held by a local or named return never assigned, and any other word
+no function has panic with 0x51 after the arguments, as the compiler's
+internal dispatch does. Parameters
 and returns of a function type are value types other than function types, or
 storage, memory or calldata references. External function values, function values in storage, arrays,
 structs, events, the ABI or inline assembly, and comparisons of function

@@ -117,13 +117,14 @@ End
 
 (* The word a value of type ty is held in memory as; an external function is
  * its address then its selector, left-aligned. An internal function is its
- * number in the compiler's internal dispatch, which starts at 1, and the
- * zero value 0; a function without a number has no word. *)
+ * number in the compiler's internal dispatch, which starts at 1, and a word
+ * no function has, the zero value 0 included, is itself; a function without
+ * a number has no word. *)
 Definition memory_word_def:
   memory_word env ty v =
     case v of
       ScalarValue (InternalFunctionValue f) =>
-        (case f of NONE => SOME 0 | SOME x => ALOOKUP env.function_ids x)
+        (case f of INL x => ALOOKUP env.function_ids x | INR w => SOME w)
     | ScalarValue (ExternalFunctionValue a selector) =>
         if LENGTH selector = 4 then
           SOME (w2n a * 2 ** 96 + num_of_be_bytes selector * 2 ** 64)
@@ -148,8 +149,10 @@ End
  * bytes its own bits, an enum word outside the enum's members Panic(0x21),
  * as its validator does; a reference the object at that address; an
  * internal function the function with that dispatch number, as in
- * memory_word. A nonzero word no function has is left unsupported: the
- * compiler panics only once it is called. *)
+ * memory_word, or the word itself when no function has it, which the
+ * compiler's dispatch panics on (0x51) only once it is called. A function of
+ * another type is left unsupported: the compiler calls it when the number of
+ * stack slots its parameters and returns take matches, and panics otherwise. *)
 Definition word_value_def:
   word_value env ty (w : num) =
     if memory_object_type ty then INL (ReferenceValue (MemoryReference w ty)) else
@@ -161,11 +164,13 @@ Definition word_value_def:
              else INR (PanicCompletion 33)
          | NONE => INR (InvalidCompletion "unknown enum"))
     | FunctionT InternalFn _ _ _ =>
-        if w = 0 then INL (ScalarValue (InternalFunctionValue NONE)) else
         (case FILTER (λ(x, n). n = w) env.function_ids of
-           (x, _) :: _ => INL (ScalarValue (InternalFunctionValue (SOME x)))
-         | [] => INR (InvalidCompletion
-                        "unsupported: an internal function word no function has"))
+           [] => INL (ScalarValue (InternalFunctionValue (INR w)))
+         | (x, _) :: _ =>
+             if scalar_has_type env ty (InternalFunctionValue (INL x))
+             then INL (ScalarValue (InternalFunctionValue (INL x)))
+             else INR (InvalidCompletion
+                    "unsupported: an internal function word of a function of another type"))
     | FunctionT ExternalFn _ _ _ =>
         INL (ScalarValue (ExternalFunctionValue (n2w (w DIV 2 ** 96))
                (num_to_bytes 4 (w DIV 2 ** 64))))
@@ -409,7 +414,7 @@ Definition default_elementary_def:
     | AddressT _ => SOME (AddressValue 0w)
     | FixedBytesT n => SOME (BytesValue (REPLICATE n 0w))
     | EnumT _ => SOME (IntegerValue 0)
-    | FunctionT InternalFn _ _ _ => SOME (InternalFunctionValue NONE)
+    | FunctionT InternalFn _ _ _ => SOME (InternalFunctionValue (INR 0))
     | _ => NONE
 End
 
