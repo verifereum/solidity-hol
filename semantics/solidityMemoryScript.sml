@@ -116,8 +116,9 @@ End
 (* The word a value of type ty is held in memory as; an external function is
  * its address then its selector, left-aligned. An internal function is the id
  * of its declaration, where the compiler's word is the function's number in
- * its internal dispatch, which the pinned artifacts don't record: the two
- * differ only to code that reads the word itself. *)
+ * its internal dispatch (the artifact's internalFunctionIDs, which the
+ * importer does not read yet): the two differ only to code that reads the
+ * word itself. *)
 Definition memory_word_def:
   memory_word env ty v =
     case v of

@@ -225,8 +225,9 @@ Under `memoryguard` the compiler may start its free memory pointer higher
 than the model does, so a block that returns, stores or compares a raw
 pointer value is outside the boundary. An internal function pointer's word
 is its declaration's AST id, where the compiler stores the function's number
-in its internal dispatch, which the pinned artifacts don't record; code that
-reads that word itself sees a different number than the EVM. A constructor keeps the
+in its internal dispatch (`ContractDefinition.internalFunctionIDs` in the
+analyzed AST, which the importer does not read yet); code that reads that
+word itself sees a different number than the EVM. A constructor keeps the
 immutables only in their reserved words, as the compiled constructor does: it
 reads them from there with the same cleanup, and the created contract's
 immutables are those words when it ends; a word its immutable's type cannot
