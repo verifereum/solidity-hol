@@ -850,9 +850,10 @@ function overrides, and that functions come most derived first).
 ## Partial admission
 
 A contract is admitted per function. When a function's body or the body of
-one of its modifiers falls outside the subset, or a fallback has parameters or
-returns, import keeps the function with its header and the reason
-(`fn_unsupported`) rather than rejecting the unit. Import goes on past what it cannot represent,
+one of its modifiers falls outside the subset, import keeps the function with
+its header and the reason (`fn_unsupported`) rather than rejecting the unit;
+elaboration rejects a fallback with parameters or returns the same way, with
+the reason `fallback with parameters or returns`. Import goes on past what it cannot represent,
 leaving a placeholder (`SrcUnsupportedTypeName`, `SrcUnsupportedExpr`,
 `SrcUnsupportedStmt`) with the children it could import, so the reason has a
 line for every unsupported node, each naming it. `solidityPrepareLib` then marks, until nothing changes,

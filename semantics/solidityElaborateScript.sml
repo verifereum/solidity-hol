@@ -741,9 +741,10 @@ End
  * type (EncodedAs), keeping byte-sequence and array references live until
  * serialization, since an encoded argument needs no location copy and the
  * encoder reads it where it is, in memory, calldata or storage; or for ABI
- * encoding as its own type (Encoded, packed or not). *)
+ * encoding as its own type (Encoded, packed or not); or as the selector of
+ * abi.encodeWithSelector and abi.encodeCall (AbiSelector). *)
 Datatype:
-  operand_target = ValueOf sol_type | EncodedAs sol_type | Encoded bool
+  operand_target = ValueOf sol_type | EncodedAs sol_type | Encoded bool | AbiSelector
 End
 
 Definition values_of_def:
@@ -816,6 +817,10 @@ Definition convert_operand_def:
              (case coerce n ty a vt of
                 INL ((ss, a'), n1) => INL ((ss, ty, a'), n1)
               | INR why => INR why))
+    | AbiSelector =>
+        (case coerce n (FixedBytesT 4) a vt of
+           INL ((ss, a'), n1) => INL ((ss, FixedBytesT 4, a'), n1)
+         | INR _ => INR "selector not a bytes4")
     | Encoded packed =>
         (case abi_argument packed a vt of
            INL (ty, a') => INL (([], ty, a'), n)
@@ -877,8 +882,7 @@ Definition source_targets_def:
     operand_targets order (LENGTH ids - LENGTH order) ts 0 ids
 End
 
-(* The targets of abi_encoding's operands, ids the operands' node ids: a
- * selector is left unchecked. *)
+(* The targets of abi_encoding's operands, ids the operands' node ids. *)
 Definition abi_targets_def:
   abi_targets form (ids : num list) =
     case form of
@@ -887,12 +891,12 @@ Definition abi_targets_def:
     | AbiPlain => uniform_targets (Encoded F) ids
     | AbiWithSignature _ => uniform_targets (Encoded F) ids
     | AbiWithSelector =>
-        (case ids of [] => [] | _ :: rest => NONE :: uniform_targets (Encoded F) rest)
+        (case ids of [] => [] | _ :: rest => SOME AbiSelector :: uniform_targets (Encoded F) rest)
     | AbiCall tids =>
         (case ids of
            [] => []
          | _ :: rest =>
-             NONE :: (case all_some (MAP abi_call_parameter tids) of
+             SOME AbiSelector :: (case all_some (MAP abi_call_parameter tids) of
                         SOME tys => some_targets (encoded_as tys)
                       | NONE => []))
 End

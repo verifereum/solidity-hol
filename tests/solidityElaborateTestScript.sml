@@ -752,6 +752,31 @@ Proof
   EVAL_TAC
 QED
 
+Theorem abi_selector_mixed_operands_report:
+  ^(reports “elab_expr ^ctx0 10
+               (SrcAbiEncode ^(at 30) ^(at 31) AbiWithSelector
+                  [SrcLiteral ^(at 32) StringLiteral
+                     "0123456789abcdef0123456789abcdef0" "t_stringliteral_x";
+                   ^(bad_at 33)]
+                  "t_bytes_memory_ptr")”
+     [“(32, "selector not a bytes4")”, “(33, "bad")”])
+Proof
+  EVAL_TAC
+QED
+
+(* The arguments after an attached one, whose elaboration (first) or
+ * conversion (second) fails. *)
+Theorem attached_call_mixed_operands_report:
+  ^(reports “elab_args ^ctx0 10 30 1 [] [ValueOf (UintT 256); ValueOf (UintT 256)]
+               [^(bad_at 32); ^(string_at 33)]”
+     [“(32, "bad")”, “(33, "string literal conversion")”]) ∧
+  ^(reports “elab_args ^ctx0 10 30 1 [] [ValueOf (UintT 256); ValueOf (UintT 256)]
+               [^(string_at 32); ^(bad_at 33)]”
+     [“(32, "string literal conversion")”, “(33, "bad")”])
+Proof
+  EVAL_TAC
+QED
+
 Theorem internal_call_mixed_operands_report:
   ^(reports “elab_expr (^ctx0 with functions := [(1, ^two_parameters)]) 10
                (SrcFunctionCall ^(at 30) (SrcIdentifier ^(at 31) "f" 1 "t_function")
