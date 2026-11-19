@@ -982,7 +982,7 @@ Definition call_external_mode_def:
                  case finalize_allocation p size st5 of
                    INR c => abrupt_result c st5 gas
                  | INL st6 =>
-                 case decode_arguments env rets (TAKE size r.call_return) 0
+                 case decode_arguments env rets (FST (memory_read p size st6)) 0
                         (FST (memory_load 64 st6)) of
                    INL rvs =>
                      (case materialize_arguments env rets rvs st6 of
@@ -1265,12 +1265,15 @@ Definition simple_stmt_def:
      * free memory pointer as it reads, so a decode that reads there is left
      * unsupported, as is a failing one whose input reaches past the memory
      * size or the free memory pointer, since its failure does not say how
-     * far it read. *)
+     * far it read. The decoder compares the input's length with the heads'
+     * as signed words, slt(sub(dataEnd, headStart), size), so a length word
+     * of 2^255 or more reverts before anything is read. *)
     | DefineStmt x ty (AbiDecodeOperation tys a) =>
         (case eval_atom st.scopes a of
            SOME (ReferenceValue r) =>
              (case decode_source st r of
                 INL (bs, input_len, st0) =>
+                  if 2 ** 255 ≤ input_len then abrupt_result (RevertCompletion []) st0 gas else
                   let free = FST (memory_load 64 st0) in
                   let bound = decode_bound r free input_len in
                   (case decode_input env tys bs input_len bound 0 free of
@@ -1289,7 +1292,7 @@ Definition simple_stmt_def:
                          abrupt_result (InvalidCompletion
                            "unsupported: abi.decode failing on an input past the memory size or the free memory pointer")
                            st gas
-                       else abrupt_result c st gas)
+                       else abrupt_result c st0 gas)
               | INR c => abrupt_result c st gas)
          | _ => abrupt_result (InvalidCompletion "bad abi.decode operand") st gas)
     | DefineStmt x ty (AbiEncodeOperation selector tys args) =>

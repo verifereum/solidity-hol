@@ -220,6 +220,18 @@ contract MemoryImages {
         }
     }
 
+    // The decoder compares the input's length with the heads' as signed
+    // words, so a length word of 2^255 or more reverts.
+    function decodeHuge(uint256 x) external view {
+        bytes memory b = abi.encode(x);
+        assembly { mstore(b, shl(255, 1)) }
+        uint256 y = abi.decode(b, (uint256));
+        assembly {
+            mstore(add(mload(0x40), 0xe0), y)
+            return(0, add(mload(0x40), 0x100))
+        }
+    }
+
     // The precompile reads its input after the scratch word is zeroed, so
     // with the free memory pointer below 32 it sees a digest with zeroed bytes
     // (and the encoding overwrites the free memory pointer itself).
@@ -290,6 +302,20 @@ contract MemoryImages {
     function forwardTry(uint256 n) external view {
         try this.failing(n) returns (bytes memory) {
         } catch Panic(uint256) {
+        }
+    }
+
+    // A call's results are decoded from memory after the free memory pointer
+    // moves past them, so with the pointer set into the return data the new
+    // pointer overwrites returned words before they are decoded.
+    function peerDataLow(uint256 n) external view {
+        assembly { mstore(0x40, 0x30) }
+        (uint256 a, uint256 b, uint256 c) = IImagePeer(address(0x5000)).data(n);
+        assembly {
+            if sload(probe.slot) { revert(0, 0) }
+            mstore(add(mload(0x40), 0xe0), add(a, add(b, c)))
+            mstore(add(mload(0x40), 0xc0), b)
+            return(0, add(mload(0x40), 0x100))
         }
     }
 
