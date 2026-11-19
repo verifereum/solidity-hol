@@ -1246,9 +1246,9 @@ Definition assembly_stmt_ok_def:
     assembly_stmts_ok bad body ∧ assembly_cases_ok bad cases)
 End
 
-(* Gas and return data. The source keeps no gas, so gas() may only be a call's
- * gas argument, where it stands for the budget every call from the source
- * gets. call_stmts_ok F F also has returndatasize and returndatacopy come only
+(* Gas and return data. The source keeps no gas: a bare gas() as a call's gas
+ * argument stands for the budget every call from the source gets, and a
+ * gas() anywhere else reads a gas observation. call_stmts_ok F F also has returndatasize and returndatacopy come only
  * after a statement of the block that calls (a let, assignment or expression
  * statement whose expression has a call, staticcall or delegatecall in it),
  * earlier in their statement list or an enclosing one, or inside an if,

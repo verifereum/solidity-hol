@@ -1123,6 +1123,22 @@ End
  * materialized as extract_returndata does, and is also the frame's return
  * data from then on.
  *)
+(* A low-level call's data other than a memory byte sequence (a literal, a
+ * calldata or storage byte sequence), packed at the free memory pointer as
+ * the compiled bare call encodes it; a memory byte sequence is sent from
+ * where it is. *)
+Definition packed_call_data_def:
+  packed_call_data (st : source_state) d =
+    case (case d of
+            ReferenceValue r => byte_contents st r
+          | ScalarValue (BytesValue bs) => INL (bs, st)
+          | _ => INR (InvalidCompletion "bad call data")) of
+      INL (bs, st1) =>
+        let (p, st2) = memory_load 64 st1 in
+        INL (bs, memory_write p (bs ++ packed_bytes_tail st2.world.accounts d bs) st2)
+    | INR c => INR c
+End
+
 Definition call_low_level_def:
   call_low_level x ty kind target value g data (st : source_state) gas =
     case (eval_atom st.scopes target, eval_atom st.scopes value,
@@ -1130,12 +1146,9 @@ Definition call_low_level_def:
       (SOME (ScalarValue (AddressValue callee)),
        SOME (ScalarValue (IntegerValue v)), SOME limit, SOME d) =>
         (case (case d of
-                 ScalarValue (BytesValue bs) =>
-                   let (p, st1) = memory_load 64 st in
-                   INL (bs, memory_write p
-                          (bs ++ REPLICATE ((LENGTH bs + 31) DIV 32 * 32 - LENGTH bs) 0w) st1)
-               | ReferenceValue r => byte_contents st r
-               | _ => INR (InvalidCompletion "bad call data")) of
+                 ReferenceValue (MemoryReference q rty) =>
+                   byte_contents st (MemoryReference q rty)
+               | _ => packed_call_data st d) of
            INR c => abrupt_result c st gas
          | INL (bs, st0) =>
            let static = (kind = ExternalStaticCall ∨ st.frame.static_context) in
@@ -1501,9 +1514,9 @@ End
  *
  * A call and staticcall run the callee as the source's own calls do
  * (run_external_call), with the machine's gas budget the one every call from
- * the source gets: gas() stands for it, and the static checks admit gas()
- * only as a call's gas argument, so the budget is never a value the block
- * sees. The return data
+ * the source gets: a bare gas() as a call's gas argument stands for it, so
+ * the budget is never a value the block sees; a gas() anywhere else reads
+ * one gas observation. The return data
  * buffer starts as the source's return data. Where the source does not know
  * it, the buffer starts empty and a block that could read it before a call of
  * its own (assembly_calls_ok) fails closed.

@@ -370,6 +370,27 @@ contract MemoryImages {
         }
     }
 
+    // A low-level call packs calldata or storage data at the free memory
+    // pointer, where it would send a memory byte sequence from where it is.
+    function rawCallCalldata(bytes calldata b) external {
+        (bool ok, ) = address(0x5000).call(b);
+        assembly {
+            if sload(probe.slot) { revert(0, 0) }
+            mstore(add(mload(0x40), 0xe0), ok)
+            return(0, add(mload(0x40), 0x100))
+        }
+    }
+
+    function rawCallStored(bytes calldata b) external {
+        blob = b;
+        (bool ok, ) = address(0x5000).call(blob);
+        assembly {
+            if sload(probe.slot) { revert(0, 0) }
+            mstore(add(mload(0x40), 0xe0), ok)
+            return(0, add(mload(0x40), 0x100))
+        }
+    }
+
     // A call's results are decoded from memory after the free memory pointer
     // moves past them, so with the pointer set into the return data the new
     // pointer overwrites returned words before they are decoded.
