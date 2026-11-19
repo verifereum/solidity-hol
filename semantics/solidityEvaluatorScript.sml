@@ -648,10 +648,8 @@ Definition reset_target_def:
         else
           (case clear_storage_value env (n + LENGTH env.type_declarations)
                   st.world.accounts addr slot offset stored_ty of
-             INL accounts =>
-               normal_result (scratch_write
-                 (clear_scratch env (n + LENGTH env.type_declarations)
-                    st.world.accounts addr slot stored_ty)
+             INL (accounts, scratch) =>
+               normal_result (scratch_write scratch
                  (st with world := st.world with accounts := accounts)) gas
            | INR c => abrupt_result c st gas)
     | _ =>
@@ -736,16 +734,13 @@ Definition pop_storage_array_def:
              (StorageReference PersistentStorage _ data_slot offset _ _)) =>
              (case clear_storage_value env (n + LENGTH env.type_declarations)
                      st.world.accounts addr data_slot offset element of
-                INL accounts =>
+                INL (accounts, scratch) =>
                   (case write_storage accounts addr slot 0 (UintT 256)
                           (IntegerValue (&(old_length - 1))) of
                      SOME accounts' =>
                        normal_result
                          (define_binding x annotation (TupleValue [])
-                           (scratch_write
-                             (later_scratch (SOME slot)
-                               (clear_scratch env (n + LENGTH env.type_declarations)
-                                  st.world.accounts addr data_slot element))
+                           (scratch_write (later_scratch (SOME slot) scratch)
                              (st with world := st.world with accounts := accounts'))) gas
                    | NONE => abrupt_result (InvalidCompletion "bad array length write") st gas)
               | INR c => abrupt_result c st gas)
