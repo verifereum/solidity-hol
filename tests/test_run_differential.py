@@ -180,6 +180,17 @@ class CorpusTests(unittest.TestCase):
             with self.assertRaisesRegex(driver.CorpusError, "duplicate case"):
                 driver.load_corpus(path)
 
+    def test_rejects_case_named_like_a_memory_size_theorem(self) -> None:
+        sized = {"name": "f", "function": "f", "args": [], "expect": {"panic": 17},
+                 "memory_size": 128}
+        clash = {"name": "f_memory_size", "function": "f", "args": [], "expect": {"panic": 17}}
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "corpus.json"
+            for cases in ([sized, clash], [clash, sized]):
+                path.write_text(json.dumps(corpus(cases)), encoding="utf-8")
+                with self.assertRaisesRegex(driver.CorpusError, "repeats theorem name"):
+                    driver.load_corpus(path)
+
     def test_gas_observations_and_abort(self) -> None:
         data = corpus([{"name": "abort", "function": "f", "args": [],
                         "gas": [123, "0xff"], "expect": {"abort": True}}])
