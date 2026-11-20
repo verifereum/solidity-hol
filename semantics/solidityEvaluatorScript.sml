@@ -360,7 +360,7 @@ End
 (* A constructor keeps the contract's immutables in its reserved memory,
  * a word each from 0x80, in declaration order, base contracts first. *)
 Definition immutable_offset_def:
-  (immutable_offset x [] = NONE) ∧
+  (immutable_offset (x : ast_id) [] = NONE) ∧
   (immutable_offset x ((y, ty) :: rest) =
     if x = y then SOME (128 : num, ty : sol_type) else
     case immutable_offset x rest of
