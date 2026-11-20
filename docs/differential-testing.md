@@ -11,7 +11,8 @@ runner checks that each of those files is the one the artifact was compiled
 from.
 
 Add a feature's suite as a separate file, then generate and commit its two
-wrappers with `python3 tools/run_differential.py --write-theories --no-hol`.
+wrappers and its line in `tests/solidityDifferentialCorpusScript.sml` with
+`python3 tools/run_differential.py --write-theories --no-hol`.
 Both runners discover suites automatically; adding one does not change another
 suite's wrappers or cache keys.
 Shared report snapshots are refreshed after merges, as described in
