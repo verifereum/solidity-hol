@@ -266,8 +266,8 @@ case, rather than guessing. There are nine such cases:
   and returns take matches, and panics otherwise.
 - a stored byte sequence or array of 2^64 or more elements that is encoded,
   packed or copied to memory by encoding: the compiled encoder has no length
-  check and runs out of gas. (A stored array of references copied to memory
-  allocates first, and panics with 0x41.)
+  check, so it does not panic with 0x41. (A stored array of references copied
+  to memory allocates first, and panics with 0x41.)
 
 Inline assembly's `call`, `staticcall` and `delegatecall` (`assembly_calls.sol`,
 `assembly_delegate.sol`) run the callee on Verifereum through `externalCall`,

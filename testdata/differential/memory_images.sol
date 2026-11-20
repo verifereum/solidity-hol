@@ -402,6 +402,22 @@ contract MemoryImages {
         }
     }
 
+    // The same literal over nonzero bytes at the free memory pointer: the
+    // padding after it is written, not left as fresh memory.
+    function rawCallLiteralDirty() external {
+        assembly {
+            let p := mload(0x40)
+            mstore(p, not(0))
+            mstore(add(p, 0x20), not(0))
+        }
+        (bool ok, ) = address(0x5000).call("a literal longer than one word, packed for the call");
+        assembly {
+            if sload(probe.slot) { revert(0, 0) }
+            mstore(add(mload(0x40), 0xe0), ok)
+            return(0, add(mload(0x40), 0x100))
+        }
+    }
+
     function rawCallMemory(bytes calldata b) external {
         bytes memory m = b;
         (bool ok, ) = address(0x5000).call(m);
