@@ -316,8 +316,9 @@ End
  * cleaned; a byte sequence copies whole data words, keeping unused dirty
  * bytes, except the length byte of a short one (storage_byte_data), and an
  * empty one still writes its slot's word past its end. A length of 2^64 or
- * more is unsupported: the compiled encoder has no length check, and runs out
- * of gas, which the source does not track. The fuel bounds the struct
+ * more is unsupported: the compiled encoder has no length check, so it does
+ * not panic with 0x41, and what it does instead (run out of gas, or panic
+ * cleaning an element) the source does not track. The fuel bounds the struct
  * nesting. *)
 Definition storage_abi_value_def:
   (storage_abi_value env (fuel : num) accounts addr slot ty =
@@ -959,7 +960,8 @@ End
  * writes its slot's word after its length, past the allocation. A length of
  * 2^64 or more panics with 0x41 where the copy allocates first; where it
  * encodes first it is unsupported, as the compiled encoder has no length
- * check and runs out of gas. The fuel bounds the struct nesting. *)
+ * check (it runs out of gas, or panics cleaning an element). The fuel bounds
+ * the struct nesting. *)
 Definition materialize_storage_def:
   (materialize_storage env (fuel : num) accounts addr slot ty st =
     if byte_sequence_type ty then

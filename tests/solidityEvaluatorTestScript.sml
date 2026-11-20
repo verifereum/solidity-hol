@@ -1031,8 +1031,9 @@ Proof
 QED
 
 (* A stored byte sequence or array of scalars of length 2^64 or more is not
- * encoded or copied to memory: the compiled encoder has no length check and
- * runs out of gas, which the source does not track, so it is unsupported. A
+ * encoded or copied to memory: the compiled encoder has no length check (it
+ * runs out of gas, or panics cleaning an element), which the source does not
+ * track, so it is unsupported. A
  * stored array of references allocates its copy first, and panics with 0x41
  * as the compiler's allocator does. *)
 Definition long_bytes_accounts_def:
