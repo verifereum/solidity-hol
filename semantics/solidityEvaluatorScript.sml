@@ -258,15 +258,30 @@ Definition indexed_byte_def:
     | NONE => ValueAbrupt (InvalidCompletion "bad byte index")
 End
 
+(* A byte sequence (a literal, or one in memory, calldata or storage) packed
+ * at the free memory pointer, as the compiler packs sha256's operand and a
+ * low-level call's data other than a memory byte sequence; the pointer is not
+ * moved. *)
+Definition packed_call_data_def:
+  packed_call_data (st : source_state) d =
+    case (case d of
+            ReferenceValue r => byte_contents st r
+          | ScalarValue (BytesValue bs) => INL (bs, st)
+          | _ => INR (InvalidCompletion "bad packed byte sequence")) of
+      INL (bs, st1) =>
+        let (p, st2) = memory_load 64 st1 in
+        INL (bs, memory_write p (bs ++ packed_bytes_tail st2.world.accounts d bs) st2)
+    | INR c => INR c
+End
+
 (* A builtin's value on its operands' values, and the state after it, with
  * the memory the compiler's code uses for it. keccak256 hashes the bytes in
  * place. sha256 and ecrecover call their precompile on an encoding at the
- * free memory pointer, which they do not raise (sha256's bytes packed from
- * wherever they are, with the tail packing writes after them), and read its output from the
- * scratch word at 0: ecrecover zeroes it first, as an invalid signature
- * returns nothing, which reads as address(0), and the precompile reads its
- * input from memory after that. a.code allocates memory bytes
- * and copies the code there. *)
+ * free memory pointer, which they do not raise (sha256's by
+ * packed_call_data), and read its output from the scratch word at 0:
+ * ecrecover zeroes it first, as an invalid signature returns nothing, which
+ * reads as address(0), and the precompile reads its input from memory after
+ * that. a.code allocates memory bytes and copies the code there. *)
 Definition eval_builtin_def:
   eval_builtin st op vs =
     case (op, vs) of
@@ -300,16 +315,10 @@ Definition eval_builtin_def:
         INL (ScalarValue (BytesValue (num_to_bytes 32
           (w2n (ext_code_hash st.world.accounts address)))), st)
     | (Sha256Builtin, [v]) =>
-        (case (case v of
-                 ReferenceValue r => byte_contents st r
-               | ScalarValue (BytesValue bs) => INL (bs, st)
-               | _ => INR (InvalidCompletion "bad sha256 operand")) of
+        (case packed_call_data st v of
            INL (bs, st1) =>
-             let (p, st2) = memory_load 64 st1 in
              let hash = num_to_bytes 32 (w2n (SHA_256_bytes bs)) in
-             INL (ScalarValue (BytesValue hash),
-                  memory_write 0 hash
-                    (memory_write p (bs ++ packed_bytes_tail st2.world.accounts v bs) st2))
+             INL (ScalarValue (BytesValue hash), memory_write 0 hash st1)
          | INR c => INR c)
     | (BlockhashBuiltin, [ScalarValue (IntegerValue n)]) =>
         INL (ScalarValue (BytesValue (num_to_bytes 32
@@ -1116,22 +1125,6 @@ Definition call_transfer_def:
                      return_data := SOME res.call_return |> in
                 normal_result (define_binding x ty (TupleValue []) st') gas)
     | _ => abrupt_result (InvalidCompletion "bad transfer operands") st gas
-End
-
-(* A low-level call's data other than a memory byte sequence (a literal, a
- * calldata or storage byte sequence), packed at the free memory pointer as
- * the compiled bare call encodes it; a memory byte sequence is sent from
- * where it is. *)
-Definition packed_call_data_def:
-  packed_call_data (st : source_state) d =
-    case (case d of
-            ReferenceValue r => byte_contents st r
-          | ScalarValue (BytesValue bs) => INL (bs, st)
-          | _ => INR (InvalidCompletion "bad call data")) of
-      INL (bs, st1) =>
-        let (p, st2) = memory_load 64 st1 in
-        INL (bs, memory_write p (bs ++ packed_bytes_tail st2.world.accounts d bs) st2)
-    | INR c => INR c
 End
 
 (* A low-level target.call(data), target.staticcall(data) or

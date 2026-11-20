@@ -391,6 +391,27 @@ contract MemoryImages {
         }
     }
 
+    // A literal is packed at the free memory pointer, with zero padding to a
+    // whole word after it; a memory byte sequence is sent from where it is.
+    function rawCallLiteral() external {
+        (bool ok, ) = address(0x5000).call("a literal longer than one word, packed for the call");
+        assembly {
+            if sload(probe.slot) { revert(0, 0) }
+            mstore(add(mload(0x40), 0xe0), ok)
+            return(0, add(mload(0x40), 0x100))
+        }
+    }
+
+    function rawCallMemory(bytes calldata b) external {
+        bytes memory m = b;
+        (bool ok, ) = address(0x5000).call(m);
+        assembly {
+            if sload(probe.slot) { revert(0, 0) }
+            mstore(add(mload(0x40), 0xe0), ok)
+            return(0, add(mload(0x40), 0x100))
+        }
+    }
+
     // With the free memory pointer at 0x40, a storage array of scalars or a
     // byte sequence copied to memory is written at the pointer before its
     // allocation is finalized, so the pointer word ends past the copy rather

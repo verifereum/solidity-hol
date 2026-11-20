@@ -556,10 +556,24 @@ fun run_bytecode_case {suite, artifact, code, initcode, fixture, declarations, r
     val expected_run =
       “(^expected, SOME (seed_storage ^expected_store), expected_logs ^expected_events)”
     val equality = mk_eq (“bytecode_execution ^input_constant”, expected_run)
-    val evaluated = cv_eval equality
+    (* An expected memory size is proved by the same evaluation, as its own
+     * theorem: the differential corpus reuses the outcome theorem as an
+     * equation. *)
+    val memory_size =
+      case JSONUtil.findField c "memory_size" of
+        NONE => NONE
+      | SOME v => SOME (mk_eq (“bytecode_memory_size ^input_constant”,
+                               optionSyntax.mk_some (num_term (integer v))))
+    val evaluated = cv_eval (case memory_size of
+                               NONE => equality
+                             | SOME size => mk_conj (equality, size))
     val () = if rhs (concl evaluated) ~~ T then ()
              else fail (suite ^ "." ^ name ^ ": bytecode differs from the expectation")
-    val _ = save_thm (prefix, EQT_ELIM evaluated)
+    val proved = EQT_ELIM evaluated
+    val _ = case memory_size of
+              NONE => save_thm (prefix, proved)
+            | SOME _ => (save_thm (prefix ^ "_memory_size", CONJUNCT2 proved);
+                         save_thm (prefix, CONJUNCT1 proved))
   in
     emit [("kind", json_string "case"), ("suite", json_string suite),
           ("case", json_string name), ("side", json_string "bytecode"),
