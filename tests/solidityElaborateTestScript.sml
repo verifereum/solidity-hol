@@ -865,10 +865,12 @@ val nested_reports =
        “(^(numSyntax.term_of_int (1006 + 4 * k)), "string literal conversion")”),
      “:num # string”);
 
+val nested_reported = EVAL “blockers (elab_expr ^ctx0 10 ^(nested_modular 30))”;
+
 Theorem nested_rejected_operands_report:
   blockers (elab_expr ^ctx0 10 ^(nested_modular 30)) = ^nested_reports
 Proof
-  CONV_TAC cv_eval
+  REWRITE_TAC [nested_reported]
 QED
 
 (* The unit elaborates, so nothing in it fails. *)
