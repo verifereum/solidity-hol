@@ -913,13 +913,14 @@ Definition selector_encoding_def:
   selector_encoding (i : num) so r =
     case (so, r) of
       (INL (s, svt), INL (css, tys, args, n1)) =>
-        (case coerce n1 (FixedBytesT 4) s svt of
-           INL ((ss, s'), n2) =>
+        (case convert_operand n1 AbiSelector s svt of
+           INL ((ss, _, s'), n2) =>
              INL ((css ++ ss, AbiEncodeOperation (SOME s') tys args), n2)
-         | INR _ => INR [(i, "selector not a bytes4")])
+         | INR why => INR [(i, why)])
     | (INL (s, svt), INR bs) =>
-        INR ((if ISL (coerce 0 (FixedBytesT 4) s svt) then []
-              else [(i, "selector not a bytes4")]) ++ bs)
+        INR ((case convert_operand 0 AbiSelector s svt of
+                INL _ => []
+              | INR why => [(i, why)]) ++ bs)
     | (INR sbs, _) => INR (sbs ++ blockers r)
 End
 
@@ -2411,21 +2412,28 @@ Definition elab_expr_def:
         (SOME os', SOME ids) =>
           (case convert_operands n1 id ids tys os' of
              INL (cs, _, as, n2) => INL ((ss ++ cs, as), n2)
-           | INR bs => INR bs)
+           | INR bs =>
+               (* an order that isn't a permutation can drop an operand *)
+               INR (if argument_order_ok order (LENGTH order) then bs
+                    else bs ++ FLAT (MAP blockers os)))
       | _ => INR ((id, "argument order") :: FLAT (MAP blockers os))
     else
       case es of
         [] => INR [(id, "value count mismatch")]
       | e :: rest =>
         case tys of
-          [] => INR [(id, "value count mismatch")]
+          [] =>
+            let ((_, os), _) = elab_arg_values ctx n es in
+            INR ((id, "value count mismatch") :: FLAT (MAP blockers os))
         | ty :: ts =>
           let suffix_order =
             case order of
               [] => SOME []
             | i :: is => if i = 0 ∧ ¬MEM 0 is then SOME (MAP PRE is) else NONE in
           case suffix_order of
-            NONE => INR [(id, "argument order")]
+            NONE =>
+              let ((_, os), _) = elab_arg_values ctx n es in
+              INR ((id, "argument order") :: FLAT (MAP blockers os))
           | SOME remaining =>
           (case elab_expr ctx n e of
              INL ((ss, a, vt), n1) =>

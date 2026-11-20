@@ -765,6 +765,23 @@ Proof
   EVAL_TAC
 QED
 
+(* A selector that fails to elaborate next to an argument that fails to
+ * convert: both are reported. *)
+Theorem abi_selector_failure_reports_arguments:
+  ^(reports “elab_expr ^ctx0 10
+               (SrcAbiEncode ^(at 30) ^(at 31) AbiWithSelector
+                  [^(bad_at 32);
+                   SrcLiteral ^(at 33) NumberLiteral "0.5" "t_rational_1_by_2"]
+                  "t_bytes_memory_ptr")”
+     [“(32, "bad")”, “(33, "abi encoding of this type")”]) ∧
+  ^(reports “elab_expr ^ctx0 10
+               (SrcAbiEncode ^(at 30) ^(at 31) (AbiCall ["t_bool"])
+                  [^(bad_at 32); ^(string_at 33)] "t_bytes_memory_ptr")”
+     [“(32, "bad")”, “(33, "string literal conversion")”])
+Proof
+  EVAL_TAC
+QED
+
 (* A call that names its arguments converts each to its own parameter's type:
  * with the parameters (uint256, bytes1) taken in the order [1; 0], the string
  * literal is converted to uint256 in the first call and to bytes1 in the
@@ -801,6 +818,22 @@ Theorem attached_call_mixed_operands_report:
   ^(reports “elab_args ^ctx0 10 30 1 [] [ValueOf (UintT 256); ValueOf (UintT 256)]
                [^(string_at 32); ^(bad_at 33)]”
      [“(32, "string literal conversion")”, “(33, "bad")”])
+Proof
+  EVAL_TAC
+QED
+
+(* A call whose argument order isn't a permutation, or that has more
+ * arguments than parameters, still reports every failing argument. *)
+Theorem malformed_call_operands_report:
+  ^(reports “elab_args ^ctx0 10 30 0 [0; 0] [ValueOf (UintT 256); ValueOf (UintT 256)]
+               [^(string_at 32); ^(bad_at 33)]”
+     [“(32, "string literal conversion")”, “(33, "bad")”]) ∧
+  ^(reports “elab_args ^ctx0 10 30 2 [] [ValueOf (UintT 256)]
+               [^(bad_at 32); ^(bad_at 33)]”
+     bad_32_33) ∧
+  ^(reports “elab_args ^ctx0 10 30 1 [1; 0] [ValueOf (UintT 256); ValueOf (UintT 256)]
+               [^(bad_at 32); ^(bad_at 33)]”
+     (“(30, "argument order")” :: bad_32_33))
 Proof
   EVAL_TAC
 QED
