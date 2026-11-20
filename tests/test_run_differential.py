@@ -163,6 +163,23 @@ class CorpusTests(unittest.TestCase):
             with self.assertRaises(driver.CorpusError):
                 driver.load_corpus(fake.root / driver.CORPUS)
 
+    def test_write_theories_refreshes_rollup(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            fake = FakeRoot(Path(temporary))
+            driver.theories.refresh_rollup(fake.root, driver.load_corpus(fake.root / driver.CORPUS))
+            suite = json.loads((fake.root / "testdata/differential/suites/a.json").read_text())
+            fake.write("testdata/differential/suites/b.json", json.dumps({**suite, "name": "b"}))
+            with contextlib.redirect_stdout(io.StringIO()):
+                status = driver.main(["--write-theories", "--no-hol",
+                                      "--report-dir", str(fake.root / "report")],
+                                     root=fake.root)
+            self.assertEqual(status, 0)
+            loaded = driver.load_corpus(fake.root / driver.CORPUS)
+            rollup = (fake.root / "tests/solidityDifferentialCorpusScript.sml").read_text(
+                encoding="utf-8")
+            self.assertEqual(rollup, driver.theories.rollup(loaded))
+            self.assertIn("solidityDifferentialCorpus_b", rollup)
+
     def test_committed_corpus_is_consistent(self) -> None:
         loaded = driver.load_corpus(ROOT / driver.CORPUS)
         checks = driver.check_artifacts(ROOT, loaded)

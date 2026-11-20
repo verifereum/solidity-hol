@@ -749,7 +749,8 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
                          help="rebuild suite theories instead of using cached verdicts")
     rebuild.add_argument("--allow-cached", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--write-theories", action="store_true",
-                        help="write the per-suite HOL wrappers (commit them with the suite)")
+                        help="write the per-suite HOL wrappers and the corpus roll-up "
+                             "(commit them with the suite)")
     parser.add_argument("--no-hol", action="store_true", help="run the external checks only")
     parser.add_argument("build_args", nargs="*",
                         help="extra holbuild build options, after --")
@@ -772,6 +773,7 @@ def main(argv: list[str] | None = None, root: Path = ROOT) -> int:
         return 1
     if args.write_theories:
         theories.write_wrappers(root, theories.wrappers(root, CORPUS, corpus))
+        theories.refresh_rollup(root, corpus)
     try:
         corpus = select_shard(corpus, args.shard_count, args.shard_index)
     except CorpusError as error:
