@@ -172,6 +172,9 @@ class FleetExpectationTests(unittest.TestCase):
 
         self.run_batches(self.fleet(fetched_second_time), self.make_tests(1))
         self.assertEqual(len(attempts), 2)
+        self.assertEqual(attempts[0], attempts[1])
+        first, second = [c for c in self.commands if "run-action" in c]
+        self.assertEqual(first, second)
         self.assertIn(NOT_FETCHED, (self.work / "batch-0000" / "hol.1.log").read_text())
         self.assertEqual(runner.completed_tests(self.work), {"t0.sol"})
 
