@@ -596,7 +596,10 @@ End
  * gives the same bytes when every input lies below the free pointer. The
  * reads run from a memory size of zero, so the size they leave covers what
  * they read; an input read at or above the free pointer is unsupported and
- * fails closed. Otherwise the size is what reading from st leaves. *)
+ * fails closed. Otherwise the size is what reading from st leaves. When
+ * reading an input ends the frame with a panic or a revert, these encoders
+ * have written nothing, where the compiled one has written what comes before
+ * that input, so the frame's final memory differs from the compiled one's. *)
 Definition encoder_state_def:
   encoder_state (st : source_state) (st1 : source_state) =
     if FST (memory_load 64 st) < st1.memory_size then

@@ -381,7 +381,10 @@ fun case_term {peer, libraries} (immutables : {names : (string * IntInf.int) lis
       ("case_memory_image",
        case JSONUtil.findField c "memory_image" of
          NONE => boolSyntax.F
-       | SOME (JSON.BOOL b) => if b then boolSyntax.T else boolSyntax.F
+       | SOME (JSON.BOOL false) => boolSyntax.F
+       | SOME (JSON.BOOL true) =>
+           if isSome (JSONUtil.findField c "memory_size") then boolSyntax.T
+           else fail "memory_image without memory_size"
        | SOME _ => fail "memory_image must be a boolean")])
 
 (* ABI types come from the compiler artifact, independently of source import. *)
