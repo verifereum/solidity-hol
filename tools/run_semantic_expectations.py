@@ -29,6 +29,10 @@ CONTEXT = "solidityDifferentialTheory"
 # Each HOL process bounds the lifetime of preparation/evaluation theorem state.
 BATCH_SIZE = 16
 NO_COORDINATOR = "run-action --remote-only: no coordinator to run on; pass --remote-exec URL"
+# holbuild exits 75 with this when a run ended on the fleet but its outputs didn't
+# fetch; the same batch again has the same run key, so a later try fetches them.
+NOT_FETCHED = "could not fetch the outputs of"
+FETCH_ATTEMPTS = 3
 ACCOUNT = 0x1212121212121212121212121212120000000012
 
 
@@ -467,11 +471,17 @@ def run_fleet_batch(holbuild: str, batch: Path, entries: list[dict[str, Any]],
     command.append(CONTEXT)
     log = batch / "hol.log"
     seconds = script.seconds(entries) if script.seconds else None
-    with log.open("w", encoding="utf-8") as stream:
-        process = subprocess.Popen(command, cwd=ROOT, stdin=subprocess.DEVNULL,
-                                   stdout=stream, stderr=subprocess.STDOUT)
-        status = wait_capped(process, log, seconds)
-    action_log = log.read_text(encoding="utf-8", errors="replace")
+    for attempt in range(1, FETCH_ATTEMPTS + 1):
+        with log.open("w", encoding="utf-8") as stream:
+            process = subprocess.Popen(command, cwd=ROOT, stdin=subprocess.DEVNULL,
+                                       stdout=stream, stderr=subprocess.STDOUT)
+            status = wait_capped(process, log, seconds)
+        action_log = log.read_text(encoding="utf-8", errors="replace")
+        if status != 75 or NOT_FETCHED not in action_log or attempt == FETCH_ATTEMPTS:
+            break
+        log.replace(batch / f"hol.{attempt}.log")
+        print(f"{batch.name}: holbuild could not fetch the action's outputs; "
+              f"trying again ({attempt + 1}/{FETCH_ATTEMPTS})", file=sys.stderr)
     if status is None:
         raise ActionTimedOut(batch, "timeout",
                              f"the HOL fleet action ran past its {seconds:.0f}s cap; see {log}")
