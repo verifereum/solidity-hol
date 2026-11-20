@@ -777,7 +777,7 @@ Definition run_asm_array_def:
                   [ReferenceValue (MemoryReference 0x80 ty)] st [] in
         (r.completion,
          case memory_value env F 0 ty (ReferenceValue (MemoryReference 0x80 ty)) r.state of
-           INL (TupleValue us, _) => us
+           (INL (TupleValue us), _) => us
          | _ => [])
     | _ => (InvalidCompletion "not an array", [])
 End
@@ -892,8 +892,8 @@ Definition asm_alloc_object_def:
     case v of
       ReferenceValue (MemoryReference p ty) =>
         (case memory_value env F 0 ty v st of
-           INL (u, _) => SOME (p, u)
-         | INR _ => NONE)
+           (INL u, _) => SOME (p, u)
+         | (INR _, _) => NONE)
     | _ => NONE
 End
 
@@ -2049,6 +2049,181 @@ val () = cv_auto_trans preimages_moved_def;
 Theorem preimage_restoring_the_pointer_still_moved_it:
   preimages_moved 64 [REPLICATE 32 0w; REPLICATE 64 0w ++ num_to_bytes 32 64] ∧
   ¬preimages_moved 128 [REPLICATE 64 1w; REPLICATE 32 2w]
+Proof
+  CONV_TAC cv_eval
+QED
+
+(* Static-frame aggregate storage copies fail closed before reading their
+ * source, while non-static copies still surface a source read panic (0x21)
+ * and storage self-copy succeeds even in a static frame. *)
+Definition static_copy_env_def:
+  static_copy_env = core_program_environment <|
+    unsupported_procedures := []; procedures := [];
+    struct_layouts := [<|
+      struct_id := AstId 501;
+      struct_fields := [
+        <| state_id := AstId 502; state_backend := PersistentStorage; state_type := u256;
+           state_slot := 0w; state_offset := 0 |>;
+        <| state_id := AstId 503; state_backend := PersistentStorage; state_type := EnumT (AstId 500);
+           state_slot := 1w; state_offset := 0 |>
+      ];
+      struct_slots := 2 |>];
+    function_ids := []; creation_function_ids := [];
+    type_declarations := [
+      (AstId 500, EnumDeclaration 1);
+      (AstId 501, StructDeclaration [(AstId 502, u256); (AstId 503, EnumT (AstId 500))])];
+    state_variables := []; immutables := [];
+    entry_procedure := AstId 0;
+    external_functions := []; receive_procedure := NONE;
+    fallback_procedure := NONE; creation_procedure := NONE |>
+End
+
+Definition run_aggregate_copy_def:
+  run_aggregate_copy static ty src dst mem_writes =
+    let st0 = (if static then static_state else initial_state) with
+      scopes := [FEMPTY
+        |+ (1, <| binding_type := SingleType (LocatedT MemoryLoc ty);
+                  binding_value := ReferenceValue src |>)
+        |+ (2, <| binding_type := SingleType (LocatedT StorageLoc ty);
+                  binding_value := ReferenceValue dst |>)] in
+    let st = FOLDL (λs (a, w). memory_store a w s) st0 mem_writes in
+    (simple_stmt 10 static_copy_env
+       (CopyContentsStmt (LocatedT MemoryLoc ty) (LocatedT StorageLoc ty)
+          (BoundAtom (AstId 1)) (BoundAtom (AstId 2)))
+       st []).completion
+End
+
+Definition static_copy_dst_def:
+  static_copy_dst slot ty =
+    StorageReference PersistentStorage 0w slot 0 ty (LayoutId 1)
+End
+
+Definition static_copy_outcomes_def:
+  static_copy_outcomes =
+    let e = EnumT (AstId 500);
+        s = StructT (AstId 501);
+        dyn = ArrayT e NONE;
+        fix2 = ArrayT e (SOME 2);
+        fix33 = ArrayT e (SOME 33) in
+    (run_aggregate_copy T dyn (MemoryReference 0x80 dyn) (static_copy_dst 0w dyn) [(0x80, 1); (0xa0, 5)],
+     run_aggregate_copy F dyn (MemoryReference 0x80 dyn) (static_copy_dst 0w dyn) [(0x80, 1); (0xa0, 5)],
+     run_aggregate_copy T s (MemoryReference 0x80 s) (static_copy_dst 1w s) [(0x80, 7); (0xa0, 5)],
+     run_aggregate_copy F s (MemoryReference 0x80 s) (static_copy_dst 1w s) [(0x80, 7); (0xa0, 5)],
+     run_aggregate_copy T fix2 (MemoryReference 0x80 fix2) (static_copy_dst 3w fix2) [(0x80, 0); (0xa0, 5)],
+     run_aggregate_copy F fix2 (MemoryReference 0x80 fix2) (static_copy_dst 3w fix2) [(0x80, 0); (0xa0, 5)],
+     run_aggregate_copy T fix33 (MemoryReference 0x80 fix33) (static_copy_dst 4w fix33) [(0x480, 5)],
+     run_aggregate_copy F fix33 (MemoryReference 0x80 fix33) (static_copy_dst 4w fix33) [(0x480, 5)],
+     run_aggregate_copy T dyn (static_copy_dst 0w dyn) (static_copy_dst 0w dyn) [])
+End
+
+val () = cv_auto_trans static_copy_env_def;
+val () = cv_auto_trans run_aggregate_copy_def;
+val () = cv_auto_trans static_copy_dst_def;
+val () = cv_auto_trans static_copy_outcomes_def;
+
+Theorem static_aggregate_copy_fails_closed_before_read:
+  static_copy_outcomes =
+    (InvalidCompletion "array copy in static frame", PanicCompletion 33,
+     InvalidCompletion "array copy in static frame", PanicCompletion 33,
+     InvalidCompletion "array copy in static frame", PanicCompletion 33,
+     InvalidCompletion "array copy in static frame", PanicCompletion 33,
+     NormalCompletion)
+Proof
+  CONV_TAC cv_eval
+QED
+
+(* Encoders and emit run their fail-closed checks before surfacing a read
+ * failure, covering reads up to and including the failing one. *)
+Definition encoder_and_emit_guard_checks_def:
+  encoder_and_emit_guard_checks =
+    let e = EnumT (AstId 500);
+        arr1 = ArrayT e (SOME 1);
+        dyn = ArrayT e NONE;
+        st_overlap = memory_store 0x80 2 initial_state;
+        st_earlier_valid =
+          memory_store 0x80 0
+            (initial_state with frame := initial_state.frame with
+              call_data := num_to_bytes 32 5);
+        st_packed = memory_store 0xc0 1 (memory_store 0x80 2 (memory_store 64 0xa0 initial_state));
+        st_emit =
+          memory_store 64 0x41 (memory_store 0x20 5 (memory_store 0 1 initial_state)) in
+    (encoded_runtime_values static_copy_env st_overlap
+       [u256; LocatedT MemoryLoc arr1]
+       [ScalarValue (IntegerValue 0); ReferenceValue (MemoryReference 0x80 arr1)],
+     encoded_runtime_values static_copy_env st_earlier_valid
+       [u256; LocatedT MemoryLoc arr1; LocatedT CalldataLoc dyn]
+       [ScalarValue (IntegerValue 2); ReferenceValue (MemoryReference 0x80 arr1);
+        ReferenceValue (CalldataReference 0 1 dyn)],
+     packed_encoding static_copy_env st_packed
+       [LocatedT MemoryLoc BytesT; LocatedT MemoryLoc arr1]
+       [ReferenceValue (MemoryReference 0xc0 BytesT);
+        ReferenceValue (MemoryReference 0x80 arr1)],
+     (emit_event static_copy_env NONE
+        [(LocatedT MemoryLoc BytesT, T, BoundAtom (AstId 1));
+         (LocatedT CalldataLoc BytesT, T, BoundAtom (AstId 2));
+         (LocatedT MemoryLoc dyn, T, BoundAtom (AstId 3))]
+        (st_emit with scopes := [FEMPTY
+           |+ (1, <| binding_type := SingleType (LocatedT MemoryLoc BytesT);
+                     binding_value := ReferenceValue (MemoryReference 0 BytesT) |>)
+           |+ (2, <| binding_type := SingleType (LocatedT CalldataLoc BytesT);
+                     binding_value := ReferenceValue (CalldataReference 0 0 BytesT) |>)
+           |+ (3, <| binding_type := SingleType (LocatedT MemoryLoc dyn);
+                     binding_value := ReferenceValue (MemoryReference 0 dyn) |>)])
+        []).completion)
+End
+
+val () = cv_auto_trans encoder_and_emit_guard_checks_def;
+
+Theorem read_failures_surface_after_fail_closed_checks:
+  encoder_and_emit_guard_checks =
+    (INR (InvalidCompletion "unsupported: encoder input at or above the free memory pointer"),
+     INR (InvalidCompletion "unsupported: encoder input at or above the free memory pointer"),
+     INR (InvalidCompletion "unsupported: encoder input at or above the free memory pointer"),
+     InvalidCompletion "unsupported: an event's hash preimage moved the free memory pointer")
+Proof
+  CONV_TAC cv_eval
+QED
+
+(* dispatch and deploy_contract_frame pass parameter-decode InvalidCompletion
+ * through instead of converting it to a revert. *)
+Definition bad_param_program_def:
+  bad_param_program = <|
+    unsupported_procedures := [];
+    procedures := [<|
+      procedure_id := AstId 600;
+      parameters := [(AstId 601, LocatedT MemoryLoc (StructT (AstId 999)))];
+      return_bindings := [];
+      body := [] |>];
+    struct_layouts := [];
+    function_ids := [];
+    creation_function_ids := [];
+    type_declarations := [];
+    state_variables := [];
+    immutables := [];
+    entry_procedure := AstId 600;
+    external_functions := [<|
+      selector := [0x01w; 0x02w; 0x03w; 0x04w];
+      external_procedure := AstId 600;
+      payable := T |>];
+    receive_procedure := NONE;
+    fallback_procedure := NONE;
+    creation_procedure := SOME (AstId 600, T) |>
+End
+
+val () = cv_auto_trans bad_param_program_def;
+
+Theorem entry_decode_invalid_completion_propagates:
+  dispatch (core_program_environment bad_param_program) bad_param_program
+    (initial_state.frame with call_data := [0x01w; 0x02w; 0x03w; 0x04w] ++ REPLICATE 32 0w) =
+    DispatchInvalid "unknown struct" ∧
+  call_contract 10 bad_param_program FEMPTY
+    (initial_state.frame with call_data := [0x01w; 0x02w; 0x03w; 0x04w] ++ REPLICATE 32 0w)
+    initial_state.world =
+    ContractInvalid "unknown struct" ∧
+  deploy_contract 10 bad_param_program
+    (initial_state.frame with call_data := REPLICATE 32 0w)
+    initial_state.world =
+    ContractInvalid "unknown struct"
 Proof
   CONV_TAC cv_eval
 QED
