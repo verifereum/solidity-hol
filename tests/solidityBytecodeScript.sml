@@ -152,7 +152,8 @@ Datatype:
     case_expect : expectation;
     case_final : (num # num) list;
     case_logs : (address # bytes32 list # byte list) list;
-    case_memory_size : num option
+    case_memory_size : num option;
+    case_memory_image : bool
   |>
 End
 
@@ -249,11 +250,11 @@ Definition bytecode_execution_def:
     | NONE => (Diagnostic InvalidTransaction, NONE, [])
 End
 
-(* The memory size of the transaction's outermost frame when it halts, as
- * msize would give it: the frame's context stays on the stack after its last
- * step. *)
-Definition bytecode_memory_size_def:
-  bytecode_memory_size (accounts, tx, refs : (num # num list) list) =
+(* The memory of the transaction's outermost frame when it halts, its length
+ * what msize would give: the frame's context stays on the stack after its
+ * last step. *)
+Definition bytecode_memory_def:
+  bytecode_memory (accounts, tx, refs : (num # num list) list) =
     case run_create (Collect empty_domain) F differential_chain_id
            (test_block_hashes differential_block.number)
            differential_block accounts tx of
@@ -261,7 +262,7 @@ Definition bytecode_memory_size_def:
         (case run s of
            SOME (INR _, s1) =>
              (case s1.contexts of
-                [(ctxt, _)] => SOME (buffer_length ctxt.memory)
+                [(ctxt, _)] => SOME (buffer_to_list ctxt.memory)
               | _ => NONE)
          | _ => NONE)
     | _ => NONE
@@ -369,4 +370,4 @@ val () = cv_auto_trans case_address_def;
 val () = cv_auto_trans case_tx_def;
 val () = cv_auto_trans case_accounts_of_def;
 val () = cv_auto_trans bytecode_execution_def;
-val () = cv_auto_trans bytecode_memory_size_def;
+val () = cv_auto_trans bytecode_memory_def;

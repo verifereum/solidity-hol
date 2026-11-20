@@ -283,7 +283,7 @@ Definition contract_observation_def:
 End
 
 (* The source run of a transaction priced at gas_price, with its frame's final
- * memory size. *)
+ * memory. *)
 Definition source_frame_execution_at_def:
   source_frame_execution_at gas_price code u prog fuel c =
     case (input_call u c.case_input, case_immutable_values u c.case_immutables) of
@@ -299,7 +299,7 @@ Definition source_frame_execution_at_def:
                     c.case_peer_code c.case_peer_storage c.case_libraries in
         let w = differential_world (transfer_value c.case_sender a c.case_value pre)
                   with original := pre in
-        let (r, size) =
+        let (r, image) =
           case c.case_input of
             Deploy _ _ => deploy_contract_frame fuel prog fr
               (w with accounts := update_account a
@@ -308,7 +308,7 @@ Definition source_frame_execution_at_def:
           | _ => call_contract_frame fuel prog
                    (FEMPTY |++ MAP (λ(x, s, _). (x, s)) imm) fr w
                    (MAP GasLeftObservation c.case_gas) in
-        (contract_observation u c.case_immutable_refs a r, size)
+        (contract_observation u c.case_immutable_refs a r, image)
 End
 
 Definition source_execution_at_def:
@@ -323,11 +323,16 @@ Definition source_execution_def:
       code u prog fuel c
 End
 
-(* The final memory size of the source run of the corpus's transaction. *)
-Definition source_memory_size_def:
-  source_memory_size code u prog fuel c =
+(* The final memory of the source run of the corpus's transaction. *)
+Definition source_memory_def:
+  source_memory code u prog fuel c =
     SND (source_frame_execution_at
            (differential_tx c.case_sender c.case_value []).gasPrice code u prog fuel c)
+End
+
+Definition source_memory_size_def:
+  source_memory_size code u prog fuel c =
+    OPTION_MAP LENGTH (source_memory code u prog fuel c)
 End
 
 Definition source_observation_def:
@@ -358,11 +363,15 @@ Definition evm_execution_def:
         else bytecode_execution input
 End
 
-Definition evm_memory_size_def:
-  evm_memory_size code u c =
+Definition evm_memory_def:
+  evm_memory code u c =
     case prepared_evm_input code u c of
       INL _ => NONE
-    | INR input => bytecode_memory_size input
+    | INR input => bytecode_memory input
+End
+
+Definition evm_memory_size_def:
+  evm_memory_size code u c = OPTION_MAP LENGTH (evm_memory code u c)
 End
 
 Definition evm_observation_def:
@@ -412,6 +421,8 @@ Datatype:
   | LogUnexpected (event list) (event list)
     (* final memory size: bytecode, source, expected *)
   | MemorySizeMismatch (num option) (num option) num
+    (* final memory: bytecode, source *)
+  | MemoryMismatch (byte list option) (byte list option)
 End
 
 Definition compare_observations_def:
@@ -422,6 +433,24 @@ Definition compare_observations_def:
     else if evm_st ≠ src_st then StorageMismatch evm_st src_st
     else if evm_st ≠ expected_st then StorageUnexpected evm_st expected_st
     else Agree evm
+End
+
+(* The verdict on the runs' final memory, once everything else agrees: its
+ * size when the case gives one, and its bytes when the case asks for them. *)
+Definition memory_verdict_def:
+  memory_verdict code u prog fuel c outcome =
+    case c.case_memory_size of
+      NONE => Agree outcome
+    | SOME n =>
+        if evm_memory_size code u c ≠ SOME n ∨
+           source_memory_size code u prog fuel c ≠ SOME n
+        then MemorySizeMismatch (evm_memory_size code u c)
+               (source_memory_size code u prog fuel c) n
+        else if c.case_memory_image ∧
+                evm_memory code u c ≠ source_memory code u prog fuel c
+        then MemoryMismatch (evm_memory code u c)
+               (source_memory code u prog fuel c)
+        else Agree outcome
 End
 
 Definition differential_verdict_def:
@@ -445,15 +474,7 @@ Definition differential_verdict_def:
           LogMismatch (SND (SND evm_run)) (SND (SND src_run))
         else if SND (SND evm_run) ≠ expected_logs c.case_logs then
           LogUnexpected (SND (SND evm_run)) (expected_logs c.case_logs)
-        else
-          (case c.case_memory_size of
-             NONE => Agree outcome
-           | SOME n =>
-               if evm_memory_size code u c = SOME n ∧
-                  source_memory_size code u prog fuel c = SOME n
-               then Agree outcome
-               else MemorySizeMismatch (evm_memory_size code u c)
-                      (source_memory_size code u prog fuel c) n)
+        else memory_verdict code u prog fuel c outcome
     | other => other
 End
 
@@ -581,13 +602,46 @@ Proof
   BasicProvers.every_case_tac >> gvs[is_agreement_def]
 QED
 
+(* A case agrees only when its memory verdict does, for its outcome. *)
+Theorem differential_agrees_memory_verdict[local]:
+  differential_agrees code u prog fuel c ⇒
+  ∃outcome. is_agreement (memory_verdict code u prog fuel c outcome)
+Proof
+  rw[differential_agrees_def, differential_verdict_def] >>
+  BasicProvers.every_case_tac >> gvs[is_agreement_def] >>
+  first_assum (irule_at Any)
+QED
+
+Theorem memory_verdict_agrees[local]:
+  is_agreement (memory_verdict code u prog fuel c outcome) ⇒
+  (c.case_memory_size = SOME n ⇒
+   evm_memory_size code u c = SOME n ∧
+   source_memory_size code u prog fuel c = SOME n) ∧
+  (IS_SOME c.case_memory_size ∧ c.case_memory_image ⇒
+   evm_memory code u c = source_memory code u prog fuel c)
+Proof
+  simp[memory_verdict_def] >> BasicProvers.every_case_tac >>
+  gvs[is_agreement_def]
+QED
+
 (* With an expected memory size, both runs end their frame with it. *)
 Theorem differential_agrees_memory_size:
   differential_agrees code u prog fuel c ∧ c.case_memory_size = SOME n ⇒
   evm_memory_size code u c = SOME n ∧ source_memory_size code u prog fuel c = SOME n
 Proof
-  rw[differential_agrees_def, differential_verdict_def] >>
-  BasicProvers.EVERY_CASE_TAC >> gvs[is_agreement_def]
+  strip_tac >> drule differential_agrees_memory_verdict >> strip_tac >>
+  drule memory_verdict_agrees >> simp[]
+QED
+
+(* With an expected memory size and a memory image check, both runs end
+ * their frame with the same memory. *)
+Theorem differential_agrees_memory:
+  differential_agrees code u prog fuel c ∧ IS_SOME c.case_memory_size ∧
+  c.case_memory_image ⇒
+  evm_memory code u c = source_memory code u prog fuel c
+Proof
+  strip_tac >> drule differential_agrees_memory_verdict >> strip_tac >>
+  drule memory_verdict_agrees >> simp[]
 QED
 
 val () = cv_auto_trans argument_scalar_def;
@@ -611,11 +665,13 @@ val () = cv_auto_trans contract_observation_def;
 val () = cv_auto_trans source_frame_execution_at_def;
 val () = cv_auto_trans source_execution_at_def;
 val () = cv_auto_trans source_execution_def;
+val () = cv_auto_trans source_memory_def;
 val () = cv_auto_trans source_memory_size_def;
 val () = cv_auto_trans source_observation_def;
 val () = cv_auto_trans prepared_evm_input_def;
 val () = cv_auto_trans evm_execution_def;
 val () = cv_auto_trans evm_observation_def;
+val () = cv_auto_trans evm_memory_def;
 val () = cv_auto_trans evm_memory_size_def;
 val () = cv_auto_trans expected_outcome_def;
 val () = cv_auto_trans compare_observations_def;

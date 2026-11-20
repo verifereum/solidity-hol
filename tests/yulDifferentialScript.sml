@@ -252,7 +252,9 @@ Definition yul_observation_def:
 End
 
 (* The verdict on one case at one stage, as differential_verdict decides it
- * with the Yul run standing where the core run stands.
+ * with the Yul run standing where the core run stands, except that a case's
+ * memory_image check compares the core run's memory only: here the frames'
+ * memory sizes are compared.
  *)
 Definition yul_case_verdict_def:
   yul_case_verdict code u prog c yfuel ycode =
