@@ -377,7 +377,15 @@ fun case_term {peer, libraries} (immutables : {names : (string * IntInf.int) lis
       ("case_memory_size",
        case JSONUtil.findField c "memory_size" of
          NONE => optionSyntax.mk_none numSyntax.num
-       | SOME v => optionSyntax.mk_some (num_term (integer v)))])
+       | SOME v => optionSyntax.mk_some (num_term (integer v))),
+      ("case_memory_image",
+       case JSONUtil.findField c "memory_image" of
+         NONE => boolSyntax.F
+       | SOME (JSON.BOOL false) => boolSyntax.F
+       | SOME (JSON.BOOL true) =>
+           if isSome (JSONUtil.findField c "memory_size") then boolSyntax.T
+           else fail "memory_image without memory_size"
+       | SOME _ => fail "memory_image must be a boolean")])
 
 (* ABI types come from the compiler artifact, independently of source import. *)
 fun abi_type v = contractABISyntax.parse_abi_type (string_field v "type")

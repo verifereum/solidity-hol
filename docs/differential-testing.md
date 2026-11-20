@@ -73,6 +73,12 @@ the optimizer can leave a different active memory. A creation that
 returns its runtime code gives none, since the deployed-code copy is not
 modelled.
 
+A case with `"memory_size"` may also give `"memory_image": true`: then the
+source's final memory, its bytes up to that size, must equal Verifereum's
+outermost frame's, otherwise the case is a `memory-mismatch`. This is what
+pins memory a frame writes without raising its size, such as a panic's
+selector and code in the scratch space before its `REVERT`.
+
 A case with `"deploy": true` and the constructor's `args` (or, as
 `calldata`, their raw encoding) is a creation instead: Verifereum runs a creation transaction whose data is the artifact's
 initcode followed by the encoded arguments, and the evaluator runs the

@@ -85,9 +85,20 @@ Definition normal_result_def:
        unused_gas_evidence := gas |>
 End
 
+(* The memory a completion leaves: the compiler's panic_error_<code> writes
+ * the Panic selector and code to scratch, mstore(0, selector) then
+ * mstore(4, code), before revert(0, 0x24). *)
+Definition completion_memory_def:
+  completion_memory c st =
+    case c of
+      PanicCompletion code => memory_write 0 (panic_data code) st
+    | _ => st
+End
+
 Definition abrupt_result_def:
   abrupt_result c st gas =
-    <| completion := c; state := st; unused_gas_evidence := gas |>
+    <| completion := c; state := completion_memory c st;
+       unused_gas_evidence := gas |>
 End
 
 Definition pop_result_def:
@@ -358,7 +369,7 @@ End
 (* A constructor keeps the contract's immutables in its reserved memory,
  * a word each from 0x80, in declaration order, base contracts first. *)
 Definition immutable_offset_def:
-  (immutable_offset x [] = NONE) ∧
+  (immutable_offset (x : ast_id) [] = NONE) ∧
   (immutable_offset x ((y, ty) :: rest) =
     if x = y then SOME (128 : num, ty : sol_type) else
     case immutable_offset x rest of
@@ -880,6 +891,15 @@ Definition write_call_data_def:
     memory_write (p + LENGTH selector) data
       (if selector = [] then st
        else memory_write p (selector ++ REPLICATE 28 0w) st)
+End
+
+(* Where the compiler's revertWithError writes an error's selector and
+ * encoded arguments: scratch 0 when the declared parameters are value types
+ * whose encoding fits below 0x80 with the selector, the free memory pointer
+ * otherwise, which it doesn't advance. *)
+Definition error_payload_at_scratch_def:
+  error_payload_at_scratch params ⇔
+    EVERY is_value_type params ∧ 4 + 32 * LENGTH params ≤ 128
 End
 
 (* The compiler's revert_forward: the return data copied to the free memory
@@ -1482,7 +1502,8 @@ Definition simple_stmt_def:
            SOME vs =>
              (case encoded_runtime_values env st params vs of
                 INL ((data, spill), st1) =>
-                  let (p, st2) = memory_load 64 st1 in
+                  let (p, st2) = if error_payload_at_scratch params then (0, st1)
+                                 else memory_load 64 st1 in
                   abrupt_result (RevertCompletion (selector ++ data))
                     (memory_write (p + LENGTH selector + LENGTH data) spill
                       (write_call_data p selector data st2)) gas

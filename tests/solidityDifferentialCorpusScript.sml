@@ -105,6 +105,7 @@ Ancestors
   solidityDifferentialCorpus_receive
   solidityDifferentialCorpus_reference_forms
   solidityDifferentialCorpus_revert_arguments
+  solidityDifferentialCorpus_revert_payloads
   solidityDifferentialCorpus_scalars
   solidityDifferentialCorpus_selfdestructs
   solidityDifferentialCorpus_sha256_blockhash
