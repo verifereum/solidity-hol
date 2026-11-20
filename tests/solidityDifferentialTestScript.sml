@@ -332,7 +332,7 @@ local
   val (rejected, report) = printed (fn () =>
     (solidityBytecodeLib.run_suite_file
        {root = "..", suite_file = "testdata/differential/negative/memory_size.json"}; false)
-    handle HOL_ERR _ => true)
+    handle solidityBytecodeLib.CorpusError _ => true)
 in
   val () = if rejected andalso
       reported "differential-result: " report
