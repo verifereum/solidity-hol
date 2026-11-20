@@ -114,6 +114,16 @@ Definition abi_word_def:
   abi_word bs pos = num_of_be_bytes (TAKE 32 (DROP pos bs))
 End
 
+(* n bytes of an input at pos, reading zeros past the bytes held. *)
+Definition input_bytes_def:
+  input_bytes (bs : word8 list) pos n =
+    let xs = TAKE n (DROP pos bs) in xs ++ REPLICATE (n - LENGTH xs) 0w
+End
+
+Definition input_word_def:
+  input_word bs pos = num_of_be_bytes (input_bytes bs pos 32)
+End
+
 (* The bytes an element or field takes in the head of its array or struct. *)
 Definition abi_stride_def:
   abi_stride env ty =
@@ -292,11 +302,22 @@ Definition encoded_abi_tuple_def:
     heads ++ tails
 End
 
+(* The bytes an encoding's last dynamic part writes past its end, given each
+ * part's ABI type and those bytes: none when no part is dynamic. *)
+Definition last_spill_def:
+  (last_spill ([] : (abi_type # byte list) list) = []) ∧
+  (last_spill ((t, sp) :: ps) =
+    if EXISTS (λ(t, sp). is_dynamic t) ps then last_spill ps
+    else if is_dynamic t then sp else [])
+End
+
 (* A storage value encoded in place, as the pinned encoder does: its ABI
- * value and its encoding. Scalars are read cleaned; a byte sequence copies
- * whole data words, keeping unused dirty bytes, except the length byte of a
- * short one. A length of 2^64 or more panics with 0x41, as the memory for the
- * encoding cannot be allocated. The fuel bounds the struct nesting. *)
+ * value, its encoding, and the bytes written past its end. Scalars are read
+ * cleaned; a byte sequence copies whole data words, keeping unused dirty
+ * bytes, except the length byte of a short one (storage_byte_data), and an
+ * empty one still writes its slot's word past its end. A length of 2^64 or
+ * more panics with 0x41, as the memory for the encoding cannot be
+ * allocated. The fuel bounds the struct nesting. *)
 Definition storage_abi_value_def:
   (storage_abi_value env (fuel : num) accounts addr slot ty =
     if byte_sequence_type ty then
@@ -304,12 +325,11 @@ Definition storage_abi_value_def:
          INR c => INR c
        | INL length =>
          if 2 ** 64 ≤ length then INR (PanicCompletion 65) else
-         let padded = storage_byte_range accounts addr slot length 0
-                        (32 * ((length + 31) DIV 32)) in
-         let data = if 0 < length ∧ length < 32 then TAKE 31 padded ++ [0w]
-                    else padded in
-         case abi_value ty (ScalarValue (BytesValue (TAKE length padded))) of
-           SOME a => INL (a, enc (Uint 256) (NumV length) ++ data)
+         let data = storage_byte_data accounts addr slot length in
+         case abi_value ty (ScalarValue (BytesValue (TAKE length data))) of
+           SOME a =>
+             if length = 0 then INL (a, enc (Uint 256) (NumV 0), data)
+             else INL (a, enc (Uint 256) (NumV length) ++ data, [])
          | NONE => INR (InvalidCompletion "bad ABI value"))
     else case ty of
       ArrayT element l =>
@@ -318,11 +338,11 @@ Definition storage_abi_value_def:
              if 2 ** 64 ≤ length then INR (PanicCompletion 65) else
              case storage_abi_elements env fuel accounts addr data element 0 length of
                INL parts =>
+                 let t = abi_type env (LENGTH env.type_declarations) element in
                  INL (ListV (MAP FST parts),
                       (if l = NONE then enc (Uint 256) (NumV length) else []) ++
-                      encoded_abi_tuple
-                        (MAP (λp. (abi_type env (LENGTH env.type_declarations) element,
-                                   SND p)) parts))
+                      encoded_abi_tuple (MAP (λ(a, bs, sp). (t, bs)) parts),
+                      last_spill (MAP (λ(a, bs, sp). (t, sp)) parts))
              | INR c => INR c)
     | StructT s =>
         (case (lookup_struct env s, lookup_struct_layout env s) of
@@ -330,7 +350,10 @@ Definition storage_abi_value_def:
              if fuel = 0 then INR (InvalidCompletion "struct nesting") else
              (case storage_abi_fields env (fuel - 1) accounts addr slot
                      layout.struct_fields fields of
-                INL parts => INL (ListV (MAP FST parts), encoded_abi_tuple (MAP SND parts))
+                INL parts =>
+                  INL (ListV (MAP FST parts),
+                       encoded_abi_tuple (MAP (λ(a, (t, bs), sp). (t, bs)) parts),
+                       last_spill (MAP (λ(a, (t, bs), sp). (t, sp)) parts))
               | INR c => INR c)
          | _ => INR (InvalidCompletion "missing struct layout"))
     | _ => INR (InvalidCompletion "bad storage ABI type")) ∧
@@ -344,7 +367,7 @@ Definition storage_abi_value_def:
             (case read_storage env accounts addr s offset element of
                SOME v =>
                  (case abi_value element (ScalarValue v) of
-                    SOME a => INL (a, enc (abi_type env 0 element) a)
+                    SOME a => INL (a, enc (abi_type env 0 element) a, [])
                   | NONE => INR (InvalidCompletion "bad ABI value"))
              | NONE => INR (InvalidCompletion "bad storage read"))
           else storage_abi_value env fuel accounts addr s element in
@@ -365,16 +388,17 @@ Definition storage_abi_value_def:
             (case read_storage env accounts addr s v.state_offset ty of
                SOME x =>
                  (case abi_value ty (ScalarValue x) of
-                    SOME a => INL (a, enc (abi_type env 0 ty) a)
+                    SOME a => INL (a, enc (abi_type env 0 ty) a, [])
                   | NONE => INR (InvalidCompletion "bad ABI value"))
              | NONE => INR (InvalidCompletion "bad storage read"))
           else storage_abi_value env fuel accounts addr s ty in
         case value of
           INR c => INR c
-        | INL (a, encoded) =>
+        | INL (a, encoded, sp) =>
             case storage_abi_fields env fuel accounts addr slot layout fields of
               INL parts =>
-                INL ((a, (abi_type env (LENGTH env.type_declarations) ty, encoded)) :: parts)
+                INL ((a, (abi_type env (LENGTH env.type_declarations) ty, encoded), sp)
+                     :: parts)
             | INR c => INR c)
 Termination
   WF_REL_TAC ‘inv_image ($< LEX $< LEX $<) (λx. case x of
@@ -387,62 +411,207 @@ Termination
 End
 
 (* The value tree of a memory, calldata or storage array, struct or byte
- * sequence of type ty, as a copy to storage and the encoder read it. Calldata
+ * sequence of type ty, as a copy to storage (copying) and the encoder read
+ * it. Calldata
  * is read through the calldata accessors; a calldata array's own data span
  * was checked when it was decoded. *)
 Definition array_copy_value_def:
-  array_copy_value env (st : source_state) ty r =
+  array_copy_value env copying (st : source_state) ty r =
     case r of
-      MemoryReference _ _ _ =>
-        memory_array_value env (LENGTH env.type_declarations) st ty (ReferenceValue r)
+      MemoryReference _ _ =>
+        memory_value env copying (LENGTH env.type_declarations) ty (ReferenceValue r) st
     | CalldataReference data n rty =>
         if rty ≠ ty then INR (InvalidCompletion "bad calldata array reference")
-        else calldata_value env (LENGTH env.type_declarations) st.frame.call_data ty data n
+        else (case calldata_value env (LENGTH env.type_declarations)
+                     st.frame.call_data ty data n of
+                INL v => INL (v, st)
+              | INR c => INR c)
     | StorageReference PersistentStorage addr slot 0 rty _ =>
         if rty ≠ ty then INR (InvalidCompletion "bad storage array reference")
-        else storage_array_value env (LENGTH env.type_declarations)
-               st.world.accounts addr slot ty
+        else (case storage_array_value env (LENGTH env.type_declarations)
+                     st.world.accounts addr slot ty of
+                INL v => INL (v, scratch_write (read_scratch env
+                  (LENGTH env.type_declarations) st.world.accounts addr slot ty) st)
+              | INR c => INR c)
     | _ => INR (InvalidCompletion "bad array reference")
 End
 
-(* The ABI value of v, of type ty, and its encoding. A storage value is
- * encoded in place (storage_abi_value); any other reference is read into its
- * value tree, then encoded. *)
+(* Zero bytes the compiler's encoder writes past the end of an encoding of a
+ * value not in storage (a stored one gives its own, storage_abi_value). A
+ * byte sequence copied from memory or calldata is followed by a cleared
+ * word; a literal writes whole words. Only the encoding's last dynamic part,
+ * recursively, can spill past its end. *)
+Datatype:
+  encoding_source = CopiedBytes | StoredBytes | LiteralBytes
+End
+
+Definition encoding_source_def:
+  encoding_source v =
+    case v of
+      ReferenceValue (StorageReference _ _ _ _ _ _) => StoredBytes
+    | ReferenceValue _ => CopiedBytes
+    | _ => LiteralBytes
+End
+
+Definition padded_bytes_spill_def:
+  padded_bytes_spill src (l : num) =
+    case src of
+      CopiedBytes => if l MOD 32 = 0 then 32 else l MOD 32
+    | StoredBytes => if l = 0 then 32 else 0
+    | LiteralBytes => 0
+End
+
+(* The last dynamic part's spill, NONE when no part is dynamic. *)
+Definition later_spill_def:
+  later_spill t n rest =
+    case rest of
+      SOME m => SOME m
+    | NONE => if is_dynamic t then SOME n else NONE
+End
+
+Definition abi_spill_def:
+  (abi_spill src (Bytes NONE) (BytesV bs) = padded_bytes_spill src (LENGTH bs)) ∧
+  (abi_spill src String (BytesV bs) = padded_bytes_spill src (LENGTH bs)) ∧
+  (abi_spill src (Array _ t) (ListV vs) =
+    (case parts_spill src (REPLICATE (LENGTH vs) t) vs of SOME n => n | NONE => 0)) ∧
+  (abi_spill src (Tuple ts) (ListV vs) = (case parts_spill src ts vs of SOME n => n | NONE => 0)) ∧
+  (abi_spill src _ _ = 0) ∧
+  (parts_spill src (t :: ts) (v :: vs) =
+    later_spill t (abi_spill src t v) (parts_spill src ts vs)) ∧
+  (parts_spill src _ _ = NONE)
+Termination
+  WF_REL_TAC ‘measure (λx. case x of
+    INL (src, t, v) => abi_value_size v
+  | INR (src, ts, vs) => list_size abi_value_size vs)’ >>
+  rw[contractABITheory.abi_value_size_def, listTheory.list_size_def]
+End
+
+(* abi.encodePacked, the concatenations and indexed topics write a byte
+ * sequence v without padding, and these bytes past its contents bs: a copied
+ * one is followed by a cleared word, a literal one fills its last word with
+ * zeros, and a stored one is written in whole storage words
+ * (storage_byte_data), which keep what its slots hold past its length. *)
+Definition packed_bytes_tail_def:
+  packed_bytes_tail accounts v (bs : byte list) =
+    case v of
+      ReferenceValue (StorageReference _ addr slot _ _ _) =>
+        DROP (LENGTH bs) (storage_byte_data accounts addr slot (LENGTH bs))
+    | ReferenceValue _ => REPLICATE 32 0w
+    | _ => REPLICATE ((32 - LENGTH bs MOD 32) MOD 32) 0w
+End
+
+(* What a packed part writes past its end: a value its word's other bytes. *)
+Definition packed_tail_def:
+  packed_tail accounts ty v (bs : byte list) =
+    case ty of
+      LocatedT _ (ArrayT _ _) => []
+    | LocatedT _ _ => packed_bytes_tail accounts v bs
+    | _ => REPLICATE (32 - LENGTH bs) 0w : byte list
+End
+
+(* The length of v's in-place encoding (indexed_data): a byte sequence padded
+ * to whole words, an array or struct its parts in place, a scalar one word. *)
+Definition inplace_length_def:
+  (inplace_length (Bytes NONE) (BytesV bs) = 32 * ((LENGTH bs + 31) DIV 32)) ∧
+  (inplace_length String (BytesV bs) = 32 * ((LENGTH bs + 31) DIV 32)) ∧
+  (inplace_length (Array _ t) (ListV vs) =
+    inplace_lengths (REPLICATE (LENGTH vs) t) vs) ∧
+  (inplace_length (Tuple ts) (ListV vs) = inplace_lengths ts vs) ∧
+  (inplace_length _ _ = 32) ∧
+  (inplace_lengths (t :: ts) (v :: vs) = inplace_length t v + inplace_lengths ts vs) ∧
+  (inplace_lengths _ _ = 0)
+Termination
+  WF_REL_TAC ‘measure (λx. case x of
+    INL (t, v) => abi_value_size v
+  | INR (ts, vs) => list_size abi_value_size vs)’ >>
+  rw[contractABITheory.abi_value_size_def, listTheory.list_size_def]
+End
+
+(* How far an in-place encoding's writes reach past its end: each part's
+ * spill, less the length of the parts after it. *)
+Definition inplace_spill_def:
+  (inplace_spill src (Bytes NONE) (BytesV bs) = padded_bytes_spill src (LENGTH bs)) ∧
+  (inplace_spill src String (BytesV bs) = padded_bytes_spill src (LENGTH bs)) ∧
+  (inplace_spill src (Array _ t) (ListV vs) =
+    inplace_parts_spill src (REPLICATE (LENGTH vs) t) vs) ∧
+  (inplace_spill src (Tuple ts) (ListV vs) = inplace_parts_spill src ts vs) ∧
+  (inplace_spill src _ _ = 0) ∧
+  (inplace_parts_spill src (t :: ts) (v :: vs) =
+    MAX (inplace_spill src t v - inplace_lengths ts vs)
+        (inplace_parts_spill src ts vs)) ∧
+  (inplace_parts_spill src _ _ = 0)
+Termination
+  WF_REL_TAC ‘measure (λx. case x of
+    INL (src, t, v) => abi_value_size v
+  | INR (src, ts, vs) => list_size abi_value_size vs)’ >>
+  rw[contractABITheory.abi_value_size_def, listTheory.list_size_def]
+End
+
+(* The ABI value of v, of type ty, its encoding, and the bytes the encoder
+ * writes past its end. A storage value is encoded in place
+ * (storage_abi_value); any other reference is read into its value tree, then
+ * encoded. Reading memory raises its active size. *)
 Definition runtime_abi_value_def:
   runtime_abi_value env st ty v =
     let ty' = case ty of LocatedT _ t => t | t => t in
     case v of
       ReferenceValue (StorageReference PersistentStorage addr slot 0 rty _) =>
         if rty ≠ ty' then INR (InvalidCompletion "bad ABI value")
-        else storage_abi_value env (LENGTH env.type_declarations)
-               st.world.accounts addr slot rty
+        else (case storage_abi_value env (LENGTH env.type_declarations)
+                     st.world.accounts addr slot rty of
+                INL (a, bs, sp) => INL ((a, bs, sp), scratch_write (read_scratch env
+                  (LENGTH env.type_declarations) st.world.accounts addr slot rty) st)
+              | INR c => INR c)
     | _ =>
-      case (case v of ReferenceValue r => array_copy_value env st ty' r | _ => INL v) of
+      case (case v of ReferenceValue r => array_copy_value env F st ty' r | _ => INL (v, st)) of
         INR c => INR c
-      | INL tree =>
+      | INL (tree, st1) =>
+        let t = abi_type env (LENGTH env.type_declarations) ty' in
         case value_abi_value env ty' tree of
-          SOME a => INL (a, enc (abi_type env (LENGTH env.type_declarations) ty') a)
+          SOME a =>
+            INL ((a, enc t a, REPLICATE (abi_spill (encoding_source v) t a) 0w), st1)
         | NONE => INR (InvalidCompletion "bad ABI value")
 End
 
 Definition runtime_abi_values_def:
   (runtime_abi_values env (st : source_state) [] [] =
-     (INL [] : (contractABI$abi_type # byte list) list + source_completion)) ∧
+     (INL (([], NONE), st) :
+        (((contractABI$abi_type # byte list) list # byte list option) # source_state) +
+        source_completion)) ∧
   (runtime_abi_values env st (ty :: tys) (v :: vs) =
     case runtime_abi_value env st ty v of
       INR c => INR c
-    | INL (a, encoded_body) =>
-      (case runtime_abi_values env st tys vs of
-         INL encoded =>
-           INL ((abi_type env (LENGTH env.type_declarations) ty, encoded_body) :: encoded)
+    | INL ((a, encoded_body, sp), st1) =>
+      (case runtime_abi_values env st1 tys vs of
+         INL ((encoded, spill), st2) =>
+           let t = abi_type env (LENGTH env.type_declarations) ty in
+           INL (((t, encoded_body) :: encoded, later_spill t sp spill), st2)
        | INR c => INR c)) ∧
   (runtime_abi_values _ _ _ _ = INR (InvalidCompletion "bad ABI arguments"))
 End
 
+(* An encoder writes at the free memory pointer, and the compiled one reads
+ * each input only when it reaches it, after writing what comes before it.
+ * The encoders here read their inputs first, from memory as it was, which
+ * gives the same bytes when every input lies below the free pointer. The
+ * reads run from a memory size of zero, so the size they leave covers what
+ * they read; an input read at or above the free pointer is unsupported and
+ * fails closed. Otherwise the size is what reading from st leaves. *)
+Definition encoder_state_def:
+  encoder_state (st : source_state) (st1 : source_state) =
+    if FST (memory_load 64 st) < st1.memory_size then
+      INR (InvalidCompletion "unsupported: encoder input at or above the free memory pointer")
+    else INL (st1 with memory_size := MAX st.memory_size st1.memory_size)
+End
+
 Definition encoded_runtime_values_def:
   encoded_runtime_values env st tys vs =
-    case runtime_abi_values env st tys vs of
-      INL parts => INL (encoded_abi_tuple parts)
+    case runtime_abi_values env (st with memory_size := 0) tys vs of
+      INL ((parts, spill), st1) =>
+        (case encoder_state st st1 of
+           INL st2 =>
+             INL ((encoded_abi_tuple parts, (case spill of SOME sp => sp | NONE => [])), st2)
+         | INR c => INR c)
     | INR c => INR c
 End
 
@@ -457,33 +626,50 @@ Definition packed_value_def:
           INR (InvalidCompletion "bad packed array")
         else
           (case runtime_abi_value env st ty v of
-             INL (_, bs) => INL (case length of NONE => DROP 32 bs | SOME _ => bs)
+             INL ((_, bs, _), st1) =>
+               INL ((case length of NONE => DROP 32 bs | SOME _ => bs), st1)
            | INR c => INR c)
     | LocatedT _ _ =>
         (case v of
            ReferenceValue r => byte_contents st r
-         | ScalarValue (BytesValue bs) => INL bs
+         | ScalarValue (BytesValue bs) => INL (bs, st)
          | _ => INR (InvalidCompletion "bad packed value"))
     | _ =>
       case (abi_value ty v, storage_bytes ty) of
         (SOME a, SOME width) =>
           let word = enc (abi_type env 0 ty) a in
-          INL (case ty of
-                 FixedBytesT _ => TAKE width word
-               | _ => DROP (32 - width) word)
+          INL ((case ty of
+                  FixedBytesT _ => TAKE width word
+                | _ => DROP (32 - width) word), st)
       | _ => INR (InvalidCompletion "bad packed value")
 End
 
+(* The parts written one after another, and the bytes left past their end:
+ * the later parts' own, then what of a part's tail reaches past those. *)
 Definition packed_values_def:
-  (packed_values env st [] [] = (INL [] : byte list + source_completion)) ∧
+  (packed_values env st [] [] =
+     (INL (([], []), st) : ((byte list # byte list) # source_state) + source_completion)) ∧
   (packed_values env st (ty :: tys) (v :: vs) =
     case packed_value env st ty v of
       INR c => INR c
-    | INL bs =>
-      case packed_values env st tys vs of
-        INL rest => INL (bs ++ rest)
+    | INL (bs, st1) =>
+      case packed_values env st1 tys vs of
+        INL ((rest, spill), st2) =>
+          let tail = packed_tail st1.world.accounts ty v bs in
+          INL ((bs ++ rest,
+                spill ++ DROP (LENGTH rest + LENGTH spill) tail), st2)
       | INR c => INR c) ∧
   (packed_values _ _ _ _ = INR (InvalidCompletion "bad packed values"))
+End
+
+Definition packed_encoding_def:
+  packed_encoding env st tys vs =
+    case packed_values env (st with memory_size := 0) tys vs of
+      INL (r, st1) =>
+        (case encoder_state st st1 of
+           INL st2 => INL (r, st2)
+         | INR c => INR c)
+    | INR c => INR c
 End
 
 Definition abi_runtime_values_def:
@@ -495,12 +681,6 @@ Definition abi_runtime_values_def:
   (abi_runtime_values _ _ = NONE)
 End
 
-(* The source heap tracks allocations; an external call also reserves its
- * returndata buffer before decoding dynamic return values. *)
-Definition memory_free_pointer_def:
-  memory_free_pointer st = 128 + st.memory_allocated
-End
-
 (* A memory value decoded at pos, as the pinned decoder does: a scalar
  * validated in place (an enum outside its members reverts); a byte sequence
  * or array whose encoding starts at pos in range, its length below 2^64 and
@@ -510,87 +690,106 @@ End
  * one at an offset below 2^64 from the start of the array's data or of the
  * struct. Offsets need not be aligned, tails may overlap, and padding is
  * ignored. Byte sequences decode to their bytes, and arrays and structs to
- * the tuple of their elements or fields; free is the free memory pointer.
- * The fuel bounds the struct nesting. *)
+ * the tuple of their elements or fields; free is the free memory pointer,
+ * and reach the end of the input the decoder has read, as its mloads and
+ * mcopys reach. A byte sequence or array whose data reaches past bound is
+ * left unsupported: a memory input's bound is where the free memory pointer
+ * was, past which the compiled decoder's own allocations may lie. The
+ * compiled decoder reads the free memory pointer anew for each object it
+ * allocates, where free here only advances: an allocation below 96, whose
+ * object can cover the pointer's word, is left unsupported. The fuel bounds
+ * the struct nesting. *)
 Definition decode_memory_value_def:
-  (decode_memory_value env (fuel : num) ty bs pos free =
+  (decode_memory_value env (fuel : num) ty bs (total : num) (bound : num) pos free (reach : num) =
     if byte_sequence_type ty ∨ (case ty of ArrayT _ _ => T | _ => F) then
-      if pos + 32 > LENGTH bs then INR (RevertCompletion []) else
-      let (length, data, size) =
+      if pos + 32 > total then INR (RevertCompletion []) else
+      let (length, data, size, reach1) =
         case ty of
-          ArrayT element (SOME n) => (n, pos, 32 * n)
+          ArrayT element (SOME n) => (n, pos, 32 * n, reach)
         | ArrayT element NONE =>
-            let n = abi_word bs pos in (n, pos + 32, 32 + 32 * n)
-        | _ => let n = abi_word bs pos in (n, pos + 32, 32 + 32 * ((n + 31) DIV 32)) in
+            let n = input_word bs pos in (n, pos + 32, 32 + 32 * n, MAX reach (pos + 32))
+        | _ => let n = input_word bs pos in
+               (n, pos + 32, 32 + 32 * ((n + 31) DIV 32), MAX reach (pos + 32)) in
       if 2 ** 64 ≤ length ∨ 2 ** 64 ≤ free + size then INR (PanicCompletion 65) else
+      if free < 96 then INR (InvalidCompletion "unsupported: decoding into memory below the free memory pointer word's end") else
       case ty of
         ArrayT element _ =>
-          if data + length * abi_stride env element > LENGTH bs then
+          if data + length * abi_stride env element > total then
             INR (RevertCompletion [])
+          else if data + length * abi_stride env element > bound then
+            INR (InvalidCompletion "unsupported: abi.decode reading at the free memory pointer")
           else
-            (case decode_memory_elements env fuel element bs data 0 length (free + size) of
-               INL (vs, next) => INL (TupleValue vs, next)
+            (case decode_memory_elements env fuel element bs total bound data 0 length (free + size)
+                    reach1 of
+               INL (vs, next, reach2) => INL (TupleValue vs, next, reach2)
              | INR c => INR c)
       | _ =>
-          if data + length > LENGTH bs then INR (RevertCompletion [])
-          else INL (ScalarValue (BytesValue (TAKE length (DROP data bs))), free + size)
+          if data + length > total then INR (RevertCompletion [])
+          else if data + length > bound then
+            INR (InvalidCompletion "unsupported: abi.decode reading at the free memory pointer")
+          else INL (ScalarValue (BytesValue (input_bytes bs data length)), free + size,
+                    MAX reach1 (data + length))
     else case ty of
       StructT s =>
         (case lookup_struct env s of
            SOME fields =>
              let tys = MAP SND fields in
              if pos + head_lengths (abi_types env (LENGTH env.type_declarations) tys) 0 >
-                LENGTH bs
+                total
              then INR (RevertCompletion [])
              else if 2 ** 64 ≤ free + 32 * LENGTH tys then INR (PanicCompletion 65)
+             else if free < 96 then INR (InvalidCompletion "unsupported: decoding into memory below the free memory pointer word's end")
              else if fuel = 0 then INR (InvalidCompletion "struct nesting")
              else
-               (case decode_memory_fields env (fuel - 1) tys bs pos pos
-                       (free + 32 * LENGTH tys) of
-                  INL (vs, next) => INL (TupleValue vs, next)
+               (case decode_memory_fields env (fuel - 1) tys bs total bound pos pos
+                       (free + 32 * LENGTH tys) reach of
+                  INL (vs, next, reach1) => INL (TupleValue vs, next, reach1)
                 | INR c => INR c)
          | NONE => INR (InvalidCompletion "unknown struct"))
     | _ =>
       let a = abi_type env 0 ty in
-      let word = TAKE 32 (DROP pos bs) in
-      if pos + 32 > LENGTH bs ∨ ¬valid_enc a word then
+      let word = input_bytes bs pos 32 in
+      if pos + 32 > total ∨ ¬valid_enc a word then
         INR (RevertCompletion [])
       else
         case abi_runtime_value ty (dec a word) of
           SOME (ScalarValue v) =>
             if (case ty of EnumT _ => ¬scalar_has_type env ty v | _ => F) then
               INR (RevertCompletion [])
-            else INL (ScalarValue v, free)
+            else INL (ScalarValue v, free, MAX reach (pos + 32))
         | _ => INR (InvalidCompletion "bad ABI scalar type")) ∧
-  (decode_memory_elements env fuel element bs data i n free =
-    if n = 0 then INL ([], free) else
-    case decode_memory_part env fuel element bs data
-           (data + i * abi_stride env element) free of
+  (decode_memory_elements env fuel element bs total bound data i n free reach =
+    if n = 0 then INL ([], free, reach) else
+    case decode_memory_part env fuel element bs total bound data
+           (data + i * abi_stride env element) free reach of
       INR c => INR c
-    | INL (v, next) =>
-        case decode_memory_elements env fuel element bs data (i + 1) (n - 1) next of
-          INL (vs, last) => INL (v :: vs, last)
+    | INL (v, next, reach1) =>
+        case decode_memory_elements env fuel element bs total bound data (i + 1) (n - 1) next
+               reach1 of
+          INL (vs, last, reach2) => INL (v :: vs, last, reach2)
         | INR c => INR c) ∧
-  (decode_memory_fields env fuel [] bs base src free = INL ([], free)) ∧
-  (decode_memory_fields env fuel (ty :: tys) bs base src free =
-    case decode_memory_part env fuel ty bs base src free of
+  (decode_memory_fields env fuel [] bs total bound base src free reach = INL ([], free, reach)) ∧
+  (decode_memory_fields env fuel (ty :: tys) bs total bound base src free reach =
+    case decode_memory_part env fuel ty bs total bound base src free reach of
       INR c => INR c
-    | INL (v, next) =>
-        case decode_memory_fields env fuel tys bs base (src + abi_stride env ty) next of
-          INL (vs, last) => INL (v :: vs, last)
+    | INL (v, next, reach1) =>
+        case decode_memory_fields env fuel tys bs total bound base (src + abi_stride env ty) next
+               reach1 of
+          INL (vs, last, reach2) => INL (v :: vs, last, reach2)
         | INR c => INR c) ∧
   (* An element or field whose head is at src: a dynamic one at the offset
    * there from base. *)
-  (decode_memory_part env fuel ty bs base src free =
+  (decode_memory_part env fuel ty bs total bound base src free reach =
     if is_dynamic (abi_type env (LENGTH env.type_declarations) ty) then
-      let offset = abi_word bs src in
+      let offset = input_word bs src in
       if 2 ** 64 ≤ offset then INR (RevertCompletion [])
-      else decode_memory_value env fuel ty bs (base + offset) free
-    else decode_memory_value env fuel ty bs src free)
+      else decode_memory_value env fuel ty bs total bound (base + offset) free
+             (MAX reach (src + 32))
+    else decode_memory_value env fuel ty bs total bound src free reach)
 Termination
   WF_REL_TAC ‘inv_image ($< LEX $< LEX $<) (λx. case x of
     INL (_, fuel, ty, _) => (fuel, sol_type_size ty, 1)
-  | INR (INL (_, fuel, element, _, _, _, n, _)) =>
+  | INR (INL (_, fuel, element, _, _, _, _, _, n, _)) =>
       (fuel, sol_type_size element, n + 3)
   | INR (INR (INL (_, fuel, tys, _))) =>
       (fuel, list_size sol_type_size tys, 0)
@@ -615,48 +814,18 @@ Definition copy_calldata_array_def:
       ArrayT element l =>
         let size = (if l = NONE then 32 else 0) + 32 * length in
         if 2 ** 64 ≤ free + size then INR (PanicCompletion 65)
+        else if free < 96 then INR (InvalidCompletion "unsupported: decoding into memory below the free memory pointer word's end")
         else if data + length * abi_stride env element > LENGTH cd then
           INR (RevertCompletion [])
         else (case decode_memory_elements env (LENGTH env.type_declarations) element cd
-                     data 0 length (free + size) of
+                     (LENGTH cd) (LENGTH cd) data 0 length (free + size) 0 of
                 INL (vs, _) => INL (TupleValue vs)
               | INR c => INR c)
     | StructT _ =>
-        (case decode_memory_value env (LENGTH env.type_declarations) ty cd data free of
+        (case decode_memory_value env (LENGTH env.type_declarations) ty cd (LENGTH cd) (LENGTH cd) data free 0 of
            INL (v, _) => INL v
          | INR c => INR c)
     | _ => INR (InvalidCompletion "bad calldata copy")
-End
-
-(* The memory a value of type ty takes once materialized: each array's
- * elements and length word, each struct's fields, and each byte sequence's
- * length and data. *)
-Definition memory_value_size_def:
-  (memory_value_size env ty v =
-    case (ty, v) of
-      (ArrayT element length, TupleValue vs) =>
-        (if length = NONE then 32 else 0) + 32 * LENGTH vs +
-        memory_values_size env element vs
-    | (StructT s, TupleValue vs) =>
-        32 * LENGTH vs +
-        (case lookup_struct env s of
-           SOME fields => memory_fields_size env (MAP SND fields) vs
-         | NONE => 0)
-    | (_, ScalarValue (BytesValue bs)) =>
-        if byte_sequence_type ty then 32 + 32 * ((LENGTH bs + 31) DIV 32) else 0
-    | _ => 0) ∧
-  (memory_values_size env element [] = 0) ∧
-  (memory_values_size env element (v :: vs) =
-    memory_value_size env element v + memory_values_size env element vs) ∧
-  (memory_fields_size env (ty :: tys) (v :: vs) =
-    memory_value_size env ty v + memory_fields_size env tys vs) ∧
-  (memory_fields_size env _ _ = 0)
-Termination
-  WF_REL_TAC ‘measure (λx. case x of
-    INL (env, ty, v) => runtime_value_size v
-  | INR (INL (env, element, vs)) => list_size runtime_value_size vs
-  | INR (INR (env, tys, vs)) => list_size runtime_value_size vs)’ >>
-  rw[solidityCoreTheory.runtime_value_size_def, listTheory.list_size_def]
 End
 
 (* An argument at head: a scalar, static array or static struct in place, any
@@ -664,131 +833,236 @@ End
  * stays in the calldata: a byte sequence or dynamic array with its data in
  * range, any other dynamic value with its heads in range. *)
 Definition decode_abi_argument_def:
-  decode_abi_argument env ty bs head base free =
-    if head + 32 > LENGTH bs then INR (RevertCompletion []) else
+  decode_abi_argument env ty bs (total : num) (bound : num) head base free reach =
+    if head + 32 > total then INR (RevertCompletion []) else
     case ty of
       LocatedT CalldataLoc element =>
         let a = abi_type env (LENGTH env.type_declarations) element in
         if ¬is_dynamic a then
           INL (ReferenceValue (CalldataReference (base + head) (calldata_length element)
-                 element), free)
+                 element), free, reach)
         else
-        let offset = abi_word bs head in
+        let offset = input_word bs head in
         if byte_sequence_type element ∨ (case element of ArrayT _ NONE => T | _ => F) then
-          if 2 ** 64 ≤ offset ∨ offset + 32 > LENGTH bs then
+          if 2 ** 64 ≤ offset ∨ offset + 32 > total then
             INR (RevertCompletion []) else
-          let length = abi_word bs offset in
+          let length = input_word bs offset in
           let stride = case element of ArrayT inner NONE => abi_stride env inner | _ => 1 in
-          if 2 ** 64 ≤ length ∨ offset + 32 + length * stride > LENGTH bs then
+          if 2 ** 64 ≤ length ∨ offset + 32 + length * stride > total then
             INR (RevertCompletion [])
           else INL (ReferenceValue (CalldataReference (base + offset + 32) length element),
-                    free)
-        else if 2 ** 64 ≤ offset ∨ offset + abi_head_size a > LENGTH bs then
+                    free, MAX reach (MAX (head + 32) (offset + 32)))
+        else if 2 ** 64 ≤ offset ∨ offset + abi_head_size a > total then
           INR (RevertCompletion [])
         else INL (ReferenceValue (CalldataReference (base + offset)
-                    (calldata_length element) element), free)
+                    (calldata_length element) element), free, MAX reach (head + 32))
     | LocatedT MemoryLoc element =>
-        decode_memory_part env (LENGTH env.type_declarations) element bs 0 head free
-    | _ => decode_memory_value env (LENGTH env.type_declarations) ty bs head free
+        decode_memory_part env (LENGTH env.type_declarations) element bs total bound 0 head free
+          reach
+    | _ => decode_memory_value env (LENGTH env.type_declarations) ty bs total bound head free reach
 End
 
 Definition decode_abi_arguments_def:
-  (decode_abi_arguments env [] bs head base free = INL []) ∧
-  (decode_abi_arguments env (ty :: tys) bs head base free =
-    case decode_abi_argument env ty bs head base free of
+  (decode_abi_arguments env [] bs total bound head base free reach = INL ([], reach)) ∧
+  (decode_abi_arguments env (ty :: tys) bs total bound head base free reach =
+    case decode_abi_argument env ty bs total bound head base free reach of
       INR c => INR c
-    | INL (v, next) =>
-        case decode_abi_arguments env tys bs (head + abi_stride env ty) base next of
-          INL vs => INL (v :: vs)
+    | INL (v, next, reach1) =>
+        case decode_abi_arguments env tys bs total bound (head + abi_stride env ty) base next
+               reach1 of
+          INL (vs, reach2) => INL (v :: vs, reach2)
         | INR c => INR c)
+End
+
+(* Arguments decoded from an input of total bytes, of which bs holds the
+ * leading ones; the rest read as zeros. Memory is decoded in place this way,
+ * as the compiler's decoder reads only the words it needs; with the
+ * arguments comes the end of the input it read. Data reaching past bound is
+ * left unsupported (decode_memory_value). *)
+Definition decode_input_def:
+  decode_input env tys bs total bound base free =
+    if head_lengths (abi_types env (LENGTH env.type_declarations) tys) 0 > total then
+      INR (RevertCompletion [])
+    else decode_abi_arguments env tys bs total bound 0 base free 0
 End
 
 Definition decode_arguments_def:
   decode_arguments env tys bs base free =
-    if head_lengths (abi_types env (LENGTH env.type_declarations) tys) 0 > LENGTH bs then
-      INR (RevertCompletion [])
-    else decode_abi_arguments env tys bs 0 base free
+    case decode_input env tys bs (LENGTH bs) (LENGTH bs) base free of
+      INL (vs, _) => INL vs
+    | INR c => INR c
 End
 
-(* A decoded memory value as heap objects, allocated in decoding order: an
- * array or struct before its elements or fields. Storage byte copies retain
- * unknown padding; calldata copies zero it. Keep the source location through
- * nested arrays and structs. *)
+(* A decoded value written to memory as the compiler's abi_decode functions write
+ * it, allocating in decoding order: an array or struct, its length word if
+ * dynamic, then each element or field, a reference one allocated before its
+ * pointer is stored; a byte sequence copied with cleanup. *)
 Definition materialize_value_def:
-  (materialize_value env loc ty v (st : source_state) =
+  (materialize_value env ty v (st : source_state) =
     case (ty, v) of
       (ArrayT element length, TupleValue vs) =>
         let n = LENGTH vs in
-        let id = st.next_heap_id + 1 in
-        let obj = <| object_type := ty; object_length := n;
-                     object_cells := FEMPTY;
-                     object_address := 128 + st.memory_allocated;
-                     object_padded := T |> in
-        let st1 = st with <| heap := st.heap |+ (id, obj); next_heap_id := id;
-                     memory_allocated := st.memory_allocated +
-                       (if length = NONE then 32 else 0) + 32 * n |> in
-        (case materialize_values env loc element 0 vs FEMPTY st1 of
-           SOME (cells, st2) =>
-             SOME (ReferenceValue (MemoryReference (HeapId id) 0 ty),
-                   st2 with heap := st2.heap |+ (id, obj with object_cells := cells))
-         | NONE => NONE)
+        (case allocate_memory ((if length = NONE then 32 else 0) + 32 * n) st of
+           INR c => INR c
+         | INL (p, st1) =>
+             let st2 = if length = NONE then memory_store p n st1 else st1 in
+             (case materialize_words env (REPLICATE n element) vs
+                     (if length = NONE then p + 32 else p) st2 of
+                INL st3 => INL (ReferenceValue (MemoryReference p ty), st3)
+              | INR c => INR c))
     | (StructT s, TupleValue vs) =>
         (case lookup_struct env s of
            SOME fields =>
-             let n = LENGTH vs in
-             let id = st.next_heap_id + 1 in
-             let obj = <| object_type := ty; object_length := n;
-                          object_cells := FEMPTY;
-                          object_address := 128 + st.memory_allocated;
-                          object_padded := T |> in
-             let st1 = st with <| heap := st.heap |+ (id, obj); next_heap_id := id;
-                          memory_allocated := st.memory_allocated + 32 * n |> in
-             (case materialize_fields env loc (MAP SND fields) 0 vs FEMPTY st1 of
-                SOME (cells, st2) =>
-                  SOME (ReferenceValue (MemoryReference (HeapId id) 0 ty),
-                        st2 with heap := st2.heap |+ (id, obj with object_cells := cells))
-              | NONE => NONE)
-         | NONE => NONE)
+             (case allocate_memory (32 * LENGTH vs) st of
+                INR c => INR c
+              | INL (p, st1) =>
+                  (case materialize_words env (MAP SND fields) vs p st1 of
+                     INL st2 => INL (ReferenceValue (MemoryReference p ty), st2)
+                   | INR c => INR c))
+         | NONE => INR (InvalidCompletion "unknown struct"))
     | (_, ScalarValue (BytesValue bs)) =>
-        if byte_sequence_type ty then SOME (allocate_bytes (loc ≠ StorageLoc) ty bs st)
-        else SOME (v, st)
-    | (_, ScalarValue _) => SOME (v, st)
-    | _ => NONE) ∧
-  (materialize_values env loc element i [] cells st = SOME (cells, st)) ∧
-  (materialize_values env loc element i (v :: vs) cells st =
-    case materialize_value env loc element v st of
-      SOME (value, st1) =>
-        materialize_values env loc element (i + 1) vs (cells |+ (i, value)) st1
-    | NONE => NONE) ∧
-  (materialize_fields env loc [] i [] cells st = SOME (cells, st)) ∧
-  (materialize_fields env loc (ty :: tys) i (v :: vs) cells st =
-    case materialize_value env loc ty v st of
-      SOME (value, st1) =>
-        materialize_fields env loc tys (i + 1) vs (cells |+ (i, value)) st1
-    | NONE => NONE) ∧
-  (materialize_fields env loc _ i _ cells st = NONE)
+        if byte_sequence_type ty then
+          (case new_byte_array bs st of
+             INL (p, st1) => INL (ReferenceValue (MemoryReference p ty), st1)
+           | INR c => INR c)
+        else INL (v, st)
+    | (_, ScalarValue _) => INL (v, st)
+    | _ => INR (InvalidCompletion "bad decoded value")) ∧
+  (materialize_words env [] [] p st = INL st) ∧
+  (materialize_words env (ty :: tys) (v :: vs) p st =
+    case materialize_value env ty v st of
+      INR c => INR c
+    | INL (value, st1) =>
+        case write_memory_word env ty p value st1 of
+          INR c => INR c
+        | INL st2 => materialize_words env tys vs (p + 32) st2) ∧
+  (materialize_words env _ _ p st = INR (InvalidCompletion "bad decoded value"))
 Termination
   WF_REL_TAC ‘measure (λx. case x of
-    INL (env, loc, ty, v, st) => runtime_value_size v
-  | INR (INL (env, loc, element, i, vs, cells, st)) => list_size runtime_value_size vs
-  | INR (INR (env, loc, tys, i, vs, cells, st)) => list_size runtime_value_size vs)’ >>
+    INL (env, ty, v, st) => runtime_value_size v
+  | INR (env, tys, vs, p, st) => list_size runtime_value_size vs)’ >>
   rw[solidityCoreTheory.runtime_value_size_def, listTheory.list_size_def]
 End
 
-(* Decoded memory payloads become heap objects before a procedure sees them.
+(* A storage array, struct or byte sequence copied to new memory, as the
+ * compiler's storage-to-memory copies do. A byte sequence or an array of
+ * scalars is written at the free memory pointer first and its allocation
+ * finalized after, as the compiled copy encodes at allocate_unbounded() and
+ * then calls finalize_allocation; an array of references or a struct is
+ * allocated before its members. Scalars are read cleaned, and a byte
+ * sequence keeps whole data words (storage_byte_data); an empty one still
+ * writes its slot's word after its length, past the allocation. The fuel
+ * bounds the struct nesting. *)
+Definition materialize_storage_def:
+  (materialize_storage env (fuel : num) accounts addr slot ty st =
+    if byte_sequence_type ty then
+      (case storage_byte_length accounts addr slot of
+         INR c => INR c
+       | INL length =>
+           if 2 ** 64 ≤ length then INR (PanicCompletion 65) else
+           let (p, st1) = memory_load 64 st in
+           case finalize_allocation p ((length + 31) DIV 32 * 32 + 32)
+                  (memory_write (p + 32)
+                     (storage_byte_data accounts addr slot length)
+                     (memory_store p length st1)) of
+             INR c => INR c
+           | INL st2 => INL (ReferenceValue (MemoryReference p ty), st2))
+    else case ty of
+      ArrayT element l =>
+        (case storage_array_data accounts addr slot ty of
+           (length, data) =>
+             if 2 ** 64 ≤ length then INR (PanicCompletion 65) else
+             let size = (if l = NONE then 32 else 0) + 32 * length;
+                 scalars = is_stored_scalar_type element in
+             case (if scalars then INL (memory_load 64 st)
+                   else allocate_memory size st) of
+               INR c => INR c
+             | INL (p, st1) =>
+                 let st2 = if l = NONE then memory_store p length st1 else st1 in
+                 case materialize_storage_elements env fuel accounts addr data element
+                        0 length (if l = NONE then p + 32 else p) st2 of
+                   INL st3 =>
+                     (case (if scalars then finalize_allocation p size st3
+                            else INL st3) of
+                        INL st4 => INL (ReferenceValue (MemoryReference p ty), st4)
+                      | INR c => INR c)
+                 | INR c => INR c)
+    | StructT s =>
+        (case (lookup_struct env s, lookup_struct_layout env s) of
+           (SOME fields, SOME layout) =>
+             if fuel = 0 then INR (InvalidCompletion "struct nesting") else
+             (case allocate_memory (32 * LENGTH fields) st of
+                INR c => INR c
+              | INL (p, st1) =>
+                  case materialize_storage_fields env (fuel - 1) accounts addr slot
+                         layout.struct_fields fields p st1 of
+                    INL st2 => INL (ReferenceValue (MemoryReference p ty), st2)
+                  | INR c => INR c)
+         | _ => INR (InvalidCompletion "missing struct layout"))
+    | _ => INR (InvalidCompletion "bad storage array type")) ∧
+  (materialize_storage_elements env fuel accounts addr data element i n q st =
+    if n = 0 then INL st else
+    case storage_element_location env data element i of
+      NONE => INR (InvalidCompletion "bad array element type")
+    | SOME (s, offset) =>
+        let value =
+          if is_stored_scalar_type element then
+            (case read_storage env accounts addr s offset element of
+               SOME v => INL (ScalarValue v, st)
+             | NONE => INR (InvalidCompletion "bad storage read"))
+          else materialize_storage env fuel accounts addr s element st in
+        case value of
+          INR c => INR c
+        | INL (v, st1) =>
+            case write_memory_word env element q v st1 of
+              INR c => INR c
+            | INL st2 =>
+                materialize_storage_elements env fuel accounts addr data element
+                  (i + 1) (n - 1) (q + 32) st2) ∧
+  (materialize_storage_fields env fuel accounts addr slot layout [] q st = INL st) ∧
+  (materialize_storage_fields env fuel accounts addr slot layout ((f, ty) :: fields) q st =
+    case ALOOKUP (MAP (λv. (v.state_id, v)) layout) f of
+      NONE => INR (InvalidCompletion "missing field layout")
+    | SOME v =>
+        let s = slot + v.state_slot in
+        let value =
+          if is_stored_scalar_type ty then
+            (case read_storage env accounts addr s v.state_offset ty of
+               SOME x => INL (ScalarValue x, st)
+             | NONE => INR (InvalidCompletion "bad storage read"))
+          else materialize_storage env fuel accounts addr s ty st in
+        case value of
+          INR c => INR c
+        | INL (x, st1) =>
+            case write_memory_word env ty q x st1 of
+              INR c => INR c
+            | INL st2 =>
+                materialize_storage_fields env fuel accounts addr slot layout fields
+                  (q + 32) st2)
+Termination
+  WF_REL_TAC ‘inv_image ($< LEX $< LEX $<) (λx. case x of
+    INL (env, fuel, accounts, addr, slot, ty, st) => (fuel, sol_type_size ty, 0)
+  | INR (INL (env, fuel, accounts, addr, data, element, i, n, q, st)) =>
+      (fuel, sol_type_size element, n + 1)
+  | INR (INR (env, fuel, accounts, addr, slot, layout, fields, q, st)) =>
+      (fuel, list_size (sol_type_size o SND) fields, 1))’ >>
+  rw[solidityASTTheory.sol_type_size_def, listTheory.list_size_def]
+End
+
+(* Decoded memory payloads are written to memory before a procedure sees them.
  * Calldata payloads retain slices into the frame's original call_data. *)
 Definition materialize_arguments_def:
-  (materialize_arguments env [] [] st = SOME ([], st)) ∧
+  (materialize_arguments env [] [] st = INL ([], st)) ∧
   (materialize_arguments env (ty :: tys) (v :: vs) st =
     case (case ty of
-            LocatedT MemoryLoc element => materialize_value env CalldataLoc element v st
-          | _ => SOME (v, st)) of
-      SOME (value, st1) =>
+            LocatedT MemoryLoc element => materialize_value env element v st
+          | _ => INL (v, st)) of
+      INL (value, st1) =>
         (case materialize_arguments env tys vs st1 of
-           SOME (values, st2) => SOME (value :: values, st2)
-         | NONE => NONE)
-    | NONE => NONE) ∧
-  (materialize_arguments _ _ _ _ = NONE)
+           INL (values, st2) => INL (value :: values, st2)
+         | INR c => INR c)
+    | INR c => INR c) ∧
+  (materialize_arguments _ _ _ _ = INR (InvalidCompletion "bad decoded arguments"))
 End
 
 (* Revert data of Panic(uint256), selector 0x4e487b71. *)
@@ -831,38 +1105,56 @@ End
  * struct hashes its in-place encoding, a byte sequence its bytes; a scalar
  * topic is its ABI word. *)
 Definition event_parts_def:
-  (event_parts env st [] = INL ([], [])) ∧
+  (event_parts env st [] = INL (([], [], NONE, []), st)) ∧
   (event_parts env st ((ty, indexed, v) :: args) =
     case runtime_abi_value env st ty v of
       INR c => INR c
-    | INL (a, encoded_body) =>
-      (case event_parts env st args of
+    | INL ((a, encoded_body, sp), st1) =>
+      (case event_parts env st1 args of
          INR c => INR c
-       | INL (topics, parts) =>
+       | INL ((topics, parts, spill, temps), st2) =>
         let t = abi_type env (LENGTH env.type_declarations) ty in
+        let composite = (case t of Array _ _ => T | Tuple _ => T | _ => F) in
         if indexed then
+          let src = encoding_source v in
+          if composite ∧ src = StoredBytes ∧ inplace_spill src t a ≠ 0 then
+            INR (InvalidCompletion
+                   "unsupported: an indexed stored array or struct ending in empty bytes")
+          else
+          (* the topic, and the bytes hashed for it at the free memory pointer *)
           let topic =
-            if (case t of Array _ _ => T | Tuple _ => T | _ => F) then
-              OPTION_MAP (λbs. word_of_bytes_be (Keccak_256_w64 bs))
+            if composite then
+              OPTION_MAP (λbs. (word_of_bytes_be (Keccak_256_w64 bs),
+                                [bs ++ REPLICATE (inplace_spill src t a) 0w]))
                 (indexed_data t a encoded_body)
             else case a of
               BytesV bs =>
-                SOME (if is_dynamic t then word_of_bytes_be (Keccak_256_w64 bs)
-                      else word_of_bytes T (0w : bytes32) encoded_body)
-            | _ => SOME (word_of_bytes T (0w : bytes32) encoded_body) in
+                SOME (if is_dynamic t then
+                        (word_of_bytes_be (Keccak_256_w64 bs),
+                         [bs ++ packed_bytes_tail st1.world.accounts v bs])
+                      else (word_of_bytes T (0w : bytes32) encoded_body, []))
+            | _ => SOME (word_of_bytes T (0w : bytes32) encoded_body, []) in
           (case topic of
-             SOME word => INL (word :: topics, parts)
+             SOME (word, temp) => INL ((word :: topics, parts, spill, temp ++ temps), st2)
            | NONE => INR (InvalidCompletion "bad indexed event argument"))
-        else INL (topics, (t, encoded_body) :: parts)))
+        else INL ((topics, (t, encoded_body) :: parts, later_spill t sp spill, temps), st2)))
 End
 
+(* The compiled emit reads the indexed arguments for their topics before it
+ * encodes the others as the log's data. *)
 Definition event_log_def:
   event_log env st logger topic0 args =
-    case event_parts env st args of
-      INL (topics, parts) =>
-        INL <| logger := logger;
-               topics := (case topic0 of SOME t => t :: topics | NONE => topics);
-               data := encoded_abi_tuple parts |>
+    case event_parts env (st with memory_size := 0)
+           (FILTER (λ(ty, indexed, v). indexed) args ++
+            FILTER (λ(ty, indexed, v). ¬indexed) args) of
+      INL ((topics, parts, spill, temps), st1) =>
+        (case encoder_state st st1 of
+           INL st2 =>
+             INL ((<| logger := logger;
+                      topics := (case topic0 of SOME t => t :: topics | NONE => topics);
+                      data := encoded_abi_tuple parts |>,
+                   (case spill of SOME sp => sp | NONE => []), temps), st2)
+         | INR c => INR c)
     | INR c => INR c
 End
 
@@ -901,6 +1193,8 @@ QED
 val () = cv_auto_trans abi_runtime_value_def;
 val () = cv_auto_trans abi_runtime_values_def;
 val () = cv_auto_trans abi_word_def;
+val () = cv_auto_trans input_bytes_def;
+val () = cv_auto_trans input_word_def;
 val () = cv_auto_trans abi_stride_def;
 val () = cv_auto_trans abi_head_size_def;
 val () = cv_auto_trans calldata_length_def;
@@ -932,6 +1226,14 @@ Proof
 QED
 val () = cv_auto_trans encoded_abi_parts_def;
 val () = cv_auto_trans encoded_abi_tuple_def;
+val last_spill_pre_def = cv_auto_trans_pre "last_spill_pre" last_spill_def;
+
+Theorem last_spill_pre[cv_pre,local]:
+  ∀ps. last_spill_pre ps
+Proof
+  Induct >> rw[Once last_spill_pre_def]
+QED
+
 val storage_abi_value_pre_def = cv_auto_trans_pre_rec
   "storage_abi_value_pre storage_abi_elements_pre storage_abi_fields_pre"
   storage_abi_value_def (
@@ -955,6 +1257,54 @@ Proof
   simp[Once storage_abi_value_pre_def] >> rw[] >> gvs[]
 QED
 val () = cv_auto_trans array_copy_value_def;
+val () = cv_auto_trans encoding_source_def;
+val () = cv_auto_trans padded_bytes_spill_def;
+val () = cv_auto_trans later_spill_def;
+val abi_spill_pre_def = cv_auto_trans_pre_rec "abi_spill_pre parts_spill_pre" abi_spill_def (
+  WF_REL_TAC ‘measure (λx. case x of
+    INL (src, t, v) => cv_size v
+  | INR (src, ts, vs) => cv_size vs)’ >>
+  cv_termination_tac
+);
+
+Theorem abi_spill_pre[cv_pre]:
+  (∀src t v. abi_spill_pre src t v) ∧ (∀src ts vs. parts_spill_pre src ts vs)
+Proof
+  ho_match_mp_tac abi_spill_ind >> rpt strip_tac >>
+  simp[Once abi_spill_pre_def] >> rw[] >> gvs[]
+QED
+
+val () = cv_auto_trans packed_bytes_tail_def;
+val () = cv_auto_trans packed_tail_def;
+val inplace_length_pre_def = cv_auto_trans_pre_rec
+  "inplace_length_pre inplace_lengths_pre" inplace_length_def (
+  WF_REL_TAC ‘measure (λx. case x of
+    INL (t, v) => cv_size v
+  | INR (ts, vs) => cv_size vs)’ >>
+  cv_termination_tac
+);
+
+Theorem inplace_length_pre[cv_pre]:
+  (∀t v. inplace_length_pre t v) ∧ (∀ts vs. inplace_lengths_pre ts vs)
+Proof
+  ho_match_mp_tac inplace_length_ind >> rpt strip_tac >>
+  simp[Once inplace_length_pre_def] >> rw[] >> gvs[]
+QED
+
+val inplace_spill_pre_def = cv_auto_trans_pre_rec
+  "inplace_spill_pre inplace_parts_spill_pre" inplace_spill_def (
+  WF_REL_TAC ‘measure (λx. case x of
+    INL (src, t, v) => cv_size v
+  | INR (src, ts, vs) => cv_size vs)’ >>
+  cv_termination_tac
+);
+
+Theorem inplace_spill_pre[cv_pre]:
+  (∀src t v. inplace_spill_pre src t v) ∧ (∀src ts vs. inplace_parts_spill_pre src ts vs)
+Proof
+  ho_match_mp_tac inplace_spill_ind >> rpt strip_tac >>
+  simp[Once inplace_spill_pre_def] >> rw[] >> gvs[]
+QED
 val () = cv_auto_trans runtime_abi_value_def;
 val runtime_abi_values_pre_def =
   cv_auto_trans_pre "runtime_abi_values_pre" runtime_abi_values_def;
@@ -966,6 +1316,7 @@ Proof
   simp[Once runtime_abi_values_pre_def] >> rw[] >> gvs[]
 QED
 
+val () = cv_auto_trans encoder_state_def;
 val () = cv_auto_trans encoded_runtime_values_def;
 val () = cv_auto_trans packed_value_def;
 val packed_values_pre_def =
@@ -977,13 +1328,14 @@ Proof
   ho_match_mp_tac packed_values_ind >> rpt strip_tac >>
   simp[Once packed_values_pre_def] >> rw[] >> gvs[]
 QED
-val () = cv_auto_trans memory_free_pointer_def;
+
+val () = cv_auto_trans packed_encoding_def;
 val decode_memory_value_pre_def = cv_auto_trans_pre_rec
   "decode_memory_value_pre decode_memory_elements_pre decode_memory_fields_pre decode_memory_part_pre"
   decode_memory_value_def (
   WF_REL_TAC ‘inv_image ($< LEX $< LEX $<) (λx. case x of
     INL (_, fuel, ty, _) => (cv$c2n fuel, cv_size ty, 1)
-  | INR (INL (_, fuel, element, _, _, _, n, _)) =>
+  | INR (INL (_, fuel, element, _, _, _, _, _, n, _)) =>
       (cv$c2n fuel, cv_size element, cv$c2n n + 3)
   | INR (INR (INL (_, fuel, tys, _))) =>
       (cv$c2n fuel, cv_size tys, 0)
@@ -993,56 +1345,63 @@ val decode_memory_value_pre_def = cv_auto_trans_pre_rec
 );
 
 Theorem decode_memory_value_pre[cv_pre]:
-  (∀env fuel ty bs pos free. decode_memory_value_pre env fuel ty bs pos free) ∧
-  (∀env fuel element bs data i n free.
-     decode_memory_elements_pre env fuel element bs data i n free) ∧
-  (∀env fuel tys bs base src free. decode_memory_fields_pre env fuel tys bs base src free) ∧
-  (∀env fuel ty bs base src free. decode_memory_part_pre env fuel ty bs base src free)
+  (∀env fuel ty bs total bound pos free reach.
+     decode_memory_value_pre env fuel ty bs total bound pos free reach) ∧
+  (∀env fuel element bs total bound data i n free reach.
+     decode_memory_elements_pre env fuel element bs total bound data i n free reach) ∧
+  (∀env fuel tys bs total bound base src free reach.
+     decode_memory_fields_pre env fuel tys bs total bound base src free reach) ∧
+  (∀env fuel ty bs total bound base src free reach.
+     decode_memory_part_pre env fuel ty bs total bound base src free reach)
 Proof
   ho_match_mp_tac decode_memory_value_ind >> rpt strip_tac >>
   simp[Once decode_memory_value_pre_def] >> rw[] >> gvs[]
 QED
 val () = cv_auto_trans copy_calldata_array_def;
-val memory_value_size_pre_def = cv_auto_trans_pre_rec
-  "memory_value_size_pre memory_values_size_pre memory_fields_size_pre" memory_value_size_def (
-  WF_REL_TAC ‘measure (λx. case x of
-    INL (env, ty, v) => cv_size v
-  | INR (INL (env, element, vs)) => cv_size vs
-  | INR (INR (env, tys, vs)) => cv_size vs)’ >>
-  cv_termination_tac
-);
-
-Theorem memory_value_size_pre[cv_pre]:
-  (∀env ty v. memory_value_size_pre env ty v) ∧
-  (∀env element vs. memory_values_size_pre env element vs) ∧
-  (∀env tys vs. memory_fields_size_pre env tys vs)
-Proof
-  ho_match_mp_tac memory_value_size_ind >> rpt strip_tac >>
-  simp[Once memory_value_size_pre_def] >> rw[] >> gvs[]
-QED
-
 val () = cv_auto_trans decode_abi_argument_def;
 val () = cv_auto_trans decode_abi_arguments_def;
+val () = cv_auto_trans decode_input_def;
 val () = cv_auto_trans decode_arguments_def;
-val materialize_value_pre_def = cv_auto_trans_pre_rec "materialize_value_pre materialize_values_pre materialize_fields_pre" materialize_value_def (
+val materialize_value_pre_def = cv_auto_trans_pre_rec
+  "materialize_value_pre materialize_words_pre" materialize_value_def (
   WF_REL_TAC ‘measure (λx. case x of
-    INL (env, loc, ty, v, st) => cv_size v
-  | INR (INL (env, loc, element, i, vs, cells, st)) => cv_size vs
-  | INR (INR (env, loc, tys, i, vs, cells, st)) => cv_size vs)’ >>
+    INL (env, ty, v, st) => cv_size v
+  | INR (env, tys, vs, p, st) => cv_size vs)’ >>
   cv_termination_tac
 );
 
 Theorem materialize_value_pre[cv_pre]:
-  (∀env loc ty v st. materialize_value_pre env loc ty v st) ∧
-  (∀env loc element i vs cells st. materialize_values_pre env loc element i vs cells st) ∧
-  (∀env loc tys i vs cells st. materialize_fields_pre env loc tys i vs cells st)
+  (∀env ty v st. materialize_value_pre env ty v st) ∧
+  (∀env tys vs p st. materialize_words_pre env tys vs p st)
 Proof
   ho_match_mp_tac materialize_value_ind >> rpt strip_tac >>
-  simp[Once materialize_value_pre_def] >> rw[] >> gvs[] >>
-  (* record updates appear as cases on the state *)
-  Cases_on ‘st’ >>
-  gvs[solidityStateTheory.source_state_fn_updates, solidityMemoryTheory.heap_object_literal]
+  simp[Once materialize_value_pre_def] >> rw[] >> gvs[]
 QED
+
+val materialize_storage_pre_def = cv_auto_trans_pre_rec
+  "materialize_storage_pre materialize_storage_elements_pre materialize_storage_fields_pre"
+  materialize_storage_def (
+  WF_REL_TAC ‘inv_image ($< LEX $< LEX $<) (λx. case x of
+    INL (env, fuel, accounts, addr, slot, ty, st) => (cv$c2n fuel, cv_size ty, 0)
+  | INR (INL (env, fuel, accounts, addr, data, element, i, n, q, st)) =>
+      (cv$c2n fuel, cv_size element, cv$c2n n + 1)
+  | INR (INR (env, fuel, accounts, addr, slot, layout, fields, q, st)) =>
+      (cv$c2n fuel, cv_size fields, 1))’ >>
+  cv_termination_tac
+);
+
+Theorem materialize_storage_pre[cv_pre]:
+  (∀env fuel accounts addr slot ty st.
+     materialize_storage_pre env fuel accounts addr slot ty st) ∧
+  (∀env fuel accounts addr data element i n q st.
+     materialize_storage_elements_pre env fuel accounts addr data element i n q st) ∧
+  (∀env fuel accounts addr slot layout fields q st.
+     materialize_storage_fields_pre env fuel accounts addr slot layout fields q st)
+Proof
+  ho_match_mp_tac materialize_storage_ind >> rpt strip_tac >>
+  simp[Once materialize_storage_pre_def] >> rw[] >> gvs[]
+QED
+
 val materialize_arguments_pre_def =
   cv_auto_trans_pre "materialize_arguments_pre" materialize_arguments_def;
 

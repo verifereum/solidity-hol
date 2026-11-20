@@ -624,8 +624,9 @@ Definition low_level_external_kind_def:
   (low_level_external_kind LowLevelDelegateCall = ExternalDelegateCall)
 End
 
-(* The data of a low-level call is packed where it is: a memory, calldata
- * or storage bytes or a bytes literal, never copied into allocated memory. *)
+(* The data of a low-level call: a memory, calldata or storage bytes or a
+ * bytes literal. Memory data is sent from where it is; the evaluator packs
+ * any other at the free memory pointer, as the compiled call does. *)
 Definition low_level_data_def:
   low_level_data a vt =
     case (a, vt) of
@@ -755,6 +756,14 @@ End
 Definition encoded_as_def:
   (encoded_as [] = []) ∧
   (encoded_as (ty :: tys) = EncodedAs ty :: encoded_as tys)
+End
+
+(* A builtin's operands as conversion targets: a value operand to its type,
+ * one read in place as encoded for its type. *)
+Definition builtin_targets_def:
+  (builtin_targets [] = []) ∧
+  (builtin_targets (ValueOperand ty :: ops) = ValueOf ty :: builtin_targets ops) ∧
+  (builtin_targets (InPlaceOperand ty :: ops) = EncodedAs ty :: builtin_targets ops)
 End
 
 Definition expr_ids_def:
@@ -925,17 +934,17 @@ Definition return_ids_def:
     | _ => REPLICATE len (expr_id e)
 End
 
-(* A builtin on its operands' values, each converted to its operand type.
+(* A builtin on its operands' values, each converted to its operand's target.
  * The hash of a literal is a constant, as the compiler folds it without
  * allocating memory. *)
 Definition elab_builtin_def:
   elab_builtin n id ids op vs =
-    let (operand_tys, result) = builtin_signature op in
+    let (operands, result) = builtin_signature op in
     case (op, vs) of
       (Keccak256Builtin, [(ConstantAtom (BytesValue bs), ElabBytesLiteral)]) =>
         INL (([], ConstantAtom (BytesValue (Keccak_256_w64 bs))), n)
     | _ =>
-      case convert_operands n id ids (values_of operand_tys) vs of
+      case convert_operands n id ids (builtin_targets operands) vs of
         INL (cs, _, atoms, n1) =>
           let (rs, r) = bind_value n1 result (BuiltinOperation op atoms) in
           INL ((cs ++ rs, r), n1 + 1)
@@ -1147,7 +1156,7 @@ Definition computed_struct_layouts_def:
   (computed_struct_layouts (SUC n) structs =
     let layouts = computed_struct_layouts n structs in
     let env = <| procedures := []; state_variables := []; immutables := [];
-                 type_declarations := [];
+                 function_ids := []; type_declarations := [];
                  struct_layouts := MAP (λs. (s.struct_id, s)) layouts |> in
     FLAT (MAP (λs.
       case computed_struct_fields env 0 0 s.struct_members of
@@ -1199,13 +1208,13 @@ Definition located_binding_ok_def:
            (SOME decls, SOME layouts) =>
              storage_type_ok <| procedures := []; state_variables := []; immutables := [];
                                 struct_layouts := MAP (λs. (s.struct_id, s)) layouts;
-                                type_declarations := decls |> element
+                                function_ids := []; type_declarations := decls |> element
          | _ => F)
     | LocatedT _ element =>
         (case elab_type_declarations enums structs of
            SOME decls =>
              memory_type_ok <| procedures := []; state_variables := []; immutables := [];
-                               struct_layouts := []; type_declarations := decls |>
+                               struct_layouts := []; function_ids := []; type_declarations := decls |>
                (LENGTH decls) element
          | NONE => F)
     | _ => T
@@ -1227,7 +1236,7 @@ Definition abi_binding_ok_def:
     case elab_type_declarations enums structs of
       SOME decls =>
         abi_type_ok <| procedures := []; state_variables := []; immutables := [];
-                       struct_layouts := []; type_declarations := decls |> ty
+                       struct_layouts := []; function_ids := []; type_declarations := decls |> ty
     | NONE => F
 End
 
@@ -1238,7 +1247,7 @@ Definition static_binding_ok_def:
     case elab_type_declarations enums structs of
       SOME decls =>
         static_object_type <| procedures := []; state_variables := []; immutables := [];
-                              struct_layouts := []; type_declarations := decls |>
+                              struct_layouts := []; function_ids := []; type_declarations := decls |>
           (LENGTH decls) ty
     | NONE => F
 End
@@ -1602,7 +1611,7 @@ Definition elab_expr_def:
                      (case function_value_type callee tid of
                         SOME ty =>
                           INL (([], ConstantAtom (InternalFunctionValue
-                                      (SOME (AstId callee.fn_info.node_id))),
+                                      (INL (AstId callee.fn_info.node_id))),
                                 ElabType ty), n)
                       | NONE => INR [(info.node_id, "unsupported function value")])
                  | NONE => unknown_reference ctx info.node_id "unsupported identifier" x)
@@ -2256,7 +2265,7 @@ Definition elab_expr_def:
               | INR bs => INR bs)
          | INR _ =>
              INR (elab_arg_failures ctx n
-                    (some_targets (values_of (FST (builtin_signature op)))) args))
+                    (some_targets (builtin_targets (FST (builtin_signature op)))) args))
     | SrcModular info _ op args tid =>
         (* the operands in order, then the modulus check and the operation *)
         ensure (source_type_matches (UintT 256) tid) (info.node_id, "type annotation mismatch")
@@ -2988,7 +2997,7 @@ Definition elab_enum_environment_def:
   elab_enum_environment ctx =
     <| procedures := []; state_variables := []; immutables := [];
        struct_layouts := [];
-       type_declarations :=
+       function_ids := []; type_declarations :=
          MAP (λ(id, members). (AstId id, EnumDeclaration members)) ctx.enums |>
 End
 
@@ -3001,14 +3010,9 @@ Definition elab_assembly_reference_def:
         else
           (case ty of
              LocatedT MemoryLoc t =>
-               (case elab_type_declarations ctx.enums ctx.structs of
-                  SOME decls =>
-                    if assembly_memory_type
-                         <| procedures := []; state_variables := []; immutables := [];
-                            struct_layouts := []; type_declarations := decls |> t
-                    then INL (([], AssemblyMemory (AstId x) t), n)
-                    else INR [(id, "assembly reference of this type")]
-                | NONE => INR [(id, "assembly reference of this type")])
+               if located_object_shape MemoryLoc t
+               then INL (([], AssemblyMemory (AstId x) t), n)
+               else INR [(id, "assembly reference of this type")]
            | LocatedT CalldataLoc t =>
                if located_object_shape CalldataLoc t ∧ ¬calldata_slice_type t then
                  INL (([], AssemblyCalldataOffset (AstId x)), n)
@@ -3366,8 +3370,6 @@ Definition elab_stmts_def:
                ¬assembly_stmts_ok (YReturn :: YStop :: assembly_unsupported) code
        then [(info.node_id, "assembly halt in a constructor")]
        else []) ++
-      (if assembly_memory_ok code then []
-       else [(info.node_id, "unsupported assembly memory use")]) ++
       (if assembly_gas_ok code then []
        else [(info.node_id, "unsupported assembly gas or return data use")]) ++
       (if ALL_DISTINCT (MAP FST refs) then []
@@ -4037,6 +4039,8 @@ Definition elaborate_contract_def:
                 state_variables := cvs;
                 immutables := MAP (λ(x, ty). (AstId x, ty)) immutables;
                 struct_layouts := layouts; type_declarations := decls;
+                function_ids :=
+                  MAP (λ(x, n). (AstId x, n)) c.contract_function_ids;
                 entry_procedure :=
                   (case ps of
                      p :: _ => p.procedure_id
@@ -4282,6 +4286,7 @@ val () = cv_auto_trans builtin_result_def;
 
 val () = cv_auto_trans values_of_def;
 val () = cv_auto_trans encoded_as_def;
+val () = cv_auto_trans builtin_targets_def;
 val () = cv_auto_trans expr_ids_def;
 val () = cv_auto_trans abi_argument_def;
 val () = cv_auto_trans convert_operand_def;

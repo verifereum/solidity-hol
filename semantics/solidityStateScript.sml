@@ -31,25 +31,6 @@ Datatype:
   |>
 End
 
-(* Addressable heap objects: references carry identity and a captured offset.
- * Byte sequences use the length and byte cells; other heap values are deferred.
- * object_address is the memory address the compiler's allocator gives the
- * object (the free memory pointer when it is allocated), which inline
- * assembly sees as the reference's value. object_padded says the compiler's
- * memory holds zeros from a byte sequence's last byte to its word boundary,
- * as the compiler's allocations write it; a copy of return data leaves what
- * was there before.
- *)
-Datatype:
-  heap_object = <|
-    object_type : sol_type;
-    object_length : num;
-    object_cells : num |-> runtime_value;
-    object_address : num;
-    object_padded : bool
-  |>
-End
-
 Datatype:
   source_frame = <|
     self_address : address;
@@ -62,11 +43,15 @@ Datatype:
   |>
 End
 
-(* Scopes, heap and targets are num-keyed finite maps (scopes and targets keyed
- * by the ast_id's number), which cv encodes as sptrees. Scopes are innermost
- * first. The immutables are the values of the contract's immutables, keyed by
- * their declarations: those the deployed code holds, or, during creation, those
- * the constructor has assigned so far; one not there is zero. The return
+(* Scopes and targets are num-keyed finite maps (keyed by the ast_id's
+ * number), which cv encodes as sptrees. Memory is the frame's EVM memory, a
+ * byte per address (absent bytes are zero) with its active size, as the
+ * compiled code sees it: the free memory pointer is the word at 0x40, and
+ * memory references are addresses in it. Scopes are innermost
+ * first. The immutables are the values of the contract's immutables the
+ * deployed code holds, keyed by their declarations (one not there is zero);
+ * NONE during creation, where they are words in the frame's reserved memory
+ * instead, as the compiled constructor keeps them. The return
  * data is the frame's return data buffer, the last message call's return or
  * revert bytes, where the source knows it: NONE after a call whose return data
  * the source computes no bytes for (the ecrecover precompile).
@@ -75,11 +60,10 @@ Datatype:
   source_state = <|
     world : source_world;
     frame : source_frame;
-    immutables : num |-> scalar;
+    immutables : (num |-> scalar) option;
     scopes : (num |-> source_binding) list;
-    heap : num |-> heap_object;
-    next_heap_id : num;
-    memory_allocated : num;
+    memory : num |-> word8;
+    memory_size : num;
     targets : num |-> captured_target;
     return_data : byte list option
   |>

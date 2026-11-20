@@ -167,14 +167,14 @@ Proof
   CONV_TAC (QUANT_CONV (LAND_CONV cv_eval)) >> simp[] >> EVAL_TAC
 QED
 
-(* pointer runs, but its block leaves b at 0, below the free memory
- * pointer, so the write-back fails closed. *)
-Theorem partial_pointer_fails_closed:
-  partial_call (^(listSyntax.mk_list (selector "8a237e56", “:word8”)) ++
-                word_to_bytes (32w : bytes32) T ++ REPLICATE 32 0w) =
-  ContractInvalid "assembly write-back failed"
+(* pointer's block points b at address 0, the scratch space; memory is
+ * bytes, so that is a pointer like any other, and p's 0 is returned. *)
+Theorem partial_pointer_runs:
+  ∃w. partial_call (^(listSyntax.mk_list (selector "8a237e56", “:word8”)) ++
+                    word_to_bytes (32w : bytes32) T ++ REPLICATE 32 0w) =
+      ContractReturned (REPLICATE 32 0w) w
 Proof
-  CONV_TAC (LAND_CONV cv_eval) >> REFL_TAC
+  CONV_TAC (QUANT_CONV (LAND_CONV cv_eval)) >> simp[] >> EVAL_TAC
 QED
 
 (* Unknown calldata reaches the unsupported fallback, which refuses rather

@@ -36,15 +36,13 @@
  * parameters, read by origin(), gasprice(), chainid(), number(),
  * timestamp(), coinbase(), basefee(), gaslimit() and prevrandao().
  *
- * A scope's value is NONE for a word nobody wrote: inline assembly reading
- * memory the source never gave it (yulEvaluator's YulCheckedBuiltin) gets one,
- * and it stays unknown until something observes it, which fails.
- *
  * Gas is not modelled, but a frame still has a budget: gas_limit is what the
- * frame's caller gave it, gas() reads it, and a message call hands the call's
- * own gas argument on to the callee, capped at this budget.  Nothing in the
- * frame spends any of it, so it never falls; the
- * callee's own gas is the callee's frame's, which is Verifereum's.
+ * frame's caller gave it, a bare gas() as a call's gas argument stands for it,
+ * and a message call hands the call's own gas argument on to the callee,
+ * capped at this budget.  Nothing in the frame spends any of it, so it never
+ * falls; the callee's own gas is the callee's frame's, which is Verifereum's.
+ * The gas left, which any other gas() reads, is not computed: each such read
+ * consumes the next of gas_observations, the readings observed for the frame.
  *
  * return_data is the frame's buffer for the return data of its last message
  * call, a frame input like the call data: empty before any call, and what
@@ -92,7 +90,7 @@ Datatype:
     memory_size : num;
     gas_limit : num;
     gas_observations : gas_observation list;
-    scopes : (string |-> bytes32 option) list;
+    scopes : (string |-> bytes32) list;
     transaction_parameters : transaction_parameters;
     original : evm_accounts;
     to_delete : address list

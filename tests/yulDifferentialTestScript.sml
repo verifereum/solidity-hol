@@ -59,7 +59,7 @@ Definition code_reading_case_def:
     <| case_sender := 0x2000w; case_value := 0; case_input := RawCall [];
        case_storage := []; case_peer_code := []; case_peer_storage := []; case_libraries := [];
        case_expect := ExpectReturn []; case_final := []; case_gas := []; case_logs := [];
-       case_immutables := []; case_immutable_refs := [] |>
+       case_immutables := []; case_immutable_refs := []; case_memory_size := NONE |>
 End
 
 Definition code_reading_program_def:
@@ -81,7 +81,7 @@ Theorem runtime_reads_its_stage_code:
   FST (yul_case_execution [0xFFw] code_reading_program u
          code_reading_case 20) = Returned [0x11w; 0x22w]
 Proof
-  simp[yul_case_execution_def, code_reading_case_def,
+  simp[yul_case_execution_def, yul_case_frame_def, code_reading_case_def,
        input_call_def, case_immutable_values_def] >>
   CONV_TAC cv_eval
 QED
@@ -127,7 +127,7 @@ Theorem creation_copies_and_patches_runtime:
     (code_reading_program with creation_program := SOME creation_copy_program)
     u creation_copy_case 40) = Returned (word_to_bytes_be (42w : bytes32))
 Proof
-  simp[yul_case_execution_def, creation_copy_case_def, code_reading_case_def,
+  simp[yul_case_execution_def, yul_case_frame_def, creation_copy_case_def, code_reading_case_def,
        input_call_def, case_immutable_values_def] >>
   CONV_TAC cv_eval
 QED
@@ -148,7 +148,7 @@ Theorem creation_copies_runtime_before_trailing_data:
         creation_copy_program.creation_bytes ++ [0xAAw; 0xBBw]))
     u creation_copy_case 40) = Returned (word_to_bytes_be (42w : bytes32))
 Proof
-  simp[yul_case_execution_def, creation_copy_case_def, code_reading_case_def,
+  simp[yul_case_execution_def, yul_case_frame_def, creation_copy_case_def, code_reading_case_def,
        input_call_def, case_immutable_values_def] >>
   CONV_TAC cv_eval
 QED

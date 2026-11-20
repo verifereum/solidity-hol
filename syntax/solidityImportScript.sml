@@ -400,7 +400,11 @@ Datatype:
     contract_library_functions : src_function list;
     (* the public state variables, immutables and constants, each with its
      * getter's selector *)
-    contract_getters : (num # byte list) list
+    contract_getters : (num # byte list) list;
+    (* the compiler's internal dispatch numbers (internalFunctionIDs): each
+     * function an internal function value can name, by id, with the number
+     * the value is held as *)
+    contract_function_ids : (num # num) list
   |>
 End
 

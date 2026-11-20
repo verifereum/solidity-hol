@@ -310,7 +310,7 @@ val evaluator_clauses =
 val helper_defs = [
   yul_normal_def, yul_abrupt_def, yul_invalid_def,
   yul_literal_value_def, yul_sign_extend_def, yul_builtin_value_args_def,
-  yul_known_def, yul_lift_result_def
+  yul_call_budget_def
 ]
 
 (* The shaping the frame rule builds with, unfolded unconditionally: it is a
@@ -369,7 +369,7 @@ val guarded_helper_defs = [
   yul_bind_def, yul_bind_scope_def, yul_assign_def, yul_assign_list_def,
   yul_update_def,
   yul_memory_byte_def, yul_memory_read_def, yul_memory_write_def,
-  yul_memory_touch_def, yul_memory_region_def, yul_mload_def, yul_mstore_def,
+  touched_size_def, yul_memory_touch_def, yul_memory_region_def, yul_mload_def, yul_mstore_def,
   yul_sload_def, yul_sstore_def, yul_tload_def, yul_tstore_def, yul_call_def,
   yul_return_data_copy_def, yul_name_of_bytes_def,
   eval_yul_builtin_call_def, yul_set_immutable_def
@@ -507,7 +507,7 @@ val frame_update_key =
     (fst (strip_comb
             (lhs (concl (SPEC_ALL yul_machine_scopes_update_self))))))
 
-val vals_shape_keys = [("list", "HD"), ("list", "TL"), ("option", "THE"),
+val vals_shape_keys = [("list", "HD"), ("list", "TL"),
                        ("yulEvaluatorProps", "yul_take_shape")]
 
 (* The number of arguments a term of this type takes. *)
@@ -928,7 +928,7 @@ fun result_conv v tm =
  * m` on a machine that is an `if`, is left where it is: nothing there is read
  * off the decision, and pushing would copy the rest of the body into both
  * branches of a decision the block's own clause does not branch on. *)
-val yul_expr_result_RAND = TypeBase.case_rand_of ``:'a yul_expr_result``
+val yul_expr_result_RAND = TypeBase.case_rand_of ``:yul_expr_result``
 val option_RAND = TypeBase.case_rand_of ``:'a option``
 val list_RAND = TypeBase.case_rand_of ``:'a list``
 

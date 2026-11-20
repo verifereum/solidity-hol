@@ -94,9 +94,9 @@ Definition initial_state_def:
                   prevHashes := []; blobHashes := []; chainId := 0;
                   authRefund := 0 |> |>;
     scopes := [];
-    heap := FEMPTY;
-    next_heap_id := 0; immutables := FEMPTY;
-    memory_allocated := 0;
+    (* the free memory pointer at 0x40 holds 0x80, as the prologue leaves it *)
+    memory := FEMPTY |+ (0x5F, 0x80w); memory_size := 96;
+    immutables := SOME FEMPTY;
     targets := FEMPTY; return_data := SOME []
   |>
 End
@@ -512,7 +512,8 @@ val empty_contract =
       contract_base_arguments := []; contract_static_calls := []; contract_storage := [];
       contract_structs := []; contract_enums := []; contract_events := [];
       contract_modifiers := []; contract_functions := [];
-      contract_library_functions := []; contract_getters := [] |>”;
+      contract_library_functions := []; contract_getters := [];
+      contract_function_ids := [] |>”;
 fun function_of ps rs ss =
   “<| fn_info := ^(at 1); fn_name := "f"; fn_scope := 0;
       fn_kind := FunctionKind; fn_visibility := InternalVisibility;

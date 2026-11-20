@@ -313,7 +313,8 @@ def summarise(report: dict[str, Any]) -> str:
         lines.append(f"| {item['check']} | `{item['subject']}` | {status} |")
     lines += ["", "## What is not an agreement", "",
               "Each case's status is one of agree, mismatch, unexpected, storage-mismatch, "
-              "storage-unexpected, log-mismatch, log-unexpected, inconclusive or error; "
+              "storage-unexpected, log-mismatch, log-unexpected, memory-size-mismatch, "
+              "inconclusive or error; "
               "only agree is an agreement, and the rest are listed here with the status "
               "that classifies them. An inconclusive is a diagnostic on one side, not a "
               "disagreement. A case at a stage the importer did not admit is not a "

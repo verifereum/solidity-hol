@@ -2606,7 +2606,19 @@ fun contract external_structs contracts declared v = within v (fn v =>
                       else NONE)
              variables,
            pairSyntax.mk_prod (numSyntax.num,
-             listSyntax.mk_list_type (wordsSyntax.mk_int_word_type 8))))]
+             listSyntax.mk_list_type (wordsSyntax.mk_int_word_type 8)))),
+       ("contract_function_ids", listSyntax.mk_list
+          (case optional_field v "internalFunctionIDs" of
+             NONE => []
+           | SOME ids =>
+               map (fn (k, n) =>
+                      if size k > 0 andalso CharVector.all Char.isDigit k then
+                        pairSyntax.mk_pair (mk_num (valOf (IntInf.fromString k)),
+                                            mk_num (JSONUtil.asIntInf n))
+                      else raise MalformedInput
+                        (describe v ^ ": internalFunctionIDs key " ^ k))
+                 (object ids),
+           pairSyntax.mk_prod (numSyntax.num, numSyntax.num)))]
   end)
 
 (* File-level structs, of any source unit of the compilation, accompany each

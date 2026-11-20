@@ -194,6 +194,22 @@ fun run_case {suite, code, initcode, fixture, immutables, unit, program, fuel, b
                        logs_json other)]);
         false
       end
+    else if is_con "MemorySizeMismatch" result then
+      let
+        fun size tm = if optionSyntax.is_some tm then
+                        json_string (term_to_string (optionSyntax.dest_some tm))
+                      else json_string "none"
+        val (bytecode, source, expected) =
+          case snd (strip_comb result) of
+            [b, s, e] => (b, s, e)
+          | _ => raise ERR "run_case" "unexpected verdict"
+      in
+        emit (base @ [("status", json_string "memory-size-mismatch"),
+                      ("bytecode_memory_size", size bytecode),
+                      ("source_memory_size", size source),
+                      ("expected_memory_size", json_string (term_to_string expected))]);
+        false
+      end
     else if is_con "StorageMismatch" result orelse is_con "StorageUnexpected" result
     then
       let
@@ -516,9 +532,16 @@ fun run_yul_stage env (stage_tag, json_tag, ycode) =
                 ("stage", json_string json_tag)]
     fun emit_status status extra =
       emit_yul (base @ [("status", json_string status)] @ extra)
+    (* The expected memory size is the optimizer-off code's; the optimizer
+     * can leave a different active memory, so the optimized stage does not
+     * check it. *)
+    val case_tm =
+      if json_tag = "optimized" then
+        let val c = #case_tm env in “^c with case_memory_size := NONE” end
+      else #case_tm env
     val tm = yul_verdict_term
       {code = #code env, unit = #unit env, program = #program env,
-       case_tm = #case_tm env, ycode = ycode}
+       case_tm = case_tm, ycode = ycode}
     val th = cv_eval tm
     val verdict = rhs (concl th)
     fun both_sides () =
@@ -580,6 +603,22 @@ fun run_yul_stage env (stage_tag, json_tag, ycode) =
           [("bytecode_logs", logs_json bytecode_logs),
            (if mismatch then "yul_logs" else "expected_logs",
             logs_json other_logs)];
+        false
+      end
+    else if is_con "MemorySizeMismatch" verdict then
+      let
+        fun size tm = if optionSyntax.is_some tm then
+                        json_string (term_to_string (optionSyntax.dest_some tm))
+                      else json_string "none"
+        val (bytecode, yul, expected) =
+          case snd (strip_comb verdict) of
+            [b, y, e] => (b, y, e)
+          | _ => raise ERR "run_yul_stage" "unexpected verdict"
+      in
+        emit_status "memory-size-mismatch"
+          [("bytecode_memory_size", size bytecode),
+           ("yul_memory_size", size yul),
+           ("expected_memory_size", json_string (term_to_string expected))];
         false
       end
     else

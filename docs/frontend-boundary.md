@@ -204,73 +204,66 @@ reference whose data runs past the end of the calldata ends with an
 `InvalidCompletion`: the model has no bytes there to read, where the EVM
 reads zeros.
 
-Inline assembly reads a memory `bytes` or `string` local, or a memory array
-of value types (`uint8[]`, `address[]`, `bytes32[2]`), as its address
-(`assembly_memory.sol`, `assembly_arrays.sol`). The source heap gives each
-object the address the compiler's allocator would (`object_address`: `0x80`
-plus the memory allocated so far, `0x60` for the shared empty object), and a
-block runs over a memory holding each byte sequence's length word and bytes
-there, and each such array's length word, if it is dynamic, and a word per
-element, as solc keeps the element in memory. On normal exit each element is
-read back from its word, which must be the exact word its value is kept as
-(a `uint8` of 256 or a `bool` of 2 fails closed, where solc would clean it
-when it reads the element); arrays of other element types are not in the
-block's memory. Objects are projected in allocation order so an older object's
-word padding cannot overwrite a later allocation. Byte-sequence padding ends
-at the aligned allocation end, including for an unaligned caught Error string;
-it cannot make the next object's length word writable. Under
-`memoryguard` the compiler may start its free memory pointer above `0x80`, so
-arithmetic relative to a pointer is modelled but returning, storing or
-comparing a raw pointer value is outside the boundary. The block's memory also
-holds the free memory pointer at `0x40`, `0x80` plus the memory allocated so
-far, under the same boundary. Below `0x80` a block may write anything, as
-Solady's hashing helpers do over the scratch space, the free memory pointer
-and the zero slot, but a block that exits normally must leave the zero slot
-`[0x60, 0x80)` zero, since the compiler's empty byte sequences and arrays read
-it, or it ends with an `InvalidCompletion`. What a block wrote from the free
-memory pointer up is dropped (the
-temporary memory the Solidity docs allow a memory-safe block), except the
-objects it allocates there (`assembly_alloc.sol`): a block that exits normally
-may raise the pointer from F0 to a word-aligned F1 < 2^64, never lower it, and leave a memory
-local at an address p in [F0, F1). The object there is read back from the
-block's final memory as the local's type, as solc lays it out: its whole
-rounded size must end by F1, its length word and data must be written, each
-array element must round-trip, and a byte sequence is zero-padded
-(`object_padded`) only if the block wrote its padding as zeros, so a
-`returndatacopy` into it (Uniswap v4's `Hooks.callHook`) leaves the padding
-unwritten. It becomes a new heap object at p, and later allocations start at
-F1. Locals left at one address share its object only if their declared types
-are equal; overlapping objects, a local moved to an existing object (a
-retyping alias such as `EnumerableSet.values`' `result := store`) or to any
-other address fail closed. A literal address with a literal length is
-read only at the free memory pointer, the zero slot or where the block may
-have written it before (any memory write, also inside an earlier block,
-branch or loop, in an argument to the right, since arguments run right to
-left, and, in a Yul function's body, anywhere in the function's statement
-list outside other functions' bodies, since a function may be called from
-anywhere in it), as the elaborator checks; the run-time check below has the last word. At a computed address a block may read only the free memory pointer,
-the zero slot `[0x60, 0x80)`, each array's words, each byte sequence's length word and data
-(zero-padded to whole words where solc's memory holds the zeros: not for
-bytes copied from return data, a low-level call's or a `catch`'s, whose
-padding solc leaves as it was), and bytes it has written itself; any other read,
-another kind of memory object, the scratch space before the block writes it,
-or past an object's last word, ends the block with an `InvalidCompletion`.
-Both checks count only the bytes a sub-word load keeps: `shr(k, mload(p))`
-with a literal `k` reads `[p, p + 32 - k / 8)` (rounding `k / 8` down), and
-`byte(0, mload(p))` reads only byte `p`, so the bytes either shifts out may
-be unwritten, as when Solady reads an address from the low 20 bytes of a
-scratch word (`assembly_prefix_loads.sol`).
-This projection describes logical bytes, rather than physical ABI tail padding.
-In particular, `try_decode_error_message` can leave copied dirty padding or,
-for an unpadded string, bytes from the outbound call's temporary ABI buffer
-past the logical string end. Assembly that observes those physical tail bytes
-is outside this source-heap boundary and fails closed where those bytes are
-not projected. Caught Error strings and generic return bytes keep
-`object_padded = F`; no zeros are invented for their unmodelled tails.
-A callee that returns fewer bytes than the block's output region leaves the
-rest unwritten, so reading it fails closed where the EVM reads stale scratch:
-OpenZeppelin's `SafeERC20` against a token whose `transfer` returns nothing
-runs to that.
+Inline assembly reads any memory local as its address (`assembly_memory.sol`,
+`assembly_arrays.sol`, `assembly_alloc.sol`). Solidity code and assembly run on
+one byte-addressed memory per frame, laid out as the pinned compiler lays it
+out: the scratch space `[0x00, 0x40)`, the free memory pointer at `0x40`, the
+zero slot `[0x60, 0x80)`, which empty byte sequences and arrays share, then a
+creation frame's immutables, a word each, then objects allocated at the free
+memory pointer. A byte sequence is its length word then its bytes, a dynamic
+array its length word then a word per element, a static array or struct a
+word per element or field; a reference-typed element is the address of its
+object. The compiled code's own memory effects are part of the semantics:
+storage navigation hashes in the scratch space, encoder temporaries and
+spills at the free memory pointer, call input and output regions, and the
+return data copy. A block may read and write any address, raise or lower the
+free memory pointer, and leave a memory local at any address; whatever it
+leaves is what the Solidity code after it reads, with the compiler's cleanup
+of the words it reads (`bool` normalised, integers and addresses masked or
+sign-extended, `bytesN` high-masked, an out-of-range enum Panic `0x21`).
+Under the pinned profile (via-IR, optimizer off) the free memory pointer
+starts at `0x80`, past a creation frame's reserved immutable words, where the
+model's does; the `memory_images` suite compares it byte for byte. An internal function pointer's word
+is the function's number in the compiler's internal dispatch, which the
+importer reads from `ContractDefinition.internalFunctionIDs` in the analyzed
+AST, and 0 for the zero value. A word no function has reads as itself and
+panics with 0x51 when called, as the compiler's internal dispatch does; a word
+of a function of another type fails closed. The compiled creation code
+dispatches only the functions creation code takes a pointer to, while the
+model resolves a word against every numbered function: a constructor calling
+through a word that assembly set to a function only the deployed code takes a
+pointer to runs that function, where the compiled constructor panics with
+0x51. A constructor keeps the
+immutables only in their reserved words, as the compiled constructor does: it
+reads them from there with the same cleanup, and the created contract's
+immutables are those words when it ends; a word its immutable's type cannot
+hold (one assembly left dirty) fails closed.
+
+Where the compiled code's memory behaviour depends on something the model
+does not track, execution stops with an `unsupported:` completion naming the
+case, rather than guessing. There are eight such cases:
+
+- an encoder input at or above the free memory pointer, which the compiled
+  encoder overwrites before it reads it;
+- an indexed event argument that is a stored array or struct whose in-place
+  encoding ends in an empty byte sequence;
+- an event that reads an argument from memory and whose indexed arguments'
+  hash preimages overwrite the free memory pointer: the compiled emit reads
+  the pointer anew for each preimage and for the log's data, so a later
+  preimage can land on that argument before it is read;
+- an `abi.decode` of memory that reads at or past the free memory pointer,
+  where the compiled decoder allocates while it reads;
+- a decoding into memory (from calldata, an `abi.decode` or a call's
+  results) that allocates with the free memory pointer below 96, where an
+  allocated object can cover the pointer's word, which the compiled decoder
+  reads again for each object it allocates;
+- an `abi.decode` that fails on a memory input reaching past the memory size
+  or the free memory pointer, since its failure does not say how far it read;
+- an immutable's reserved word that its type cannot hold, when a constructor
+  ends;
+- an internal function word, read from memory, of a function of another type:
+  the compiled code calls it when the number of stack slots its parameters
+  and returns take matches, and panics otherwise.
 
 Inline assembly's `call`, `staticcall` and `delegatecall` (`assembly_calls.sol`,
 `assembly_delegate.sol`) run the callee on Verifereum through `externalCall`,
@@ -294,12 +287,9 @@ empty buffer keeps it unknown. A Yul function's body may read return data
 where the block may at its start (`assembly_library_forms.sol`): anywhere
 while the source knows the buffer, and otherwise only after a call of its
 own, since the function may be called before any of the block's calls. A block in a static frame that names `call` or
-`delegatecall` fails closed; `staticcall` runs. A block that leaves an
-object's padding (the bytes past its length, in its last word) unwritten or
-not zero leaves it out of later blocks' memory, where reading it fails closed.
-solc lets a block assign a memory
-reference (`b := ...`); the elaborator rejects it, since the block reads the
-name as a literal.
+`delegatecall` fails closed; `staticcall` runs. A block may assign a memory
+reference (`b := ...`): the reference then holds the address the block left
+in it.
 
 ## Storage layout
 
@@ -485,8 +475,9 @@ its most derived override. Its type keeps the declared mutability, and a
 pure function converts implicitly to view and nonpayable function types, a
 view one to nonpayable. A call through a value evaluates the callee
 expression first and copies its value, then the arguments in order; the zero
-value, held by a local or named return never assigned, panics with 0x51
-after the arguments, as the compiler's internal dispatch does. Parameters
+value, held by a local or named return never assigned, and any other word
+no function has panic with 0x51 after the arguments, as the compiler's
+internal dispatch does. Parameters
 and returns of a function type are value types other than function types, or
 storage, memory or calldata references. External function values, function values in storage, arrays,
 structs, events, the ABI or inline assembly, and comparisons of function

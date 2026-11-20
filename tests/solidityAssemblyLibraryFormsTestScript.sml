@@ -1,7 +1,5 @@
-(* Inline assembly the compiler runs but the source model leaves out: a
- * block that leaves the zero slot non-zero, which the compiler's empty byte
- * sequences and arrays would then read, and an enum local written past its
- * last member. *)
+(* Inline assembly the compiler runs but the source model leaves out: an
+ * enum local written past its last member. *)
 Theory solidityAssemblyLibraryFormsTest
 Ancestors solidityCoreWf solidityDifferentialCorpus_assembly_library_forms
 Libs solidityBytecodeLib cv_transLib
@@ -30,15 +28,6 @@ fun rejected_case name =
       {names = [], refs = “[] : (num # num list) list”}
       (call_input (fn () => “[] : byte list”) c) c
   end;
-
-Theorem zero_slot_left_non_zero:
-  source_execution bytecode_rejected_assembly_library_forms_code
-    corpus_assembly_library_forms_unit corpus_assembly_library_forms_program 1000
-    ^(rejected_case "zero_slot_left_non_zero") =
-  (Diagnostic InvalidCompletion, NONE, [])
-Proof
-  CONV_TAC cv_eval
-QED
 
 Theorem enum_past_last_member:
   source_execution bytecode_rejected_assembly_library_forms_code

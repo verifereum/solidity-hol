@@ -248,6 +248,9 @@ def load_corpus(path: Path) -> dict[str, Any]:
                     check_word(gas, 256, f"{what}.gas[{index}]")
             if "fuel" in case:
                 check_fuel(case["fuel"], f"{what}.fuel")
+            if "memory_size" in case:
+                # the frame's memory size at its halt, as msize would give it
+                check_word(case["memory_size"], 256, f"{what}.memory_size")
             for key in ("storage", "final_storage", "peer_storage"):
                 if key in case:
                     check_storage(case[key], f"{what}.{key}")
@@ -264,7 +267,8 @@ def load_corpus(path: Path) -> dict[str, Any]:
                     check_argument(value, f"{what}.immutables.{key}")
             unknown = set(case) - {"name", "function", "deploy", "args", "calldata", "sender",
                                    "value", "storage", "peer_storage", "expect",
-                                   "final_storage", "logs", "fuel", "immutables", "gas"}
+                                   "final_storage", "logs", "fuel", "immutables", "gas",
+                                   "memory_size"}
             if unknown:
                 raise CorpusError(f"{what}: unknown fields {sorted(unknown)}")
     return corpus
@@ -605,7 +609,8 @@ def write_reproduction(root: Path, directory: Path, suite: dict[str, Any],
                    if key in suite})
     if case is not None:
         inputs.update({"case": case["name"],
-                       **{key: case[key] for key in ("function", "deploy", "args", "calldata")
+                       **{key: case[key] for key in ("function", "deploy", "args", "calldata",
+                                                     "immutables", "gas")
                           if key in case},
                        "sender": case.get("sender", "0x2000"),
                        "value": case.get("value", 0),
@@ -614,6 +619,7 @@ def write_reproduction(root: Path, directory: Path, suite: dict[str, Any],
                        "expect": case["expect"],
                        "final_storage": case.get("final_storage", {}),
                        "logs": case.get("logs", []),
+                       **({"memory_size": case["memory_size"]} if "memory_size" in case else {}),
                        "fuel": case.get("fuel", fuel)})
     exporter.write_json_atomic(directory / "inputs.json", inputs)
     exporter.write_json_atomic(directory / "outcomes.json", result)

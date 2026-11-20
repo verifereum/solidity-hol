@@ -197,7 +197,7 @@ Definition test_program_def:
   test_program = <|
     unsupported_procedures := []; procedures := [add_proc; count_proc; pair_proc; first_proc; fact_proc;
                    wrapper_proc; void_proc; convert_proc; scope_proc];
-    struct_layouts := []; type_declarations := test_decls;
+    struct_layouts := []; function_ids := []; type_declarations := test_decls;
     state_variables := []; immutables := [];
     entry_procedure := AstId 6;
     external_functions := []; receive_procedure := NONE;
@@ -1168,7 +1168,7 @@ End
 Definition struct_layout_environment_def:
   struct_layout_environment layouts = core_program_environment
     <| unsupported_procedures := []; procedures := []; state_variables := []; immutables := []; struct_layouts := layouts;
-       type_declarations := MAP (λs. (s.struct_id, StructDeclaration
+       function_ids := []; type_declarations := MAP (λs. (s.struct_id, StructDeclaration
          (MAP (λv. (v.state_id, v.state_type)) s.struct_fields))) layouts;
        entry_procedure := AstId 0;
        external_functions := []; receive_procedure := NONE;
@@ -1418,34 +1418,12 @@ Proof
 QED
 
 (* codesize and codecopy pass the static check (a creation frame refuses
- * them at run time); extcodecopy writes like the other copies, and a literal
- * region it writes is readable after it. *)
+ * them at run time). *)
 Theorem assembly_code_builtins_are_supported:
   assembly_expr_ok assembly_unsupported (YulBuiltin YCodeSize []) ∧
   assembly_expr_ok assembly_unsupported
     (YulBuiltin YCodeCopy
-      [YulLit (LitNumber 0w); YulLit (LitNumber 0w); YulLit (LitNumber 32w)]) ∧
-  assembly_memory_ok
-    [YulExprStmt (YulBuiltin YExtCodeCopy
-       [YulName "a"; YulLit (LitNumber 0w); YulLit (LitNumber 0w);
-        YulLit (LitNumber 32w)]);
-     YulAssign ["x"] (YulBuiltin YMLoad [YulLit (LitNumber 0w)])] ∧
-  ¬assembly_memory_ok
-    [YulExprStmt (YulBuiltin YExtCodeCopy
-       [YulName "a"; YulLit (LitNumber 0x80w); YulLit (LitNumber 0w);
-        YulLit (LitNumber 32w)])] ∧
-  ¬assembly_memory_ok
-    [YulExprStmt (YulBuiltin YExtCodeCopy [YulName "a"; YulLit (LitNumber 0w)])] ∧
-  assembly_memory_ok
-    [YulExprStmt (YulBuiltin YCodeCopy
-       [YulLit (LitNumber 0w); YulLit (LitNumber 0w); YulLit (LitNumber 32w)]);
-     YulAssign ["x"] (YulBuiltin YMLoad [YulLit (LitNumber 0w)])] ∧
-  ¬assembly_memory_ok
-    [YulExprStmt (YulBuiltin YCodeCopy
-       [YulLit (LitNumber 0x80w); YulLit (LitNumber 0w);
-        YulLit (LitNumber 32w)])] ∧
-  ¬assembly_memory_ok
-    [YulExprStmt (YulBuiltin YCodeCopy [YulLit (LitNumber 0w)])]
+      [YulLit (LitNumber 0w); YulLit (LitNumber 0w); YulLit (LitNumber 32w)])
 Proof
   EVAL_TAC
 QED

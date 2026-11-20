@@ -87,7 +87,7 @@ End
 Definition argument_env_def:
   argument_env = <|
     procedures := []; state_variables := []; immutables := [];
-    struct_layouts := []; type_declarations := [] |> : core_environment
+    struct_layouts := []; function_ids := []; type_declarations := [] |> : core_environment
 End
 
 Definition encoded_values_def:
@@ -282,12 +282,13 @@ Definition contract_observation_def:
     | ContractOutOfFuel => (Diagnostic OutOfFuel, NONE, [])
 End
 
-(* The source run of a transaction priced at gas_price. *)
-Definition source_execution_at_def:
-  source_execution_at gas_price code u prog fuel c =
+(* The source run of a transaction priced at gas_price, with its frame's final
+ * memory size. *)
+Definition source_frame_execution_at_def:
+  source_frame_execution_at gas_price code u prog fuel c =
     case (input_call u c.case_input, case_immutable_values u c.case_immutables) of
-      (INL d, _) => (Diagnostic d, NONE, [])
-    | (_, NONE) => (Diagnostic UnencodableArguments, NONE, [])
+      (INL d, _) => ((Diagnostic d, NONE, []), NONE)
+    | (_, NONE) => ((Diagnostic UnencodableArguments, NONE, []), NONE)
     | (INR (data, _), SOME imm) =>
         let a = case_address c in
         let fr0 = differential_frame c.case_sender c.case_value data in
@@ -298,15 +299,21 @@ Definition source_execution_at_def:
                     c.case_peer_code c.case_peer_storage c.case_libraries in
         let w = differential_world (transfer_value c.case_sender a c.case_value pre)
                   with original := pre in
-        contract_observation u c.case_immutable_refs a
-          (case c.case_input of
-             Deploy _ _ => deploy_contract_with_gas fuel prog fr
-               (w with accounts := update_account a
-                 ((lookup_account a w.accounts) with nonce := 1) w.accounts)
-               (MAP GasLeftObservation c.case_gas)
-           | _ => call_contract_with_gas fuel prog
-                    (FEMPTY |++ MAP (λ(x, s, _). (x, s)) imm) fr w
-                    (MAP GasLeftObservation c.case_gas))
+        let (r, size) =
+          case c.case_input of
+            Deploy _ _ => deploy_contract_frame fuel prog fr
+              (w with accounts := update_account a
+                ((lookup_account a w.accounts) with nonce := 1) w.accounts)
+              (MAP GasLeftObservation c.case_gas)
+          | _ => call_contract_frame fuel prog
+                   (FEMPTY |++ MAP (λ(x, s, _). (x, s)) imm) fr w
+                   (MAP GasLeftObservation c.case_gas) in
+        (contract_observation u c.case_immutable_refs a r, size)
+End
+
+Definition source_execution_at_def:
+  source_execution_at gas_price code u prog fuel c =
+    FST (source_frame_execution_at gas_price code u prog fuel c)
 End
 
 (* The source run of the corpus's transaction, priced as differential_tx. *)
@@ -314,6 +321,13 @@ Definition source_execution_def:
   source_execution code u prog fuel c =
     source_execution_at (differential_tx c.case_sender c.case_value []).gasPrice
       code u prog fuel c
+End
+
+(* The final memory size of the source run of the corpus's transaction. *)
+Definition source_memory_size_def:
+  source_memory_size code u prog fuel c =
+    SND (source_frame_execution_at
+           (differential_tx c.case_sender c.case_value []).gasPrice code u prog fuel c)
 End
 
 Definition source_observation_def:
@@ -342,6 +356,13 @@ Definition evm_execution_def:
         if c.case_gas ≠ [] ∧ bytecode_gas_observations input ≠ SOME c.case_gas then
           (Diagnostic InvalidGasEvidence, NONE, [])
         else bytecode_execution input
+End
+
+Definition evm_memory_size_def:
+  evm_memory_size code u c =
+    case prepared_evm_input code u c of
+      INL _ => NONE
+    | INR input => bytecode_memory_size input
 End
 
 Definition evm_observation_def:
@@ -389,6 +410,8 @@ Datatype:
   | LogMismatch (event list) (event list)
     (* logs: the ones both runs agree on, the expected ones *)
   | LogUnexpected (event list) (event list)
+    (* final memory size: bytecode, source, expected *)
+  | MemorySizeMismatch (num option) (num option) num
 End
 
 Definition compare_observations_def:
@@ -422,7 +445,15 @@ Definition differential_verdict_def:
           LogMismatch (SND (SND evm_run)) (SND (SND src_run))
         else if SND (SND evm_run) ≠ expected_logs c.case_logs then
           LogUnexpected (SND (SND evm_run)) (expected_logs c.case_logs)
-        else Agree outcome
+        else
+          (case c.case_memory_size of
+             NONE => Agree outcome
+           | SOME n =>
+               if evm_memory_size code u c = SOME n ∧
+                  source_memory_size code u prog fuel c = SOME n
+               then Agree outcome
+               else MemorySizeMismatch (evm_memory_size code u c)
+                      (source_memory_size code u prog fuel c) n)
     | other => other
 End
 
@@ -506,22 +537,6 @@ Proof
   gvs[is_agreement_def]
 QED
 
-Theorem complete_check_agreement[local]:
-  is_agreement
-    (case verdict of
-       Agree outcome =>
-         if b1 then StorageMismatch s1 s2
-         else if b2 then StorageUnexpected s3 s4
-         else if b3 then LogMismatch l1 l2
-         else if b4 then LogUnexpected l3 l4
-         else Agree outcome
-     | other => other) ⇒
-  is_agreement verdict
-Proof
-  Cases_on ‘verdict’ >> simp[is_agreement_def] >>
-  rpt IF_CASES_TAC >> simp[is_agreement_def]
-QED
-
 (* What an agreement establishes: both runs produce the expected outcome,
  * which is a return or a revert, never a diagnostic, and the expected final
  * storage at the observed slots.
@@ -539,8 +554,10 @@ Theorem differential_agrees_outcomes:
 Proof
   rw[differential_agrees_def, differential_verdict_def,
      evm_observation_def, source_observation_def] >>
-  drule complete_check_agreement >> strip_tac >>
-  drule compare_observations_agree >> simp[]
+  qmatch_asmsub_abbrev_tac ‘compare_observations ex ev sr’ >>
+  ‘is_agreement (compare_observations ex ev sr)’
+    by (Cases_on ‘compare_observations ex ev sr’ >> gvs[is_agreement_def]) >>
+  drule compare_observations_agree >> simp[Abbr ‘ex’]
 QED
 
 (* Full committed storage, including slots absent from diagnostics. *)
@@ -564,6 +581,15 @@ Proof
   BasicProvers.every_case_tac >> gvs[is_agreement_def]
 QED
 
+(* With an expected memory size, both runs end their frame with it. *)
+Theorem differential_agrees_memory_size:
+  differential_agrees code u prog fuel c ∧ c.case_memory_size = SOME n ⇒
+  evm_memory_size code u c = SOME n ∧ source_memory_size code u prog fuel c = SOME n
+Proof
+  rw[differential_agrees_def, differential_verdict_def] >>
+  BasicProvers.EVERY_CASE_TAC >> gvs[is_agreement_def]
+QED
+
 val () = cv_auto_trans argument_scalar_def;
 val () = cv_auto_trans argument_value_def;
 val () = cv_auto_trans argument_values_def;
@@ -582,12 +608,15 @@ val () = cv_auto_trans input_call_def;
 val () = cv_auto_trans differential_frame_def;
 val () = cv_auto_trans differential_world_def;
 val () = cv_auto_trans contract_observation_def;
+val () = cv_auto_trans source_frame_execution_at_def;
 val () = cv_auto_trans source_execution_at_def;
 val () = cv_auto_trans source_execution_def;
+val () = cv_auto_trans source_memory_size_def;
 val () = cv_auto_trans source_observation_def;
 val () = cv_auto_trans prepared_evm_input_def;
 val () = cv_auto_trans evm_execution_def;
 val () = cv_auto_trans evm_observation_def;
+val () = cv_auto_trans evm_memory_size_def;
 val () = cv_auto_trans expected_outcome_def;
 val () = cv_auto_trans compare_observations_def;
 val () = cv_auto_trans differential_verdict_def;

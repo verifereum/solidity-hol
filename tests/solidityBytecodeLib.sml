@@ -373,7 +373,11 @@ fun case_term {peer, libraries} (immutables : {names : (string * IntInf.int) lis
       ("case_libraries", libraries),
       ("case_expect", expectation (field c "expect")),
       ("case_final", storage (JSONUtil.findField c "final_storage")),
-      ("case_logs", logs (JSONUtil.findField c "logs"))])
+      ("case_logs", logs (JSONUtil.findField c "logs")),
+      ("case_memory_size",
+       case JSONUtil.findField c "memory_size" of
+         NONE => optionSyntax.mk_none numSyntax.num
+       | SOME v => optionSyntax.mk_some (num_term (integer v)))])
 
 (* ABI types come from the compiler artifact, independently of source import. *)
 fun abi_type v = contractABISyntax.parse_abi_type (string_field v "type")
