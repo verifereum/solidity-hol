@@ -241,7 +241,7 @@ hold (one assembly left dirty) fails closed.
 
 Where the compiled code's memory behaviour depends on something the model
 does not track, execution stops with an `unsupported:` completion naming the
-case, rather than guessing. There are eight such cases:
+case, rather than guessing. There are nine such cases:
 
 - an encoder input at or above the free memory pointer, which the compiled
   encoder overwrites before it reads it;
@@ -264,6 +264,10 @@ case, rather than guessing. There are eight such cases:
 - an internal function word, read from memory, of a function of another type:
   the compiled code calls it when the number of stack slots its parameters
   and returns take matches, and panics otherwise.
+- a stored byte sequence or array of 2^64 or more elements that is encoded,
+  packed or copied to memory by encoding: the compiled encoder has no length
+  check, so it does not panic with 0x41. (A stored array of references copied
+  to memory allocates first, and panics with 0x41.)
 
 Inline assembly's `call`, `staticcall` and `delegatecall` (`assembly_calls.sol`,
 `assembly_delegate.sol`) run the callee on Verifereum through `externalCall`,

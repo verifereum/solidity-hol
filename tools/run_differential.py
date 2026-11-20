@@ -225,10 +225,13 @@ def load_corpus(path: Path) -> dict[str, Any]:
             if case_name in case_names:
                 raise CorpusError(f"duplicate case {what}")
             case_names.add(case_name)
+            # The bytecode theory also saves an expected memory size, as
+            # <case>_memory_size.
             theorem = f"{name}_{case_name}"
-            if theorem in theorems:
-                raise CorpusError(f"case {what} repeats theorem name {theorem}")
-            theorems.add(theorem)
+            for saved in [theorem] + ([f"{theorem}_memory_size"] if "memory_size" in case else []):
+                if saved in theorems:
+                    raise CorpusError(f"case {what} repeats theorem name {saved}")
+                theorems.add(saved)
             check_call(case, what)
             if "sender" in case:
                 check_word(case["sender"], 160, f"{what}.sender")

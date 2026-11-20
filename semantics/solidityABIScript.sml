@@ -316,15 +316,19 @@ End
  * cleaned; a byte sequence copies whole data words, keeping unused dirty
  * bytes, except the length byte of a short one (storage_byte_data), and an
  * empty one still writes its slot's word past its end. A length of 2^64 or
- * more panics with 0x41, as the memory for the encoding cannot be
- * allocated. The fuel bounds the struct nesting. *)
+ * more is unsupported: the compiled encoder has no length check, so it does
+ * not panic with 0x41, and what it does instead (run out of gas, or panic
+ * cleaning an element) the source does not track. The fuel bounds the struct
+ * nesting. *)
 Definition storage_abi_value_def:
   (storage_abi_value env (fuel : num) accounts addr slot ty =
     if byte_sequence_type ty then
       (case storage_byte_length accounts addr slot of
          INR c => INR c
        | INL length =>
-         if 2 ** 64 ≤ length then INR (PanicCompletion 65) else
+         if 2 ** 64 ≤ length then
+           INR (InvalidCompletion
+                  "unsupported: a stored sequence of 2^64 or more elements encoded to memory") else
          let data = storage_byte_data accounts addr slot length in
          case abi_value ty (ScalarValue (BytesValue (TAKE length data))) of
            SOME a =>
@@ -335,7 +339,9 @@ Definition storage_abi_value_def:
       ArrayT element l =>
         (case storage_array_data accounts addr slot ty of
            (length, data) =>
-             if 2 ** 64 ≤ length then INR (PanicCompletion 65) else
+             if 2 ** 64 ≤ length then
+               INR (InvalidCompletion
+                      "unsupported: a stored sequence of 2^64 or more elements encoded to memory") else
              case storage_abi_elements env fuel accounts addr data element 0 length of
                INL parts =>
                  let t = abi_type env (LENGTH env.type_declarations) element in
@@ -954,15 +960,20 @@ End
  * then calls finalize_allocation; an array of references or a struct is
  * allocated before its members. Scalars are read cleaned, and a byte
  * sequence keeps whole data words (storage_byte_data); an empty one still
- * writes its slot's word after its length, past the allocation. The fuel
- * bounds the struct nesting. *)
+ * writes its slot's word after its length, past the allocation. A length of
+ * 2^64 or more panics with 0x41 where the copy allocates first; where it
+ * encodes first it is unsupported, as the compiled encoder has no length
+ * check (it runs out of gas, or panics cleaning an element). The fuel bounds
+ * the struct nesting. *)
 Definition materialize_storage_def:
   (materialize_storage env (fuel : num) accounts addr slot ty st =
     if byte_sequence_type ty then
       (case storage_byte_length accounts addr slot of
          INR c => INR c
        | INL length =>
-           if 2 ** 64 ≤ length then INR (PanicCompletion 65) else
+           if 2 ** 64 ≤ length then
+             INR (InvalidCompletion
+                    "unsupported: a stored sequence of 2^64 or more elements encoded to memory") else
            let (p, st1) = memory_load 64 st in
            case finalize_allocation p ((length + 31) DIV 32 * 32 + 32)
                   (memory_write (p + 32)
@@ -974,9 +985,13 @@ Definition materialize_storage_def:
       ArrayT element l =>
         (case storage_array_data accounts addr slot ty of
            (length, data) =>
-             if 2 ** 64 ≤ length then INR (PanicCompletion 65) else
              let size = (if l = NONE then 32 else 0) + 32 * length;
                  scalars = is_stored_scalar_type element in
+             if 2 ** 64 ≤ length then
+               INR (if scalars then
+                      InvalidCompletion
+                        "unsupported: a stored sequence of 2^64 or more elements encoded to memory"
+                    else PanicCompletion 65) else
              case (if scalars then INL (memory_load 64 st)
                    else allocate_memory size st) of
                INR c => INR c

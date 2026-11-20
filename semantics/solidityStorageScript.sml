@@ -156,6 +156,10 @@ Definition storage_byte_data_def:
     else storage_byte_range accounts addr slot length 0 (32 * ((length + 31) DIV 32))
 End
 
+(* The bytes of a stored byte sequence, as the compiled code packs or copies
+ * them into memory. A length of 2^64 or more is unsupported: the compiled
+ * encoder has no length check, and runs out of gas, which the source does not
+ * track. *)
 Definition storage_byte_contents_def:
   storage_byte_contents accounts r =
     case r of
@@ -164,7 +168,9 @@ Definition storage_byte_contents_def:
         else (case storage_byte_length accounts addr slot of
           INR c => INR c
         | INL length =>
-            if 2 ** 64 ≤ length then INR (PanicCompletion 65)
+            if 2 ** 64 ≤ length then
+              INR (InvalidCompletion
+                     "unsupported: a stored sequence of 2^64 or more elements encoded to memory")
             else INL (storage_byte_range accounts addr slot length 0 length))
     | _ => INR (InvalidCompletion "not storage bytes")
 End

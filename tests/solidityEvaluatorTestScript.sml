@@ -1030,9 +1030,12 @@ Proof
   CONV_TAC cv_eval
 QED
 
-(* A storage byte sequence of length 2^64 or more is not encoded in place:
- * the memory for its encoding cannot be allocated, so it panics with 0x41, as
- * a read of its contents does. *)
+(* A stored byte sequence or array of scalars of length 2^64 or more is not
+ * encoded or copied to memory: the compiled encoder has no length check (it
+ * runs out of gas, or panics cleaning an element), which the source does not
+ * track, so it is unsupported. A
+ * stored array of references allocates its copy first, and panics with 0x41
+ * as the compiler's allocator does. *)
 Definition long_bytes_accounts_def:
   long_bytes_accounts =
     update_account 0w (empty_account_state with
@@ -1040,13 +1043,53 @@ Definition long_bytes_accounts_def:
       empty_accounts
 End
 
-Theorem storage_abi_value_bytes_too_long:
-  storage_abi_value env 0 long_bytes_accounts 0w 0w BytesT = INR (PanicCompletion 65) ∧
-  storage_byte_contents long_bytes_accounts
-    (StorageReference PersistentStorage 0w 0w 0 BytesT (LayoutId 0)) =
-  INR (PanicCompletion 65)
+Definition long_array_accounts_def:
+  long_array_accounts =
+    update_account 0w (empty_account_state with
+      storage := update_storage 0w (n2w (2 ** 64)) empty_storage)
+      empty_accounts
+End
+
+Definition long_storage_unsupported_def:
+  long_storage_unsupported = InvalidCompletion
+    "unsupported: a stored sequence of 2^64 or more elements encoded to memory"
+End
+
+Definition long_storage_failures_def:
+  long_storage_failures =
+    [(case storage_abi_value test_env 0 long_bytes_accounts 0w 0w BytesT of
+        INR c => SOME c | INL _ => NONE);
+     (case storage_abi_value test_env 0 long_array_accounts 0w 0w
+             (ArrayT u256 NONE) of
+        INR c => SOME c | INL _ => NONE);
+     (case storage_abi_value test_env 0 long_array_accounts 0w 0w
+             (ArrayT (ArrayT u256 NONE) NONE) of
+        INR c => SOME c | INL _ => NONE);
+     (case storage_byte_contents long_bytes_accounts
+             (StorageReference PersistentStorage 0w 0w 0 BytesT (LayoutId 0)) of
+        INR c => SOME c | INL _ => NONE);
+     (case materialize_storage test_env 0 long_bytes_accounts 0w 0w BytesT
+             initial_state of
+        INR c => SOME c | INL _ => NONE);
+     (case materialize_storage test_env 0 long_array_accounts 0w 0w
+             (ArrayT u256 NONE) initial_state of
+        INR c => SOME c | INL _ => NONE);
+     (case materialize_storage test_env 0 long_array_accounts 0w 0w
+             (ArrayT (ArrayT u256 NONE) NONE) initial_state of
+        INR c => SOME c | INL _ => NONE)]
+End
+
+val () = List.app cv_auto_trans
+  [long_storage_unsupported_def, long_storage_failures_def];
+
+Theorem storage_too_long_unsupported:
+  long_storage_failures =
+    [SOME long_storage_unsupported; SOME long_storage_unsupported;
+     SOME long_storage_unsupported; SOME long_storage_unsupported;
+     SOME long_storage_unsupported; SOME long_storage_unsupported;
+     SOME (PanicCompletion 65)]
 Proof
-  simp[Once solidityABITheory.storage_abi_value_def, long_bytes_accounts_def] >> EVAL_TAC
+  CONV_TAC cv_eval
 QED
 
 (* return(...) in a callee ends the whole frame with its bytes. *)

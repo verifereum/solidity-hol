@@ -63,12 +63,14 @@ slot words, while ordinary arguments and results use the shared ABI codec.
 
 A case may give `"memory_size": n`, the memory size in bytes the frame has
 when it halts, as the compiled code's trace shows it (the size before its
-`RETURN` or `REVERT`, raised to cover the region that instruction reads). The
-source's final memory size, Verifereum's outermost frame's memory length after
-the transaction's last step and, in the Yul run's optimizer-off stages, the
-Yul evaluator's must all equal it; otherwise the case is a
-`memory-size-mismatch`. The optimized stage does not check it, since the
-optimizer can leave a different active memory. A creation that
+`RETURN` or `REVERT`, raised to cover the region that instruction reads).
+Verifereum's outermost frame's memory length after the transaction's last step
+must equal it: the suite's bytecode theory proves that with the outcome, so a
+wrong size fails that theory, as a bytecode case that differs from the
+expectation. The source's final memory size and, in the Yul run's
+optimizer-off stages, the Yul evaluator's must equal it too; otherwise the
+case is a `memory-size-mismatch`. The optimized stage does not check it, since
+the optimizer can leave a different active memory. A creation that
 returns its runtime code gives none, since the deployed-code copy is not
 modelled.
 
@@ -112,8 +114,9 @@ Each suite has two committed theories under `tests/corpus/`:
 
 - `solidityBytecodeCorpus_<suite>` encodes calls from the artifact's ABI and
   method selectors, runs Verifereum, and proves the expected outcome, storage
-  and logs for every case. A case's memory size is not checked there: the
-  combined verdict checks it, reading Verifereum's final memory size. It depends on the suite and compiler artifacts, not the source
+  and logs for every case. For a case with an expected memory size it also
+  proves Verifereum's final memory size, as `<case>_memory_size`, in the same
+  evaluation. It depends on the suite and compiler artifacts, not the source
   frontend or evaluator.
 - `solidityDifferentialCorpus_<suite>` prepares the source and proves that its
   calldata, initial accounts and transaction equal the bytecode theory's inputs.

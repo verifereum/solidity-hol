@@ -268,6 +268,10 @@ Definition bytecode_memory_def:
     | _ => NONE
 End
 
+Definition bytecode_memory_size_def:
+  bytecode_memory_size input = OPTION_MAP LENGTH (bytecode_memory input)
+End
+
 (* Track a GAS word through stack shuffles to a call's budget operand.
  * Dup of that word also exposes it as a value, so it is an observation. *)
 Definition is_call_budget_gas_def:
@@ -371,3 +375,4 @@ val () = cv_auto_trans case_tx_def;
 val () = cv_auto_trans case_accounts_of_def;
 val () = cv_auto_trans bytecode_execution_def;
 val () = cv_auto_trans bytecode_memory_def;
+val () = cv_auto_trans bytecode_memory_size_def;
