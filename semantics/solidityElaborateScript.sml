@@ -4037,10 +4037,10 @@ Definition reference_values_def:
 End
 
 Definition procedure_references_def:
-  procedure_references ps x =
-    case ALOOKUP ps x of
-      SOME p => stmts_references p.body
-    | NONE => []
+  (procedure_references [] x = []) ∧
+  (procedure_references ((p : core_procedure) :: ps) x =
+    if p.procedure_id = x then stmts_references p.body
+    else procedure_references ps x)
 End
 
 (* The procedures xs reach by calls and function values, as the compiler
@@ -4059,8 +4059,7 @@ End
  * the creation procedure x and the procedures it reaches, as the compiler's
  * addToInternalDispatch collects them while generating the creation code. *)
 Definition creation_dispatch_def:
-  creation_dispatch (procs : core_procedure list) x =
-    let ps = MAP (λp. (p.procedure_id, p)) procs in
+  creation_dispatch ps x =
     nub (FLAT (MAP (λy. reference_values (procedure_references ps y))
                  (reached_procedures (LENGTH ps + 2) ps [x])))
 End
