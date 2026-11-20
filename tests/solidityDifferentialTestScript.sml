@@ -326,8 +326,8 @@ in
 end
 
 (* The bytecode side proves a case's memory size: memory_forwarding's
- * forward_create with its true outcome but a memory size one word too large
- * fails its bytecode case. *)
+ * forward_create agrees with its true memory size and fails as a bytecode
+ * case with the same outcome but a memory size one word too large. *)
 local
   val (rejected, report) = printed (fn () =>
     (solidityBytecodeLib.run_suite_file
@@ -336,7 +336,9 @@ local
 in
   val () = if rejected andalso
       reported "differential-result: " report
-        ["\"case\":\"forward_create\"", "\"side\":\"bytecode\"", "\"status\":\"error\"",
+        ["\"case\":\"forward_create\"", "\"side\":\"bytecode\"", "\"status\":\"agree\""] andalso
+      reported "differential-result: " report
+        ["\"case\":\"forward_create_wrong_size\"", "\"side\":\"bytecode\"", "\"status\":\"error\"",
          "bytecode differs from the expectation"]
     then () else raise Fail ("memory size regression: " ^ report)
 end
