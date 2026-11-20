@@ -3,9 +3,10 @@ pragma solidity 0.8.37;
 
 // The creation code's internal dispatch holds only the functions creation
 // code names as values: here increment (in the constructor), viaHelper (in a
-// function the constructor calls), discarded (a bare expression statement)
-// and holed (a discarded tuple component). runtimeOnly is named only by
-// deployed code. The constructor overwrites op's reserved memory word with
+// function the constructor calls), discarded (a bare expression statement),
+// holed (a discarded tuple component), chained (named but never called) and
+// deep (named by chained, which creation reaches only as a value).
+// runtimeOnly is named only by deployed code. The constructor overwrites op's reserved memory word with
 // the given number and calls through it: the number of a function outside
 // the creation dispatch panics with 0x51, as one no function has does. With
 // keep set it instead copies that word to a local and back without calling
@@ -20,6 +21,7 @@ contract CreationDispatch {
         helper();
         discarded;
         (uint256 a, ) = (1, holed);
+        chained;
         assembly { mstore(0x80, word) }
         if (keep) {
             function(uint256) internal pure returns (uint256) kept = op;
@@ -48,6 +50,15 @@ contract CreationDispatch {
 
     function holed(uint256 x) internal pure returns (uint256) {
         return 4 * x;
+    }
+
+    function chained(uint256 x) internal pure returns (uint256) {
+        deep;
+        return 6 * x;
+    }
+
+    function deep(uint256 x) internal pure returns (uint256) {
+        return 7 * x;
     }
 
     function runtimeOnly(uint256 x) internal pure returns (uint256) {
