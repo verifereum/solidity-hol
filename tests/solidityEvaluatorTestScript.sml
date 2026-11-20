@@ -1054,28 +1054,41 @@ Definition long_storage_unsupported_def:
     "unsupported: a stored sequence of 2^64 or more elements encoded to memory"
 End
 
+Definition long_storage_failures_def:
+  long_storage_failures =
+    [(case storage_abi_value test_env 0 long_bytes_accounts 0w 0w BytesT of
+        INR c => SOME c | INL _ => NONE);
+     (case storage_abi_value test_env 0 long_array_accounts 0w 0w
+             (ArrayT u256 NONE) of
+        INR c => SOME c | INL _ => NONE);
+     (case storage_abi_value test_env 0 long_array_accounts 0w 0w
+             (ArrayT (ArrayT u256 NONE) NONE) of
+        INR c => SOME c | INL _ => NONE);
+     (case storage_byte_contents long_bytes_accounts
+             (StorageReference PersistentStorage 0w 0w 0 BytesT (LayoutId 0)) of
+        INR c => SOME c | INL _ => NONE);
+     (case materialize_storage test_env 0 long_bytes_accounts 0w 0w BytesT
+             initial_state of
+        INR c => SOME c | INL _ => NONE);
+     (case materialize_storage test_env 0 long_array_accounts 0w 0w
+             (ArrayT u256 NONE) initial_state of
+        INR c => SOME c | INL _ => NONE);
+     (case materialize_storage test_env 0 long_array_accounts 0w 0w
+             (ArrayT (ArrayT u256 NONE) NONE) initial_state of
+        INR c => SOME c | INL _ => NONE)]
+End
+
+val () = List.app cv_auto_trans
+  [long_storage_unsupported_def, long_storage_failures_def];
+
 Theorem storage_too_long_unsupported:
-  storage_abi_value env 0 long_bytes_accounts 0w 0w BytesT =
-    INR long_storage_unsupported ∧
-  storage_abi_value env 0 long_array_accounts 0w 0w (ArrayT u256 NONE) =
-    INR long_storage_unsupported ∧
-  storage_abi_value env 0 long_array_accounts 0w 0w
-    (ArrayT (ArrayT u256 NONE) NONE) = INR long_storage_unsupported ∧
-  storage_byte_contents long_bytes_accounts
-    (StorageReference PersistentStorage 0w 0w 0 BytesT (LayoutId 0)) =
-    INR long_storage_unsupported ∧
-  materialize_storage env 0 long_bytes_accounts 0w 0w BytesT st =
-    INR long_storage_unsupported ∧
-  materialize_storage env 0 long_array_accounts 0w 0w (ArrayT u256 NONE) st =
-    INR long_storage_unsupported ∧
-  materialize_storage env 0 long_array_accounts 0w 0w
-    (ArrayT (ArrayT u256 NONE) NONE) st = INR (PanicCompletion 65)
+  long_storage_failures =
+    [SOME long_storage_unsupported; SOME long_storage_unsupported;
+     SOME long_storage_unsupported; SOME long_storage_unsupported;
+     SOME long_storage_unsupported; SOME long_storage_unsupported;
+     SOME (PanicCompletion 65)]
 Proof
-  rpt conj_tac >>
-  simp[Once solidityABITheory.storage_abi_value_def,
-       Once solidityABITheory.materialize_storage_def,
-       long_bytes_accounts_def, long_array_accounts_def,
-       long_storage_unsupported_def] >> EVAL_TAC
+  CONV_TAC cv_eval
 QED
 
 (* return(...) in a callee ends the whole frame with its bytes. *)
