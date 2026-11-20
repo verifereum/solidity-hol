@@ -271,7 +271,11 @@ class CorpusTests(unittest.TestCase):
                 ({"function": "f", "args": [], "immutables": [1]},
                  "immutables must be a non-empty object, in a call"),
                 ({"function": "f", "args": [], "immutables": {"x": "xyz"}},
-                 r"immutables\.x must be an integer")]:
+                 r"immutables\.x must be an integer"),
+                ({"calldata": "0x", "memory_image": True},
+                 "memory_image without memory_size"),
+                ({"calldata": "0x", "memory_size": 96, "memory_image": 1},
+                 "memory_image must be a boolean")]:
             case = {**base, **fields}
             with self.subTest(fields=fields), tempfile.TemporaryDirectory() as temporary:
                 path = Path(temporary) / "corpus.json"

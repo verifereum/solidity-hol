@@ -251,6 +251,12 @@ def load_corpus(path: Path) -> dict[str, Any]:
             if "memory_size" in case:
                 # the frame's memory size at its halt, as msize would give it
                 check_word(case["memory_size"], 256, f"{what}.memory_size")
+            if "memory_image" in case:
+                # also compare the frame's final memory bytes, up to that size
+                if not isinstance(case["memory_image"], bool):
+                    raise CorpusError(f"{what}.memory_image must be a boolean")
+                if "memory_size" not in case:
+                    raise CorpusError(f"{what}: memory_image without memory_size")
             for key in ("storage", "final_storage", "peer_storage"):
                 if key in case:
                     check_storage(case[key], f"{what}.{key}")
@@ -268,7 +274,7 @@ def load_corpus(path: Path) -> dict[str, Any]:
             unknown = set(case) - {"name", "function", "deploy", "args", "calldata", "sender",
                                    "value", "storage", "peer_storage", "expect",
                                    "final_storage", "logs", "fuel", "immutables", "gas",
-                                   "memory_size"}
+                                   "memory_size", "memory_image"}
             if unknown:
                 raise CorpusError(f"{what}: unknown fields {sorted(unknown)}")
     return corpus
@@ -619,7 +625,8 @@ def write_reproduction(root: Path, directory: Path, suite: dict[str, Any],
                        "expect": case["expect"],
                        "final_storage": case.get("final_storage", {}),
                        "logs": case.get("logs", []),
-                       **({"memory_size": case["memory_size"]} if "memory_size" in case else {}),
+                       **{key: case[key] for key in ("memory_size", "memory_image")
+                          if key in case},
                        "fuel": case.get("fuel", fuel)})
     exporter.write_json_atomic(directory / "inputs.json", inputs)
     exporter.write_json_atomic(directory / "outcomes.json", result)

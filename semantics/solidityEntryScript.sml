@@ -113,13 +113,13 @@ Definition fallback_output_def:
     | [ReferenceValue r] =>
         (case byte_contents st r of
            INL (bs, st1) => (INL bs, st1)
-         | INR c => (INR c, st))
+         | INR c => (INR c, completion_memory c st))
     | _ => (INR (InvalidCompletion "bad fallback return"), st)
 End
 
 (* A frame's output, and the state after the compiled code writes the
  * encoding of its return values, and the encoder's spill past it, at the free
- * memory pointer. *)
+ * memory pointer; when the encoding panics, the panic's scratch write. *)
 Definition entry_output_def:
   entry_output env p kind st vs =
     if kind = FallbackEntry then fallback_output st vs
@@ -127,7 +127,7 @@ Definition entry_output_def:
       INL ((data, spill), st1) =>
         (INL data, let q = FST (memory_load 64 st1) in
                    memory_write (q + LENGTH data) spill (memory_write q data st1))
-    | INR c => (INR c, st)
+    | INR c => (INR c, completion_memory c st)
 End
 
 (* The end of the transaction: its pending deletions happen. *)
@@ -168,9 +168,14 @@ Definition memory_immutables_def:
     | _ => NONE)
 End
 
+(* The bytes of a state's memory, up to its size. *)
+Definition memory_image_def:
+  memory_image (st : source_state) = yul_mem_read st.memory 0 st.memory_size
+End
+
 (* One frame running procedure p on its arguments, with the values imm of
  * the immutables (NONE in a creation frame, which keeps them in its reserved
- * memory), and the frame's memory size when it ends, which source code cannot
+ * memory), and the frame's memory when it ends, which source code cannot
  * observe. An inline assembly halt returns its bytes as the frame's data; in
  * a creation frame those bytes would be the deployed code, which the source
  * does not model, so a halt there fails closed. A creation frame yields the
@@ -219,7 +224,7 @@ Definition run_entry_frame_def:
     | FramePanic code w' => ContractReverted (panic_data code) w'
     | FrameInvalid reason => ContractInvalid reason
     | FrameResourceLimit => ContractOutOfFuel),
-     (SND out).memory_size)
+     memory_image (SND out))
 End
 
 Definition run_entry_with_gas_def:
@@ -240,8 +245,7 @@ Definition unconsumed_gas_result_def:
 End
 
 (* A call of the deployed contract, whose immutables have the values imm, with
- * its frame's final memory size; NONE when dispatch ends it before a frame
- * runs. *)
+ * its frame's final memory; NONE when dispatch ends it before a frame runs. *)
 Definition call_contract_frame_def:
   call_contract_frame fuel (prog : core_program) imm (fr : source_frame)
                 (w : source_world) gas =
@@ -253,8 +257,8 @@ Definition call_contract_frame_def:
     | DispatchInvalid reason =>
         (unconsumed_gas_result gas (ContractInvalid reason), NONE)
     | DispatchCall p args kind =>
-        let (r, size) = run_entry_frame fuel env p args fr w (SOME imm) 0 NONE kind gas in
-        (r, SOME size)
+        let (r, image) = run_entry_frame fuel env p args fr w (SOME imm) 0 NONE kind gas in
+        (r, SOME image)
 End
 
 Definition call_contract_with_gas_def:
@@ -315,12 +319,12 @@ Definition deploy_contract_frame_def:
                 (unconsumed_gas_result gas (ContractReverted (panic_data n) w), NONE)
             | INR _ => (unconsumed_gas_result gas (ContractReverted [] w), NONE)
             | INL args =>
-                let (r, size) =
+                let (r, image) =
                   run_entry_frame fuel env p args (fr with call_data := []) w
                     NONE (32 * LENGTH prog.immutables)
                     (if p.parameters = [] then NONE else SOME fr.call_data)
                     CreationEntry gas in
-                (r, SOME size)
+                (r, SOME image)
 End
 
 Definition deploy_contract_with_gas_def:
