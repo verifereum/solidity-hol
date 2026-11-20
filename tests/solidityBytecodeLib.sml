@@ -570,7 +570,7 @@ fun run_bytecode_case {suite, artifact, code, initcode, fixture, declarations, r
     val memory_size =
       case JSONUtil.findField c "memory_size" of
         NONE => NONE
-      | SOME v => SOME (mk_eq (“bytecode_memory_size ^input_constant”,
+      | SOME v => SOME (mk_eq (“OPTION_MAP LENGTH (bytecode_memory ^input_constant)”,
                                optionSyntax.mk_some (num_term (integer v))))
     val evaluated = cv_eval (case memory_size of
                                NONE => equality
