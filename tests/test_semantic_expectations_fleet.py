@@ -152,8 +152,10 @@ class FleetExpectationTests(unittest.TestCase):
                           ("status", self.fleet(self.complete, status=1))):
             with self.subTest(name), tempfile.TemporaryDirectory() as temporary:
                 self.work = Path(temporary)
+                self.commands = []
                 with self.assertRaisesRegex(SystemExit, "fleet action failed") as failure:
                     self.run_batches(run, self.make_tests(1))
+                self.assertEqual(len([c for c in self.commands if "run-action" in c]), 1)
                 if name != "unavailable":
                     self.assertEqual(failure.exception.reason,
                                      {"failed": "script", "missing": "status 0",
