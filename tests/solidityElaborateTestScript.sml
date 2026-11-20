@@ -828,6 +828,9 @@ Theorem malformed_call_operands_report:
   ^(reports “elab_args ^ctx0 10 30 0 [0; 0] [ValueOf (UintT 256); ValueOf (UintT 256)]
                [^(string_at 32); ^(bad_at 33)]”
      [“(32, "string literal conversion")”, “(33, "bad")”]) ∧
+  ^(reports “elab_args ^ctx0 10 30 0 [0; 0] [ValueOf (UintT 256); ValueOf (UintT 256)]
+               [^(one_at 32); ^(bad_at 33)]”
+     [“(33, "bad")”]) ∧
   ^(reports “elab_args ^ctx0 10 30 2 [] [ValueOf (UintT 256)]
                [^(bad_at 32); ^(bad_at 33)]”
      bad_32_33) ∧

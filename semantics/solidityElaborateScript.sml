@@ -2411,7 +2411,9 @@ Definition elab_expr_def:
       case (arrange order os, arrange order (expr_ids es)) of
         (SOME os', SOME ids) =>
           (case convert_operands n1 id ids tys os' of
-             INL (cs, _, as, n2) => INL ((ss ++ cs, as), n2)
+             INL (cs, _, as, n2) =>
+               if EVERY ISL os then INL ((ss ++ cs, as), n2)
+               else INR (FLAT (MAP blockers os))
            | INR bs =>
                (* an order that isn't a permutation can drop an operand *)
                INR (if argument_order_ok order (LENGTH order) then bs
