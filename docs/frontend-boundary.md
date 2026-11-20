@@ -228,12 +228,12 @@ is the function's number in the compiler's internal dispatch, which the
 importer reads from `ContractDefinition.internalFunctionIDs` in the analyzed
 AST, and 0 for the zero value. A word no function has reads as itself and
 panics with 0x51 when called, as the compiler's internal dispatch does; a word
-of a function of another type fails closed. The compiled creation code
-dispatches only the functions creation code takes a pointer to, while the
-model resolves a word against every numbered function: a constructor calling
-through a word that assembly set to a function only the deployed code takes a
-pointer to runs that function, where the compiled constructor panics with
-0x51. A constructor keeps the
+of a function of another type fails closed. The creation code's dispatch
+holds only the functions creation code names as values (in the code the
+constructor runs and in the functions that code calls, transitively, bare
+references and discarded tuple components included), and so does the
+model's: a constructor calling through a word that assembly set to a
+function only the deployed code names panics with 0x51. A constructor keeps the
 immutables only in their reserved words, as the compiled constructor does: it
 reads them from there with the same cleanup, and the created contract's
 immutables are those words when it ends; a word its immutable's type cannot

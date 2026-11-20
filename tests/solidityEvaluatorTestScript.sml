@@ -187,7 +187,7 @@ Definition test_program_def:
     unsupported_procedures := []; procedures := [add_proc; sum_proc; fact_proc; pair_proc; first_proc;
                    spin_proc; fail_proc; call_fail_proc; callee_proc;
                    caller_proc];
-    struct_layouts := []; function_ids := []; type_declarations := [];
+    struct_layouts := []; function_ids := []; creation_function_ids := []; type_declarations := [];
     state_variables := []; immutables := [];
     entry_procedure := AstId 1;
     external_functions := []; receive_procedure := NONE;
@@ -301,7 +301,7 @@ End
 Definition storage_program_def:
   storage_program vs = <|
     unsupported_procedures := []; procedures := [store_proc];
-    struct_layouts := []; function_ids := []; type_declarations := [];
+    struct_layouts := []; function_ids := []; creation_function_ids := []; type_declarations := [];
     state_variables := vs; immutables := [];
     entry_procedure := AstId 20;
     external_functions := []; receive_procedure := NONE;
@@ -486,7 +486,7 @@ End
 Definition asm_env_def:
   asm_env code = core_program_environment <|
     unsupported_procedures := []; procedures := [asm_proc code; asm_caller; halt_proc];
-    struct_layouts := []; function_ids := []; type_declarations := [];
+    struct_layouts := []; function_ids := []; creation_function_ids := []; type_declarations := [];
     state_variables := []; immutables := [];
     entry_procedure := AstId 110;
     external_functions := []; receive_procedure := NONE;
@@ -653,7 +653,7 @@ Definition run_asm_blocks_def:
     | INL (b, st) =>
         let env = core_program_environment <|
           unsupported_procedures := []; procedures := [asm_bytes_proc codes];
-          struct_layouts := []; function_ids := []; type_declarations := [];
+          struct_layouts := []; function_ids := []; creation_function_ids := []; type_declarations := [];
           state_variables := []; immutables := [];
           entry_procedure := AstId 140;
           external_functions := []; receive_procedure := NONE;
@@ -745,7 +745,7 @@ End
 Definition asm_array_env_def:
   asm_array_env ty code = core_program_environment <|
     unsupported_procedures := []; procedures := [asm_array_proc ty code];
-    struct_layouts := []; function_ids := []; type_declarations := [];
+    struct_layouts := []; function_ids := []; creation_function_ids := []; type_declarations := [];
     state_variables := []; immutables := [];
     entry_procedure := AstId 140;
     external_functions := []; receive_procedure := NONE;
@@ -903,7 +903,7 @@ Definition run_asm_alloc_def:
     let st = memory_store 64 0xc0 (memory_store 0xa0 5 (memory_store 0x80 1 initial_state)) in
     let env = core_program_environment <|
       unsupported_procedures := []; procedures := [asm_alloc_proc ty1 ty2 code];
-      struct_layouts := []; function_ids := []; type_declarations := [];
+      struct_layouts := []; function_ids := []; creation_function_ids := []; type_declarations := [];
       state_variables := []; immutables := [];
       entry_procedure := AstId 140;
       external_functions := []; receive_procedure := NONE;
@@ -1006,7 +1006,7 @@ Definition run_asm_literal_def:
                ReturnStmt [BoundAtom (AstId 162)]] |> in
     let env = core_program_environment <|
       unsupported_procedures := []; procedures := [proc];
-      struct_layouts := []; function_ids := []; type_declarations := [];
+      struct_layouts := []; function_ids := []; creation_function_ids := []; type_declarations := [];
       state_variables := []; immutables := [];
       entry_procedure := AstId 160;
       external_functions := []; receive_procedure := NONE;
@@ -1163,7 +1163,7 @@ Definition asm_typed_def:
     let env = core_program_environment <|
       unsupported_procedures := []; procedures := [p];
       struct_layouts := [];
-      function_ids := []; type_declarations := [(AstId 900, EnumDeclaration 3);
+      function_ids := []; creation_function_ids := []; type_declarations := [(AstId 900, EnumDeclaration 3);
                             (AstId 901, UserValueDeclaration (FixedBytesT 4))];
       state_variables := []; immutables := [];
       entry_procedure := AstId 110;
@@ -1339,7 +1339,7 @@ Definition run_return_bytes_def:
   run_return_bytes op code =
     let env = core_program_environment <|
       unsupported_procedures := []; procedures := [return_bytes_proc op code];
-      struct_layouts := []; function_ids := []; type_declarations := [];
+      struct_layouts := []; function_ids := []; creation_function_ids := []; type_declarations := [];
       state_variables := []; immutables := [];
       entry_procedure := AstId 150;
       external_functions := []; receive_procedure := NONE;
@@ -1500,7 +1500,7 @@ Definition run_rd_def:
   run_rd pre codes =
     (invoke_source 20 (core_program_environment <|
         unsupported_procedures := []; procedures := [rd_proc pre codes];
-        struct_layouts := []; function_ids := []; type_declarations := [];
+        struct_layouts := []; function_ids := []; creation_function_ids := []; type_declarations := [];
         state_variables := []; immutables := [];
         entry_procedure := AstId 130;
         external_functions := []; receive_procedure := NONE;
@@ -1666,7 +1666,7 @@ Definition run_asm_pointer_def:
   run_asm_pointer code p =
     let env = core_program_environment <|
       unsupported_procedures := []; procedures := [asm_pointer_proc code];
-      struct_layouts := []; function_ids := []; type_declarations := [];
+      struct_layouts := []; function_ids := []; creation_function_ids := []; type_declarations := [];
       state_variables := []; immutables := [];
       entry_procedure := AstId 160;
       external_functions := []; receive_procedure := NONE;
@@ -1717,7 +1717,7 @@ Definition run_asm_calldata_def:
   run_asm_calldata code b =
     let env = core_program_environment <|
       unsupported_procedures := []; procedures := [asm_calldata_proc code];
-      struct_layouts := []; function_ids := []; type_declarations := [];
+      struct_layouts := []; function_ids := []; creation_function_ids := []; type_declarations := [];
       state_variables := []; immutables := [];
       entry_procedure := AstId 170;
       external_functions := []; receive_procedure := NONE;

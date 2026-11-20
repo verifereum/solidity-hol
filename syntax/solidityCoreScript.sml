@@ -325,7 +325,10 @@ End
  * functions the frontend could not model: they have no procedure, so the
  * dispatch entries naming them refuse, and no procedure can call them. The
  * function ids give each procedure an internal function value can name the
- * number the compiler holds that value as. *)
+ * number the compiler holds that value as; the creation function ids are
+ * the functions the creation code's internal dispatch holds, those creation
+ * code names as values, and the only ones an internal function value calls
+ * during creation. *)
 Datatype:
   core_program = <|
     procedures : core_procedure list;
@@ -339,7 +342,8 @@ Datatype:
     receive_procedure : ast_id option;
     fallback_procedure : (ast_id # bool) option;
     creation_procedure : (ast_id # bool) option;
-    function_ids : (ast_id # num) list
+    function_ids : (ast_id # num) list;
+    creation_function_ids : ast_id list
   |>
 End
 

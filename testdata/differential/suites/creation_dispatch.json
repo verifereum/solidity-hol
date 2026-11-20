@@ -1,0 +1,120 @@
+{
+  "name": "creation_dispatch",
+  "source": "testdata/differential/creation_dispatch.sol",
+  "contract": "CreationDispatch",
+  "artifact": "testdata/differential/expected/creation_dispatch.json",
+  "cases": [
+    {
+      "name": "creation_calls_constructor_named_function",
+      "deploy": true,
+      "args": [
+        1,
+        false
+      ],
+      "expect": {
+        "return": []
+      },
+      "final_storage": {
+        "0": 6
+      }
+    },
+    {
+      "name": "creation_calls_function_named_by_called_function",
+      "deploy": true,
+      "args": [
+        2,
+        false
+      ],
+      "expect": {
+        "return": []
+      },
+      "final_storage": {
+        "0": 10
+      }
+    },
+    {
+      "name": "creation_calls_function_named_by_bare_statement",
+      "deploy": true,
+      "args": [
+        3,
+        false
+      ],
+      "expect": {
+        "return": []
+      },
+      "final_storage": {
+        "0": 15
+      }
+    },
+    {
+      "name": "creation_calls_function_named_by_tuple_hole",
+      "deploy": true,
+      "args": [
+        4,
+        false
+      ],
+      "expect": {
+        "return": []
+      },
+      "final_storage": {
+        "0": 20
+      }
+    },
+    {
+      "name": "creation_panics_on_runtime_only_function",
+      "deploy": true,
+      "args": [
+        5,
+        false
+      ],
+      "expect": {
+        "revert": "0x4e487b710000000000000000000000000000000000000000000000000000000000000051"
+      }
+    },
+    {
+      "name": "creation_copies_runtime_only_function_word",
+      "deploy": true,
+      "args": [
+        5,
+        true
+      ],
+      "expect": {
+        "revert": "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000050000000000000000000000000000000000000000000000000000000000000005000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    {
+      "name": "creation_panics_on_zero_word",
+      "deploy": true,
+      "args": [
+        0,
+        false
+      ],
+      "expect": {
+        "revert": "0x4e487b710000000000000000000000000000000000000000000000000000000000000051"
+      }
+    },
+    {
+      "name": "creation_panics_on_word_past_functions",
+      "deploy": true,
+      "args": [
+        6,
+        false
+      ],
+      "expect": {
+        "revert": "0x4e487b710000000000000000000000000000000000000000000000000000000000000051"
+      }
+    },
+    {
+      "name": "runtime_calls_runtime_only_function",
+      "function": "useRuntime",
+      "args": [
+        7
+      ],
+      "expect": {
+        "return": [
+          35
+        ]
+      }
+    }
+  ]
+}
