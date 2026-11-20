@@ -14,6 +14,8 @@ import run_semantic_expectations as runner
 
 CONFIGURED = {"HOLBUILD_REMOTE_CACHE_URL": "https://cache.invalid"}
 DONE = f"solidity-hol:{runner.CONTEXT} " + "a" * 64 + " done\n"
+# holbuild's own line (sml/commands.sml) for a run that ended but didn't fetch.
+NOT_FETCHED = "holbuild: remote execution: could not fetch the outputs of 1 runs from the remote cache\n"
 
 
 class Action:
@@ -71,7 +73,7 @@ class FleetExpectationTests(unittest.TestCase):
             outputs.mkdir(parents=True, exist_ok=True)
             text = (write or (lambda d, b: DONE))(outputs, batch)
             kwargs["stdout"].write(text)
-            exits = runner.NO_COORDINATOR in text or runner.NOT_FETCHED in text
+            exits = runner.NO_COORDINATOR in text or NOT_FETCHED in text
             return subprocess.CompletedProcess(command, 75 if exits else status)
         return run
 
@@ -159,8 +161,7 @@ class FleetExpectationTests(unittest.TestCase):
                 self.assertEqual(runner.completed_tests(self.work), set())
 
     def not_fetched(self, outputs: Path, batch: dict[str, Any]) -> str:
-        return (DONE.replace(" done", " missing") + "holbuild: remote execution: "
-                + runner.NOT_FETCHED + " 1 runs from the remote cache\n")
+        return DONE.replace(" done", " missing") + NOT_FETCHED
 
     def test_a_batch_whose_outputs_did_not_fetch_runs_again(self) -> None:
         attempts = []
@@ -171,7 +172,7 @@ class FleetExpectationTests(unittest.TestCase):
 
         self.run_batches(self.fleet(fetched_second_time), self.make_tests(1))
         self.assertEqual(len(attempts), 2)
-        self.assertIn(runner.NOT_FETCHED, (self.work / "batch-0000" / "hol.1.log").read_text())
+        self.assertIn(NOT_FETCHED, (self.work / "batch-0000" / "hol.1.log").read_text())
         self.assertEqual(runner.completed_tests(self.work), {"t0.sol"})
 
     def test_a_batch_whose_outputs_never_fetch_fails_after_its_attempts(self) -> None:
