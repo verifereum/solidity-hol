@@ -166,6 +166,7 @@ class CorpusTests(unittest.TestCase):
     def test_write_theories_refreshes_rollup(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             fake = FakeRoot(Path(temporary))
+            driver.theories.refresh_rollup(fake.root, driver.load_corpus(fake.root / driver.CORPUS))
             suite = json.loads((fake.root / "testdata/differential/suites/a.json").read_text())
             fake.write("testdata/differential/suites/b.json", json.dumps({**suite, "name": "b"}))
             with contextlib.redirect_stdout(io.StringIO()):
