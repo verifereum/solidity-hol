@@ -16,6 +16,8 @@ fun holbuild_extra_deps (_ : string list) = ()
 val () = holbuild_extra_deps [
   "../testdata/differential/expected/mutant.json",
   "../testdata/differential/negative/bridge.json",
+  "../testdata/differential/negative/memory_size.json",
+  "../testdata/differential/expected/memory_images.json",
   "../testdata/differential/expected/storage.json",
   "../testdata/differential/storage.sol", "../SOLIDITY_PIN",
   "../testdata/differential/expected/gas_invalid.json",
@@ -321,6 +323,22 @@ in
       reported ["\"case\":\"get_total_reads_storage\"",
                 "\"status\":\"inconclusive\"", "UnknownFunction"]
     then () else raise Fail ("bridge regression: " ^ report)
+end
+
+(* The bytecode side proves a case's memory size: memory_forwarding's
+ * forward_create with its true outcome but a memory size one word too large
+ * fails its bytecode case. *)
+local
+  val (rejected, report) = printed (fn () =>
+    (solidityBytecodeLib.run_suite_file
+       {root = "..", suite_file = "testdata/differential/negative/memory_size.json"}; false)
+    handle HOL_ERR _ => true)
+in
+  val () = if rejected andalso
+      reported "differential-result: " report
+        ["\"case\":\"forward_create\"", "\"side\":\"bytecode\"", "\"status\":\"error\"",
+         "bytecode differs from the expectation"]
+    then () else raise Fail ("memory size regression: " ^ report)
 end
 
 (* The expectations replay on a call that aborts (INVALID): it fails with no
