@@ -58,7 +58,7 @@ class FleetExpectationTests(unittest.TestCase):
         return tests
 
     def fleet(self, write: Callable[[Path, dict[str, Any]], str] | None = None,
-              status: int = 0) -> Callable[..., subprocess.CompletedProcess[str]]:
+              status: int | None = None) -> Callable[..., subprocess.CompletedProcess[str]]:
         """A holbuild whose run-action completes every test of the staged batch."""
         def run(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
             self.commands.append(command)
@@ -73,8 +73,10 @@ class FleetExpectationTests(unittest.TestCase):
             outputs.mkdir(parents=True, exist_ok=True)
             text = (write or (lambda d, b: DONE))(outputs, batch)
             kwargs["stdout"].write(text)
-            exits = runner.NO_COORDINATOR in text or NOT_FETCHED in text
-            return subprocess.CompletedProcess(command, 75 if exits else status)
+            if status is None:
+                exits = runner.NO_COORDINATOR in text or NOT_FETCHED in text
+                return subprocess.CompletedProcess(command, 75 if exits else 0)
+            return subprocess.CompletedProcess(command, status)
         return run
 
     def run_batches(self, run: Callable[..., Any], tests: list[dict[str, Any]],
@@ -149,7 +151,8 @@ class FleetExpectationTests(unittest.TestCase):
 
         for name, run in (("failed", self.fleet(failed)), ("missing", self.fleet(missing)),
                           ("unavailable", self.fleet(unavailable, status=75)),
-                          ("status", self.fleet(self.complete, status=1))):
+                          ("status", self.fleet(self.complete, status=1)),
+                          ("not fetched, status 1", self.fleet(self.not_fetched, status=1))):
             with self.subTest(name), tempfile.TemporaryDirectory() as temporary:
                 self.work = Path(temporary)
                 self.commands = []
@@ -159,7 +162,7 @@ class FleetExpectationTests(unittest.TestCase):
                 if name != "unavailable":
                     self.assertEqual(failure.exception.reason,
                                      {"failed": "script", "missing": "status 0",
-                                      "status": "status 1"}[name])
+                                      "status": "status 1", "not fetched, status 1": "status 1"}[name])
                 self.assertEqual(runner.completed_tests(self.work), set())
 
     def not_fetched(self, outputs: Path, batch: dict[str, Any]) -> str:
