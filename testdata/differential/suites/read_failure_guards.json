@@ -1,0 +1,75 @@
+{
+  "name": "read_failure_guards",
+  "source": "testdata/differential/read_failure_guards.sol",
+  "contract": "ReadFailureGuards",
+  "artifact": "testdata/differential/expected/read_failure_guards.json",
+  "cases": [
+    {
+      "name": "encoder_below_fp_panics",
+      "calldata": "0x64da0650",
+      "expect": {
+        "panic": 33
+      }
+    },
+    {
+      "name": "packed_below_fp_panics",
+      "function": "packedBelowFpPanics",
+      "args": [],
+      "expect": {
+        "panic": 33
+      }
+    },
+    {
+      "name": "emit_below_fp_panics",
+      "function": "emitBelowFpPanics",
+      "args": [
+        "0x"
+      ],
+      "expect": {
+        "panic": 33
+      }
+    },
+    {
+      "name": "copy_dyn_non_static_panics",
+      "function": "copyDyn",
+      "args": [],
+      "expect": {
+        "panic": 33
+      }
+    },
+    {
+      "name": "copy_struct_non_static_panics",
+      "function": "copyStruct",
+      "args": [],
+      "expect": {
+        "panic": 33
+      }
+    },
+    {
+      "name": "copy_fixed_non_static_panics",
+      "function": "copyFixed",
+      "args": [],
+      "expect": {
+        "panic": 33
+      }
+    },
+    {
+      "name": "copy_fixed2_non_static_panics",
+      "function": "copyFixed2",
+      "args": [],
+      "expect": {
+        "panic": 33
+      }
+    },
+    {
+      "name": "self_copy_succeeds",
+      "function": "selfCopy",
+      "args": [],
+      "expect": {
+        "return": [
+          0
+        ]
+      }
+    }
+  ]
+}
