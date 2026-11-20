@@ -68,10 +68,11 @@ class FleetExpectationTests(unittest.TestCase):
             script = Path(command[command.index("--script") + 1])
             batch = json.loads((script.parent / "batch.json").read_text())
             outputs = Path(command[command.index("--outputs-dir") + 1]) / "solidity-hol" / runner.CONTEXT
-            outputs.mkdir(parents=True)
+            outputs.mkdir(parents=True, exist_ok=True)
             text = (write or (lambda d, b: DONE))(outputs, batch)
             kwargs["stdout"].write(text)
-            return subprocess.CompletedProcess(command, 75 if runner.NO_COORDINATOR in text else status)
+            exits = runner.NO_COORDINATOR in text or runner.NOT_FETCHED in text
+            return subprocess.CompletedProcess(command, 75 if exits else status)
         return run
 
     def run_batches(self, run: Callable[..., Any], tests: list[dict[str, Any]],
@@ -156,6 +157,29 @@ class FleetExpectationTests(unittest.TestCase):
                                      {"failed": "script", "missing": "status 0",
                                       "status": "status 1"}[name])
                 self.assertEqual(runner.completed_tests(self.work), set())
+
+    def not_fetched(self, outputs: Path, batch: dict[str, Any]) -> str:
+        return (DONE.replace(" done", " missing") + "holbuild: remote execution: "
+                + runner.NOT_FETCHED + " 1 runs from the remote cache\n")
+
+    def test_a_batch_whose_outputs_did_not_fetch_runs_again(self) -> None:
+        attempts = []
+
+        def fetched_second_time(outputs: Path, batch: dict[str, Any]) -> str:
+            attempts.append(batch)
+            return self.not_fetched(outputs, batch) if len(attempts) == 1 else self.complete(outputs, batch)
+
+        self.run_batches(self.fleet(fetched_second_time), self.make_tests(1))
+        self.assertEqual(len(attempts), 2)
+        self.assertIn(runner.NOT_FETCHED, (self.work / "batch-0000" / "hol.1.log").read_text())
+        self.assertEqual(runner.completed_tests(self.work), {"t0.sol"})
+
+    def test_a_batch_whose_outputs_never_fetch_fails_after_its_attempts(self) -> None:
+        with self.assertRaisesRegex(SystemExit, "fleet action failed") as failure:
+            self.run_batches(self.fleet(self.not_fetched), self.make_tests(1))
+        self.assertEqual(failure.exception.reason, "status 75")
+        self.assertEqual(len([c for c in self.commands if "run-action" in c]), runner.FETCH_ATTEMPTS)
+        self.assertEqual(runner.completed_tests(self.work), set())
 
     def test_a_running_action_past_its_cap_is_stopped_but_a_queued_one_is_not(self) -> None:
         log = self.work / "hol.log"
