@@ -849,6 +849,28 @@ Proof
   EVAL_TAC
 QED
 
+(* Each level of a deep nesting of rejected operand lists reports its own
+ * failing operand, and the innermost one is reported once. The operands are
+ * elaborated in one pass: elaborating a rejected list's operands again to
+ * report them would visit the innermost one 2^30 times. *)
+fun nested_modular 0 = bad_at 1000
+  | nested_modular k =
+      “SrcModular ^(at (1000 + 4 * k)) ^(at (1001 + 4 * k)) AddModOp
+         [^(nested_modular (k - 1)); ^(string_at (1002 + 4 * k)); ^(one_at (1003 + 4 * k))]
+         "t_uint256"”;
+val nested_reports =
+  listSyntax.mk_list
+    (“(1000, "bad")” ::
+     List.tabulate (30, fn k =>
+       “(^(numSyntax.term_of_int (1006 + 4 * k)), "string literal conversion")”),
+     “:num # string”);
+
+Theorem nested_rejected_operands_report:
+  blockers (elab_expr ^ctx0 10 ^(nested_modular 30)) = ^nested_reports
+Proof
+  CONV_TAC cv_eval
+QED
+
 (* The unit elaborates, so nothing in it fails. *)
 Theorem pure_core_has_no_failures:
   unit_elaboration_failures T pure_core = []
