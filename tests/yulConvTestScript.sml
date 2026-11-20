@@ -332,6 +332,49 @@ fun under_clock secs thunk =
   (SOME (Timeout.apply (Time.fromReal secs) thunk ())
      handle Timeout.TIMEOUT _ => NONE)
 
+(* Computing Keccak over a symbolic word would expand the hash rounds
+ * while the converter is still evaluating the surrounding function. *)
+val () =
+  let
+    val fns = “yul_env
+      [YulFunction "hash_word" ["x"] ["hash"]
+        [YulExprStmt (YulBuiltin YMStore [YulLit (LitNumber 0w); YulName "x"]);
+         YulAssign ["hash"]
+           (YulBuiltin YKeccak256 [YulLit (LitNumber 0w); YulLit (LitNumber 32w)])]]”
+    val x = hd arg_names
+    val call = “invoke_yul 20 ^fns "hash_word" [^x] ^yul_conv_machine_term”
+    val result = “EvalValues [word_of_bytes T 0w (Keccak_256_w64 hash_bytes)] m”
+    fun check () =
+      let
+        val form = rhs (concl (yulConvLib.yul_invoke_conv [] call))
+        val (inst, _) = match_term result form
+          handle HOL_ERR _ => fail "hash_word did not return a folded Keccak hash"
+        val bytes = subst inst “hash_bytes : word8 list”
+        val expected = “word_to_bytes_be ^x”
+        fun normalise tm = rhs (concl (EVAL tm))
+        val concrete = “Keccak_256_w64 (REPLICATE 32 (0w : word8))”
+        val digest = “word_to_bytes_be
+          (0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563w : bytes32)”
+      in
+        if not (aconv (normalise bytes) (normalise expected)) then
+          fail "hash_word did not hash the stored word's big-endian bytes"
+        else if not (yulConvLib.is_closed_form form andalso
+                     yulConvLib.is_fixed_point [] form) then
+          fail "hash_word left unfinished Yul evaluation"
+        else if not (yulConvLib.is_fixed_point []
+                       “Keccak_256_w64 [b : word8; 0w]”) then
+          fail "Keccak unfolded on a list containing a symbolic byte"
+        else if not (aconv (rhs (concl (yulConvLib.yul_eval_conv [] fns concrete)))
+                           (normalise digest)) then
+          fail "Keccak on literal bytes did not compute the expected digest"
+        else ()
+      end
+  in
+    case under_clock 60.0 check of
+      NONE => fail "Keccak conversion did not come back within 60s"
+    | SOME () => print "yulConvTest: symbolic Keccak stays folded and literal Keccak computes\n"
+  end
+
 fun convert f =
   let val t = call_term f in
     case under_clock 60.0 (fn () => yulConvLib.yul_invoke_conv table_defs t) of

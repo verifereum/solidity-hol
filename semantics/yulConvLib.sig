@@ -70,9 +70,9 @@ sig
    *)
   val residues : term -> (string * string) list
 
-  (* The residues a form may have: the call and the loop it left folded; the
-   * operations
-   * whose input is a value nobody has -- the evaluator's own frame and memory
+  (* The residues a form may have: folded calls and loops, Keccak hashes
+   * on symbolic bytes, and operations whose input is a value nobody has --
+   * the evaluator's own frame and memory
    * operations, FLOOKUP of a scope that came out of a callee's frame, and the
    * scope readers, which the conversion always unfolds but which have nothing
    * to unfold to over a scope a callee has not returned; and the result and
