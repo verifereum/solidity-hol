@@ -21,7 +21,7 @@ Definition scalar_env_def:
     procedures := [];
     state_variables := []; immutables := [];
     struct_layouts := [];
-    function_ids := []; type_declarations := [(AstId 900, EnumDeclaration 3);
+    function_ids := []; creation_function_ids := []; type_declarations := [(AstId 900, EnumDeclaration 3);
                           (AstId 901, UserValueDeclaration (UintT 64))]
   |>
 End

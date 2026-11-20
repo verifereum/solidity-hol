@@ -25,7 +25,8 @@ Datatype:
     immutables : (ast_id # sol_type) list;
     struct_layouts : (ast_id # core_struct_layout) list;
     type_declarations : (ast_id # core_type_declaration) list;
-    function_ids : (ast_id # num) list
+    function_ids : (ast_id # num) list;
+    creation_function_ids : ast_id list
   |>
 End
 
@@ -36,7 +37,8 @@ Definition core_program_environment_def:
     immutables := prog.immutables;
     struct_layouts := MAP (λs. (s.struct_id, s)) prog.struct_layouts;
     type_declarations := prog.type_declarations;
-    function_ids := prog.function_ids
+    function_ids := prog.function_ids;
+    creation_function_ids := prog.creation_function_ids
   |>
 End
 

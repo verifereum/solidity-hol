@@ -125,6 +125,8 @@ Proof
     rename1 ‘eval_atom _ _ = SOME (ScalarValue (InternalFunctionValue go))’ >>
     Cases_on ‘go’ >> Cases_on ‘eval_atoms st.scopes atoms’ >> gvs[] >>
     rename1 ‘invoke_source _ _ f vs _ _’ >>
+    Cases_on ‘st.immutables = NONE’ >>
+    Cases_on ‘MEM f env.creation_function_ids’ >> gvs[] >>
     Cases_on ‘(invoke_source n env f vs st gas).completion = FuelExhausted’ >>
     gvs[bind_call_result_def])
   >~ [‘bind_call_result’] >-

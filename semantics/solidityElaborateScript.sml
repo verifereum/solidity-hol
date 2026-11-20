@@ -1156,7 +1156,7 @@ Definition computed_struct_layouts_def:
   (computed_struct_layouts (SUC n) structs =
     let layouts = computed_struct_layouts n structs in
     let env = <| procedures := []; state_variables := []; immutables := [];
-                 function_ids := []; type_declarations := [];
+                 function_ids := []; creation_function_ids := []; type_declarations := [];
                  struct_layouts := MAP (λs. (s.struct_id, s)) layouts |> in
     FLAT (MAP (λs.
       case computed_struct_fields env 0 0 s.struct_members of
@@ -1208,13 +1208,13 @@ Definition located_binding_ok_def:
            (SOME decls, SOME layouts) =>
              storage_type_ok <| procedures := []; state_variables := []; immutables := [];
                                 struct_layouts := MAP (λs. (s.struct_id, s)) layouts;
-                                function_ids := []; type_declarations := decls |> element
+                                function_ids := []; creation_function_ids := []; type_declarations := decls |> element
          | _ => F)
     | LocatedT _ element =>
         (case elab_type_declarations enums structs of
            SOME decls =>
              memory_type_ok <| procedures := []; state_variables := []; immutables := [];
-                               struct_layouts := []; function_ids := []; type_declarations := decls |>
+                               struct_layouts := []; function_ids := []; creation_function_ids := []; type_declarations := decls |>
                (LENGTH decls) element
          | NONE => F)
     | _ => T
@@ -1236,7 +1236,7 @@ Definition abi_binding_ok_def:
     case elab_type_declarations enums structs of
       SOME decls =>
         abi_type_ok <| procedures := []; state_variables := []; immutables := [];
-                       struct_layouts := []; function_ids := []; type_declarations := decls |> ty
+                       struct_layouts := []; function_ids := []; creation_function_ids := []; type_declarations := decls |> ty
     | NONE => F
 End
 
@@ -1247,7 +1247,7 @@ Definition static_binding_ok_def:
     case elab_type_declarations enums structs of
       SOME decls =>
         static_object_type <| procedures := []; state_variables := []; immutables := [];
-                              struct_layouts := []; function_ids := []; type_declarations := decls |>
+                              struct_layouts := []; function_ids := []; creation_function_ids := []; type_declarations := decls |>
           (LENGTH decls) ty
     | NONE => F
 End
@@ -1607,12 +1607,16 @@ Definition elab_expr_def:
                  case ALOOKUP ctx.functions x of
                    SOME callee =>
                      (* a function as an internal function value, naming the
-                        procedure a call of it would run *)
+                        procedure a call of it would run; bound where it is
+                        written, so a discarded one still counts as named
+                        (creation_dispatch) *)
                      (case function_value_type callee tid of
                         SOME ty =>
-                          INL (([], ConstantAtom (InternalFunctionValue
-                                      (INL (AstId callee.fn_info.node_id))),
-                                ElabType ty), n)
+                          let (ss, a) = bind_value n ty
+                                (ConvertOperation ty
+                                   (ConstantAtom (InternalFunctionValue
+                                      (INL (AstId callee.fn_info.node_id))))) in
+                          INL ((ss, a, ElabType ty), n + 1)
                       | NONE => INR [(info.node_id, "unsupported function value")])
                  | NONE => unknown_reference ctx info.node_id "unsupported identifier" x)
     | SrcArrayLength info root_expr tid =>
@@ -2997,7 +3001,7 @@ Definition elab_enum_environment_def:
   elab_enum_environment ctx =
     <| procedures := []; state_variables := []; immutables := [];
        struct_layouts := [];
-       function_ids := []; type_declarations :=
+       function_ids := []; creation_function_ids := []; type_declarations :=
          MAP (λ(id, members). (AstId id, EnumDeclaration members)) ctx.enums |>
 End
 
@@ -3998,6 +4002,68 @@ Definition dropped_constants_def:
          c0.contract_constants)
 End
 
+(* The procedures a statement list calls (INL) and the functions it names as
+ * internal function values (INR). A function value is only ever written as
+ * the conversion elab_expr binds it with. *)
+Definition operation_references_def:
+  operation_references op =
+    case op of
+      InternalCallOperation f _ => [INL f]
+    | ConvertOperation _ (ConstantAtom (InternalFunctionValue (INL f))) =>
+        [INR f]
+    | _ => []
+End
+
+Definition stmt_references_def:
+  (stmt_references (DefineStmt _ _ op) = operation_references op) ∧
+  (stmt_references (IfStmt _ ts es) =
+     stmts_references ts ++ stmts_references es) ∧
+  (stmt_references (WhileStmt pre _ body) =
+     stmts_references pre ++ stmts_references body) ∧
+  (stmt_references _ = []) ∧
+  (stmts_references [] = []) ∧
+  (stmts_references (s :: ss) = stmt_references s ++ stmts_references ss)
+End
+
+Definition reference_name_def:
+  (reference_name (INL (f : ast_id)) = f) ∧
+  (reference_name (INR f) = f)
+End
+
+Definition reference_values_def:
+  (reference_values [] = []) ∧
+  (reference_values (INL _ :: rs) = reference_values rs) ∧
+  (reference_values (INR (f : ast_id) :: rs) = f :: reference_values rs)
+End
+
+Definition procedure_references_def:
+  (procedure_references [] x = []) ∧
+  (procedure_references ((p : core_procedure) :: ps) x =
+    if p.procedure_id = x then stmts_references p.body
+    else procedure_references ps x)
+End
+
+(* The procedures xs reach by calls and function values, as the compiler
+ * queues a function for code generation when code it generates calls it or
+ * names it as a value. Each round adds a procedure or ends, so
+ * LENGTH ps + 2 rounds are enough. *)
+Definition reached_procedures_def:
+  (reached_procedures 0 ps xs = xs) ∧
+  (reached_procedures (SUC k) ps xs =
+    let ys = nub (xs ++ MAP reference_name
+                          (FLAT (MAP (procedure_references ps) xs))) in
+    if LENGTH ys = LENGTH xs then xs else reached_procedures k ps ys)
+End
+
+(* The creation code's internal dispatch: the functions named as values by
+ * the creation procedure x and the procedures it reaches, as the compiler's
+ * addToInternalDispatch collects them while generating the creation code. *)
+Definition creation_dispatch_def:
+  creation_dispatch ps x =
+    nub (FLAT (MAP (λy. reference_values (procedure_references ps y))
+                 (reached_procedures (LENGTH ps + 2) ps [x])))
+End
+
 Definition elaborate_contract_def:
   elaborate_contract ctx (c0 : src_contract) (c : src_contract) state immutables n =
     let fs = live_functions c.contract_functions in
@@ -4031,8 +4097,8 @@ Definition elaborate_contract_def:
         case (ps, creation) of
           ([], INR _) => NONE
         | _ =>
-        SOME <| procedures :=
-                  ps ++ (case creation of INL p => [p] | INR _ => []);
+        let procs = ps ++ (case creation of INL p => [p] | INR _ => []) in
+        SOME <| procedures := procs;
                 unsupported_procedures :=
                   unsupported_functions c ++ dropped_constants c0 c ++
                   (case creation of INL _ => [] | INR x => [x]);
@@ -4041,6 +4107,7 @@ Definition elaborate_contract_def:
                 struct_layouts := layouts; type_declarations := decls;
                 function_ids :=
                   MAP (λ(x, n). (AstId x, n)) c.contract_function_ids;
+                creation_function_ids := creation_dispatch procs creation_id;
                 entry_procedure :=
                   (case ps of
                      p :: _ => p.procedure_id
@@ -4678,6 +4745,13 @@ val () = cv_auto_trans unsupported_functions_def;
 val () = cv_auto_trans unsupported_creation_def;
 val () = cv_auto_trans live_constants_def;
 val () = cv_auto_trans dropped_constants_def;
+val () = cv_auto_trans operation_references_def;
+val () = cv_auto_trans stmt_references_def;
+val () = cv_auto_trans reference_name_def;
+val () = cv_auto_trans reference_values_def;
+val () = cv_auto_trans procedure_references_def;
+val () = cv_auto_trans reached_procedures_def;
+val () = cv_auto_trans creation_dispatch_def;
 val () = cv_auto_trans elaborate_contract_def;
 val () = cv_auto_trans table_blockers_def;
 val () = cv_auto_trans contract_blockers_def;
