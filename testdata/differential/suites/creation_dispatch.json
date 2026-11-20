@@ -111,6 +111,17 @@
       }
     },
     {
+      "name": "creation_panics_on_directly_called_function",
+      "deploy": true,
+      "args": [
+        8,
+        false
+      ],
+      "expect": {
+        "revert": "0x4e487b710000000000000000000000000000000000000000000000000000000000000051"
+      }
+    },
+    {
       "name": "creation_panics_on_zero_word",
       "deploy": true,
       "args": [
@@ -125,7 +136,7 @@
       "name": "creation_panics_on_word_past_functions",
       "deploy": true,
       "args": [
-        8,
+        9,
         false
       ],
       "expect": {
@@ -141,6 +152,18 @@
       "expect": {
         "return": [
           35
+        ]
+      }
+    },
+    {
+      "name": "runtime_calls_directly_called_function",
+      "function": "useDirect",
+      "args": [
+        7
+      ],
+      "expect": {
+        "return": [
+          56
         ]
       }
     }

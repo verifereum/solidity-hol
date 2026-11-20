@@ -6,12 +6,14 @@ pragma solidity 0.8.37;
 // function the constructor calls), discarded (a bare expression statement),
 // holed (a discarded tuple component), chained (named but never called) and
 // deep (named by chained, which creation reaches only as a value).
-// runtimeOnly is named only by deployed code. The constructor overwrites op's reserved memory word with
-// the given number and calls through it: the number of a function outside
-// the creation dispatch panics with 0x51, as one no function has does. With
-// keep set it instead copies that word to a local and back without calling
-// it and dumps memory, so a word outside the creation dispatch is still read
-// and written as the function it numbers.
+// runtimeOnly is named only by deployed code, and directOnly is called
+// directly during creation but named as a value only by deployed code. The
+// constructor overwrites op's reserved memory word with the given number and
+// calls through it: the number of a function outside the creation dispatch
+// panics with 0x51, as one no function has does. With keep set it instead
+// copies that word to a local and back without calling it and dumps memory,
+// so a word outside the creation dispatch is still read and written as the
+// function it numbers.
 contract CreationDispatch {
     function(uint256) internal pure returns (uint256) immutable op;
     uint256 public result;
@@ -22,6 +24,7 @@ contract CreationDispatch {
         discarded;
         (uint256 a, ) = (1, holed);
         chained;
+        directOnly(a);
         assembly { mstore(0x80, word) }
         if (keep) {
             function(uint256) internal pure returns (uint256) kept = op;
@@ -65,8 +68,17 @@ contract CreationDispatch {
         return 5 * x;
     }
 
+    function directOnly(uint256 x) internal pure returns (uint256) {
+        return 8 * x;
+    }
+
     function useRuntime(uint256 x) external pure returns (uint256) {
         function(uint256) internal pure returns (uint256) f = runtimeOnly;
+        return f(x);
+    }
+
+    function useDirect(uint256 x) external pure returns (uint256) {
+        function(uint256) internal pure returns (uint256) f = directOnly;
         return f(x);
     }
 }
