@@ -2184,6 +2184,34 @@ Proof
   CONV_TAC cv_eval
 QED
 
+(* With no argument in memory, an indexed calldata preimage that moves the free
+ * memory pointer below a stored array's slot hash fails closed: the compiled
+ * encoder would write the log's data where that hash later overwrites it. *)
+Definition stored_emit_guard_check_def:
+  stored_emit_guard_check =
+    let arr = ArrayT u256 NONE in
+    (emit_event static_copy_env NONE
+       [(LocatedT CalldataLoc BytesT, T, BoundAtom (AstId 1));
+        (LocatedT StorageLoc arr, F, BoundAtom (AstId 2))]
+       (memory_store 64 0x40 initial_state with <|
+          frame := initial_state.frame with call_data := REPLICATE 32 0w;
+          scopes := [FEMPTY
+            |+ (1, <| binding_type := SingleType (LocatedT CalldataLoc BytesT);
+                      binding_value := ReferenceValue (CalldataReference 0 32 BytesT) |>)
+            |+ (2, <| binding_type := SingleType (LocatedT StorageLoc arr);
+                      binding_value := ReferenceValue (static_copy_dst 6w arr) |>)] |>)
+       []).completion
+End
+
+val () = cv_auto_trans stored_emit_guard_check_def;
+
+Theorem stored_emit_preimage_pointer_move_fails_closed:
+  stored_emit_guard_check =
+    InvalidCompletion "unsupported: encoder reach overlaps a free memory pointer moved by an event's hash preimage"
+Proof
+  CONV_TAC cv_eval
+QED
+
 (* dispatch and deploy_contract_frame pass parameter-decode InvalidCompletion
  * through instead of converting it to a revert. *)
 Definition bad_param_program_def:
