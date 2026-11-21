@@ -244,13 +244,15 @@ Where the compiled code's memory behaviour depends on something the model
 does not track, execution stops with an `unsupported:` completion naming the
 case, rather than guessing. There are nine such cases:
 
-- an encoder input at or above the free memory pointer, which the compiled
-  encoder overwrites before it reads it;
+- an encoder input with a byte at or above the free memory pointer (for a
+  stored input, the scratch word its slot is hashed in), which the compiled
+  encoder overwrites before it reads it; an input ending at the pointer is
+  encoded, even when the pointer is not word-aligned;
 - an indexed event argument that is a stored array or struct whose in-place
   encoding ends in an empty byte sequence;
 - an event whose indexed arguments' hash preimages move the free memory
-  pointer below what the event read (its memory arguments, and the scratch
-  words hashed to read its stored ones): the compiled emit reads the pointer
+  pointer below the last byte the event read (its memory arguments, and the
+  scratch words hashed to read its stored ones): the compiled emit reads the pointer
   anew for each preimage and for the log's data, so a later preimage can land
   on an argument before it is read, or a scratch hash on the log's data;
 - an `abi.decode` of memory that reads at or past the free memory pointer,

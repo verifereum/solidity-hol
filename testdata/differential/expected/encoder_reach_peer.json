@@ -1,0 +1,286 @@
+{
+  "compiler": {
+    "pin": "f401782df49be312ea4ef52a2d467cf5183b5906",
+    "reportedVersion": "solc, the solidity compiler commandline interface\nVersion: 0.8.37+commit.f401782d.Linux.g++"
+  },
+  "format": "solidity-hol-solc-artifact-v1",
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "debug": {
+        "revertStrings": "default"
+      },
+      "evmVersion": "osaka",
+      "metadata": {
+        "appendCBOR": false,
+        "bytecodeHash": "none"
+      },
+      "optimizer": {
+        "enabled": false,
+        "runs": 200
+      },
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "storageLayout",
+            "transientStorageLayout",
+            "evm.bytecode.object",
+            "evm.deployedBytecode.object",
+            "evm.deployedBytecode.immutableReferences",
+            "evm.methodIdentifiers"
+          ]
+        }
+      },
+      "viaIR": true
+    },
+    "sources": {
+      "testdata/differential/encoder_reach_peer.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity 0.8.37;\n\n// The encoder reach suite's peer: it takes a byte sequence and returns its\n// length.\ncontract ReachPeer {\n    function take(bytes calldata b) external pure returns (uint256) {\n        return b.length;\n    }\n}\n"
+      }
+    }
+  },
+  "output": {
+    "contracts": {
+      "testdata/differential/encoder_reach_peer.sol": {
+        "ReachPeer": {
+          "abi": [
+            {
+              "inputs": [
+                {
+                  "internalType": "bytes",
+                  "name": "b",
+                  "type": "bytes"
+                }
+              ],
+              "name": "take",
+              "outputs": [
+                {
+                  "internalType": "uint256",
+                  "name": "",
+                  "type": "uint256"
+                }
+              ],
+              "stateMutability": "pure",
+              "type": "function"
+            }
+          ],
+          "evm": {
+            "bytecode": {
+              "object": "608060405234601c57600e6020565b61014261002b823961014290f35b6026565b60405190565b5f80fdfe60806040526004361015610013575b610120565b61001d5f3561002c565b63cce919570361000e576100ea565b60e01c90565b60405190565b5f80fd5b5f80fd5b5f80fd5b5f80fd5b5f80fd5b5f80fd5b909182601f8301121561008a5781359167ffffffffffffffff831161008557602001926001830284011161008057565b61004c565b610048565b610044565b906020828203126100c0575f82013567ffffffffffffffff81116100bb576100b79201610050565b9091565b610040565b61003c565b90565b6100d1906100c5565b9052565b91906100e8905f602085019401906100c8565b565b3461011b5761011761010661010036600461008f565b9061012c565b61010e610032565b918291826100d5565b0390f35b610038565b5f80fd5b5f90565b5090565b9061013f91610139610124565b50610128565b9056"
+            },
+            "deployedBytecode": {
+              "immutableReferences": {},
+              "object": "60806040526004361015610013575b610120565b61001d5f3561002c565b63cce919570361000e576100ea565b60e01c90565b60405190565b5f80fd5b5f80fd5b5f80fd5b5f80fd5b5f80fd5b5f80fd5b909182601f8301121561008a5781359167ffffffffffffffff831161008557602001926001830284011161008057565b61004c565b610048565b610044565b906020828203126100c0575f82013567ffffffffffffffff81116100bb576100b79201610050565b9091565b610040565b61003c565b90565b6100d1906100c5565b9052565b91906100e8905f602085019401906100c8565b565b3461011b5761011761010661010036600461008f565b9061012c565b61010e610032565b918291826100d5565b0390f35b610038565b5f80fd5b5f90565b5090565b9061013f91610139610124565b50610128565b9056"
+            },
+            "methodIdentifiers": {
+              "take(bytes)": "cce91957"
+            }
+          },
+          "storageLayout": {
+            "storage": [],
+            "types": null
+          },
+          "transientStorageLayout": {
+            "storage": [],
+            "types": null
+          }
+        }
+      }
+    },
+    "sources": {
+      "testdata/differential/encoder_reach_peer.sol": {
+        "ast": {
+          "absolutePath": "testdata/differential/encoder_reach_peer.sol",
+          "exportedSymbols": {
+            "ReachPeer": [
+              13
+            ]
+          },
+          "id": 14,
+          "license": "MIT",
+          "nodeType": "SourceUnit",
+          "nodes": [
+            {
+              "id": 1,
+              "literals": [
+                "solidity",
+                "0.8",
+                ".37"
+              ],
+              "nodeType": "PragmaDirective",
+              "src": "32:23:0"
+            },
+            {
+              "abstract": false,
+              "baseContracts": [],
+              "canonicalName": "ReachPeer",
+              "contractDependencies": [],
+              "contractKind": "contract",
+              "fullyImplemented": true,
+              "id": 13,
+              "linearizedBaseContracts": [
+                13
+              ],
+              "name": "ReachPeer",
+              "nameLocation": "153:9:0",
+              "nodeType": "ContractDefinition",
+              "nodes": [
+                {
+                  "body": {
+                    "id": 11,
+                    "nodeType": "Block",
+                    "src": "233:32:0",
+                    "statements": [
+                      {
+                        "expression": {
+                          "expression": {
+                            "id": 8,
+                            "name": "b",
+                            "nodeType": "Identifier",
+                            "overloadedDeclarations": [],
+                            "referencedDeclaration": 3,
+                            "src": "250:1:0",
+                            "typeDescriptions": {
+                              "typeIdentifier": "t_bytes_calldata_ptr",
+                              "typeString": "bytes calldata"
+                            }
+                          },
+                          "id": 9,
+                          "isConstant": false,
+                          "isLValue": false,
+                          "isPure": false,
+                          "lValueRequested": false,
+                          "memberLocation": "252:6:0",
+                          "memberName": "length",
+                          "nodeType": "MemberAccess",
+                          "src": "250:8:0",
+                          "typeDescriptions": {
+                            "typeIdentifier": "t_uint256",
+                            "typeString": "uint256"
+                          }
+                        },
+                        "functionReturnParameters": 7,
+                        "id": 10,
+                        "nodeType": "Return",
+                        "src": "243:15:0"
+                      }
+                    ]
+                  },
+                  "functionSelector": "cce91957",
+                  "id": 12,
+                  "implemented": true,
+                  "kind": "function",
+                  "modifiers": [],
+                  "name": "take",
+                  "nameLocation": "178:4:0",
+                  "nodeType": "FunctionDefinition",
+                  "parameters": {
+                    "id": 4,
+                    "nodeType": "ParameterList",
+                    "parameters": [
+                      {
+                        "constant": false,
+                        "id": 3,
+                        "mutability": "mutable",
+                        "name": "b",
+                        "nameLocation": "198:1:0",
+                        "nodeType": "VariableDeclaration",
+                        "scope": 12,
+                        "src": "183:16:0",
+                        "stateVariable": false,
+                        "storageLocation": "calldata",
+                        "typeDescriptions": {
+                          "typeIdentifier": "t_bytes_calldata_ptr",
+                          "typeString": "bytes"
+                        },
+                        "typeName": {
+                          "id": 2,
+                          "name": "bytes",
+                          "nodeType": "ElementaryTypeName",
+                          "src": "183:5:0",
+                          "typeDescriptions": {
+                            "typeIdentifier": "t_bytes_storage_ptr",
+                            "typeString": "bytes"
+                          }
+                        },
+                        "visibility": "internal"
+                      }
+                    ],
+                    "src": "182:18:0"
+                  },
+                  "returnParameters": {
+                    "id": 7,
+                    "nodeType": "ParameterList",
+                    "parameters": [
+                      {
+                        "constant": false,
+                        "id": 6,
+                        "mutability": "mutable",
+                        "name": "",
+                        "nameLocation": "-1:-1:-1",
+                        "nodeType": "VariableDeclaration",
+                        "scope": 12,
+                        "src": "224:7:0",
+                        "stateVariable": false,
+                        "storageLocation": "default",
+                        "typeDescriptions": {
+                          "typeIdentifier": "t_uint256",
+                          "typeString": "uint256"
+                        },
+                        "typeName": {
+                          "id": 5,
+                          "name": "uint256",
+                          "nodeType": "ElementaryTypeName",
+                          "src": "224:7:0",
+                          "typeDescriptions": {
+                            "typeIdentifier": "t_uint256",
+                            "typeString": "uint256"
+                          }
+                        },
+                        "visibility": "internal"
+                      }
+                    ],
+                    "src": "223:9:0"
+                  },
+                  "scope": 13,
+                  "src": "169:96:0",
+                  "stateMutability": "pure",
+                  "virtual": false,
+                  "visibility": "external"
+                }
+              ],
+              "scope": 14,
+              "src": "144:123:0",
+              "usedErrors": [],
+              "usedEvents": []
+            }
+          ],
+          "src": "32:236:0"
+        },
+        "id": 0
+      }
+    }
+  },
+  "profile": {
+    "compilerVersion": "0.8.37",
+    "settings": {
+      "debug": {
+        "revertStrings": "default"
+      },
+      "evmVersion": "osaka",
+      "metadata": {
+        "appendCBOR": false,
+        "bytecodeHash": "none"
+      },
+      "optimizer": {
+        "enabled": false,
+        "runs": 200
+      },
+      "viaIR": true
+    }
+  }
+}
