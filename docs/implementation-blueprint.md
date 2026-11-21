@@ -111,11 +111,16 @@ source and invalid generated core distinguishable. The acceptance census tracks
 which upstream tests prepare; executing upstream semanticTests expectations is
 separate work.
 
-Memory/calldata execution, a memory model compatible with inline assembly, and
-aggregate aliasing/copying remain unresolved. Concrete CALL/CREATE experiments
-below do not settle the source external-call context, transaction bookkeeping or
-gas contract. Deployment and exact gas/refund correspondence also remain open.
-Full type safety and whole-language coverage are later obligations.
+Memory and calldata execute on one byte-addressed memory per frame, shared
+with inline assembly. Reference rebinding and aggregate copies execute
+(`BindReferenceStmt`, `CopyContentsStmt`). Deployment runs through
+`deploy_contract`; creation and external calls run on Verifereum through the
+provisional adapter (`run_create_call`, `run_external_call`). The concrete
+CALL/CREATE experiments below do not settle that adapter's obligations for the
+source external-call context, transaction bookkeeping or gas
+([source-evm-adapter-contract.md](source-evm-adapter-contract.md)); exact
+gas/refund correspondence remains open. Full type safety and whole-language
+coverage are later obligations.
 
 ## Concrete EVM boundary experiment
 
