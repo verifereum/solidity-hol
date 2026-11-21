@@ -1,5 +1,5 @@
-(* The Yul evaluator: a fuel-indexed, executable interpreter for the runtime
- * object, written so that it cv_evals.
+(* The Yul evaluator: a fuel-indexed, executable interpreter for creation and
+ * runtime objects, written so that it cv_evals.
  *
  * Fuel: n bounds every recursive step that is not structural. Sibling
  * statements and the arguments of one call reuse the bound; entering a
@@ -23,9 +23,9 @@
  * number of them is an error rather than a silent truncation, as is an
  * argument that is not exactly one value, a literal too long for the dialect,
  * an unknown function, an unbound name, a builtin called with the wrong number
- * of arguments, an immutable the frame does not carry, and the object-level
- * builtins, which read the running code or the object's layout, neither of
- * which the evaluator models.
+ * of arguments, an immutable the frame does not carry, or an unknown object
+ * name. Object builtins read the frame's code, extents and immutable offsets;
+ * linker symbols remain unsupported.
  * So is a break or continue that leaves a loop's post statement: Yul allows
  * them only in a loop's body, and one from the post would otherwise reach an
  * enclosing loop.
@@ -45,13 +45,15 @@
  * bytes of it, the same bytes Verifereum's own sub-frame return writes. A call
  * that leaves the model ends in YulInvalid rather than in a guess.
  *
- * Gas is not charged, so gas() reports the whole budget the frame was given
- * and never falls, and a call hands its own gas argument on to the callee,
- * capped at that budget: solc writes gas() there unless the source names a
- * limit. delegatecall is not
- * implemented and the dialect does not name it, so importing Yul that uses it
- * fails closed. docs/yul-call-design.md says why, and what the model does not
- * do.
+ * Gas is not charged, so the gas left is not something the model computes: a
+ * gas() whose value is read consumes the frame's next observed gas reading
+ * (gas_observations), and fails without one.  A bare gas() as the first
+ * argument of call, staticcall or delegatecall stands for the whole budget the
+ * frame was given instead, which solc writes there unless the source names a
+ * limit; a call hands its gas argument on to the callee, capped at that
+ * budget. delegatecall goes to run_delegate_call, which runs the callee's code
+ * in this frame's account, with the frame's caller and call value.
+ * docs/yul-call-design.md says what the model does not do.
  *)
 Theory yulEvaluator
 Ancestors
@@ -132,14 +134,19 @@ End
  * written out at the call, because a mutual recursion translated through a
  * pre-relation is compared on its arguments as terms: a constant application
  * is the same term on both sides, an inlined record update is not.
+ *
+ * The frame is the callee's *whole* scope stack, not the caller's with one more
+ * scope on top: Yul functions cannot access variables defined outside the
+ * function, so the caller's scopes are not the callee's to read, and a body that
+ * looks one up is rejected rather than answered.  `invoke_yul` gives the caller
+ * its own scopes back, which is what keeps the frame the callee's alone.
  *)
 Definition yul_push_frame_def:
   yul_push_frame params args results m =
     m with scopes :=
-      yul_bind_scope (FEMPTY : string |-> bytes32)
-        (ZIP (params, args) ++
-         ZIP (results, REPLICATE (LENGTH results) 0w)) ::
-      m.scopes
+      [yul_bind_scope (FEMPTY : string |-> bytes32)
+         (ZIP (params, args) ++
+          ZIP (results, REPLICATE (LENGTH results) 0w))]
 End
 
 (* Binds names in the innermost scope.  Written as a case on the scope stack
@@ -208,12 +215,32 @@ Definition yul_memory_write_def:
     yul_memory_write (m with memory := m.memory |+ (offset, b)) (offset + 1) bs
 End
 
+(* The same read and write on the byte map alone: a caller writing many bytes
+ * updates the machine once, not once a byte (yulEvaluatorProps relates them).
+ *)
+Definition yul_mem_read_def:
+  (yul_mem_read (mem : num |-> word8) offset 0 = []) ∧
+  (yul_mem_read mem offset (SUC k) =
+     (case FLOOKUP mem offset of NONE => 0w | SOME b => b) ::
+     yul_mem_read mem (offset + 1) k)
+End
+
+Definition yul_mem_write_def:
+  (yul_mem_write (mem : num |-> word8) offset [] = mem) ∧
+  (yul_mem_write mem offset (b :: bs) =
+     yul_mem_write (mem |+ (offset, b)) (offset + 1) bs)
+End
+
+(* The active memory size after an access of sz bytes at offset: raised to
+ * the words covering them, unless sz is zero. *)
+Definition touched_size_def:
+  touched_size size offset sz =
+    MAX size (if sz = 0 then 0 else word_size (offset + sz) * 32)
+End
 
 Definition yul_memory_touch_def:
   yul_memory_touch m offset sz =
-    m with memory_size :=
-      MAX m.memory_size
-          (if sz = 0 then 0 else word_size (offset + sz) * 32)
+    m with memory_size := touched_size m.memory_size offset sz
 End
 
 (* The touched machine and the bytes read from it. *)
@@ -247,6 +274,23 @@ Definition yul_sstore_def:
         update_account m.self_address
           (account with storage := update_storage slot value account.storage)
           m.accounts
+End
+
+(* Transient storage, the executing account's part of the frame's.  The frame
+ * has no static mode, so tstore always takes effect, as sstore does. *)
+
+Definition yul_tload_def:
+  yul_tload m slot =
+    lookup_storage slot (lookup_transient_storage m.self_address m.transient)
+End
+
+Definition yul_tstore_def:
+  yul_tstore m slot value =
+    m with transient :=
+      update_transient_storage m.self_address
+        (update_storage slot value
+           (lookup_transient_storage m.self_address m.transient))
+        m.transient
 End
 
 (* SIGNEXTEND(i, x): the low 8*(i+1) bits of x as a signed number, extended
@@ -290,7 +334,7 @@ Datatype:
   | EvalAbrupt yul_completion yul_machine
 End
 
-(* A message call, as the EVM's CALL and STATICCALL make it.
+(* A message call, as the EVM's CALL, STATICCALL and DELEGATECALL make it.
  *
  * The input region is read out of the caller's memory and touched, then the
  * call goes to run_external_call, which is Verifereum's run_call on the fresh
@@ -300,22 +344,28 @@ End
  * callee's own budget the builtin's gas argument capped at this frame's: gas
  * is not charged here, so the frame's budget is the most it can hand on.
  * The callee's code is the account's -- a delegated
- * account runs its delegate's, as the EVM's CALL does. The Yul frame carries
- * no transient storage, so the callee starts with none.
+ * account runs its delegate's, as the EVM's CALL does. The callee starts
+ * from the frame's transient storage, as it does from the frame's accounts.
+ * A delegate call (delegate) goes to run_delegate_call instead: the callee's
+ * code runs under this frame's address, with its caller and call value, and
+ * moves no value.
  *
  * What comes back is CALL's own answer: 1 if the callee stopped or returned
- * and 0 if it reverted or halted exceptionally, with the frame's accounts and
- * logs taken from the callee only in the first case. The return data is the
+ * and 0 if it reverted or halted exceptionally, with the frame's accounts,
+ * transient storage and logs taken from the callee only in the first case. The return data is the
  * callee's output either way -- the revert data for a revert, nothing for an
  * exceptional halt -- and is kept whole in return_data, while the output
  * region gets only the first min(outsize, returndatasize) bytes of it, left
  * as they were beyond that.
  *
+ * A successful call also takes back the transaction's original accounts and
+ * the accounts the callee left pending deletion, which the frame keeps for
+ * its caller.
+ *
  * run_external_call answers NONE where the call leaves the model: a recipient
- * balance overflow, a run outside the domain (one that ends in no frame, in
- * more than one, or in a vfm_abort), or a callee that ends with accounts
- * pending deletion. That is an invalid outcome, not a failed call, since the
- * model cannot say whether it would have succeeded.
+ * balance overflow or a run outside the domain (one that ends in no frame, in
+ * more than one, or in a vfm_abort). That is an invalid outcome, not a failed
+ * call, since the model cannot say whether it would have succeeded.
  *)
 (* The words are pinned rather than left to inference: every one of the sizes
  * reaches the machine only through w2n, which says nothing about its width, so
@@ -324,23 +374,68 @@ End
  * dispatch is a definition the kernel will not accept.
  *)
 Definition yul_call_def:
-  yul_call (m : yul_machine) (static : bool) (gas : bytes32)
+  yul_call (m : yul_machine) (static : bool) (delegate : bool) (gas : bytes32)
            (callee : bytes32) (value : bytes32) (input : bytes32)
            (input_size : bytes32) (output : bytes32) (output_size : bytes32) =
     let (m1, args) = yul_memory_region m (w2n input) (w2n input_size) in
-      case run_external_call m1.self_address (w2w callee) args (w2n value)
-             static (MIN (w2n gas) m1.gas_limit) m1.accounts
-             empty_transient_storage
-             m1.transaction_parameters of
+      case (if delegate then
+              run_delegate_call m1.self_address m1.caller_address
+                (w2n m1.call_value) (w2w callee) args static
+                (MIN (w2n gas) m1.gas_limit) m1.accounts m1.original
+                m1.transient m1.transaction_parameters
+            else
+              run_external_call m1.self_address (w2w callee) args (w2n value)
+                static (MIN (w2n gas) m1.gas_limit) m1.accounts m1.original
+                m1.transient m1.transaction_parameters) of
         NONE => EvalAbrupt (YulInvalid "call outside the model") m1
       | SOME outcome =>
           let m2 = m1 with <| accounts := outcome.call_accounts;
+                               transient := outcome.call_transient;
                                logs := m1.logs ++ outcome.call_logs;
+                               original := outcome.call_original;
+                               to_delete := m1.to_delete ++ outcome.call_to_delete;
                                return_data := outcome.call_return |> in
             EvalValues [b2w outcome.call_success]
               (yul_memory_write
                  (yul_memory_touch m2 (w2n output) (w2n output_size))
                  (w2n output) (TAKE (w2n output_size) outcome.call_return))
+End
+
+(* Creation reads initcode from memory and installs the resulting world. *)
+Definition yul_create_def:
+  yul_create (m : yul_machine) salt (value : bytes32)
+             (input : bytes32) (size : bytes32) =
+    let (m1, initcode) = yul_memory_region m (w2n input) (w2n size) in
+    case run_create_call m1.self_address salt initcode (w2n value) m1.gas_limit
+           m1.accounts m1.original m1.transient m1.transaction_parameters of
+      NONE => EvalAbrupt (YulInvalid "creation outside the model") m1
+    | SOME r =>
+        EvalValues [case r.create_address of NONE => 0w | SOME a => w2w a]
+          (m1 with <| accounts := r.create_accounts;
+                      transient := r.create_transient;
+                      logs := m1.logs ++ r.create_logs;
+                      original := r.create_original;
+                      to_delete := m1.to_delete ++ r.create_to_delete;
+                      return_data := r.create_return |>)
+End
+
+(* selfdestruct(beneficiary), as Verifereum's SELFDESTRUCT under EIP-6780:
+ * the executing account's balance moves to the beneficiary, and the frame
+ * stops. An account the transaction created -- empty in its original
+ * accounts -- also loses a balance it sent to itself, and is left pending
+ * deletion, which the transaction's end carries out; any other account keeps
+ * its code and storage. The frame has no static mode, as for sstore.
+ *)
+Definition yul_self_destruct_def:
+  yul_self_destruct (m : yul_machine) (beneficiary : address) =
+    let self = lookup_account m.self_address m.accounts;
+        accounts = transfer_value m.self_address beneficiary self.balance
+                     m.accounts in
+      if account_empty (lookup_account m.self_address m.original) then
+        m with <| accounts := update_account m.self_address
+                                (self with balance := 0) accounts;
+                  to_delete := m.to_delete ++ [m.self_address] |>
+      else m with accounts := accounts
 End
 
 (* returndatacopy: the bytes it reads come from return_data, not from memory,
@@ -359,10 +454,41 @@ Definition yul_return_data_copy_def:
            (w2n dest) (TAKE (w2n size) (DROP (w2n source) m.return_data)))
 End
 
-(* One builtin, on values that have already been evaluated, left to right.
- * Anything the pinned dialect does not define -- a wrong number of arguments,
- * or one of the object-level builtins, whose code and object the evaluator
- * does not model -- is an error rather than a silent no-op.
+(* addmod and mulmod as the EVM computes them (verifereum's step_modop): the
+ * sum or product of the full values, without wrapping, modulo n, and 0 for a
+ * zero modulus.  The words are pinned, since a and b reach the result only
+ * through w2n.
+ *)
+Definition modular_word_def:
+  modular_word f (a : bytes32) (b : bytes32) (n : bytes32) : bytes32 =
+    if n = 0w then 0w else n2w (f (w2n a) (w2n b) MOD w2n n)
+End
+
+(* The hash of block n, as the EVM's BLOCKHASH computes it (verifereum's
+ * step_block_hash): one of the 256 blocks before the current one, read from
+ * the transaction's previous hashes, most recent first, and 0 for any other
+ * block or one the hashes don't reach.
+ *)
+Definition block_hash_word_def:
+  block_hash_word (tx : transaction_parameters) (n : num) : bytes32 =
+    let index = tx.blockNumber - n - 1 in
+      if n < tx.blockNumber ∧ tx.blockNumber - 256 ≤ n ∧
+         index < LENGTH tx.prevHashes
+      then EL index tx.prevHashes else 0w
+End
+
+(* An account's code hash, as EXTCODEHASH (verifereum's step_ext_code_hash)
+ * reads it: 0 for an empty account, which includes one that doesn't exist,
+ * else the Keccak-256 hash of its code. *)
+Definition ext_code_hash_def:
+  ext_code_hash accounts address : bytes32 =
+    let account = lookup_account address accounts in
+      if account_empty account then 0w
+      else word_of_bytes_be (Keccak_256_w64 account.code)
+End
+
+(* One builtin on evaluated values. Literal-name operands are dispatched by
+ * eval_yul_builtin_call; unsupported builtins and wrong arities fail closed.
  *)
 Definition eval_yul_builtin_def:
   eval_yul_builtin op args m =
@@ -374,6 +500,8 @@ Definition eval_yul_builtin_def:
     | (YSDiv, [a; b]) => EvalValues [with_zero word_quot a b] m
     | (YMod, [a; b]) => EvalValues [with_zero word_mod a b] m
     | (YSMod, [a; b]) => EvalValues [with_zero word_rem a b] m
+    | (YAddMod, [a; b; n]) => EvalValues [modular_word $+ a b n] m
+    | (YMulMod, [a; b; n]) => EvalValues [modular_word $* a b n] m
     | (YExp, [a; b]) => EvalValues [word_exp a b] m
     | (YSignExtend, [a; b]) => EvalValues [yul_sign_extend a b] m
     | (YLt, [a; b]) => EvalValues [b2w (w2n a < w2n b)] m
@@ -389,6 +517,9 @@ Definition eval_yul_builtin_def:
     | (YShl, [n; w]) => EvalValues [word_lsl w (w2n n)] m
     | (YShr, [n; w]) => EvalValues [word_lsr w (w2n n)] m
     | (YSar, [n; w]) => EvalValues [word_asr w (w2n n)] m
+    | (YByte, [i; w]) =>
+        EvalValues [if w2n i < 32 then n2w ((w2n w DIV 2 ** (8 * (31 - w2n i))) MOD 256)
+                    else 0w] m
     | (YKeccak256, [p; s]) =>
         let (m', bs) = yul_memory_region m (w2n p) (w2n s) in
           EvalValues [word_of_bytes_be (Keccak_256_w64 bs)] m'
@@ -396,6 +527,9 @@ Definition eval_yul_builtin_def:
         let (m', bs) = yul_mload m (w2n p) in
           EvalValues [word_of_bytes_be bs] m'
     | (YMStore, [p; v]) => EvalValues [] (yul_mstore m (w2n p) v)
+    | (YMStore8, [p; v]) =>
+        EvalValues [] (yul_memory_write (yul_memory_touch m (w2n p) 1)
+          (w2n p) [(n2w (w2n v) : byte)])
     | (YMCopy, [d; s; l]) =>
         (* both ranges are touched, whichever of them reaches further, and the
          * bytes are read before any is written, so overlapping regions copy as
@@ -406,6 +540,8 @@ Definition eval_yul_builtin_def:
                (w2n d) bs)
     | (YSLoad, [s]) => EvalValues [yul_sload m s] m
     | (YSStore, [s; v]) => EvalValues [] (yul_sstore m s v)
+    | (YTLoad, [s]) => EvalValues [yul_tload m s] m
+    | (YTStore, [s; v]) => EvalValues [] (yul_tstore m s v)
     | (YCallDataLoad, [i]) =>
         EvalValues
           [word_of_bytes_be (take_pad_0 32 (DROP (w2n i) m.call_data))]
@@ -419,6 +555,8 @@ Definition eval_yul_builtin_def:
     | (YMemoryGuard, [x]) => EvalValues [x] m
     | (YCaller, []) => EvalValues [n2w (w2n m.caller_address)] m
     | (YAddress, []) => EvalValues [n2w (w2n m.self_address)] m
+    | (YSelfBalance, []) =>
+        EvalValues [n2w (lookup_account m.self_address m.accounts).balance] m
     | (YOrigin, []) =>
         EvalValues [n2w (w2n m.transaction_parameters.origin)] m
     | (YGasPrice, []) =>
@@ -430,10 +568,13 @@ Definition eval_yul_builtin_def:
         EvalValues [n2w m.transaction_parameters.blockGasLimit] m
     | (YNumber, []) =>
         EvalValues [n2w m.transaction_parameters.blockNumber] m
+    | (YBlockHash, [n]) =>
+        EvalValues [block_hash_word m.transaction_parameters (w2n n)] m
     | (YTimestamp, []) =>
         EvalValues [n2w m.transaction_parameters.blockTimeStamp] m
     | (YCoinbase, []) =>
         EvalValues [n2w (w2n m.transaction_parameters.blockCoinBase)] m
+    | (YPrevRandao, []) => EvalValues [m.transaction_parameters.prevRandao] m
     | (YLog0, [p; s]) =>
         let (m', bs) = yul_memory_region m (w2n p) (w2n s) in
           EvalValues []
@@ -464,46 +605,128 @@ Definition eval_yul_builtin_def:
               [<| logger := m'.self_address; topics := [t1; t2; t3; t4];
                   data := bs |>])
     | (YPop, [_]) => EvalValues [] m
-    | (YGas, []) => EvalValues [n2w m.gas_limit] m
+    (* the gas left, as observed: the model charges no gas to compute it *)
+    | (YGas, []) =>
+        (case m.gas_observations of
+           GasLeftObservation g :: rest =>
+             if g < 2 ** 256 then
+               EvalValues [n2w g] (m with gas_observations := rest)
+             else EvalAbrupt (YulInvalid "missing gas observation") m
+         | _ => EvalAbrupt (YulInvalid "missing gas observation") m)
+    | (YBalance, [a]) =>
+        EvalValues [n2w (lookup_account (w2w a) m.accounts).balance] m
     | (YExtCodeSize, [a]) =>
         EvalValues [n2w (LENGTH (lookup_account (w2w a) m.accounts).code)] m
+    | (YExtCodeHash, [a]) => EvalValues [ext_code_hash m.accounts (w2w a)] m
+    | (YExtCodeCopy, [a; dst; src; sz]) =>
+        EvalValues []
+          (yul_memory_write (yul_memory_touch m (w2n dst) (w2n sz))
+             (w2n dst)
+             (take_pad_0 (w2n sz)
+                (DROP (w2n src) (lookup_account (w2w a) m.accounts).code)))
     | (YReturnDataSize, []) =>
         EvalValues [n2w (LENGTH m.return_data)] m
     | (YReturnDataCopy, [dst; src; sz]) => yul_return_data_copy m dst src sz
     (* call(gas, address, value, args, argsSize, ret, retSize) *)
     | (YCall, [gl; ad; v; inp; insz; outp; outsz]) =>
-        yul_call m F gl ad v inp insz outp outsz
+        yul_call m F F gl ad v inp insz outp outsz
     (* staticcall(gas, address, args, argsSize, ret, retSize) *)
     | (YStaticCall, [gl; ad; inp; insz; outp; outsz]) =>
-        yul_call m T gl ad 0w inp insz outp outsz
+        yul_call m T F gl ad 0w inp insz outp outsz
+    (* delegatecall(gas, address, args, argsSize, ret, retSize) *)
+    | (YDelegateCall, [gl; ad; inp; insz; outp; outsz]) =>
+        yul_call m F T gl ad 0w inp insz outp outsz
+    | (YCreate, [v; p; n]) => yul_create m NONE v p n
+    | (YCreate2, [v; p; n; salt]) => yul_create m (SOME salt) v p n
     | (YStop, []) => EvalAbrupt (YulReturn []) m
+    | (YInvalid, []) => EvalAbrupt YulAbort m
+    | (YSelfDestruct, [b]) =>
+        EvalAbrupt (YulReturn []) (yul_self_destruct m (w2w b))
     | (YReturn, [p; s]) =>
         let (m', bs) = yul_memory_region m (w2n p) (w2n s) in
           EvalAbrupt (YulReturn bs) m'
     | (YRevert, [p; s]) =>
         let (m', bs) = yul_memory_region m (w2n p) (w2n s) in
           EvalAbrupt (YulRevert bs) m'
-    | (YCodeSize, _) => EvalAbrupt (YulInvalid "object-level builtin") m
-    | (YCodeCopy, _) => EvalAbrupt (YulInvalid "object-level builtin") m
+    | (YCodeSize, []) => EvalValues [n2w (LENGTH m.code)] m
+    | (YCodeCopy, [dst; src; sz]) =>
+        EvalValues []
+          (yul_memory_write (yul_memory_touch m (w2n dst) (w2n sz))
+             (w2n dst) (take_pad_0 (w2n sz) (DROP (w2n src) m.code)))
+    | (YDataCopy, [dst; src; sz]) =>
+        EvalValues []
+          (yul_memory_write (yul_memory_touch m (w2n dst) (w2n sz))
+             (w2n dst) (take_pad_0 (w2n sz) (DROP (w2n src) m.code)))
     | (YDataSize, _) => EvalAbrupt (YulInvalid "object-level builtin") m
     | (YDataOffset, _) => EvalAbrupt (YulInvalid "object-level builtin") m
+    | (YSetImmutable, _) => EvalAbrupt (YulInvalid "object-level builtin") m
+    | (YLinkerSymbol, _) => EvalAbrupt (YulInvalid "object-level builtin") m
     | _ => EvalAbrupt (YulInvalid "bad builtin call") m
 End
 
-(* loadimmutable is the one builtin whose operand is a name rather than a value:
- * the compiler writes loadimmutable("3"), and the name is the text between the
- * literal's quotes.  That form is dispatched here, on the argument's syntax;
- * everything else, a loadimmutable whose argument is not a name literal
- * included, goes to eval_yul_builtin on its values, where the default is an
- * error.
- *)
+(* A call whose gas argument is a bare gas(): that argument is the frame's
+ * whole budget, not a reading of the gas left, so it is not evaluated. *)
+Definition yul_call_budget_def:
+  yul_call_budget op args ⇔
+    (op = YCall ∨ op = YStaticCall ∨ op = YDelegateCall) ∧
+    case args of
+      YulBuiltin b [] :: _ => b = YGas
+    | _ => F
+End
+
+(* Object and immutable names are identifiers, not 256-bit values, and a
+ * call's budget gas() is no value either (yul_call_budget). *)
+Definition yul_builtin_value_args_def:
+  yul_builtin_value_args op args =
+    if yul_call_budget op args then
+      (case args of [] => [] | _ :: rest => rest)
+    else
+    case (op, args) of
+      (YLoadImmutable, [YulLit (LitBytes _)]) => []
+    | (YDataSize, [YulLit (LitBytes _)]) => []
+    | (YDataOffset, [YulLit (LitBytes _)]) => []
+    | (YSetImmutable, [position; YulLit (LitBytes _); value]) => [position; value]
+    | _ => args
+End
+
+Theorem yul_builtin_value_args_size:
+  list_size yul_expr_size (yul_builtin_value_args op args) ≤
+  list_size yul_expr_size args
+Proof
+  rw[yul_builtin_value_args_def] >>
+  BasicProvers.every_case_tac >> simp[listTheory.list_size_def]
+QED
+
+(* setimmutable patches every occurrence in the copied runtime object.
+ * An immutable unused by that object has no patch offsets. *)
+Definition yul_set_immutable_def:
+  yul_set_immutable name (position : bytes32) (value : bytes32) m =
+    let offsets = case FLOOKUP m.immutable_offsets name of
+                    NONE => [] | SOME offsets => offsets in
+    (FOLDL (λm off. yul_mstore m (w2n position + off) value) m offsets)
+      with immutables := m.immutables |+ (name, value)
+End
+
 Definition eval_yul_builtin_call_def:
   eval_yul_builtin_call op args vs m =
-    case (op, args) of
-      (YLoadImmutable, [YulLit (LitBytes nm)]) =>
+    if yul_call_budget op args then
+      eval_yul_builtin op (n2w m.gas_limit :: vs) m
+    else
+    case (op, args, vs) of
+      (YLoadImmutable, [YulLit (LitBytes nm)], []) =>
         (case FLOOKUP m.immutables (yul_name_of_bytes nm) of
            SOME v => EvalValues [v] m
          | NONE => EvalAbrupt (YulInvalid "unknown immutable") m)
+    | (YDataSize, [YulLit (LitBytes nm)], []) =>
+        (case FLOOKUP m.objects (yul_name_of_bytes nm) of
+           SOME extent => EvalValues [n2w (SND extent)] m
+         | NONE => EvalAbrupt (YulInvalid "unknown object") m)
+    | (YDataOffset, [YulLit (LitBytes nm)], []) =>
+        (case FLOOKUP m.objects (yul_name_of_bytes nm) of
+           SOME extent => EvalValues [n2w (FST extent)] m
+         | NONE => EvalAbrupt (YulInvalid "unknown object") m)
+    | (YSetImmutable, [_; YulLit (LitBytes nm); _], [position; value]) =>
+        EvalValues [] (yul_set_immutable (yul_name_of_bytes nm) position value m)
     | _ => eval_yul_builtin op vs m
 End
 
@@ -631,7 +854,7 @@ Definition eval_yul_block_def:
        SOME v => EvalValues [v] m
      | NONE => EvalAbrupt (YulInvalid "unbound name") m) ∧
   (eval_yul_expr n fns (YulBuiltin op args) m =
-     case eval_yul_args n fns args m of
+     case eval_yul_args n fns (yul_builtin_value_args op args) m of
        EvalAbrupt c m' => EvalAbrupt c m'
      | EvalValues vs m' => eval_yul_builtin_call op args vs m') ∧
   (eval_yul_expr n fns (YulApply f args) m =
@@ -691,7 +914,11 @@ Definition eval_yul_block_def:
          else eval_yul_cases n fns v rest default m) ∧
 
   (* a call: parameters in a scope of their own, results read out of it, then
-   * leave, or falling off the end, returns them *)
+   * leave, or falling off the end, returns them.  The frame is the callee's
+   * alone (`yul_push_frame`), so what the caller gets back is the caller's own
+   * scope stack -- not the callee's popped, which would be the same list only
+   * while the callee left the caller's scopes alone, which is exactly what a
+   * frame of its own makes sure of. *)
   (invoke_yul n fns name args m =
      if n = 0 then EvalAbrupt YulOutOfFuel m
      else
@@ -704,7 +931,7 @@ Definition eval_yul_block_def:
              let m1 = yul_push_frame fd.function_params args
                         fd.function_results m in
              let r = eval_yul_block (n - 1) fns fd.function_body m1 in
-             let m2 = yul_pop_scope r.machine in
+             let m2 = r.machine with scopes := m.scopes in
                if r.completion = YulNormal ∨ r.completion = YulLeave then
                  (* the frame scope yul_push_frame made is still on top, so
                   * every result is bound and this lookup cannot fail; the
@@ -727,7 +954,8 @@ Termination
      yul_measure_args_def, yul_measure_loop_def, yul_measure_cases_def,
      yul_measure_invoke_def, listTheory.list_size_def,
      basicSizeTheory.pair_size_def, yul_expr_size_pos,
-     yul_measure_loop_body_lt, yul_measure_loop_post_lt]
+     yul_measure_loop_body_lt, yul_measure_loop_post_lt] >>
+  mp_tac yul_builtin_value_args_size >> simp[]
 End
 
 
@@ -788,8 +1016,35 @@ Proof
 QED
 
 val () = cv_auto_trans yul_call_def;
+val () = cv_auto_trans yul_create_def;
 val () = cv_auto_trans yul_return_data_copy_def;
-val () = cv_auto_trans eval_yul_builtin_def;
+val () = cv_auto_trans yul_self_destruct_def;
+val block_hash_word_pre_def =
+  cv_trans_pre "block_hash_word_pre" block_hash_word_def;
+Theorem block_hash_word_pre[cv_pre]:
+  ∀tx n. block_hash_word_pre tx n
+Proof
+  simp[block_hash_word_pre_def, cv_stdTheory.EL_pre]
+QED
+(* Bound left shifts before computing powers, as in the EVM translation. *)
+val () = cv_auto_trans
+  (REWRITE_RULE [word_lsl_modexp, modular_word_def] eval_yul_builtin_def);
+val () = cv_auto_trans yul_call_budget_def;
+val () = cv_auto_trans yul_builtin_value_args_def;
+Theorem cv_yul_builtin_value_args_size[local]:
+  ∀op args. cv_size (cv_yul_builtin_value_args op args) ≤ cv_size args
+Proof
+  rw[DB.fetch "yulEvaluator" "cv_yul_builtin_value_args_def", cvTheory.cv_if_def] >>
+  cv_termination_tac >>
+  qspec_then ‘args’ assume_tac cv_size_cv_fst_cv_snd >>
+  qspec_then ‘cv_snd args’ assume_tac cv_size_cv_fst_cv_snd >>
+  qspec_then ‘cv_snd (cv_snd args)’ assume_tac cv_size_cv_fst_cv_snd >>
+  gvs[]
+QED
+
+val () = cv_auto_trans yul_mem_read_def;
+val () = cv_auto_trans yul_mem_write_def;
+val () = cv_auto_trans yul_set_immutable_def;
 val () = cv_auto_trans eval_yul_builtin_call_def;
 val () = cv_auto_trans yul_env_def;
 
@@ -819,7 +1074,10 @@ val yul_pre_def = cv_auto_trans_pre_rec "" eval_yul_block_def
    qspec_then ‘x2’ assume_tac cv_size_cv_fst_cv_snd >>
    qspec_then ‘cv_snd x2’ assume_tac cv_size_cv_fst_cv_snd >>
    qspec_then ‘cv_snd (cv_snd x2)’ assume_tac cv_size_cv_fst_cv_snd >>
-   gvs []
+   gvs [] >>
+   qspecl_then [‘cv_fst z’, ‘cv_snd z’] assume_tac
+     cv_yul_builtin_value_args_size >>
+   qspec_then ‘z’ assume_tac cv_size_cv_fst_cv_snd >> gvs []
    );
 
 (* The pre-relation is total: every input of every function has a translated

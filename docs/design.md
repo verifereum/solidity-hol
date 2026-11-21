@@ -194,22 +194,17 @@ suffix.
 
 ### Memory and calldata
 
-The initial memory design is *tentatively* an abstract but addressable and
-alias-aware Solidity heap, while calldata is represented concretely as bytes.
-A source-level memory model must preserve Solidity's reference behavior: for
-example, memory-to-memory assignment aliases, whereas storage-to-memory and
-calldata-to-memory operations copy.
+Memory is the frame's EVM memory: one byte-addressed store, with its active
+size, that Solidity code and inline assembly share, laid out as the pinned
+compiler lays it out (see [frontend-boundary.md](frontend-boundary.md)).
+Calldata is represented concretely as bytes. Memory references are addresses,
+so Solidity's reference behavior follows from the layout: memory-to-memory
+assignment aliases, whereas storage-to-memory and calldata-to-memory
+operations copy into newly allocated memory.
 
-Using an abstract heap avoids making ordinary source semantics depend
-immediately on compiler-specific allocation and byte-layout conventions. A
-later refinement to concrete EVM byte-addressed memory will be needed for
-inline assembly, exact compiler correspondence, and interactions that expose
-memory representation.
-
-Runtime values must therefore distinguish scalar values, tuples, and references
-to storage, memory, or calldata. Tree-shaped arrays and structs alone are not
-sufficient to model Solidity aliasing. "Abstract memory" still means an
-addressable heap with stable reference identity, not immutable aggregate values.
+Runtime values distinguish scalar values, tuples, and references to storage,
+memory, or calldata. Tree-shaped arrays and structs alone are not sufficient
+to model Solidity aliasing.
 
 Some operations also require normalized source type or layout information that
 cannot be recovered from a raw 256-bit word, including narrow signed cleanup,
@@ -404,8 +399,6 @@ The following issues remain deliberately unresolved:
   and source-level out-of-gas behavior;
 - the mechanism for replacing nested EVM bytecode execution with source
   semantics before compiler correctness is available;
-- the point at which abstract source memory should be refined to EVM memory;
-- treatment of inline assembly and Yul;
 - the exact versioning granularity and compatibility policy for AST schemas;
 - handling optimizer- or bug-dependent compiler behavior;
 - the final observational equivalence used by compiler-correctness theorems.

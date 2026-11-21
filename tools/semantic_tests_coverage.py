@@ -2,18 +2,21 @@
 """Report how much of solc's semantic test corpus the semantics admits.
 
 Every test under test/libsolidity/semanticTests of a solidity checkout at
-SOLIDITY_PIN is compiled with the pinned compiler and profile, then imported
-(syntax/solidityImportLib.sml) and elaborated (elaborate_unit) in HOL by
-tools/semantic_tests_coverage.sml. Each test is classified as skipped by its
-own settings, a compile failure, an importer rejection, an elaborator
-rejection, or admitted. The tests' call expectations are not run.
+SOLIDITY_PIN (or, with --suite, syntaxTests or smtCheckerTests) is compiled with the pinned compiler and profile, then prepared
+(solidityPrepareLib: import, source validation, elaboration, core checking)
+in HOL by tools/semantic_tests_coverage.sml. Each test is classified as
+skipped by its own settings, a compile failure, an importer rejection, a
+source rejection, an elaborator rejection, partially admitted (the unit is
+admitted with some of its functions unsupported) or admitted (every function
+supported). Admitted and partially admitted tests also count their functions
+and the reasons of the unsupported ones. The tests' call expectations are not
+run. In syntaxTests and smtCheckerTests only valid programs count: a test
+whose expectations list a compile error is skipped.
 
-The importer stops at its first rejection. To rank features by how many tests
-they block, and by how many they alone block, this tool also scans each AST
-for every construct outside the importer's vocabulary. The scan restates the
-importer's checks; the report counts every test where the scan disagrees with
-the importer, so drift between the two shows up rather than skewing the
-ranking.
+Preparation reports every blocker it finds, one line each, so features are
+ranked by how many rejected tests they block, and by how many they alone
+block, from those lines: FEATURES names the feature of a line, and a line it
+doesn't name is its own feature.
 """
 
 from __future__ import annotations
@@ -26,38 +29,47 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
-from typing import Any, Iterator
+import tomllib
+from typing import Any
 
 import export_solc_artifacts as exporter
 
+
 ROOT = Path(__file__).resolve().parents[1]
 TESTS_DIR = Path("test/libsolidity/semanticTests")
+SUITES = ["semanticTests", "syntaxTests", "smtCheckerTests"]
 HOL_SCRIPT = ROOT / "tools" / "semantic_tests_coverage.sml"
 REPORT_FORMAT = "solidity-hol-semantic-tests-coverage-v1"
 RESULT_PREFIX = "coverage-result: "
 
 SOURCE_MARKER = re.compile(r"^==== (Source|ExternalSource): (.*) ====\s*$")
-SETTING = re.compile(r"^//\s*([A-Za-z][A-Za-z0-9]*)\s*:\s*(.*?)\s*$")
+SETTING = re.compile(r"^//\s*([A-Za-z][A-Za-z0-9-]*)\s*:\s*(.*?)\s*$")
+# An expectation line of syntaxTests and smtCheckerTests starts with the
+# diagnostic's type; every type but these is an error (liblangutil's
+# Error::errorSeverity).
+EXPECTATION_TYPE = re.compile(r"^//\s*([A-Za-z]+)")
+NON_ERROR_TYPES = {"Warning", "Info"}
 EVM_VERSIONS = [
     "homestead", "tangerineWhistle", "spuriousDragon", "byzantium", "constantinople",
     "petersburg", "istanbul", "berlin", "london", "paris", "shanghai", "cancun",
     "prague", "osaka", "amsterdam", "@future",
 ]
-IMPORT_ERROR_NODE = re.compile(r"^(?:.*?: )?([A-Za-z]+) ([0-9]+): (.*)$", re.S)
 
 SKIPPED = "skipped"
 COMPILE_FAILURE = "compile-failure"
 IMPORT_REJECTED = "import-rejected"
 ELABORATION_REJECTED = "elaboration-rejected"
 ADMITTED = "admitted"
+PARTIALLY_ADMITTED = "partially-admitted"
 MALFORMED_INPUT = "malformed-input"
 INVALID_CORE = "invalid-core"
 SOURCE_REJECTED = "source-rejected"
 GREEDY_STEPS = 20
-CATEGORIES = [ADMITTED, ELABORATION_REJECTED, IMPORT_REJECTED, COMPILE_FAILURE,
+CATEGORIES = [ADMITTED, PARTIALLY_ADMITTED, ELABORATION_REJECTED, IMPORT_REJECTED, COMPILE_FAILURE,
               MALFORMED_INPUT, SOURCE_REJECTED, INVALID_CORE, SKIPPED]
 
 
@@ -70,23 +82,30 @@ class TestFormatError(Exception):
 
 @dataclass
 class SemanticTest:
-    """A test file: its sources, by Standard JSON name, and its settings."""
+    """A test file: its sources, by Standard JSON name, its settings and
+    the lines after `// ----`."""
 
     name: str
     sources: dict[str, str]
     settings: dict[str, str]
+    expectations: list[str] = field(default_factory=list)
 
 
 def read_test(tests_root: Path, path: Path) -> SemanticTest:
     """Parse a test as solc's TestCaseReader does: `==== Source: name ====` and
     `==== ExternalSource: [name=]path ====` markers split the sources, and the
-    `// key: value` lines between `// ====` and `// ----` are its settings."""
+    `// key: value` lines between `// ====` and `// ----` are its settings,
+    and the lines after `// ----` its expectations."""
     name = path.relative_to(tests_root).as_posix()
     sources: dict[str, list[str]] = {}
     current = name
     settings: dict[str, str] = {}
     in_settings = False
-    for line in path.read_text(encoding="utf-8").splitlines(keepends=True):
+    # solc's runner reads bytes: syntaxTests/string/invalid_utf8_sequence.sol
+    # is not UTF-8 (and expects an error).
+    lines = path.read_text(encoding="utf-8", errors="surrogateescape").splitlines(keepends=True)
+    expectations: list[str] = []
+    for number, line in enumerate(lines):
         stripped = line.rstrip("\r\n")
         marker = SOURCE_MARKER.match(stripped)
         if marker is not None:
@@ -101,6 +120,7 @@ def read_test(tests_root: Path, path: Path) -> SemanticTest:
                 sources[source_name] = [external_path.read_text(encoding="utf-8")]
             continue
         if stripped.startswith("// ----"):
+            expectations = [line.rstrip("\r\n") for line in lines[number + 1:]]
             break
         if stripped.startswith("// ===="):
             in_settings = True
@@ -111,7 +131,12 @@ def read_test(tests_root: Path, path: Path) -> SemanticTest:
             settings[setting.group(1)] = setting.group(2)
         else:
             sources.setdefault(current, []).append(line)
-    return SemanticTest(name, {k: "".join(v) for k, v in sources.items()}, settings)
+    return SemanticTest(name, {k: "".join(v) for k, v in sources.items()}, settings,
+                        expectations)
+
+
+def tests_dir(suite: str) -> Path:
+    return TESTS_DIR.parent / suite
 
 
 def find_tests(tests_root: Path) -> list[Path]:
@@ -139,12 +164,33 @@ def evm_version_admits(requirement: str, version: str) -> bool:
     return comparisons[comparator]
 
 
-def skip_reason(test: SemanticTest, profile: dict[str, Any]) -> str | None:
+def expected_errors(test: SemanticTest) -> list[str]:
+    """The error types a syntaxTests or smtCheckerTests test expects, in
+    order; an expectations block stops at a second `// ----`, below which
+    solc's test runners keep their own expectations."""
+    errors = []
+    for line in test.expectations:
+        if line.startswith("// ----"):
+            break
+        match = EXPECTATION_TYPE.match(line)
+        if match is not None and match.group(1) not in NON_ERROR_TYPES:
+            errors.append(match.group(1))
+    return errors
+
+
+def skip_reason(test: SemanticTest, profile: dict[str, Any],
+                suite: str = "semanticTests") -> str | None:
     """Why the test's own settings exclude it from the via-IR profile, if
-    they do."""
+    they do. In syntaxTests and smtCheckerTests, an expected error excludes
+    it too, and `compileViaYul` only picks the pipeline solc's runner checks."""
     settings = test.settings
-    if settings.get("compileViaYul", "also") == "false":
-        return "legacy pipeline only (compileViaYul: false)"
+    if suite == "semanticTests":
+        if settings.get("compileViaYul", "also") == "false":
+            return "legacy pipeline only (compileViaYul: false)"
+    else:
+        errors = expected_errors(test)
+        if errors:
+            return f"expected compile error ({errors[0]})"
     evm = settings.get("EVMVersion", "any")
     if not evm_version_admits(evm, profile["settings"]["evmVersion"]):
         return f"EVM version (EVMVersion: {evm})"
@@ -162,492 +208,27 @@ def compile_test(solc: Path, test: SemanticTest, profile_path: Path) -> dict[str
     return exporter.build_artifact_from_sources(solc, test.sources, profile_path)
 
 
-# The scan
-
-
-@dataclass(frozen=True)
-class Blocker:
-    """A construct the semantics does not support: the AST node's type, the
-    feature it belongs to, and the stage that rejects it, the importer
-    ("import") or the elaborator ("elaboration")."""
-
-    node_type: str
-    feature: str
-    stage: str
-
-
-EXPRESSIONS = {
-    "Identifier", "Literal", "UnaryOperation", "BinaryOperation", "Assignment",
-    "TupleExpression", "FunctionCall", "IndexAccess",
-}
-STATEMENTS = {
-    "Block", "UncheckedBlock", "ExpressionStatement", "VariableDeclarationStatement",
-    "IfStatement", "WhileStatement", "DoWhileStatement", "ForStatement", "Break",
-    "Continue", "Return",
-}
-# Nodes the importer reads only in a fixed position, checked there, and nodes
-# it never reaches because it rejects their parents (IdentifierPath) or never
-# reads the field holding them (StructuredDocumentation).
-STRUCTURAL = {
-    "SourceUnit", "PragmaDirective", "ContractDefinition", "FunctionDefinition",
-    "ParameterList", "VariableDeclaration", "ElementaryTypeName",
-    "ElementaryTypeNameExpression", "IdentifierPath", "StructuredDocumentation", "Mapping", "StructDefinition",
-}
-FEATURES = {
-    "Conditional": "conditional expressions",
-    "EmitStatement": "events",
-    "EnumDefinition": "enums",
-    "EnumValue": "enums",
-    "ErrorDefinition": "custom errors",
-    "EventDefinition": "events",
-    "FunctionCallOptions": "call options ({value: …, gas: …})",
-    "FunctionTypeName": "function types",
-    "ImportDirective": "imports",
-    "IndexRangeAccess": "array slices",
-    "InheritanceSpecifier": "inheritance",
-    "InlineAssembly": "inline assembly",
-    "ModifierDefinition": "modifiers",
-    "ModifierInvocation": "modifiers",
-    "OverrideSpecifier": "overrides",
-    "PlaceholderStatement": "modifiers",
-    "RevertStatement": "custom errors",
-    "TryCatchClause": "try/catch",
-    "TryStatement": "try/catch",
-    "UserDefinedValueTypeDefinition": "user-defined value types",
-    "UsingForDirective": "using for",
-}
-FUNCTION_KINDS = {
-    "constructor": "constructors", "fallback": "fallback functions",
-    "receive": "receive functions", "freeFunction": "free functions",
-}
-# By the leading part of a type identifier.
-TYPE_FEATURES = [
-    ("t_magic_message", "msg/block/tx globals"),
-    ("t_magic_block", "msg/block/tx globals"),
-    ("t_magic_transaction", "msg/block/tx globals"),
-    ("t_magic_abi", "abi.* functions"),
-    ("t_magic_meta_type", "type(…)"),
-    ("t_type$_t_enum", "enums"),
-    ("t_type$_t_struct", "structs"),
-    ("t_type$_t_userDefinedValueType", "user-defined value types"),
-    ("t_type$_t_contract", "library calls and contract-name members"),
-    ("t_type$_t_super", "inheritance"),
-    ("t_type$_t_bytes_", "bytes and string"),
-    ("t_type$_t_string", "bytes and string"),
-    ("t_type$_t_array", "arrays"),
-    ("t_type", "members of elementary type names"),
-    ("t_struct", "structs"),
-    ("t_enum", "enums"),
-    ("t_userDefinedValueType", "user-defined value types"),
-    ("t_mapping", "mappings"),
-    ("t_array", "arrays"),
-    ("t_bytes_", "bytes and string"),
-    ("t_bytes", "fixed-size bytes members and indexing"),
-    ("t_string", "bytes and string"),
-    ("t_contract", "external calls and contract members"),
-    ("t_super", "inheritance"),
-    ("t_address", "address members (balance, call, transfer, …)"),
-    ("t_function_event", "events"),
-    ("t_function_error", "custom errors"),
-    ("t_error", "custom errors"),
-    ("t_function", "function members (selector, address, …)"),
-    ("t_module", "imports"),
-    ("t_uint", "using for"),
-    ("t_int", "using for"),
-    ("t_bool", "using for"),
-    ("t_rational", "using for"),
-]
-BUILTINS = {
-    "msg": "msg/block/tx globals", "block": "msg/block/tx globals",
-    "tx": "msg/block/tx globals", "abi": "abi.* functions", "type": "type(…)",
-    "require": "require/assert/revert", "assert": "require/assert/revert",
-    "revert": "require/assert/revert", "this": "this", "super": "inheritance",
-    "keccak256": "hash and signature built-ins", "sha256": "hash and signature built-ins",
-    "ripemd160": "hash and signature built-ins", "ecrecover": "hash and signature built-ins",
-}
-
-
-def type_feature(type_identifier: str | None) -> str:
-    """The feature a type needs, classifying a tuple by its first component
-    outside the elementary types."""
-    if (type_identifier or "").startswith("t_tuple$_"):
-        if "$__$" in type_identifier:
-            return "tuples with empty components"
-        for component in type_identifier[len("t_tuple$_"):].split("_$_"):
-            component = component.removesuffix("_$")
-            if component.startswith("t_tuple"):
-                return "nested tuples"
-            if not (VALUE_TYPE.fullmatch(component) or RATIONAL.fullmatch(component)):
-                return type_feature(component)
-    for prefix, feature in TYPE_FEATURES:
-        if (type_identifier or "").startswith(prefix):
-            return feature
-    return f"values of type {type_identifier}"
-
-
-def nodes(value: Any) -> Iterator[dict[str, Any]]:
-    """Every Solidity AST node under `value`, in document order. The Yul nodes
-    of inline assembly, which have no id, are left out, and so are storage
-    layout specifiers, which the importer does not read."""
-    if isinstance(value, dict):
-        if value.get("nodeType") == "StorageLayoutSpecifier":
-            return
-        if "nodeType" in value and "id" in value:
-            yield value
-        for key, child in value.items():
-            if value.get("nodeType") == "ArrayTypeName" and key == "length":
-                continue
-            yield from nodes(child)
-    elif isinstance(value, list):
-        for child in value:
-            yield from nodes(child)
-
-
-def node_blockers(node: dict[str, Any], *, builtin_callee: bool = False) -> list[Blocker]:
-    """What the importer rejects at this node itself; children are checked as
-    nodes of their own. Member and index accesses are classified by the type
-    of the value accessed."""
-    kind = node["nodeType"]
-    found: list[str] = []
-    if kind in FEATURES:
-        found.append(FEATURES[kind])
-    elif kind == "IndexAccess" and node.get("indexExpression") is None:
-        found.append("array type expressions")
-    elif kind == "ArrayTypeName":
-        length = node.get("length")
-        tid = (length or {}).get("typeDescriptions", {}).get("typeIdentifier", "")
-        match = re.fullmatch(r"t_rational_([0-9]+)_by_1", tid)
-        if length is not None and (match is None or int(match[1]) == 0):
-            found.append("arrays")
-    elif kind == "MemberAccess":
-        if (node.get("referencedDeclaration") is None
-                and node["memberName"] not in {"length", "push", "pop"}):
-            found.append(type_feature(node["expression"]["typeDescriptions"].get("typeIdentifier")))
-    elif kind == "NewExpression":
-        created = node["typeName"]
-        found.append("contract creation (new C)" if created["nodeType"] == "UserDefinedTypeName"
-                     else "memory arrays (new T[](n))" if created["nodeType"] == "ArrayTypeName"
-                     else type_feature(created["typeDescriptions"].get("typeIdentifier")))
-    elif kind == "UserDefinedTypeName":
-        if not node["typeDescriptions"].get("typeIdentifier", "").startswith("t_struct$_"):
-            found.append(type_feature(node["typeDescriptions"].get("typeIdentifier")))
-    elif kind == "Literal":
-        if node.get("subdenomination") is not None:
-            found.append("literal subdenominations (ether, days, …)")
-    elif kind == "Identifier":
-        if node.get("referencedDeclaration", 0) < 0 and not builtin_callee:
-            found.append(BUILTINS.get(node["name"], f"built-in {node['name']}"))
-    elif kind == "TupleExpression":
-        if node["isInlineArray"]:
-            found.append("inline arrays")
-    elif kind == "FunctionCall":
-        if node["names"]:
-            found.append("named arguments")
-        if node["tryCall"]:
-            found.append("try/catch")
-        if node["kind"] == "structConstructorCall":
-            found.append("structs")
-    elif kind == "VariableDeclaration":
-        if node["stateVariable"] and node.get("visibility") == "public":
-            found.append("public state variables")
-        if node["constant"]:
-            found.append("constants")
-        if node["mutability"] == "immutable":
-            found.append("immutables")
-        if node.get("value") is not None:
-            found.append("declaration values")
-    elif kind == "FunctionDefinition":
-        if node["kind"] != "function":
-            found.append(FUNCTION_KINDS.get(node["kind"], f"{node['kind']} functions"))
-        if not node["implemented"]:
-            found.append("unimplemented functions")
-        if node["modifiers"]:
-            found.append("modifiers")
-        if node["virtual"]:
-            found.append("virtual functions")
-        if node.get("overrides") is not None:
-            found.append("overrides")
-    elif kind == "ContractDefinition":
-        if node["contractKind"] != "contract":
-            found.append({"library": "libraries", "interface": "interfaces"}[node["contractKind"]])
-        if node["abstract"]:
-            found.append("abstract contracts")
-        if node["baseContracts"] or node["linearizedBaseContracts"] != [node["id"]]:
-            found.append("inheritance")
-    elif kind not in EXPRESSIONS | STATEMENTS | STRUCTURAL:
-        found.append(f"{kind} nodes")
-    return [Blocker(kind, feature, "import") for feature in found]
-
-
-VALUE_TYPE = re.compile(
-    r"t_(bool|address_payable|address|u?int(8|16|24|32|40|48|56|64|72|80|88|96|104|112|120"
-    r"|128|136|144|152|160|168|176|184|192|200|208|216|224|232|240|248|256)"
-    r"|bytes([1-9]|[12][0-9]|3[0-2]))(?=_\$_|_\$|$)"
-)
-RATIONAL = re.compile(r"t_rational_(minus_)?[0-9]+_by_[0-9]+")
-
-
-def decodes(type_identifier: str) -> bool:
-    """Whether decode_type_identifier admits a type identifier: an elementary
-    value type, a rational literal type, or a tuple of elementary types."""
-    if VALUE_TYPE.fullmatch(type_identifier) or RATIONAL.fullmatch(type_identifier):
-        return True
-    if type_identifier == "t_tuple$__$":
-        return True
-    if not type_identifier.startswith("t_tuple$"):
-        return False
-    *components, last = type_identifier[len("t_tuple$"):].split("$")
-    return last == "" and all(
-        len(c) >= 2 and c[0] == c[-1] == "_" and VALUE_TYPE.fullmatch(c[1:-1]) is not None
-        for c in components
-    )
-
-
-def storage_type_supported(type_identifier: str) -> bool:
-    """Storage scalars, structs and combinations of arrays and mappings."""
-    def parse_at(start: int) -> int | None:
-        array = "t_array$_"
-        if type_identifier.startswith(array, start):
-            end = parse_at(start + len(array))
-            if end is None:
-                return None
-            if type_identifier.startswith("_$dyn_storage", end):
-                return end + len("_$dyn_storage")
-            dimension = re.match(r"_\$([0-9]+)_storage", type_identifier[end:])
-            if dimension is None or not 0 < int(dimension[1]) < 2**256:
-                return None
-            return end + dimension.end()
-        prefix = "t_mapping$_"
-        if type_identifier.startswith(prefix, start):
-            key = VALUE_TYPE.match(type_identifier, start + len(prefix))
-            if key is None or not type_identifier.startswith("_$_", key.end()):
-                return None
-            value_end = parse_at(key.end() + 3)
-            if value_end is None or not type_identifier.startswith("_$", value_end):
-                return None
-            return value_end + 2
-        struct = re.match(r"t_struct\$_.*?_\$[0-9]+_storage(?=_\$_|_\$|$)",
-                          type_identifier[start:])
-        if struct is not None:
-            return start + struct.end()
-        scalar = VALUE_TYPE.match(type_identifier, start)
-        return scalar.end() if scalar is not None else None
-
-    return parse_at(0) == len(type_identifier)
-
-
-UNARY_OPERATORS = {"++", "--", "-", "!", "~"}
-
-
-def elaboration_blockers(node: dict[str, Any], *, storage_field: bool = False,
-                         literal_message: bool = False) -> list[Blocker]:
-    """What valid_src_unit or elaborate_unit rejects at a node the importer
-    admits: unsupported storage/reference types and indexing, conversions
-    outside the elementary types, string literals, payable functions, `delete`,
-    and units that are not one
-    contract with functions. Other expressions get their types from these, or
-    are rejected by the importer."""
-    kind = node["nodeType"]
-    found: list[str] = []
-    if (kind == "VariableDeclaration"
-            or (kind == "FunctionCall" and node["kind"] == "typeConversion")
-            or (kind == "Literal" and node["kind"] not in ("number", "bool")
-                and not literal_message)):
-        type_identifier = node["typeDescriptions"].get("typeIdentifier") or ""
-        admitted_storage = (kind == "VariableDeclaration" and (node["stateVariable"] or storage_field)
-                            and storage_type_supported(type_identifier.removesuffix("_ptr")
-                                                       if storage_field else type_identifier))
-        if not decodes(type_identifier) and not admitted_storage:
-            found.append(type_feature(type_identifier))
-        if (kind == "VariableDeclaration"
-                and node["storageLocation"] not in ("default", "memory")):
-            found.append("transient storage" if node["storageLocation"] == "transient"
-                         else "local reference bindings")
-    elif (kind == "TupleExpression" and not node["isInlineArray"]
-          and not decodes(node["typeDescriptions"]["typeIdentifier"])):
-        type_identifier = node["typeDescriptions"]["typeIdentifier"]
-        found.append("tuples of literals" if "t_rational" in type_identifier
-                     else type_feature(type_identifier))
-    elif kind == "UnaryOperation" and node["operator"] not in UNARY_OPERATORS:
-        found.append(f"operator {node['operator']}")
-    elif ((kind == "UnaryOperation" and RATIONAL.fullmatch(node["typeDescriptions"]["typeIdentifier"]))
-          or (kind == "BinaryOperation"
-              and RATIONAL.fullmatch(node["commonType"]["typeIdentifier"]))):
-        found.append("constant expressions over literals")
-    elif kind == "Literal" and node["kind"] == "number" and not RATIONAL.fullmatch(
-            node["typeDescriptions"].get("typeIdentifier") or ""):
-        found.append("literals of non-integer types")
-    elif kind == "FunctionDefinition" and node["stateMutability"] == "payable":
-        found.append("payable functions")
-    elif kind == "IndexAccess":
-        base_type = node["baseExpression"]["typeDescriptions"].get("typeIdentifier") or ""
-        if (not base_type.startswith(("t_mapping$_", "t_array$_"))
-                or not storage_type_supported(base_type)):
-            found.append(type_feature(base_type))
-    elif kind == "MemberAccess":
-        base_type = node["expression"]["typeDescriptions"].get("typeIdentifier") or ""
-        if node.get("referencedDeclaration") is not None:
-            if not base_type.startswith("t_struct$_") or not storage_type_supported(base_type):
-                found.append(type_feature(base_type))
-        elif node["memberName"] in {"length", "push", "pop"}:
-            if not base_type.startswith("t_array$_") or not storage_type_supported(base_type):
-                found.append(type_feature(base_type))
-            elif node["memberName"] != "length":
-                if not base_type.endswith("_$dyn_storage"):
-                    found.append("fixed array mutation")
-                elif not VALUE_TYPE.fullmatch(base_type[len("t_array$_"):-len("_$dyn_storage")]):
-                    found.append("aggregate array mutation")
-    elif kind == "SourceUnit":
-        contracts = [m for m in node["nodes"] if m["nodeType"] == "ContractDefinition"]
-        if len(contracts) != 1:
-            found.append("source units without exactly one contract")
-    elif kind == "ContractDefinition":
-        if not any(m["nodeType"] == "FunctionDefinition" for m in node["nodes"]):
-            found.append("contracts without functions")
-    return [Blocker(kind, feature, "elaboration") for feature in found]
-
-
-def callee_blockers(node: dict[str, Any], callees: set[int],
-                    conversions: set[int]) -> list[Blocker]:
-    """Type names and function names, which the semantics admits only as the
-    callee of a conversion or a call; and the callees of conversions to
-    non-elementary types, where the importer rejects those."""
-    if node["id"] in conversions and node["nodeType"] != "ElementaryTypeNameExpression":
-        return [Blocker(node["nodeType"], "conversions to non-elementary types", "import")]
-    if node["id"] in callees:
-        return []
-    if (node["nodeType"] == "MemberAccess" and node.get("referencedDeclaration") is None
-            and node["memberName"] in {"push", "pop"}):
-        return [Blocker("MemberAccess", "array members as values", "elaboration")]
-    if node["nodeType"] == "ElementaryTypeNameExpression":
-        return [Blocker(node["nodeType"], "type names as values", "import")]
-    if (node["nodeType"] == "Identifier"
-            and node["typeDescriptions"].get("typeIdentifier", "").startswith("t_function_internal")):
-        return [Blocker(node["nodeType"], "functions as values", "elaboration")]
-    return []
-
-
-INTEGER_TYPE = re.compile(r"t_u?int[0-9]+")
-
-
-def coerced_literals(node: dict[str, Any], by_id: dict[int, dict[str, Any]]) -> list[Blocker]:
-    """Integer literals used where a value of another type is expected, which
-    elaborate_unit converts only to integer types: initial values, returned
-    values, assigned values, operands and arguments."""
-    kind = node["nodeType"]
-    expected: list[tuple[dict[str, Any] | None, dict[str, Any]]] = []
-    if kind == "VariableDeclarationStatement" and len(node["declarations"]) == 1:
-        expected.append((node.get("initialValue"), node["declarations"][0]))
-    elif kind == "Return" and node.get("expression") is not None:
-        returns = by_id.get(node.get("functionReturnParameters"), {}).get("parameters", [])
-        if len(returns) == 1:
-            expected.append((node["expression"], returns[0]))
-    elif kind == "Assignment" and node["operator"] not in ("<<=", ">>="):
-        expected.append((node["rightHandSide"], node))
-    elif kind == "BinaryOperation":
-        common = {"typeDescriptions": node["commonType"]}
-        expected.append((node["leftExpression"], common))
-        if node["operator"] not in ("<<", ">>", "**"):
-            expected.append((node["rightExpression"], common))
-    elif kind == "FunctionCall" and node["kind"] == "functionCall":
-        callee = by_id.get(node["expression"].get("referencedDeclaration"), {})
-        if callee.get("nodeType") == "FunctionDefinition":
-            expected.extend(zip(node["arguments"], callee["parameters"]["parameters"]))
-        member = node["expression"]
-        if (member.get("nodeType") == "MemberAccess" and member["memberName"] == "push"
-                and len(node["arguments"]) == 1):
-            array_type = member["expression"]["typeDescriptions"].get("typeIdentifier", "")
-            match = re.fullmatch(r"t_array\$_(t_[^$]+)_\$dyn_storage", array_type)
-            if match is not None:
-                expected.append((node["arguments"][0],
-                                 {"typeDescriptions": {"typeIdentifier": match[1]}}))
-    for value, target in expected:
-        target_type = target["typeDescriptions"].get("typeIdentifier") or ""
-        if (value is not None and value["nodeType"] == "Literal"
-                and RATIONAL.fullmatch(value["typeDescriptions"].get("typeIdentifier") or "")
-                and VALUE_TYPE.fullmatch(target_type) and not INTEGER_TYPE.fullmatch(target_type)):
-            return [Blocker(kind, "literals of non-integer types", "elaboration")]
-    return []
-
-
-def scan(asts: dict[str, Any]) -> dict[int, list[Blocker]]:
-    """Every node the semantics rejects, by node id, the importer's reasons
-    first."""
-    found: dict[int, list[Blocker]] = {}
-    for ast in asts.values():
-        by_id = {n["id"]: n for n in nodes(ast)}
-        calls = [n for n in by_id.values() if n["nodeType"] == "FunctionCall"]
-        callees = {n["expression"]["id"] for n in calls}
-        conversions = {n["expression"]["id"] for n in calls if n["kind"] == "typeConversion"}
-        fields = {v["id"] for n in by_id.values() if n["nodeType"] == "StructDefinition"
-                  for v in n["members"]}
-        builtins = [n for n in calls if n["kind"] == "functionCall"
-                    and n["expression"]["nodeType"] == "Identifier"
-                    and n["expression"].get("referencedDeclaration") in {-18, -3, -19}]
-        builtin_callees = {n["expression"]["id"] for n in builtins}
-        builtin_calls = {n["id"] for n in builtins}
-        literal_messages: set[int] = set()
-        for call in builtins:
-            declaration = call["expression"]["referencedDeclaration"]
-            args = call["arguments"]
-            message = (args[1] if declaration == -18 and len(args) == 2 else
-                       args[0] if declaration == -19 and len(args) == 1 else None)
-            if (message is not None and message["nodeType"] == "Literal"
-                    and message["kind"] in {"string", "unicodeString", "hexString"}
-                    and message["typeDescriptions"]["typeIdentifier"].startswith("t_stringliteral_")):
-                literal_messages.add(message["id"])
-        storage_bases = {n["baseExpression"]["id"] for n in by_id.values()
-                         if n["nodeType"] == "IndexAccess"}
-        storage_bases.update(n["expression"]["id"] for n in by_id.values()
-                             if n["nodeType"] == "MemberAccess")
-        for node in nodes(ast):
-            blockers = (node_blockers(node, builtin_callee=node["id"] in builtin_callees)
-                        + callee_blockers(node, callees, conversions)
-                        + elaboration_blockers(node, storage_field=node["id"] in fields,
-                                               literal_message=node["id"] in literal_messages)
-                        + coerced_literals(node, by_id))
-            if node["id"] in builtin_calls:
-                declaration = node["expression"]["referencedDeclaration"]
-                if len(node["arguments"]) not in ({1, 2} if declaration == -18 else
-                                                  {1} if declaration == -3 else {0, 1}):
-                    blockers.append(Blocker("FunctionCall", "custom errors", "import"))
-            if (node["nodeType"] in {"Identifier", "IndexAccess", "MemberAccess"}
-                    and node.get("typeDescriptions", {}).get("typeIdentifier", "").startswith(("t_mapping$_", "t_array$_", "t_struct$_"))
-                    and node["id"] not in storage_bases):
-                tid = node["typeDescriptions"]["typeIdentifier"]
-                feature = ("array values" if tid.startswith("t_array$_")
-                           else "mapping values" if tid.startswith("t_mapping$_")
-                           else "struct values and copying")
-                blockers.append(Blocker(node["nodeType"], feature, "elaboration"))
-            if blockers:
-                found.setdefault(node["id"], []).extend(blockers)
-    return found
-
-
 # The HOL run
 
 
-def run_hol(holbuild: str, work: Path, units: list[tuple[str, Path]]) -> dict[str, dict[str, Any]]:
-    """Import and elaborate every unit, in one HOL session; the result of each
-    test by name."""
-    manifest = work / "manifest.txt"
-    manifest.write_text("".join(f"{name}\t{path}\n" for name, path in units), encoding="utf-8")
-    log = work / "hol.log"
-    # `holbuild run` loads built theories but does not build them.
-    build = [holbuild, "-j8", "build", "--skip-checkpoints", "--skip-proof-steps", "solidityPrepareLib",
-             "solidityElaborateTheory"]
-    print("+", " ".join(build), file=sys.stderr, flush=True)
-    subprocess.run(build, cwd=ROOT, check=True)
-    command = [holbuild, "-j1", "run", str(HOL_SCRIPT)]
-    print("+", " ".join(command), file=sys.stderr, flush=True)
-    with log.open("w", encoding="utf-8") as stream:
-        status = subprocess.run(
-            command, cwd=ROOT, stdin=subprocess.DEVNULL, stdout=stream,
-            stderr=subprocess.STDOUT,
-            env={**os.environ, "SEMANTIC_TESTS_MANIFEST": str(manifest)},
-        ).returncode
+def remote_configured() -> bool:
+    """Keep configured remote setups from silently running coverage locally."""
+    if any(os.environ.get(name) for name in (
+            "HOLBUILD_REMOTE_CACHE_URL", "HOLBUILD_REMOTE_CACHE_CURL_CONFIG",
+            "HOLBUILD_REMOTE_EXEC_CURL_CONFIG")):
+        return True
+    config = ROOT / ".holconfig.toml"
+    if not config.is_file():
+        return False
+    with config.open("rb") as stream:
+        remote = tomllib.load(stream).get("remote_cache", {})
+    return bool(remote.get("url") or remote.get("curl_config"))
+
+
+def read_hol_results(result_file: Path, log: Path, status: int,
+                     units: list[tuple[str, Path]]) -> dict[str, dict[str, Any]]:
     results = {}
-    for line in log.read_text(encoding="utf-8", errors="replace").splitlines():
+    for line in result_file.read_text(encoding="utf-8", errors="replace").splitlines():
         if line.startswith(RESULT_PREFIX):
             try:
                 result = json.loads(line[len(RESULT_PREFIX):])
@@ -662,46 +243,167 @@ def run_hol(holbuild: str, work: Path, units: list[tuple[str, Path]]) -> dict[st
     return results
 
 
+def run_fleet_shard(holbuild: str, work: Path,
+                    units: list[tuple[str, Path]]) -> dict[str, dict[str, Any]] | None:
+    """Run one cached action; None means no coordinator was configured."""
+    work.mkdir(parents=True, exist_ok=True)
+    manifest = work / "manifest.txt"
+    staged_units = []
+    for index, (name, source) in enumerate(units):
+        target = work / f"{index}.json"
+        shutil.copyfile(source, target)
+        staged_units.append((name, target))
+    manifest.write_text("".join(f"{name}\t{path.name}\n" for name, path in staged_units),
+                        encoding="utf-8")
+    script = work / HOL_SCRIPT.name
+    shutil.copyfile(HOL_SCRIPT, script)
+    supports = [manifest]
+    for source in (exporter.PIN_FILE, exporter.DEFAULT_PROFILE, exporter.OPTIMIZED_PROFILE):
+        target = work / source.relative_to(ROOT)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, target)
+        supports.append(target)
+    supports.extend(path for _, path in staged_units)
+    command = [holbuild, "-j1", "run-action", "--remote-only", "--skip-checkpoints",
+               "--skip-proof-steps", "--script", str(script),
+               "--load", "solidityPrepareLib", "--output", "results.jsonl",
+               "--outputs-dir", str(work / "outputs")]
+    for support in supports:
+        command.extend(["--support", str(support)])
+    command.append("solidityElaborateTheory")
+    print(f"+ {holbuild} run-action solidityElaborateTheory ({len(units)} tests)",
+          file=sys.stderr, flush=True)
+    log = work / "hol.log"
+    with log.open("w", encoding="utf-8") as stream:
+        status = subprocess.run(command, cwd=ROOT, stdin=subprocess.DEVNULL,
+                                stdout=stream, stderr=subprocess.STDOUT).returncode
+    action_log = log.read_text(encoding="utf-8", errors="replace")
+    print(action_log, file=sys.stderr, end="", flush=True)
+    if (status == 75 and "run-action --remote-only: no coordinator to run on; "
+            "pass --remote-exec URL" in action_log):
+        return None
+    result_file = work / "outputs/solidity-hol/solidityElaborateTheory/results.jsonl"
+    completed = re.search(r"^solidity-hol:solidityElaborateTheory [0-9a-f]{64} "
+                          r"(?:done|cached)\b", action_log, re.M)
+    if status != 0 or completed is None or not result_file.is_file():
+        raise SystemExit(f"the HOL fleet action failed (status {status}):\n{action_log}")
+    return read_hol_results(result_file, log, status, units)
+
+
+def run_hol(holbuild: str, work: Path, units: list[tuple[str, Path]]) -> dict[str, dict[str, Any]]:
+    """Prepare bounded batches on the fleet, or locally without remote configuration."""
+    work = work.resolve()
+    # `holbuild run` loads built theories but does not build them.
+    build = [holbuild, "-j8", "build", "--skip-checkpoints", "--skip-proof-steps", "solidityPrepareLib",
+             "solidityElaborateTheory"]
+    print("+", " ".join(build), file=sys.stderr, flush=True)
+    subprocess.run(build, cwd=ROOT, check=True)
+    help_text = subprocess.run([holbuild, "--help"], cwd=ROOT, check=True,
+                               capture_output=True, text=True).stdout
+    configured = remote_configured()
+    if "run-action" in help_text:
+        shards = [units[i:i + 128] for i in range(0, len(units), 128)] or [[]]
+
+        def run_shard(index: int) -> dict[str, dict[str, Any]] | None:
+            return run_fleet_shard(holbuild, work / "shards" / f"{index:04}", shards[index])
+
+        results = run_shard(0)
+        if results is not None:
+            # Each startup/export mutates the same holbuild project.
+            for index in range(1, len(shards)):
+                shard = run_shard(index)
+                if shard is None:
+                    raise SystemExit("the HOL fleet action failed: coordinator disappeared "
+                                     "after the first shard")
+                results.update(shard)
+            return results
+        if configured:
+            raise SystemExit("the HOL fleet action failed: remote configuration exists but "
+                             "no coordinator was selected")
+    elif configured:
+        raise SystemExit("holbuild has no run-action support; upgrade holbuild to use the "
+                         "configured remote execution/cache instead of running coverage locally")
+
+    local_manifest = work / "local-manifest.txt"
+    local_manifest.write_text("".join(f"{name}\t{path.resolve()}\n" for name, path in units),
+                              encoding="utf-8")
+    command = [holbuild, "-j1", "run", str(HOL_SCRIPT)]
+    print("+", " ".join(command), file=sys.stderr, flush=True)
+    log = work / "hol.log"
+    with log.open("w", encoding="utf-8") as stream:
+        status = subprocess.run(
+            command, cwd=ROOT, stdin=subprocess.DEVNULL, stdout=stream,
+            stderr=subprocess.STDOUT,
+            env={**os.environ, "SEMANTIC_TESTS_MANIFEST": str(local_manifest)},
+        ).returncode
+    return read_hol_results(log, log, status, units)
+
+
+# Features
+
+
+# The feature of a blocker line, by the first pattern it matches. A line is
+# "<node type> <id>: <reason>" from the importer, or "<id>: <reason>" from
+# source validation and elaboration.
+FEATURES = [
+    (r"^FunctionTypeName\b", "function types"),
+    (r"^IndexRangeAccess\b", "array slices"),
+    (r"^(TryStatement|TryCatchClause)\b", "try/catch"),
+    (r"^UsingForDirective\b", "using for"),
+    (r"^UserDefinedValueTypeDefinition\b|^UserDefinedTypeName\b.*only struct", "user-defined value types"),
+    (r"^InlineAssembly\b", "inline assembly"),
+    (r"^FunctionDefinition\b.*unsupported source unit member", "free functions"),
+    (r"external library functions are called only", "external library functions"),
+    (r"unsupported library member", "library structs and events"),
+    (r"inline arrays", "inline arrays"),
+    (r"structConstructorCall", "struct constructors"),
+    (r"contract creation", "contract creation"),
+    (r"built-in", "built-ins"),
+]
+FEATURE_PATTERNS = [(re.compile(pattern), feature) for pattern, feature in FEATURES]
+NODE_ID = re.compile(r"\b([A-Z][A-Za-z]*) [0-9]+: ")
+HOL_ID = re.compile(r"^[0-9]+: ")
+
+
+def reason(line: str) -> str:
+    """A blocker line without its node ids, so equal reasons count once."""
+    return NODE_ID.sub(r"\1: ", HOL_ID.sub("", line))
+
+
+def feature(line: str) -> str:
+    text = reason(line)
+    return next((f for pattern, f in FEATURE_PATTERNS if pattern.search(text)), text)
+
+
 # Classification
 
 
 @dataclass
 class Classification:
-    """A test's category, the first construct the importer rejected, and every
-    construct the scan found that the semantics does not support."""
+    """A test's category and, if HOL rejected it, every blocker it reported;
+    if HOL admitted it, the functions calls reach, the reasons of the
+    unsupported ones, and why its creation has no procedure, if it has none."""
 
     test: str
     category: str
     reason: str | None = None
-    first: Blocker | None = None
-    blockers: list[Blocker] = field(default_factory=list)
-    scan_agrees: bool = True
+    blockers: list[str] = field(default_factory=list)
+    functions: int = 0
+    unsupported: list[str] = field(default_factory=list)
+    creation: list[str] = field(default_factory=list)
+
+    def features(self) -> set[str]:
+        return {feature(b) for b in self.blockers}
 
 
-def classify(test: str, scanned: dict[int, list[Blocker]], hol: dict[str, Any]) -> Classification:
-    """Combine the importer's and elaborator's verdict with the scan. The scan
-    agrees if it finds nothing in an admitted test, only elaboration-stage
-    blockers in a test the elaborator rejects, and an import-stage blocker at
-    the node the importer rejected."""
-    blockers = sorted({b for bs in scanned.values() for b in bs},
-                      key=lambda b: (b.feature, b.node_type, b.stage))
-    stages = {b.stage for b in blockers}
+def classify(test: str, hol: dict[str, Any]) -> Classification:
     status = hol["status"]
-    message = hol.get("message")
-    if status == ADMITTED:
-        return Classification(test, ADMITTED, blockers=blockers, scan_agrees=not blockers)
-    if status in (ELABORATION_REJECTED, SOURCE_REJECTED):
-        return Classification(test, status, message, blockers=blockers,
-                              scan_agrees=stages == {"elaboration"})
-    if status in (MALFORMED_INPUT, INVALID_CORE):
-        return Classification(test, status, message, blockers=blockers, scan_agrees=False)
-    if status != IMPORT_REJECTED:
+    if status not in CATEGORIES or status in (SKIPPED, COMPILE_FAILURE):
         raise ValueError(f"{test}: unknown HOL status {status!r}")
-    match = IMPORT_ERROR_NODE.match(message or "")
-    at_node = [b for b in scanned.get(int(match.group(2)), []) if b.stage == "import"] if match else []
-    first = at_node[0] if at_node else Blocker(match.group(1) if match else "?", "unclassified", "import")
-    return Classification(test, IMPORT_REJECTED, message, first, blockers,
-                          scan_agrees=bool(at_node))
+    blockers = hol.get("blockers", [])
+    return Classification(test, status, "\n".join(blockers) or None, blockers,
+                          hol.get("functions", 0), hol.get("unsupported", []),
+                          hol.get("creation", []))
 
 
 # The report
@@ -712,41 +414,38 @@ class Report:
     pin: str
     profile: str
     results: list[Classification]
+    suite: str = "semanticTests"
 
     def counts(self) -> Counter[str]:
         return Counter(r.category for r in self.results)
+
+    def function_reasons(self) -> Counter[str]:
+        """The reasons functions of admitted units are unsupported, without
+        node ids, each counted once per function."""
+        return Counter(line for r in self.results for unsupported in r.unsupported
+                       for line in {reason(line) for line in unsupported.splitlines()})
 
     def rejected(self) -> list[Classification]:
         return [r for r in self.results if r.category in (IMPORT_REJECTED, ELABORATION_REJECTED, SOURCE_REJECTED)]
 
     def feature_ranking(self) -> list[dict[str, Any]]:
         """Features by how many rejected tests they occur in, with how many
-        they are the only blocker of and how many the importer stopped at."""
-        rejected = self.rejected()
+        they are the only blocker of."""
         blocking: Counter[str] = Counter()
         only: Counter[str] = Counter()
-        first: Counter[str] = Counter()
-        node_types: dict[str, set[str]] = {}
-        for r in rejected:
-            features = {b.feature for b in r.blockers}
-            for b in r.blockers:
-                node_types.setdefault(b.feature, set()).add(b.node_type)
+        for r in self.rejected():
+            features = r.features()
             blocking.update(features)
             if len(features) == 1:
                 only.update(features)
-            if r.first is not None:
-                first[r.first.feature] += 1
-        return [
-            {"feature": f, "node_types": sorted(node_types.get(f, ())), "tests": n,
-             "only_blocker": only[f], "first_rejection": first[f]}
-            for f, n in sorted(blocking.items(), key=lambda kv: (-kv[1], -only[kv[0]], kv[0]))
-        ]
+        return [{"feature": f, "tests": n, "only_blocker": only[f]}
+                for f, n in sorted(blocking.items(), key=lambda kv: (-kv[1], -only[kv[0]], kv[0]))]
 
     def greedy_order(self, limit: int) -> list[tuple[str, int]]:
         """Features in the order that admits the most rejected tests at each
-        step, by the scan, with the number admitted once all up to it are
-        supported. Ties go to the feature occurring in more tests."""
-        tests = [{b.feature for b in r.blockers} for r in self.rejected()]
+        step, with the number admitted once all up to it are supported. Ties
+        go to the feature occurring in more tests."""
+        tests = [r.features() for r in self.rejected()]
         occurrences = Counter(f for features in tests for f in features)
         chosen: set[str] = set()
         order = []
@@ -763,15 +462,18 @@ class Report:
         return {
             "format": REPORT_FORMAT,
             "solidity_pin": self.pin,
+            "suite": self.suite,
             "profile": self.profile,
             "counts": {c: self.counts()[c] for c in CATEGORIES},
+            "functions": {"total": sum(r.functions for r in self.results),
+                          "unsupported": sum(len(r.unsupported) for r in self.results)},
             "features": self.feature_ranking(),
             "greedy_order": [{"feature": f, "admitted": n} for f, n in self.greedy_order(GREEDY_STEPS)],
             "tests": [
                 {"test": r.test, "category": r.category, "reason": r.reason,
-                 "first": r.first.feature if r.first else None,
-                 "features": sorted({b.feature for b in r.blockers}),
-                 "scan_agrees": r.scan_agrees}
+                 "blockers": r.blockers, "features": sorted(r.features()),
+                 "functions": r.functions, "unsupported": r.unsupported,
+                 "creation": r.creation}
                 for r in self.results
             ],
         }
@@ -779,33 +481,44 @@ class Report:
     def markdown(self) -> str:
         counts = self.counts()
         total = len(self.results)
-        disagreements = [r for r in self.results if not r.scan_agrees]
         lines = [
-            "# Coverage of solc's semantic tests",
+            f"# Coverage of solc's {self.suite}",
             "",
             "Generated by `tools/semantic_tests_coverage.py`; do not edit by hand.",
             "",
-            f"Every test under `{TESTS_DIR.as_posix()}` of argotorg/solidity at "
+            f"Every test under `{tests_dir(self.suite).as_posix()}` of argotorg/solidity at "
             f"`{self.pin}` was compiled with profile `{self.profile}`, imported by "
             "`solidityPrepareLib`, including source validation, elaboration and full core checking. Call expectations "
             "(the `// ----` sections) are not run, so an admitted test is one the "
-            "semantics accepts, not one it is known to agree on.",
+            "semantics accepts, not one it is known to agree on. A test is admitted "
+            "when every function calls reach is supported, and partially admitted "
+            "when the unit is admitted with some of them unsupported, or without a "
+            "procedure for its creation: those have no procedure and a call of them, "
+            "or a deployment, is refused.",
             "",
-            "`source-rejected` records a failed `valid_src_unit` check. That check",
-            "mixes subset restrictions and consistency checks; this category does",
-            "not establish that a feature is unsupported. The scan only identifies",
-            "known blockers present in the same test.",
-            "",
+        ]
+        if self.suite != "semanticTests":
+            valid = total - counts[SKIPPED] - counts[COMPILE_FAILURE]
+            lines += [
+                "Only valid programs count: tests whose expectations list a compile "
+                "error are skipped, and so are compile failures. Of the "
+                f"{valid} valid tests, {counts[ADMITTED]} are admitted and "
+                f"{counts[PARTIALLY_ADMITTED]} partially admitted.",
+                "",
+            ]
+        lines += [
             "To regenerate it from the repository root, with the pinned solc and the "
             "tests checked out outside the repository:",
             "",
             "```sh",
             "git init ../solidity-tests && cd ../solidity-tests",
             "git remote add origin https://github.com/argotorg/solidity.git",
-            f"git sparse-checkout set --no-cone {TESTS_DIR.as_posix()}",
+            f"git sparse-checkout set --no-cone {tests_dir(self.suite).as_posix()}",
             f"git fetch --depth 1 --filter=blob:none origin {self.pin}",
             "git checkout FETCH_HEAD && cd -",
-            "tools/semantic_tests_coverage.py ../solidity-tests --solc /path/to/solc",
+            "tools/semantic_tests_coverage.py ../solidity-tests --solc /path/to/solc"
+            + ("" if self.suite == "semanticTests"
+               else f" --suite {self.suite} --output <report path>"),
             "```",
             "",
             "| outcome | tests |",
@@ -813,32 +526,39 @@ class Report:
         ]
         lines += [f"| {c} | {counts[c]} |" for c in CATEGORIES]
         lines += [f"| total | {total} |", ""]
+        functions = sum(r.functions for r in self.results)
+        unsupported = sum(len(r.unsupported) for r in self.results)
         lines += [
+            "## Functions of admitted units",
+            "",
+            f"The {counts[ADMITTED] + counts[PARTIALLY_ADMITTED]} admitted and partially "
+            f"admitted tests have {functions} functions that calls reach, library "
+            f"functions included; {functions - unsupported} are supported and "
+            f"{unsupported} unsupported, for these reasons (a function can have several):",
+            "",
+            "| reason | functions |",
+            "| --- | ---: |",
+        ]
+        lines += [f"| {reason} | {n} |" for reason, n in self.function_reasons().most_common()]
+        lines += [
+            "",
             "## Features blocking rejected tests",
             "",
-            "Each rejected test is scanned for every construct the importer or the "
-            "elaborator rejects. *tests* counts the rejected tests a feature occurs in; "
-            "*only blocker* the tests in which it is the only feature found, which "
-            "supporting it would admit as far as the scan can tell; *first* the tests "
-            "the importer stopped at it.",
+            "*tests* counts the rejected tests a feature blocks; *only blocker* the "
+            "tests it alone blocks, which supporting it would admit unless it hides "
+            "a blocker behind it.",
             "",
-            f"The scan disagrees with the HOL run on {len(disagreements)} tests"
-            + (", listed at the end." if disagreements else "."),
-            "",
-            "| feature | AST nodes | tests | only blocker | first |",
-            "| --- | --- | ---: | ---: | ---: |",
+            "| feature | tests | only blocker |",
+            "| --- | ---: | ---: |",
         ]
-        for f in self.feature_ranking():
-            node_types = ", ".join(f"`{t}`" for t in f["node_types"])
-            lines.append(f"| {f['feature']} | {node_types} | {f['tests']} | "
-                         f"{f['only_blocker']} | {f['first_rejection']} |")
+        lines += [f"| {f['feature']} | {f['tests']} | {f['only_blocker']} |" for f in self.feature_ranking()]
         lines += [
             "",
             "## Features in order of tests admitted",
             "",
             "Supporting the features in this order admits the most rejected tests at "
-            "each step, by the scan; *admitted* counts the tests admitted once every "
-            "feature up to that row is supported. It ignores how hard a feature is.",
+            "each step; *admitted* counts the tests admitted once every feature up to "
+            "that row is supported. It ignores how hard a feature is.",
             "",
             "| step | feature | admitted |",
             "| ---: | --- | ---: |",
@@ -849,14 +569,14 @@ class Report:
                           for r in self.results if r.category in (SKIPPED, COMPILE_FAILURE))
         lines += [f"| {reason} | {n} |" for reason, n in sorted(reasons.items(), key=lambda kv: -kv[1])]
         for title, category in (("Admitted", ADMITTED),
+                                ("Partially admitted", PARTIALLY_ADMITTED),
                                 ("Source validation rejections", SOURCE_REJECTED),
                                 ("Elaborator rejections", ELABORATION_REJECTED)):
             lines += ["", f"## {title}", ""]
             tests = [r for r in self.results if r.category == category]
-            lines += [f"- `{r.test}`" + (f": {r.reason}" if r.reason else "") for r in tests] or ["None."]
-        if disagreements:
-            lines += ["", "## Scan disagreements", ""]
-            lines += [f"- `{r.test}` ({r.category}): {r.reason}" for r in disagreements]
+            lines += [f"- `{r.test}`" + "".join(f"\n  - {b}" for b in r.blockers) +
+                      "".join(f"\n  - creation: {b}" for b in r.creation)
+                      for r in tests] or ["None."]
         return "\n".join(lines) + "\n"
 
 
@@ -868,9 +588,16 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--solc", required=True, type=Path)
     parser.add_argument("--holbuild", default="holbuild")
     parser.add_argument("-j", "--jobs", type=int, default=os.cpu_count())
-    parser.add_argument("--output", type=Path, default=ROOT / "docs" / "semantic-tests-coverage",
-                        help="report path without extension; .md and .json are written")
-    return parser.parse_args(argv)
+    parser.add_argument("--suite", choices=SUITES, default="semanticTests")
+    parser.add_argument("--output", type=Path,
+                        help="report path without extension; .md and .json are written "
+                        "(default for semanticTests: docs/semantic-tests-coverage)")
+    args = parser.parse_args(argv)
+    if args.output is None:
+        if args.suite != "semanticTests":
+            parser.error(f"--suite {args.suite} needs --output")
+        args.output = ROOT / "docs" / "semantic-tests-coverage"
+    return args
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -879,13 +606,13 @@ def main(argv: list[str] | None = None) -> int:
     profile = exporter.read_json(exporter.DEFAULT_PROFILE)
     # Checked once here, so that every failure below is the test's own.
     exporter.compiler_identity(args.solc, profile["compilerVersion"], pin)
-    tests_root = args.solidity / TESTS_DIR
+    tests_root = args.solidity / tests_dir(args.suite)
     tests = [read_test(tests_root, path) for path in find_tests(tests_root)]
 
     results: dict[str, Classification] = {}
     to_compile = []
     for test in tests:
-        reason = skip_reason(test, profile)
+        reason = skip_reason(test, profile, args.suite)
         if reason is not None:
             results[test.name] = Classification(test.name, SKIPPED, reason)
         else:
@@ -899,24 +626,22 @@ def main(argv: list[str] | None = None) -> int:
 
     with tempfile.TemporaryDirectory(prefix="semantic-tests-") as temporary:
         work = Path(temporary)
-        compiled: dict[str, dict[str, Any]] = {}
         units = []
         with ThreadPoolExecutor(max_workers=args.jobs) as pool:
             for index, (test, outcome) in enumerate(pool.map(compile_one, to_compile)):
                 if isinstance(outcome, str):
                     results[test.name] = Classification(test.name, COMPILE_FAILURE, outcome)
                     continue
-                compiled[test.name] = outcome
                 path = work / f"{index}.json"
                 path.write_text(json.dumps(outcome), encoding="utf-8")
                 units.append((test.name, path))
         print(f"{len(tests)} tests, {len(units)} compiled", file=sys.stderr, flush=True)
         hol = run_hol(args.holbuild, work, units)
-    for name, sources in compiled.items():
-        results[name] = classify(name, scan({source: data["ast"] for source, data in sources["output"]["sources"].items()}),
-                                 hol[name])
+    for name, _ in units:
+        results[name] = classify(name, hol[name])
 
-    report = Report(pin, exporter.DEFAULT_PROFILE.stem, [results[t.name] for t in tests])
+    report = Report(pin, exporter.DEFAULT_PROFILE.stem, [results[t.name] for t in tests],
+                    args.suite)
     exporter.write_json_atomic(args.output.with_suffix(".json"), report.json())
     args.output.with_suffix(".md").write_text(report.markdown(), encoding="utf-8")
     counts = report.counts()

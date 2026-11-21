@@ -19,7 +19,9 @@
  * sides. Its observation is the outcome the EVM sees (a return of ABI-encoded
  * data, a revert, or a diagnostic), the contract's committed storage and the
  * log the frame wrote; a revert takes the initial world back, as
- * finish_yul_frame says. The calldata is built by the same input_call the
+ * finish_yul_frame says, and since the frame is the whole transaction a
+ * success ends with its pending deletions applied (yul_transaction_frame).
+ * The calldata is built by the same input_call the
  * bytecode run uses, so a named call and raw calldata are called identically
  * on both sides, and the verdict is solidityDifferential's own, with the Yul
  * run standing where the core run stands: a Mismatch is the bytecode run and
@@ -34,6 +36,28 @@ Ancestors
 Libs
   cv_transLib wordsLib intLib
 
+(* Each stage's actual object layout, alongside its creation code. *)
+Datatype:
+  yul_creation_program = <|
+    creation_body : yul_stmt list;
+    creation_name : string;
+    deployed_name : string;
+    creation_bytes : byte list;
+    deployed_bytes : byte list;
+    deployed_offset : num;
+    creation_refs : (num # num list) list
+  |>
+End
+
+Datatype:
+  yul_case_program = <|
+    runtime_body : yul_stmt list;
+    runtime_bytes : byte list;
+    runtime_refs : (num # num list) list;
+    creation_program : yul_creation_program option
+  |>
+End
+
 (* The frame the corpus's cases run in: the contract account at
  * contract_address holding the case's initial storage, its deployed bytecode
  * and the case's value, the case's sender funded for it, the peer contract the
@@ -44,14 +68,20 @@ Libs
  * transaction and block the bytecode run is given -- its own frame's
  * transaction parameters, so that origin, gasprice, chainid and the block
  * builtins read on both sides what the corpus's transaction says, rather than
- * a second copy of it that could drift from the corpus's. There are no
- * immutables to load: no corpus suite is compiled with any. The frame's gas
+ * a second copy of it that could drift from the corpus's. The immutables are
+ * the ones the case gives, and zero for the others the code loads, by the
+ * names the compiler's Yul loads them by (their declarations' ids); the
+ * deployed code holds the same values, as in the bytecode run. The frame's gas
  * limit is that transaction's own -- the number the bytecode run starts with --
  * so a callee of the Yul frame gets the same order of budget as the bytecode
- * run's, and the return data buffer starts empty as a fresh frame's does.
+ * run's, and the return data buffer and transient storage start empty as a
+ * fresh transaction's do.
  *)
 Definition yul_differential_machine_def:
-  yul_differential_machine code c data =
+  yul_differential_machine code imm c data =
+    let pre = case_accounts (patch_immutables c.case_immutable_refs imm code)
+                c.case_storage c.case_sender c.case_peer_code
+                c.case_peer_storage c.case_libraries in
     <| accounts :=
          (* the same world the source run starts from: the case's value has
           * already moved to the contract, so a call the frame makes with part
@@ -60,26 +90,49 @@ Definition yul_differential_machine_def:
           * back to its address -- Caller.bumpSelf's ISelf(address(this)) -- so
           * that such a call runs the bytecode the real transaction would.
           *)
-         transfer_value c.case_sender contract_address c.case_value
-           (case_accounts code c.case_storage c.case_sender c.case_peer_code
-              c.case_peer_storage);
+         transfer_value c.case_sender contract_address c.case_value pre;
+       (* the transaction's original accounts: the world before the value
+        * moved *)
+       original := pre; to_delete := [];
+       transient := empty_transient_storage;
        logs := [];
        self_address := contract_address;
        caller_address := c.case_sender;
        call_value := n2w c.case_value;
        call_data := data;
        return_data := [];
-       immutables := (FEMPTY : string |-> bytes32);
+       code := patch_immutables c.case_immutable_refs imm code;
+       objects := FEMPTY; immutable_offsets := FEMPTY;
+       (* the compiler's Yul names an immutable by its declaration's id *)
+       immutables :=
+         FEMPTY |++ MAP (λ(x, _). (toString x, 0w : bytes32)) c.case_immutable_refs
+                |++ MAP (λ(x, _, w). (toString x, n2w (num_of_be_bytes w) : bytes32))
+                      imm;
        memory := (FEMPTY : num |-> word8);
        memory_size := 0;
-       gas_limit := (differential_tx c.case_sender c.case_value data).gasLimit;
+       gas_limit := (differential_tx c.case_sender c.case_value data).gasLimit; gas_observations := [];
        scopes := ([] : (string |-> bytes32) list);
        transaction_parameters :=
-         initial_tx_params differential_chain_id [] differential_block
+         initial_tx_params differential_chain_id
+           (test_block_hashes differential_block.number) differential_block
            (differential_tx c.case_sender c.case_value data) 0 |>
 End
 
-(* What the frame's caller sees, as finish_yul_frame decides it: the same
+(* The frame is the whole transaction: a stop or a return also carries out
+ * the deletions its calls left pending (EIP-6780), as solidityEntry's
+ * settle_source_world does for a source frame; a revert or an abort keeps
+ * the initial world.
+ *)
+Definition yul_transaction_frame_def:
+  yul_transaction_frame initial final completion =
+    case finish_yul_frame initial final completion of
+      YulFrameSuccess data w =>
+        YulFrameSuccess data
+          (w with accounts := process_deletions final.to_delete w.accounts)
+    | other => other
+End
+
+(* What the frame's caller sees, as yul_transaction_frame decides it: the same
  * shape contract_observation gives the bytecode run.
  *)
 Definition yul_frame_observation_def:
@@ -91,22 +144,106 @@ Definition yul_frame_observation_def:
     | YulFrameRevert data w =>
         (Reverted data,
          SOME (lookup_account contract_address w.accounts).storage, w.logs)
+    | YulFrameAbort w =>
+        (Aborted, SOME (lookup_account contract_address w.accounts).storage, w.logs)
     | YulFrameInvalid _ => (Diagnostic InvalidCompletion, NONE, [])
     | YulFrameResourceLimit => (Diagnostic OutOfFuel, NONE, [])
 End
 
+(* The creation frame has empty calldata; arguments follow its initcode. *)
+Definition yul_creation_machine_def:
+  yul_creation_machine p c data =
+    (yul_differential_machine [] ([] : (num # scalar # byte list) list) c []) with
+      <| accounts := transfer_value c.case_sender (case_address c) c.case_value
+           (case_accounts [] c.case_storage c.case_sender
+              c.case_peer_code c.case_peer_storage c.case_libraries);
+         (* the created account is empty in the original accounts, as
+          * Verifereum's CREATE marks it *)
+         original := update_account (case_address c) empty_account_state
+           (case_accounts [] c.case_storage c.case_sender
+              c.case_peer_code c.case_peer_storage c.case_libraries);
+         self_address := case_address c;
+         code := p.creation_bytes ++ data;
+         objects := FEMPTY |+ (p.creation_name, (0, LENGTH p.creation_bytes))
+           |+ (p.deployed_name,
+                (p.deployed_offset, LENGTH p.deployed_bytes));
+         immutables := FEMPTY;
+         immutable_offsets := FEMPTY |++
+           MAP (λ(x, offsets). (toString x, offsets)) p.creation_refs;
+         transaction_parameters := initial_tx_params differential_chain_id
+           (test_block_hashes differential_block.number)
+           differential_block (case_tx c data) 0 |>
+End
+
+(* Compare the bytes actually returned, including immutable patches. *)
+Definition yul_created_code_def:
+  yul_created_code p imm =
+    FOLDL (λcode (x, offsets).
+      FOLDL (patch_word (word_to_bytes_be
+        (case FLOOKUP imm (toString x) of NONE => (0w : bytes32) | SOME w => w)))
+        code offsets) p.deployed_bytes p.creation_refs
+End
+
+Definition yul_creation_frame_def:
+  yul_creation_frame p c data fuel =
+    if p.deployed_offset + LENGTH p.deployed_bytes > LENGTH p.creation_bytes ∨
+       TAKE (LENGTH p.deployed_bytes) (DROP p.deployed_offset p.creation_bytes)
+         ≠ p.deployed_bytes then
+      ((Diagnostic InvalidCompletion, NONE, []), NONE)
+    else
+      let m = yul_creation_machine p c data in
+      let r = run_yul fuel p.creation_body m in
+      ((case yul_transaction_frame m r.machine r.completion of
+          YulFrameSuccess out w =>
+            if out = yul_created_code p r.machine.immutables then
+              (Returned (code_immutable_words p.creation_refs out),
+               SOME (lookup_account (case_address c) w.accounts).storage, w.logs)
+            else (Diagnostic InvalidCompletion, NONE, [])
+        | YulFrameRevert out w =>
+            (Reverted out,
+             SOME (lookup_account (case_address c) w.accounts).storage, w.logs)
+        | YulFrameAbort w =>
+            (Aborted, SOME (lookup_account (case_address c) w.accounts).storage, w.logs)
+        | YulFrameInvalid _ => (Diagnostic InvalidCompletion, NONE, [])
+        | YulFrameResourceLimit => (Diagnostic OutOfFuel, NONE, [])),
+       SOME r.machine.memory_size)
+End
+
+Definition yul_creation_execution_def:
+  yul_creation_execution p c data fuel = FST (yul_creation_frame p c data fuel)
+End
+
 (* A case's call: the same calldata the bytecode run is given, so an
  * unencodable argument or an unknown function is the same diagnostic on both
- * sides.
+ * sides. Each run also gives the active memory size it ends with.
  *)
+Definition yul_case_frame_def:
+  yul_case_frame (evm_code : byte list) ycode u c fuel =
+    case (input_call u c.case_input, case_immutable_values u c.case_immutables) of
+      (INL d, _) => ((Diagnostic d, NONE, []), NONE)
+    | (_, NONE) => ((Diagnostic UnencodableArguments, NONE, []), NONE)
+    | (INR (data, _), SOME imm) =>
+        (case c.case_input of
+           Deploy _ _ =>
+             (case ycode.creation_program of
+                NONE => ((Diagnostic InvalidCompletion, NONE, []), NONE)
+              | SOME p => yul_creation_frame p c data fuel)
+         | _ =>
+             let m = yul_differential_machine ycode.runtime_bytes imm
+                       (c with case_immutable_refs := ycode.runtime_refs) data in
+             let r = run_yul fuel ycode.runtime_body m in
+             (yul_frame_observation (yul_transaction_frame m r.machine r.completion),
+              SOME r.machine.memory_size))
+End
+
 Definition yul_case_execution_def:
   yul_case_execution evm_code ycode u c fuel =
-    case input_call u c.case_input of
-      INL d => (Diagnostic d, NONE, [])
-    | INR (data, _) =>
-        let m = yul_differential_machine evm_code c data in
-        let r = run_yul fuel ycode m in
-        yul_frame_observation (finish_yul_frame m r.machine r.completion)
+    FST (yul_case_frame evm_code ycode u c fuel)
+End
+
+Definition yul_memory_size_def:
+  yul_memory_size evm_code ycode u c fuel =
+    SND (yul_case_frame evm_code ycode u c fuel)
 End
 
 Definition yul_observation_def:
@@ -115,7 +252,9 @@ Definition yul_observation_def:
 End
 
 (* The verdict on one case at one stage, as differential_verdict decides it
- * with the Yul run standing where the core run stands.
+ * with the Yul run standing where the core run stands, except that a case's
+ * memory_image check compares the core run's memory only: here the frames'
+ * memory sizes are compared.
  *)
 Definition yul_case_verdict_def:
   yul_case_verdict code u prog c yfuel ycode =
@@ -138,7 +277,15 @@ Definition yul_case_verdict_def:
           LogMismatch (SND (SND evm_run)) (SND (SND yul_run))
         else if SND (SND evm_run) ≠ expected_logs c.case_logs then
           LogUnexpected (SND (SND evm_run)) (expected_logs c.case_logs)
-        else Agree outcome
+        else
+          (case c.case_memory_size of
+             NONE => Agree outcome
+           | SOME n =>
+               if evm_memory_size code u c = SOME n ∧
+                  yul_memory_size code ycode u c yfuel = SOME n
+               then Agree outcome
+               else MemorySizeMismatch (evm_memory_size code u c)
+                      (yul_memory_size code ycode u c yfuel) n)
     | other => other
 End
 
@@ -146,26 +293,6 @@ Definition yul_agrees_def:
   yul_agrees code u prog c yfuel ycode ⇔
     is_agreement (yul_case_verdict code u prog c yfuel ycode)
 End
-
-(* The complete-storage and complete-log checks of yul_case_verdict cannot
- * turn an agreement into a disagreement: what holds when compare_observations
- * agrees is what the verdict's own checks leave alone.
- *)
-Theorem complete_check_agreement[local]:
-  is_agreement
-    (case verdict of
-       Agree outcome =>
-         if b1 then StorageMismatch s1 s2
-         else if b2 then StorageUnexpected s3 s4
-         else if b3 then LogMismatch l1 l2
-         else if b4 then LogUnexpected l3 l4
-         else Agree outcome
-     | other => other) ⇒
-  is_agreement verdict
-Proof
-  Cases_on ‘verdict’ >> simp[is_agreement_def] >>
-  rpt IF_CASES_TAC >> simp[is_agreement_def]
-QED
 
 (* What an agreement establishes: the Yul run returns or reverts what the case
  * expects, and it is never a diagnostic. The bytecode run's side is
@@ -180,8 +307,10 @@ Theorem yul_agrees_outcomes:
      expected_storage c.case_storage c.case_final slots)
 Proof
   rw[yul_agrees_def, yul_case_verdict_def, yul_observation_def] >>
-  drule complete_check_agreement >> strip_tac >>
-  drule compare_observations_agree >> simp[]
+  qmatch_asmsub_abbrev_tac ‘compare_observations ex ev yr’ >>
+  ‘is_agreement (compare_observations ex ev yr)’
+    by (Cases_on ‘compare_observations ex ev yr’ >> gvs[is_agreement_def]) >>
+  drule compare_observations_agree >> simp[Abbr ‘ex’]
 QED
 
 (* And it is at the complete storage the case expects, not just the slots it
@@ -205,9 +334,16 @@ Proof
   BasicProvers.every_case_tac >> gvs[is_agreement_def]
 QED
 
+val () = cv_auto_trans yul_transaction_frame_def;
 val () = cv_auto_trans yul_differential_machine_def;
 val () = cv_auto_trans yul_frame_observation_def;
+val () = cv_auto_trans yul_creation_machine_def;
+val () = cv_auto_trans yul_created_code_def;
+val () = cv_auto_trans yul_creation_frame_def;
+val () = cv_auto_trans yul_creation_execution_def;
+val () = cv_auto_trans yul_case_frame_def;
 val () = cv_auto_trans yul_case_execution_def;
+val () = cv_auto_trans yul_memory_size_def;
 val () = cv_auto_trans yul_observation_def;
 val () = cv_auto_trans yul_case_verdict_def;
 val () = cv_auto_trans yul_agrees_def;

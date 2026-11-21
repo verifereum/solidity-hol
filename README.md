@@ -16,7 +16,9 @@ iterations independently of EVM gas.
 `solidityPrepareLib.prepare_artifact` is the checked entry point for artifact
 consumers. It checks the artifact format, compiler version/commit, profile and
 Standard JSON settings against `SOLIDITY_PIN` and
-`profiles/solc-0.8.37-via-ir-osaka.json`. It then imports and validates the source,
+`profiles/solc-0.8.37-via-ir-osaka.json`, accepting the optimized variant only
+with recorded unoptimized stack-depth failures (see [profiles.md](docs/profiles.md)).
+It then imports and validates the source,
 elaborates it, and checks the complete `wf_core_program` with `cv_eval`.
 Success retains the checked artifact alongside the source/core terms and HOL theorems for source validation,
 elaboration and core well-formedness. Artifact metadata checks run in SML;
@@ -28,6 +30,13 @@ Malformed artifacts, unsupported import/lowering, source-validation rejection
 and invalid generated core have distinct diagnostics. Source validation also
 contains supported-subset restrictions. Invalid generated core is an
 implementation failure. Unexpected HOL evaluation failures propagate.
+
+Internal and private library functions are imported with each contract that
+reaches them. Public and external library calls use `DELEGATECALL` to linked
+library addresses, with storage references encoded as slot words. Direct and
+bound calls share the linked address used by `address(L)` and fixture deployment.
+Their library bodies and declarations reached only through those bodies are
+omitted from the calling contract's source program.
 
 The raw importer and `elaborate_unit` remain available for reasoning and
 frontend inspection. Their callers own the compiler/profile contract, source
@@ -41,23 +50,60 @@ declarations and storage layouts. `core_program_environment` derives the
 checking/runtime environment from that program. Struct declarations describe
 field identities and types even when there is no storage layout. Storage
 layouts separately describe slots and offsets and must agree with the declared
-fields. Enum and user-defined value declarations also live in the program;
-their importer coverage is still deferred.
+fields. Enums retain their declaration identities. The importer erases user-defined
+value types to their elementary underlying types and lowers their resolved
+operators to internal calls.
 
 The evaluator executes elementary scalar operations and conversions, locals,
-tuples, structured control flow, internal calls, built-in failures, packed
-state values, scalar-key mappings, storage arrays and storage struct members.
+tuples, structured control flow, internal calls, calls through internal
+function values, built-in failures, packed
+state values, scalar and bytes/string mapping keys, storage arrays and storage
+struct members. Transient value-type state variables use a separate backend
+with transaction lifetime; custom storage bases use the compiler's absolute
+layout slots. See [frontend-boundary.md](docs/frontend-boundary.md#storage-layout).
 Assignment, compound assignment, increment and tuple writes share local or
-captured-reference destinations. `solidityStorage` owns packed access and
+captured-reference destinations. Non-canonical `bool` and enum storage bytes,
+and non-canonical words written back to locals by inline assembly, fail with
+`InvalidCompletion`: core source values carry no dirty bits. This applies to
+storage array copies and ABI encoding too. `solidityStorage` owns packed access and
 navigation; the evaluator owns bindings, frame checks and control flow.
 Scalar writes, reference
-rebinding and content copying are distinct core operations; the latter two
-remain extension points rather than implemented aggregate semantics.
+rebinding and content copying are distinct core operations.
 
-Memory/calldata execution and a memory model compatible with inline assembly
-remain unresolved. High-level external calls run the callee on Verifereum
-through `externalCall`, a provisional adapter with a fixed gas budget and a
-fresh callee frame; creation is not connected yet. Core well-formedness alone does not rule out `InvalidCompletion`:
+An inline assembly block (`AssemblyStmt`) runs on the Yul evaluator over the
+frame's own memory. Solidity code and assembly share one byte-addressed
+memory, laid out as the pinned compiler lays it out (the free memory pointer
+at `0x40`, the zero slot at `0x60`, objects allocated at the free memory
+pointer), so a block may read and write any address, and what it leaves is
+what the Solidity code after it reads. The block
+reads and writes back the value-type locals it names, reads state variables'
+slots and offsets and storage pointer locals' slots and offsets (assigning a
+pointer's `x.slot` points it at that slot of the executing account), calldata
+references' offsets and lengths (`x.offset` and `x.length`, a static array's
+plain name; assigning them rebinds the reference, which must stay within the
+calldata), integer, `bool` and fixed-bytes constants as literals in its code,
+as the compiler puts them, so its Yul functions see them too (a function's
+parameters and results may reuse such a name in its body), and reads and may
+assign the addresses of the memory locals it names. `return`/`stop` end the
+frame with a `HaltCompletion`. `call`, `staticcall` and
+`delegatecall` run the callee through the same `externalCall` adapter as
+high-level calls (`delegatecall` in this contract's account), with the
+same fixed gas budget. Bare `gas()` as a call's first argument stands
+for that budget and consumes no observation. Value-position `gas()` and
+source `gasleft()` each consume one explicit gas observation; missing or
+out-of-range evidence fails closed. The block sees the frame's return data as the
+source's calls left it; after an `ecrecover`, whose return data the source
+doesn't compute, `returndatasize`/`returndatacopy` must follow a call the
+block made itself, else the block fails closed. In a
+static frame a block naming `call` or `delegatecall` fails closed. Memory
+expansion gas is not modelled, so a write far past the used memory succeeds
+where the EVM runs out of gas. High-level external calls and
+the low-level `call`, `staticcall` and `delegatecall` run the callee on
+Verifereum through `externalCall`, a provisional adapter with a fixed gas
+budget (a `gas` option caps it) and a fresh callee frame; a delegate call's
+frame runs the callee's code in the caller's account. Source `new C` runs the
+compiler's initcode, and Yul `create`/`create2` the initcode in memory, on
+Verifereum through `run_create_call`. Core well-formedness alone does not rule out `InvalidCompletion`:
 for example, a storage write in a static frame is deliberately invalid.
 
 ## Yul
@@ -88,9 +134,28 @@ The differential corpus compares source evaluation with pinned compiler
 bytecode in Verifereum, including complete committed contract storage. Slot
 lists select diagnostics; they do not limit comparison. The upstream `semanticTests` coverage tool checks
 preparation acceptance; it does not execute the tests' call expectations.
+Each rejected test lists every blocker preparation reports, with its node
+id; the tool only groups those lines under feature labels.
+The coverage tool stages its compiler artifacts and pin/profile files for a
+cached `holbuild run-action` batches of up to 128 tests on the configured
+remote-execution fleet. Batches run serially because their startup/export
+phases share holbuild's project mutation lock. Completed batches
+can be reused after an interrupted run. Python 3.11 or later is required. Without
+a configured fleet, it runs the preparation check locally. An older holbuild
+without `run-action` needs an upgrade when remote execution/cache is configured;
+otherwise it can use the local check. A configured fleet's execution failures stop
+the coverage run instead of falling back locally.
 See [differential-testing.md](docs/differential-testing.md),
 [profiles.md](docs/profiles.md) and
 [semantic-tests-coverage.md](docs/semantic-tests-coverage.md).
+Run admitted upstream call expectations separately with
+[`tools/run_semantic_expectations.py`](docs/semantic-expectations-runner.md);
+this on-demand sweep does not run in per-PR CI.
+
+Feature PRs include their own suite, compiler artifact and generated per-suite
+source/bytecode theories; shared report
+snapshots are refreshed after merges. See
+[generated-artifacts.md](docs/generated-artifacts.md) for the commands and ownership.
 
 See [implementation-blueprint.md](docs/implementation-blueprint.md) for module
 ownership, evaluator interfaces and extension points.

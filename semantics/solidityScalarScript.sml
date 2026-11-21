@@ -52,6 +52,11 @@ Definition panic_enum_conversion_def:
   panic_enum_conversion = 0x21n
 End
 
+(* A call of the zero internal function value. *)
+Definition panic_zero_function_def:
+  panic_zero_function = 0x51n
+End
+
 (* Integers *)
 
 (* Two's complement truncation to n bits. *)
@@ -193,7 +198,9 @@ QED
 
 (* Division rounds towards zero; the remainder takes the dividend's sign.
  * Division and remainder by zero panic even in unchecked mode, and
- * type(int).min / -1 is the only division that overflows.
+ * type(int).min / -1 is the only division that overflows. addmod and mulmod
+ * take the sum or product without wrapping, and panic on a zero modulus in
+ * either mode.
  *)
 Definition eval_integer_operation_def:
   eval_integer_operation mode signed n op args =
@@ -210,6 +217,12 @@ Definition eval_integer_operation_def:
     | (RemainderOp, [IntegerValue x; IntegerValue y]) =>
         if y = 0 then ScalarPanic panic_division_by_zero
         else integer_result signed n (truncating_rem x y)
+    | (AddModOp, [IntegerValue x; IntegerValue y; IntegerValue k]) =>
+        if k = 0 then ScalarPanic panic_division_by_zero
+        else integer_result signed n (truncating_rem (x + y) k)
+    | (MulModOp, [IntegerValue x; IntegerValue y; IntegerValue k]) =>
+        if k = 0 then ScalarPanic panic_division_by_zero
+        else integer_result signed n (truncating_rem (x * y) k)
     | (ExponentOp, [IntegerValue x; IntegerValue e]) =>
         integer_exponent mode signed n x (Num e)
     | (ShiftLeftOp, [IntegerValue x; IntegerValue y]) =>
@@ -325,7 +338,8 @@ End
  * truncate or extend in two's complement. Integer/bytes and address/bytes
  * conversions are big-endian re-encodings between equal sizes. Conversion to
  * an enum panics with 0x21 when out of range, even in unchecked mode.
- * User-defined value types share their underlying representation.
+ * User-defined value types share their underlying representation, and an
+ * internal function value is the same under every mutability.
  *)
 Definition convert_scalar_def:
   convert_scalar env dst s =
@@ -350,6 +364,7 @@ Definition convert_scalar_def:
          | NONE => ScalarInvalid)
     | (UserValueT _, _) => ScalarOk s
     | (BoolT, BoolValue _) => ScalarOk s
+    | (FunctionT _ _ _ _, InternalFunctionValue _) => ScalarOk s
     | _ => ScalarInvalid
 End
 
@@ -506,9 +521,9 @@ Proof
   gvs[scalar_has_type_def, elementary_scalar_has_type_def, AllCaseEqs()]
   >- (gvs[integer_in_range_def, AllCasePreds()] >>
       irule LESS_LESS_EQ_TRANS >> irule_at Any w2n_lt >> simp[])
-  >- simp[integer_in_range_def, EXP_EXP_MULT, num_of_be_bytes_bound]
-  >- (drule_all wf_core_environment_user_value >> simp[])
-  >- (drule_all wf_core_environment_user_value >> simp[])
+  >- simp[integer_in_range_def, EXP_EXP_MULT, num_of_be_bytes_bound] >>
+  TRY (drule_all wf_core_environment_user_value >> simp[] >> NO_TAC) >>
+  BasicProvers.EVERY_CASE_TAC >> gvs[]
 QED
 
 (* Progress: operations the checker admits never return ScalarInvalid on
@@ -587,8 +602,9 @@ Proof
   TRY (Cases_on ‘src’) >>
   gvs[core_convertible_def, elementary_convertible_def, AllCaseEqs()] >>
   TRY (Cases_on ‘v’) >>
-  gvs[scalar_has_type_cases, convert_scalar_def,
-      elementary_scalar_has_type_def, AllCaseEqs()]
+  gvs[scalar_has_type_cases, convert_scalar_def, scalar_has_type_def,
+      elementary_scalar_has_type_def, AllCaseEqs()] >>
+  gvs[AllCasePreds()]
 QED
 
 (* The fast paths agree with the plain definitions: integer_exponent with
@@ -751,9 +767,12 @@ Proof
   rw[implicitly_convertible_def]
   >- (Cases_on ‘dst’ >>
       gvs[scalar_has_type_cases, scalar_has_type_def,
-          elementary_scalar_has_type_def, convert_scalar_def]) >>
+          elementary_scalar_has_type_def, convert_scalar_def] >>
+      gvs[AllCasePreds()] >> BasicProvers.EVERY_CASE_TAC >> gvs[]) >>
   Cases_on ‘src’ >> Cases_on ‘dst’ >>
-  gvs[AllCaseEqs(), scalar_has_type_cases, convert_scalar_def]
+  gvs[AllCaseEqs(), scalar_has_type_cases, convert_scalar_def] >>
+  gvs[scalar_has_type_def, AllCasePreds()] >>
+  BasicProvers.EVERY_CASE_TAC >> gvs[]
 QED
 
 (* cv translation, so the evaluator can run scalar steps under cv_compute. *)

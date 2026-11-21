@@ -185,3 +185,130 @@ val () = expect_unknown "unsupported literal kind"
            (call "pop" [obj [("nodeType", str "YulLiteral"),
                              ("kind", str "address"), ("value", str "0")]])]]
      creation_code)
+
+(* The import goes on past an unknown node: each is a line of the refusal,
+ * also one under another. *)
+val () =
+  (ignore (import
+     (output_with
+        [runtime_object
+           [expression_statement (call "first_unknown" [call "nested_unknown" []]),
+            expression_statement (call "second_unknown" [])]]
+        creation_code));
+   raise ERR "yulImportTest" "three unknown calls: admitted")
+  handle yulImportLib.ImportError msg =>
+    (case String.fields (fn c => c = #"\n") msg of
+       [a, b, c] =>
+         if String.isSubstring "nested_unknown" a andalso
+            String.isSubstring "first_unknown" b andalso
+            String.isSubstring "second_unknown" c then ()
+         else raise ERR "yulImportTest" ("three unknown calls: " ^ msg)
+     | _ => raise ERR "yulImportTest" ("three unknown calls: " ^ msg))
+
+(* A function defined inside a nested block is refused, and the blockers in
+ * its body are lines of the refusal too; its call to itself is not one. *)
+val () =
+  (ignore (import
+     (output_with
+        [runtime_object
+           [obj [("nodeType", str "YulBlock"),
+                 ("statements", arr
+                    [obj [("nodeType", str "YulFunctionDefinition"),
+                          ("name", str "inner"),
+                          ("body", obj [("nodeType", str "YulBlock"),
+                                        ("statements", arr
+                                           [expression_statement (call "inner_unknown" []),
+                                            expression_statement (call "inner" [])])])]])]]]
+        creation_code));
+   raise ERR "yulImportTest" "nested function definition: admitted")
+  handle yulImportLib.ImportError msg =>
+    (case String.fields (fn c => c = #"\n") msg of
+       [a, b] =>
+         if String.isSubstring "call to inner_unknown" a andalso
+            String.isSubstring "unsupported statement YulFunctionDefinition" b
+         then ()
+         else raise ERR "yulImportTest" ("nested function definition: " ^ msg)
+     | _ => raise ERR "yulImportTest" ("nested function definition: " ^ msg))
+
+(* The refusal of v, line by line, each with the text expected in it. *)
+fun expect_lines what v expected =
+  (ignore (import v); raise ERR "yulImportTest" (what ^ ": admitted"))
+  handle yulImportLib.ImportError msg =>
+    let val lines = String.fields (fn c => c = #"\n") msg in
+      if length lines = length expected andalso
+         ListPair.all (fn (l, e) => String.isSubstring e l) (lines, expected)
+      then ()
+      else raise ERR "yulImportTest" (what ^ ": " ^ msg)
+    end
+
+fun block statements = obj [("nodeType", str "YulBlock"), ("statements", arr statements)]
+
+(* A case literal the importer refuses does not hide the blockers of the
+ * cases after it. *)
+val () = expect_lines "refused case literal"
+  (output_with
+     [runtime_object
+        [obj [("nodeType", str "YulSwitch"), ("expression", number "0"),
+              ("cases", arr
+                 [obj [("nodeType", str "YulCase"),
+                       ("value", obj [("nodeType", str "YulLiteral"), ("kind", str "bool"),
+                                      ("value", str "maybe"), ("type", str "")]),
+                       ("body", block [])],
+                  obj [("nodeType", str "YulCase"), ("value", str "default"),
+                       ("body", block [expression_statement (call "case_unknown" [])])]])]]]
+     creation_code)
+  ["invalid boolean literal maybe", "call to case_unknown"]
+
+(* An object nested in the runtime object does not hide the blockers of
+ * its code. *)
+val () = expect_lines "nested object and unknown call"
+  (output_with
+     [object_node [expression_statement (call "code_unknown" [])]
+        [data_section, object_node creation_code []]]
+     creation_code)
+  ["call to code_unknown", "expected YulData"]
+
+(* The same artifact's creation code must be imported, not its runtime body. *)
+val () =
+  let
+    val artifact = JSONParser.parseFile fixture
+    val (name, deployed, code) = yulImportLib.import_creation
+      (JSONUtil.lookupField artifact "output") source contract yulImportLib.Ir
+    val runtime = yulImportLib.import_runtime_artifact fixture source contract
+                    yulImportLib.Ir
+  in
+    if name <> deployed andalso not (aconv code runtime) andalso
+       not (null (fst (listSyntax.dest_list code))) then ()
+    else raise ERR "yulImportTest" "creation import did not retain distinct code"
+  end
+
+(* These names must travel through the same dialect-derived table as every
+ * other compiler-emitted builtin. *)
+val () =
+  if aconv
+    (import (output_with
+      [runtime_object
+        [expression_statement (call "pop" [call "balance" [number "119"]]),
+         expression_statement (call "pop" [call "selfbalance" []]),
+         expression_statement (call "datacopy" [number "0", number "1", number "2"])]]
+      creation_code))
+    “[(YulExprStmt (YulBuiltin YPop
+         [YulBuiltin YBalance [YulLit (LitNumber 119w)]]));
+       YulExprStmt (YulBuiltin YPop [YulBuiltin YSelfBalance []]);
+       YulExprStmt (YulBuiltin YDataCopy
+         [YulLit (LitNumber 0w); YulLit (LitNumber 1w); YulLit (LitNumber 2w)])]”
+  then () else raise ERR "yulImportTest" "balance/selfbalance/datacopy import";
+
+val () =
+  if aconv
+    (import (output_with
+      [runtime_object
+        [expression_statement (call "extcodecopy"
+           [number "119", number "0", number "1", number "2"]),
+         expression_statement (call "pop" [call "blockhash" [number "3"]])]]
+      creation_code))
+    “[YulExprStmt (YulBuiltin YExtCodeCopy
+         [YulLit (LitNumber 119w); YulLit (LitNumber 0w); YulLit (LitNumber 1w);
+          YulLit (LitNumber 2w)]);
+       YulExprStmt (YulBuiltin YPop [YulBuiltin YBlockHash [YulLit (LitNumber 3w)]])]”
+  then () else raise ERR "yulImportTest" "extcodecopy/blockhash import";

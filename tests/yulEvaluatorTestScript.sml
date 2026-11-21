@@ -1,5 +1,5 @@
 (* Smoke tests for the Yul evaluator, run by cv_eval: straight-line code and
- * memory, storage, a battery over the arithmetic, comparison, bitwise and
+ * memory, storage, transient storage, a battery over the arithmetic, comparison, bitwise and
  * memory builtins, loops with a break and with a continue, a call whose
  * arguments must be evaluated right to left, a switch, sign extension, a
  * revert inside a callee, and the invalid outcomes.  The semantics test set
@@ -18,17 +18,20 @@ Definition yul_test_tx_params_def:
   yul_test_tx_params =
     <| origin := 0xA1w; gasPrice := 9; baseFeePerGas := 3;
        baseFeePerBlobGas := 0; blockNumber := 7; blockTimeStamp := 1700;
-       blockCoinBase := 0xC0w; blockGasLimit := 30000; prevRandao := 0w;
+       blockCoinBase := 0xC0w; blockGasLimit := 30000; prevRandao := 0x5EEDw;
        prevHashes := []; blobHashes := []; chainId := 5; authRefund := 0 |>
 End
 
 Definition yul_test_machine_def:
   yul_test_machine =
-    <| accounts := empty_accounts; logs := []; self_address := 0w;
+    <| accounts := empty_accounts; transient := empty_transient_storage;
+       logs := []; self_address := 0w;
        caller_address := 0w; call_value := 0w; call_data := []; return_data := [];
+       code := []; objects := FEMPTY; immutable_offsets := FEMPTY;
        immutables := (FEMPTY : string |-> bytes32); memory := FEMPTY;
-       memory_size := 0; gas_limit := 0; scopes := [];
-       transaction_parameters := yul_test_tx_params |>
+       memory_size := 0; gas_limit := 0; gas_observations := []; scopes := [];
+       transaction_parameters := yul_test_tx_params;
+       original := empty_accounts; to_delete := [] |>
 End
 
 Definition run_def:
@@ -43,11 +46,14 @@ val () = cv_auto_trans run_def;
  *)
 Definition yul_frame_machine_def:
   yul_frame_machine =
-    <| accounts := empty_accounts; logs := []; self_address := 0x1234w;
+    <| accounts := empty_accounts; transient := empty_transient_storage;
+       logs := []; self_address := 0x1234w;
        caller_address := 0x5678w; call_value := 0w; call_data := []; return_data := [];
+       code := []; objects := FEMPTY; immutable_offsets := FEMPTY;
        immutables := (FEMPTY : string |-> bytes32) |+ ("3", 42w);
-       memory := FEMPTY; memory_size := 0; gas_limit := 0; scopes := [];
-       transaction_parameters := yul_test_tx_params |>
+       memory := FEMPTY; memory_size := 0; gas_limit := 0; gas_observations := []; scopes := [];
+       transaction_parameters := yul_test_tx_params;
+       original := empty_accounts; to_delete := [] |>
 End
 
 Definition run_frame_def:
@@ -146,6 +152,23 @@ Definition store_code_def:
 End
 
 val () = cv_auto_trans store_code_def;
+
+(* tstore(7, 42) mstore(0, tload(7)) mstore(32, sload(7)) return(0, 64)
+ * The transient write is read back, and the account's storage is untouched.
+ *)
+Definition transient_store_code_def:
+  transient_store_code =
+    [YulExprStmt (YulBuiltin YTStore
+       [YulLit (LitNumber 7w); YulLit (LitNumber 42w)]);
+     YulExprStmt (YulBuiltin YMStore
+       [YulLit (LitNumber 0w); YulBuiltin YTLoad [YulLit (LitNumber 7w)]]);
+     YulExprStmt (YulBuiltin YMStore
+       [YulLit (LitNumber 32w); YulBuiltin YSLoad [YulLit (LitNumber 7w)]]);
+     YulExprStmt (YulBuiltin YReturn
+       [YulLit (LitNumber 0w); YulLit (LitNumber 64w)])]
+End
+
+val () = cv_auto_trans transient_store_code_def;
 
 (* let acc := 0
  * for { let i := 0 } lt(i, 3) { i := add(i, 1)  j := add(j, 1) } {
@@ -432,7 +455,7 @@ End
 
 val () = cv_auto_trans log3_code_def;
 
-(* mstore(0, address()) mstore(32, origin()) ... return(0, 288)
+(* mstore(0, address()) mstore(32, origin()) ... return(0, 320)
  * The executing account from the frame, the rest from its transaction and
  * block.
  *)
@@ -442,9 +465,9 @@ Definition environment_code_def:
                      [YulLit (LitNumber (n2w (32 * i))); YulBuiltin b []]))
       [(0, YAddress); (1, YOrigin); (2, YChainId); (3, YNumber);
        (4, YTimestamp); (5, YCoinbase); (6, YGasPrice); (7, YBaseFee);
-       (8, YGasLimit)] ++
+       (8, YGasLimit); (9, YPrevRandao)] ++
     [YulExprStmt (YulBuiltin YReturn
-       [YulLit (LitNumber 0w); YulLit (LitNumber 288w)])]
+       [YulLit (LitNumber 0w); YulLit (LitNumber 320w)])]
 End
 
 val () = cv_auto_trans environment_code_def;
@@ -611,6 +634,13 @@ QED
 
 Theorem storage_round_trips:
   (run 20 store_code).completion = YulReturn (word_to_bytes_be (42w : bytes32))
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem transient_storage_round_trips_apart_from_storage:
+  (run 20 transient_store_code).completion =
+  YulReturn (word_to_bytes_be (42w : bytes32) ++ word_to_bytes_be (0w : bytes32))
 Proof
   CONV_TAC cv_eval
 QED
@@ -789,7 +819,8 @@ Theorem environment_builtins_read_the_frame_transaction_and_block:
              word_to_bytes_be (0xC0w : bytes32) ++
              word_to_bytes_be (9w : bytes32) ++
              word_to_bytes_be (3w : bytes32) ++
-             word_to_bytes_be (30000w : bytes32))
+             word_to_bytes_be (30000w : bytes32) ++
+             word_to_bytes_be (0x5EEDw : bytes32))
 Proof
   CONV_TAC cv_eval
 QED
@@ -822,9 +853,10 @@ Proof
 QED
 
 (* The frame the call family runs on. The caller runs for 0x1234 and has a gas
- * budget of its own, big enough for a callee that writes a slot; three callees
+ * budget of its own, big enough for a callee that writes a slot; four callees
  * have code -- 0x77 returns one word, 0x78
- * writes a slot, 0x7a reverts with one word -- 0x79 has no account at all, and
+ * writes a slot, 0x7a reverts with one word, 0x7c adds one to its transient
+ * slot 0 and returns the new value -- 0x79 has no account at all, and
  * 0x7b holds a balance no value can be added to without overflowing a word,
  * which is what puts a call outside the model.
  * The return data buffer is not empty, so a test can tell what returndatasize
@@ -833,7 +865,12 @@ QED
 Definition yul_call_machine_def:
   yul_call_machine =
     <| accounts :=
-         update_account 0x7bw (empty_account_state with balance := 2 ** 256)
+         update_account 0x7cw
+           (empty_account_state with
+              code := [0x60w; 0x00w; 0x5cw; 0x60w; 0x01w; 0x01w; 0x80w;
+                       0x60w; 0x00w; 0x5dw; 0x60w; 0x00w; 0x52w;
+                       0x60w; 0x20w; 0x60w; 0x00w; 0xf3w])
+         (update_account 0x7bw (empty_account_state with balance := 2 ** 256)
          (update_account 0x7aw
            (empty_account_state with
               code := [0x60w; 0xaaw; 0x60w; 0x00w; 0x52w;
@@ -845,12 +882,15 @@ Definition yul_call_machine_def:
                  (empty_account_state with
                     code := [0x60w; 0x07w; 0x60w; 0x00w; 0x52w;
                              0x60w; 0x20w; 0x60w; 0x00w; 0xf3w])
-                 empty_accounts)));
+                 empty_accounts))));
+       transient := empty_transient_storage;
        logs := []; self_address := 0x1234w; caller_address := 0x5678w;
        call_value := 0w; call_data := []; return_data := [0xaaw; 0xbbw; 0xccw];
+       code := []; objects := FEMPTY; immutable_offsets := FEMPTY;
        immutables := (FEMPTY : string |-> bytes32); memory := FEMPTY;
-       memory_size := 0; gas_limit := 100000; scopes := [];
-       transaction_parameters := yul_test_tx_params |>
+       memory_size := 0; gas_limit := 100000; gas_observations := []; scopes := [];
+       transaction_parameters := yul_test_tx_params;
+       original := empty_accounts; to_delete := [] |>
 End
 
 Definition run_call_frame_def:
@@ -899,6 +939,28 @@ Definition writing_call_builtin_code_def:
 End
 
 val () = cv_auto_trans writing_call_builtin_code_def;
+
+(* pop(call(gas(), 0x7c, 0, 0, 0, 0, 32))
+ * pop(call(gas(), 0x7c, 0, 0, 0, 32, 32))
+ * return(0, 64)
+ * The second call sees what the first left in the callee's transient storage,
+ * so the two return 1 and 2, as they would in one EVM transaction.
+ *)
+Definition transient_call_builtin_code_def:
+  transient_call_builtin_code =
+    [YulExprStmt (YulBuiltin YPop [YulBuiltin YCall
+       [YulBuiltin YGas []; YulLit (LitNumber 0x7cw); YulLit (LitNumber 0w);
+        YulLit (LitNumber 0w); YulLit (LitNumber 0w);
+        YulLit (LitNumber 0w); YulLit (LitNumber 32w)]]);
+     YulExprStmt (YulBuiltin YPop [YulBuiltin YCall
+       [YulBuiltin YGas []; YulLit (LitNumber 0x7cw); YulLit (LitNumber 0w);
+        YulLit (LitNumber 0w); YulLit (LitNumber 0w);
+        YulLit (LitNumber 32w); YulLit (LitNumber 32w)]]);
+     YulExprStmt (YulBuiltin YReturn
+       [YulLit (LitNumber 0w); YulLit (LitNumber 64w)])]
+End
+
+val () = cv_auto_trans transient_call_builtin_code_def;
 
 (* let ok := call(gas(), 0x7a, 0, 0, 0, 0, 0)
  * mstore(0, ok) returndatacopy(32, 0, 32) return(0, 64)
@@ -1069,6 +1131,67 @@ Proof
   CONV_TAC cv_eval
 QED
 
+(* The call frame with one more callee, 0x7d, which returns its caller. *)
+Definition yul_delegate_machine_def:
+  yul_delegate_machine =
+    yul_call_machine with accounts :=
+      update_account 0x7dw
+        (empty_account_state with
+           code := [0x33w; 0x60w; 0x00w; 0x52w; 0x60w; 0x20w; 0x60w; 0x00w; 0xf3w])
+        yul_call_machine.accounts
+End
+
+(* delegatecall(gas(), a, 0, 0, 0, 32) for a = 0x78, 0x77 and 0x7d, then
+ * return(0, 96) of the flags' sum and the two words the last two left at 0
+ * and 32: 0x78 writes slot 0, 0x77 returns 7, 0x7d returns its caller. *)
+Definition dcall_def:
+  dcall a out = YulBuiltin YDelegateCall
+    [YulBuiltin YGas []; YulLit (LitNumber a); YulLit (LitNumber 0w);
+     YulLit (LitNumber 0w); YulLit (LitNumber out); YulLit (LitNumber 32w)]
+End
+
+Definition delegatecall_builtin_code_def:
+  delegatecall_builtin_code =
+    [YulLet ["a"] (SOME (dcall 0x78w 64w));
+     YulLet ["b"] (SOME (dcall 0x77w 0w));
+     YulLet ["c"] (SOME (dcall 0x7dw 32w));
+     YulExprStmt (YulBuiltin YMStore [YulLit (LitNumber 64w);
+       YulBuiltin YAdd [YulName "a"; YulBuiltin YAdd [YulName "b"; YulName "c"]]]);
+     YulExprStmt (YulBuiltin YReturn
+       [YulLit (LitNumber 0w); YulLit (LitNumber 96w)])]
+End
+
+val () = cv_auto_trans yul_delegate_machine_def;
+val () = cv_auto_trans delegatecall_builtin_code_def;
+
+(* A delegate call runs the callee's code in this frame's account, with this
+ * frame's caller: 0x78's write lands in 0x1234's storage and not in 0x78's,
+ * and 0x7d sees the frame's caller 0x5678 rather than 0x1234. *)
+Theorem a_delegate_call_runs_in_the_frames_account:
+  (run_yul 20 delegatecall_builtin_code yul_delegate_machine).completion =
+  YulReturn (word_to_bytes_be (7w : bytes32) ++
+             word_to_bytes_be (0x5678w : bytes32) ++
+             word_to_bytes_be (3w : bytes32)) ∧
+  (lookup_account 0x1234w
+     (run_yul 20 delegatecall_builtin_code yul_delegate_machine).machine.accounts).storage =
+    update_storage 0w 1w empty_storage ∧
+  (lookup_account 0x78w
+     (run_yul 20 delegatecall_builtin_code yul_delegate_machine).machine.accounts).storage =
+    empty_storage
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem a_callee_sees_the_transient_storage_an_earlier_call_left:
+  (run_call_frame 20 transient_call_builtin_code).completion =
+  YulReturn (word_to_bytes_be (1w : bytes32) ++ word_to_bytes_be (2w : bytes32)) ∧
+  lookup_storage 0w
+    (lookup_transient_storage 0x7cw
+       (run_call_frame 20 transient_call_builtin_code).machine.transient) = 2w
+Proof
+  CONV_TAC cv_eval
+QED
+
 Theorem extcodesize_is_the_accounts_code_length:
   (run_call_frame 20 extcodesize_code).completion =
   YulReturn (word_to_bytes_be (10w : bytes32) ++
@@ -1093,9 +1216,14 @@ Proof
   CONV_TAC cv_eval
 QED
 
-Theorem gas_reports_the_frames_budget:
+(* gas() whose value is read is the next observed reading, not the budget;
+ * with none observed it fails. *)
+Theorem gas_reads_the_observed_gas:
+  (run_yul 20 gas_code
+     (yul_call_machine with gas_observations := [GasLeftObservation 777]))
+    .completion = YulReturn (word_to_bytes_be (777w : bytes32)) ∧
   (run_call_frame 20 gas_code).completion =
-  YulReturn (word_to_bytes_be (100000w : bytes32))
+    YulInvalid "missing gas observation"
 Proof
   CONV_TAC cv_eval
 QED
@@ -1108,6 +1236,53 @@ Theorem a_call_outside_the_model_is_invalid:
   YulInvalid "call outside the model"
 Proof
   CONV_TAC cv_eval
+QED
+
+Theorem left_shift_discards_bits_beyond_word_width:
+  eval_yul_builtin YShl [0w; 2w] yul_test_machine =
+    EvalValues [2w] yul_test_machine ∧
+  eval_yul_builtin YShl [255w; 1w] yul_test_machine =
+    EvalValues [n2w (2 ** 255)] yul_test_machine ∧
+  eval_yul_builtin YShl [256w; 2w] yul_test_machine =
+    EvalValues [0w] yul_test_machine ∧
+  eval_yul_builtin YShl [-1w; 2w] yul_test_machine =
+    EvalValues [0w] yul_test_machine
+Proof
+  CONV_TAC cv_eval
+QED
+
+(* Dynamic byte copying emits BYTE and MSTORE8. *)
+Theorem byte_extraction:
+  eval_yul_builtin YByte [30w; 0x1234w] yul_test_machine =
+    EvalValues [0x12w] yul_test_machine ∧
+  eval_yul_builtin YByte [31w; 0x1234w] yul_test_machine =
+    EvalValues [0x34w] yul_test_machine ∧
+  eval_yul_builtin YByte [32w; 0x1234w] yul_test_machine =
+    EvalValues [0w] yul_test_machine
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem byte_memory_write_preserves_neighbors:
+  case eval_yul_builtin YMStore8 [30w; 0x1AAw]
+         (yul_mstore yul_test_machine 0 (0x11223344w : bytes32)) of
+    EvalValues [] m =>
+      yul_memory_read m 28 4 = [0x11w; 0x22w; 0xAAw; 0x44w] ∧
+      m.memory_size = 32
+  | _ => F
+Proof
+  EVAL_TAC
+QED
+
+Theorem calldata_copy_zero_pads:
+  case eval_yul_builtin YCallDataCopy [1w; 1w; 3w]
+         (yul_test_machine with call_data := [0x11w; 0x22w; 0x33w]) of
+    EvalValues [] m =>
+      yul_memory_read m 0 5 = [0w; 0x22w; 0x33w; 0w; 0w] ∧
+      m.memory_size = 32
+  | _ => F
+Proof
+  EVAL_TAC
 QED
 
 Definition calldatacopy_code_def:
@@ -1144,6 +1319,225 @@ Theorem calldatacopy_overwrites_padding:
         call_data := [0x11w; 0x22w; 0x33w];
         memory := FEMPTY |+ (33, 0xffw) |+ (34, 0xffw);
         memory_size := 64 |>)).machine 31 4 = [0x22w; 0x33w; 0w; 0w]
+Proof
+  CONV_TAC cv_eval
+QED
+
+(* Creation object names can be longer than a value literal. *)
+Theorem creation_long_object_name:
+  eval_yul_expr 20 FEMPTY
+    (YulBuiltin YDataSize
+      [YulLit (LitBytes (MAP (n2w o ORD) "DynamicStorageArrays_739_deployed"))])
+    (yul_test_machine with objects :=
+       FEMPTY |+ ("DynamicStorageArrays_739_deployed", (11, 37))) =
+    EvalValues [37w] (yul_test_machine with objects :=
+       FEMPTY |+ ("DynamicStorageArrays_739_deployed", (11, 37)))
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem creation_code_is_separate_from_calldata:
+  eval_yul_builtin YCodeSize []
+    (yul_test_machine with code := [0x11w; 0x22w]) =
+      EvalValues [2w] (yul_test_machine with code := [0x11w; 0x22w]) ∧
+  eval_yul_builtin YCallDataSize []
+    (yul_test_machine with code := [0x11w; 0x22w]) =
+      EvalValues [0w] (yul_test_machine with code := [0x11w; 0x22w])
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem creation_codecopy_pads:
+  (run_yul 20
+    [YulExprStmt (YulBuiltin YCodeCopy
+       [YulLit (LitNumber 31w); YulLit (LitNumber 1w); YulLit (LitNumber 4w)]);
+     YulExprStmt (YulBuiltin YReturn
+       [YulLit (LitNumber 31w); YulLit (LitNumber 4w)])]
+    (yul_test_machine with code := [0x11w; 0x22w; 0x33w])).completion =
+      YulReturn [0x22w; 0x33w; 0w; 0w]
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem creation_setimmutable_uses_base_and_every_offset:
+  (run_yul 20
+    [YulExprStmt (YulBuiltin YSetImmutable
+       [YulLit (LitNumber 10w); YulLit (LitBytes [0x33w]);
+        YulLit (LitNumber 42w)])]
+    (yul_test_machine with immutable_offsets := FEMPTY |+ ("3", [5; 40]))).machine =
+    (yul_mstore (yul_mstore
+       (yul_test_machine with immutable_offsets := FEMPTY |+ ("3", [5; 40]))
+       15 (42w : bytes32)) 50 (42w : bytes32)) with
+      <| immutables := FEMPTY |+ ("3", 42w); scopes := [FEMPTY] |>
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem creation_unknown_object_fails:
+  eval_yul_expr 20 FEMPTY
+    (YulBuiltin YDataOffset [YulLit (LitBytes [0x78w])]) yul_test_machine =
+    EvalAbrupt (YulInvalid "unknown object") yul_test_machine
+Proof
+  CONV_TAC cv_eval
+QED
+
+Definition yul_balance_machine_def:
+  yul_balance_machine = yul_frame_machine with accounts :=
+    update_account 0x1234w (empty_account_state with balance := 17)
+      (update_account 0x77w (empty_account_state with balance := 29)
+        empty_accounts)
+End
+
+val () = cv_auto_trans yul_balance_machine_def;
+
+Theorem balance_reads_account_without_changing_machine:
+  eval_yul_builtin YBalance [0x77w] yul_balance_machine =
+    EvalValues [29w] yul_balance_machine ∧
+  eval_yul_builtin YBalance [n2w (2 ** 160 + 0x77)] yul_balance_machine =
+    EvalValues [29w] yul_balance_machine ∧
+  eval_yul_builtin YBalance [0x79w] yul_balance_machine =
+    EvalValues [0w] yul_balance_machine ∧
+  eval_yul_builtin YBalance [0x1234w] yul_balance_machine =
+    EvalValues [17w] yul_balance_machine ∧
+  eval_yul_builtin YSelfBalance [] yul_balance_machine =
+    EvalValues [17w] yul_balance_machine ∧
+  eval_yul_builtin YSelfBalance [] yul_frame_machine =
+    EvalValues [0w] yul_frame_machine
+Proof
+  CONV_TAC cv_eval
+QED
+
+(* selfdestruct runs for 0x1234, which holds 17 and code; 0x77 holds 29. In
+ * yul_destruct_machine the transaction created 0x1234 (it is empty in the
+ * original accounts); in yul_destruct_existing_machine it did not. *)
+Definition yul_destruct_machine_def:
+  yul_destruct_machine = yul_frame_machine with accounts :=
+    update_account 0x1234w (empty_account_state with <| balance := 17; code := [0w] |>)
+      (update_account 0x77w (empty_account_state with balance := 29)
+        empty_accounts)
+End
+
+Definition yul_destruct_existing_machine_def:
+  yul_destruct_existing_machine =
+    yul_destruct_machine with original := yul_destruct_machine.accounts
+End
+
+(* The completion, the balances of 0x1234 and 0x77, 0x1234's code and the
+ * pending deletions a selfdestruct leaves. *)
+Definition self_destruct_view_def:
+  self_destruct_view args m =
+    case eval_yul_builtin YSelfDestruct args m of
+      EvalAbrupt c m' =>
+        SOME (c, (lookup_account 0x1234w m'.accounts).balance,
+              (lookup_account 0x77w m'.accounts).balance,
+              (lookup_account 0x1234w m'.accounts).code, m'.to_delete)
+    | EvalValues _ _ => NONE
+End
+
+val () = cv_auto_trans yul_destruct_machine_def;
+val () = cv_auto_trans yul_destruct_existing_machine_def;
+val () = cv_auto_trans self_destruct_view_def;
+
+(* EIP-6780: the balance always moves to the beneficiary and the frame stops;
+ * only an account the transaction created is left pending deletion, and one
+ * that names itself as beneficiary then loses its balance. The beneficiary is
+ * the word's low 160 bits. *)
+Theorem self_destruct_moves_balance_and_marks_created_account:
+  self_destruct_view [0x77w] yul_destruct_machine =
+    SOME (YulReturn [], 0, 46, [0w], [0x1234w]) ∧
+  self_destruct_view [n2w (2 ** 160 + 0x77)] yul_destruct_machine =
+    SOME (YulReturn [], 0, 46, [0w], [0x1234w]) ∧
+  self_destruct_view [0x77w] yul_destruct_existing_machine =
+    SOME (YulReturn [], 0, 46, [0w], []) ∧
+  self_destruct_view [0x1234w] yul_destruct_machine =
+    SOME (YulReturn [], 0, 29, [0w], [0x1234w]) ∧
+  self_destruct_view [0x1234w] yul_destruct_existing_machine =
+    SOME (YulReturn [], 17, 29, [0w], []) ∧
+  eval_yul_builtin YSelfDestruct [] yul_destruct_machine =
+    EvalAbrupt (YulInvalid "bad builtin call") yul_destruct_machine
+Proof
+  CONV_TAC cv_eval
+QED
+
+(* selfdestruct(0x77) revert(0, 0): selfdestruct halts like stop, so the
+ * revert never runs, and the frame's account, created by the transaction, is
+ * left pending deletion. *)
+Definition self_destruct_code_def:
+  self_destruct_code =
+    [YulExprStmt (YulBuiltin YSelfDestruct [YulLit (LitNumber 0x77w)]);
+     YulExprStmt (YulBuiltin YRevert
+       [YulLit (LitNumber 0w); YulLit (LitNumber 0w)])]
+End
+
+val () = cv_auto_trans self_destruct_code_def;
+
+Theorem self_destruct_halts_like_stop:
+  (run 20 self_destruct_code).completion = YulReturn [] ∧
+  (run 20 self_destruct_code).machine.to_delete = [0w]
+Proof
+  CONV_TAC cv_eval
+QED
+
+(* An externally owned account hashes its empty code, a contract its code,
+ * and an empty or absent account reads 0, as EXTCODEHASH does. *)
+Definition yul_code_hash_machine_def:
+  yul_code_hash_machine = yul_frame_machine with accounts :=
+    update_account 0x1234w (empty_account_state with balance := 17)
+      (update_account 0x77w (empty_account_state with code := [0w])
+        (update_account 0x78w (empty_account_state with nonce := 1)
+          empty_accounts))
+End
+
+val () = cv_auto_trans yul_code_hash_machine_def;
+
+Theorem extcodehash_reads_account_without_changing_machine:
+  eval_yul_builtin YExtCodeHash [0x1234w] yul_code_hash_machine =
+    EvalValues
+      [0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470w]
+      yul_code_hash_machine ∧
+  eval_yul_builtin YExtCodeHash [0x78w] yul_code_hash_machine =
+    EvalValues
+      [0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470w]
+      yul_code_hash_machine ∧
+  eval_yul_builtin YExtCodeHash [n2w (2 ** 160 + 0x77)] yul_code_hash_machine =
+    EvalValues
+      [0xbc36789e7a1e281436464229828f817d6612f7b477d66591ff96a9e064bcc98aw]
+      yul_code_hash_machine ∧
+  eval_yul_builtin YExtCodeHash [0x79w] yul_code_hash_machine =
+    EvalValues [0w] yul_code_hash_machine ∧
+  eval_yul_builtin YExtCodeHash [] yul_code_hash_machine =
+    EvalAbrupt (YulInvalid "bad builtin call") yul_code_hash_machine
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem datacopy_zero_pads_and_expands_memory:
+  case eval_yul_builtin YDataCopy [31w; 1w; 4w]
+    (yul_frame_machine with <|
+       code := [0x11w; 0x22w; 0x33w]; call_data := [0xffw; 0xffw];
+       memory := FEMPTY |+ (30, 0xaaw) |+ (33, 0xffw) |+ (35, 0xbbw) |>) of
+    EvalValues [] m =>
+      yul_memory_read m 30 6 = [0xaaw; 0x22w; 0x33w; 0w; 0w; 0xbbw] ∧
+      m.memory_size = 64
+  | _ => F
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem datacopy_empty_range_touches_nothing:
+  eval_yul_builtin YDataCopy [0xffffw; 0xffffw; 0w] yul_frame_machine =
+    EvalValues [] yul_frame_machine
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem balance_and_datacopy_bad_arity_fails:
+  eval_yul_builtin YBalance [] yul_frame_machine =
+    EvalAbrupt (YulInvalid "bad builtin call") yul_frame_machine ∧
+  eval_yul_builtin YSelfBalance [0w] yul_frame_machine =
+    EvalAbrupt (YulInvalid "bad builtin call") yul_frame_machine ∧
+  eval_yul_builtin YDataCopy [0w; 1w] yul_frame_machine =
+    EvalAbrupt (YulInvalid "bad builtin call") yul_frame_machine
 Proof
   CONV_TAC cv_eval
 QED

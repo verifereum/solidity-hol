@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 from pathlib import Path
-import json
 import sys
 import tempfile
 import textwrap
@@ -14,57 +13,6 @@ sys.path.insert(0, str(ROOT / "tools"))
 import semantic_tests_coverage as coverage  # noqa: E402
 
 PROFILE = {"settings": {"evmVersion": "osaka", "debug": {"revertStrings": "default"}}}
-
-
-def variable(node_id: int, *, state: bool = False, type_identifier: str = "t_uint256",
-             visibility: str = "private") -> dict:
-    return {
-        "nodeType": "VariableDeclaration", "id": node_id, "stateVariable": state,
-        "constant": False, "mutability": "mutable", "storageLocation": "default",
-        "visibility": visibility,
-        "typeDescriptions": {"typeIdentifier": type_identifier},
-        "typeName": {"nodeType": "ElementaryTypeName", "id": node_id + 100, "name": "uint256"},
-    }
-
-
-def function(node_id, statements):
-    return {
-        "nodeType": "FunctionDefinition", "id": node_id, "kind": "function",
-        "implemented": True, "virtual": False, "stateMutability": "pure", "modifiers": [],
-        "parameters": {"nodeType": "ParameterList", "id": node_id + 100, "parameters": []},
-        "body": {"nodeType": "Block", "id": node_id + 200, "statements": statements},
-    }
-
-
-def unit(members):
-    return {"nodeType": "SourceUnit", "id": 1, "nodes": [{
-        "nodeType": "ContractDefinition", "id": 2, "contractKind": "contract",
-        "abstract": False, "baseContracts": [], "linearizedBaseContracts": [2],
-        "nodes": members,
-    }]}
-
-
-ASSEMBLY = {"nodeType": "InlineAssembly", "id": 20,
-            "AST": {"nodeType": "YulBlock", "statements": []}}
-
-
-class BuiltinCoverageTests(unittest.TestCase):
-    def test_literal_messages_are_admitted_only_in_builtin_calls(self) -> None:
-        artifact = json.loads((ROOT / "testdata/differential/expected/builtins.json").read_text())
-        ast = artifact["output"]["sources"]["testdata/differential/builtins.sol"]["ast"]
-        self.assertEqual(coverage.scan({"builtins.sol": ast}), {})
-        literal = next(n for n in coverage.nodes(ast)
-                       if n["nodeType"] == "Literal" and n["kind"] == "string")
-        self.assertEqual(coverage.elaboration_blockers(literal), [
-            coverage.Blocker("Literal", "bytes and string", "elaboration")])
-
-    def test_shadowed_names_are_ordinary_calls(self) -> None:
-        artifact = json.loads((ROOT / "testdata/differential/expected/shadowed_builtins.json").read_text())
-        ast = artifact["output"]["sources"]["testdata/differential/shadowed_builtins.sol"]["ast"]
-        self.assertEqual(coverage.scan({"shadowed_builtins.sol": ast}), {})
-        for node in coverage.nodes(ast):
-            if node["nodeType"] == "FunctionCall":
-                self.assertGreaterEqual(node["expression"]["referencedDeclaration"], 0)
 
 
 class ReadTestTests(unittest.TestCase):
@@ -105,172 +53,58 @@ class ReadTestTests(unittest.TestCase):
         self.assertIsNone(reason("// EVMVersion: >=osaka\n"))
         self.assertIn("revertStrings: debug", reason("// revertStrings: debug\n"))
 
+    def test_syntax_suites_skip_only_expected_errors(self) -> None:
+        def reason(text: str, suite: str = "syntaxTests") -> str | None:
+            return coverage.skip_reason(self.read(text), PROFILE, suite)
 
-class ClassifyTests(unittest.TestCase):
-    def test_preparation_failures_are_not_unsupported_features(self) -> None:
-        for status in (coverage.MALFORMED_INPUT, coverage.INVALID_CORE):
-            with self.subTest(status=status):
-                result = coverage.classify("t.sol", {}, {"status": status, "message": "bad input/core"})
-                self.assertEqual(result.category, status)
-                self.assertFalse(result.scan_agrees)
-                self.assertIsNone(result.first)
+        warnings = """\
+            contract C { function f() public { uint x; } }
+            // ====
+            // SMTEngine: all
+            // optimize-yul: false
+            // ----
+            // Warning 2072: (37-43): Unused local variable.
+            // Info 1391: CHC: 1 verification condition(s) proved safe!
+            """
+        self.assertEqual(self.read(warnings).settings,
+                         {"SMTEngine": "all", "optimize-yul": "false"})
+        self.assertIsNone(reason(warnings))
+        self.assertIsNone(reason(warnings, "smtCheckerTests"))
+        self.assertIsNone(reason("contract C {}\n"))
+        self.assertEqual(reason("""\
+            contract C { uint x = "a"; }
+            // ----
+            // Warning 1234: (0-1): W.
+            // TypeError 7407: (26-29): Type literal_string "a" is not convertible.
+            """), "expected compile error (TypeError)")
+        self.assertEqual(reason("contract C {\n// ----\n// ParserError 2314: (13-13): Expected.\n"),
+                         "expected compile error (ParserError)")
+        self.assertEqual(reason("contract C {}\n// ----\n// UnimplementedFeatureError: Not yet.\n",
+                                "smtCheckerTests"),
+                         "expected compile error (UnimplementedFeatureError)")
+        # Below a second delimiter a runner keeps its own expectations.
+        self.assertIsNone(reason("contract C {}\n// ----\n// Warning 1: W.\n// ----\n// TypeError\n"))
+        # compileViaYul picks the pipeline solc's syntax runner checks, and
+        # semanticTests' expectations are calls, never diagnostics.
+        self.assertIsNone(reason("contract C {}\n// ====\n// compileViaYul: false\n// ----\n"))
+        self.assertIsNone(reason("contract C {}\n// ----\n// TypeError() -> 1\n", "semanticTests"))
+        self.assertIn("EVMVersion: <osaka",
+                      reason("contract C {}\n// ====\n// EVMVersion: <osaka\n// ----\n"))
 
-    def test_import_rejection_records_first_and_all_blockers(self) -> None:
-        ast = unit([variable(3, state=True, visibility="public"), function(4, [ASSEMBLY])])
-        result = coverage.classify(
-            "t.sol", coverage.scan({"t.sol": ast}),
-            {"status": "import-rejected",
-             "message": "VariableDeclaration 3: public state variables are not supported"})
-        self.assertEqual(result.category, coverage.IMPORT_REJECTED)
-        self.assertEqual(result.first, coverage.Blocker(
-            "VariableDeclaration", "public state variables", "import"))
-        self.assertEqual({b.feature for b in result.blockers},
-                         {"public state variables", "inline assembly"})
-        self.assertTrue(result.scan_agrees)
+    def test_reads_sources_that_are_not_utf8(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "t.sol"
+            path.write_bytes(b'contract C { string s = "\xc0"; }\n// ----\n// SyntaxError 8452: (1-2): X.\n')
+            test = coverage.read_test(Path(temporary), path)
+        self.assertEqual(coverage.skip_reason(test, PROFILE, "syntaxTests"),
+                         "expected compile error (SyntaxError)")
 
-    def test_scan_must_explain_the_importer(self) -> None:
-        ast = unit([function(4, [])])
-        result = coverage.classify(
-            "t.sol", coverage.scan({"t.sol": ast}),
-            {"status": "import-rejected", "message": "Block 204: unsupported statement X"})
-        self.assertEqual(result.first.feature, "unclassified")
-        self.assertFalse(result.scan_agrees)
 
-    def test_source_rejection_is_distinct(self) -> None:
-        rejected = coverage.classify("t.sol", {}, {
-            "status": "source-rejected", "message": "valid_src_unit failed"})
-        self.assertEqual(rejected.category, coverage.SOURCE_REJECTED)
-        self.assertFalse(rejected.scan_agrees)
-
-    def test_import_rejection_names_its_source(self) -> None:
-        ast = unit([variable(3, state=True, visibility="public")])
-        named = coverage.classify("t.sol", coverage.scan({"t.sol": ast}), {
-            "status": "import-rejected",
-            "message": "a.sol: VariableDeclaration 3: public state variables are not supported"})
-        self.assertEqual(named.first.feature, "public state variables")
-        self.assertTrue(named.scan_agrees)
-
-    def test_elaboration_rejection_and_admission(self) -> None:
-        strings = unit([function(4, [{
-            "nodeType": "VariableDeclarationStatement", "id": 5,
-            "declarations": [variable(6, type_identifier="t_string_memory_ptr")],
-        }])])
-        rejected = coverage.classify(
-            "s.sol", coverage.scan({"s.sol": strings}),
-            {"status": "elaboration-rejected", "message": "elaborate_unit returned NONE"})
-        self.assertEqual([b.feature for b in rejected.blockers], ["bytes and string"])
-        self.assertTrue(rejected.scan_agrees)
-        admitted = coverage.classify(
-            "a.sol", coverage.scan({"a.sol": unit([function(4, [])])}), {"status": "admitted"})
-        self.assertEqual(admitted.blockers, [])
-        self.assertTrue(admitted.scan_agrees)
-
-    def test_scan_records_every_property_of_a_variable(self) -> None:
-        constant = dict(variable(3, state=True), constant=True, mutability="constant",
-                        value={"nodeType": "Literal", "id": 4, "kind": "number",
-                               "typeDescriptions": {"typeIdentifier": "t_rational_1_by_1"}})
-        self.assertEqual({b.feature for b in coverage.scan({"t.sol": unit([constant])})[3]},
-                         {"constants", "declaration values"})
-
-    def test_scan_finds_literals_of_non_integer_types(self) -> None:
-        def literal(node_id, type_identifier):
-            return {"nodeType": "Literal", "id": node_id, "kind": "number", "value": "1",
-                    "typeDescriptions": {"typeIdentifier": type_identifier}}
-
-        address = literal(5, "t_address")
-        declaration = {
-            "nodeType": "VariableDeclarationStatement", "id": 6,
-            "declarations": [variable(7, type_identifier="t_bytes4")],
-            "initialValue": literal(8, "t_rational_305419896_by_1"),
-        }
-        boolean = {"nodeType": "Literal", "id": 9, "kind": "bool", "value": "false",
-                   "typeDescriptions": {"typeIdentifier": "t_bool"}}
-        found = coverage.scan({"t.sol": unit([function(4, [address, declaration, boolean])])})
-        self.assertEqual(found[5], [coverage.Blocker(
-            "Literal", "literals of non-integer types", "elaboration")])
-        self.assertEqual(found[6], [coverage.Blocker(
-            "VariableDeclarationStatement", "literals of non-integer types", "elaboration")])
-        self.assertNotIn(8, found)
-        self.assertNotIn(9, found)
-
-    def test_tuples_are_classified_by_a_component(self) -> None:
-        self.assertTrue(coverage.decodes("t_tuple$_t_bool_$_t_bytes4_$"))
-        self.assertFalse(coverage.decodes("t_tuple$_t_bool_$_t_bytes_memory_ptr_$"))
-        self.assertEqual(coverage.type_feature("t_tuple$_t_bool_$_t_bytes_memory_ptr_$"),
-                         "bytes and string")
-        self.assertEqual(coverage.type_feature("t_bytes32"),
-                         "fixed-size bytes members and indexing")
-
-    def test_storage_and_nonpayable_functions_are_admitted(self) -> None:
-        f = dict(function(4, []), stateMutability="nonpayable")
-        ast = unit([variable(3, state=True), f])
-        self.assertEqual(coverage.scan({"t.sol": ast}), {})
-        f["stateMutability"] = "view"
-        self.assertEqual(coverage.scan({"t.sol": ast}), {})
-        f["stateMutability"] = "payable"
-        self.assertEqual(coverage.scan({"t.sol": ast})[4], [
-            coverage.Blocker("FunctionDefinition", "payable functions", "elaboration")])
-
-    def test_nested_mappings_are_storage_types(self) -> None:
-        tid = "t_mapping$_t_int8_$_t_mapping$_t_address_$_t_bytes4_$_$"
-        self.assertTrue(coverage.storage_type_supported(tid))
-        self.assertTrue(coverage.storage_type_supported("t_mapping$_t_uint160_$_t_bytes32_$"))
-        self.assertTrue(coverage.storage_type_supported("t_mapping$_t_int80_$_t_bytes16_$"))
-        self.assertTrue(coverage.storage_type_supported("t_mapping$_t_address_payable_$_t_bool_$"))
-        self.assertFalse(coverage.storage_type_supported("t_mapping$_t_bytes_memory_ptr_$_t_uint8_$"))
-        self.assertFalse(coverage.storage_type_supported("t_mapping$_t_uint8_$_t_uint8_$junk"))
-        self.assertFalse(coverage.storage_type_supported("t_mapping$_t_mapping$_t_uint8_$_t_uint8_$_$_t_uint8_$"))
-        v = variable(3, state=True, type_identifier=tid)
-        self.assertEqual(coverage.elaboration_blockers(v), [])
-        v["stateVariable"] = False
-        v["storageLocation"] = "storage"
-        self.assertIn("local reference bindings", {b.feature for b in coverage.elaboration_blockers(v)})
-
-    def test_mapping_and_storage_array_indexing_are_admitted(self) -> None:
-        base = {"nodeType": "Identifier", "id": 5, "name": "m", "referencedDeclaration": 3,
-                "typeDescriptions": {"typeIdentifier": "t_mapping$_t_uint256_$_t_uint8_$"}}
-        index = {"nodeType": "IndexAccess", "id": 6, "baseExpression": base,
-                 "indexExpression": {"nodeType": "Literal", "id": 7, "kind": "number", "value": "1",
-                                     "typeDescriptions": {"typeIdentifier": "t_rational_1_by_1"}},
-                 "typeDescriptions": {"typeIdentifier": "t_uint8"}}
-        self.assertEqual(coverage.scan({"t.sol": unit([function(4, [index])])}), {})
-        base["typeDescriptions"]["typeIdentifier"] = "t_array$_t_uint8_$2_storage"
-        self.assertEqual(coverage.node_blockers(index), [])
-        self.assertEqual(coverage.scan({"t.sol": unit([function(4, [index])])}), {})
-        base["typeDescriptions"]["typeIdentifier"] = "t_array$_t_uint8_$dyn_storage"
-        self.assertEqual(coverage.scan({"t.sol": unit([function(4, [index])])}), {})
-        self.assertTrue(coverage.storage_type_supported("t_array$_t_array$_t_uint8_$dyn_storage_$dyn_storage"))
-        self.assertTrue(coverage.storage_type_supported("t_array$_t_array$_t_uint8_$dyn_storage_$2_storage"))
-
-    def test_nested_array_types_and_fixed_length_prefix(self) -> None:
-        tid = "t_array$_t_array$_t_uint24_$11_storage_$2_storage"
-        self.assertTrue(coverage.storage_type_supported(tid))
-        self.assertFalse(coverage.storage_type_supported(tid + "_ptr"))
-        self.assertFalse(coverage.storage_type_supported("t_array$_t_uint8_$2_memory_ptr"))
-        self.assertTrue(coverage.storage_type_supported("t_array$_t_mapping$_t_uint8_$_t_uint8_$_$2_storage"))
-        root = {"nodeType": "Identifier", "id": 5, "name": "rows", "referencedDeclaration": 3,
-                "typeDescriptions": {"typeIdentifier": tid}}
-        length = {"nodeType": "MemberAccess", "id": 6, "memberName": "length", "expression": root,
-                  "typeDescriptions": {"typeIdentifier": "t_uint256"}}
-        self.assertEqual(coverage.scan({"t.sol": unit([function(4, [length])])}), {})
-
-    def test_array_type_expression_without_index_is_import_rejection(self) -> None:
-        node = {"nodeType": "IndexAccess", "id": 13}
-        self.assertEqual(coverage.node_blockers(node),
-                         [coverage.Blocker("IndexAccess", "array type expressions", "import")])
-
-    def test_struct_fixtures_have_no_coverage_blockers(self) -> None:
-        for name in ("storage_structs", "storage_structs_top_level"):
-            with self.subTest(name=name):
-                artifact = json.loads((ROOT / "testdata" / "differential" / "expected"
-                                       / f"{name}.json").read_text())
-                source = f"testdata/differential/{name}.sol"
-                self.assertEqual(coverage.scan({source: artifact["output"]["sources"][source]["ast"]}), {})
-
+class CompileTests(unittest.TestCase):
     def test_compilation_retains_artifact_contract_for_preparation(self) -> None:
         metadata = {"storageLayout": {"storage": [{"astId": 3, "slot": "0"}]},
                     "evm": {"deployedBytecode": {"object": "00"}}}
-        output = {"sources": {"t.sol": {"ast": unit([])}},
+        output = {"sources": {"t.sol": {"ast": {"nodeType": "SourceUnit", "id": 1, "nodes": []}}},
                   "contracts": {"t.sol": {"C": metadata}}}
         artifact = {"format": "solidity-hol-solc-artifact-v1", "compiler": {"pin": "pinned"},
                     "profile": PROFILE, "input": {"settings": PROFILE["settings"]},
@@ -281,23 +115,88 @@ class ClassifyTests(unittest.TestCase):
                                            Path("profile"))
         self.assertEqual(result, artifact)
 
-    def test_ranking_counts_only_blockers(self) -> None:
-        def rejected(name: str, members: list) -> coverage.Classification:
-            return coverage.classify(
-                name, coverage.scan({name: unit(members)}),
-                {"status": "import-rejected",
-                 "message": "VariableDeclaration 3: public state variables are not supported"})
 
+class FeatureTests(unittest.TestCase):
+    def test_reasons_drop_node_ids(self) -> None:
+        self.assertEqual(coverage.reason("IndexRangeAccess 12: unsupported expression IndexRangeAccess"),
+                         "IndexRangeAccess: unsupported expression IndexRangeAccess")
+        self.assertEqual(coverage.reason("InlineAssembly 5: YulFunctionCall 7: call to balance"),
+                         "InlineAssembly: YulFunctionCall: call to balance")
+        self.assertEqual(coverage.reason("42: unsupported member access"), "unsupported member access")
+
+    def test_lines_are_labelled_by_the_first_matching_pattern(self) -> None:
+        self.assertEqual(coverage.feature("TryStatement 3: typed catch clauses are not supported"), "try/catch")
+        self.assertEqual(coverage.feature("FunctionDefinition 9: unsupported source unit member "
+                                          "FunctionDefinition"), "free functions")
+
+    def test_an_unlabelled_line_is_its_own_feature(self) -> None:
+        self.assertEqual(coverage.feature("42: unsupported member access"), "unsupported member access")
+
+
+class ReportTests(unittest.TestCase):
+    def test_classification_keeps_every_blocker(self) -> None:
+        result = coverage.classify("t.sol", {"status": "import-rejected", "blockers": [
+            "IndexRangeAccess 4: unsupported expression IndexRangeAccess",
+            "7: unsupported member access"]})
+        self.assertEqual(result.category, coverage.IMPORT_REJECTED)
+        self.assertEqual(result.features(), {"array slices", "unsupported member access"})
+
+    def test_unknown_statuses_are_errors(self) -> None:
+        with self.assertRaises(ValueError):
+            coverage.classify("t.sol", {"status": "skipped"})
+
+    def test_ranking_counts_only_blockers(self) -> None:
+        def rejected(name: str, blockers: list[str]) -> coverage.Classification:
+            return coverage.classify(name, {"status": "elaboration-rejected", "blockers": blockers})
+
+        slice_ = "IndexRangeAccess 4: unsupported expression IndexRangeAccess"
         report = coverage.Report("pin", "profile", [
-            rejected("a.sol", [variable(3, state=True, visibility="public"), function(4, [])]),
-            rejected("b.sol", [variable(3, state=True, visibility="public"), function(4, [ASSEMBLY])]),
+            rejected("a.sol", [slice_]),
+            rejected("b.sol", [slice_, "InlineAssembly 20: YulFunctionCall: call to balance"]),
         ])
         ranking = {f["feature"]: f for f in report.feature_ranking()}
-        self.assertEqual(ranking["public state variables"]["tests"], 2)
-        self.assertEqual(ranking["public state variables"]["only_blocker"], 1)
-        self.assertEqual(ranking["public state variables"]["first_rejection"], 2)
+        self.assertEqual(ranking["array slices"], {"feature": "array slices", "tests": 2, "only_blocker": 1})
         self.assertEqual(ranking["inline assembly"]["only_blocker"], 0)
-        self.assertEqual(report.greedy_order(5), [("public state variables", 1), ("inline assembly", 2)])
+        self.assertEqual(report.greedy_order(5), [("array slices", 1), ("inline assembly", 2)])
+
+    def test_function_reasons_count_each_reason_once_per_function(self) -> None:
+        admitted = coverage.classify("t.sol", {
+            "status": "partially-admitted", "functions": 3,
+            "unsupported": ["IndexRangeAccess 4: unsupported expression IndexRangeAccess\n"
+                            "8: unsupported member access\n9: unsupported member access",
+                            "calls an unsupported function"]})
+        report = coverage.Report("pin", "profile", [admitted])
+        self.assertEqual(report.function_reasons(), {
+            "IndexRangeAccess: unsupported expression IndexRangeAccess": 1,
+            "unsupported member access": 1, "calls an unsupported function": 1})
+        self.assertIn("| unsupported member access | 1 |", report.markdown())
+
+    def test_other_suites_report_valid_programs_and_never_default_to_the_snapshot(self) -> None:
+        results = [coverage.Classification("a.sol", coverage.ADMITTED),
+                   coverage.Classification("b.sol", coverage.SKIPPED, "expected compile error (TypeError)"),
+                   coverage.Classification("c.sol", coverage.COMPILE_FAILURE, "stack too deep")]
+        markdown = coverage.Report("pin", "profile", results, "syntaxTests").markdown()
+        self.assertIn("# Coverage of solc's syntaxTests", markdown)
+        self.assertIn("`test/libsolidity/syntaxTests`", markdown)
+        self.assertIn("Of the 1 valid tests, 1 are admitted", markdown)
+        self.assertEqual(coverage.Report("pin", "profile", results, "smtCheckerTests").json()["suite"],
+                         "smtCheckerTests")
+        with patch("sys.stderr"), self.assertRaises(SystemExit):
+            coverage.parse_args(["sol", "--solc", "solc", "--suite", "syntaxTests"])
+        self.assertEqual(coverage.parse_args(["sol", "--solc", "solc"]).output,
+                         coverage.ROOT / "docs" / "semantic-tests-coverage")
+
+    def test_creation_blockers_are_not_functions(self) -> None:
+        partial = coverage.classify("t.sol", {
+            "status": "partially-admitted", "functions": 1, "unsupported": [],
+            "creation": ["51: not a storage location", "60: unsupported expression"]})
+        report = coverage.Report("pin", "profile", [partial])
+        self.assertEqual(report.json()["functions"], {"total": 1, "unsupported": 0})
+        self.assertEqual(report.function_reasons(), {})
+        self.assertEqual(report.json()["tests"][0]["creation"],
+                         ["51: not a storage location", "60: unsupported expression"])
+        self.assertIn("1 are supported and 0 unsupported", report.markdown())
+        self.assertIn("- `t.sol`\n  - creation: 51: not a storage location", report.markdown())
 
 
 if __name__ == "__main__":

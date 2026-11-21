@@ -2,8 +2,9 @@ signature solidityImportLib =
 sig
   include Abbrev
 
-  (* An unknown nodeType or unsupported feature, naming the offending node.
-   * Missing or ill-typed required fields raise MalformedInput instead.
+  (* Unknown nodeTypes or unsupported features, a line for each offending
+   * node, naming it. Missing or ill-typed required fields raise
+   * MalformedInput instead.
    *)
   exception ImportError of string
   (* Missing or ill-typed required JSON fields. *)
@@ -11,10 +12,29 @@ sig
 
   (* Raw, unchecked SourceUnit import. Validate valid_src_unit and the generated
    * core before execution; use solidityPrepareLib for artifact consumers.
-   * A SourceUnit AST node as a src_unit term, given the compiler's contracts
-   * output for that source, which holds the storage layouts.
+   * A SourceUnit AST node as a src_unit term, given the SourceUnit ASTs of
+   * the whole compilation, where its bases and the declarations it uses may
+   * lie, and the compiler's contracts output for that source, which holds the
+   * storage layouts.
    *)
-  val import_source_unit : JSON.value -> JSON.value -> term
+  val import_source_unit : JSON.value list -> JSON.value -> JSON.value -> term
+
+  (* The same, going on past what the importer cannot represent: the unit,
+   * with placeholders for it, and the blockers, a line each, that reject
+   * the unit, for which import_source_unit raises ImportError. Blockers
+   * confined to a function are its fn_unsupported reason instead.
+   *)
+  val import_source_unit_blockers :
+    JSON.value list -> JSON.value -> JSON.value -> term * string list
+
+  (* One source of an already-read artifact, retaining creation code from
+   * every compilation source. Profile validation remains the caller's. *)
+  val import_artifact_unit_blockers : JSON.value -> string -> term * string list
+  (* The same with the unit's contract given by name, if one is: the source's
+   * contract of that name alone. Otherwise its contracts are those that no
+   * concrete contract of the source inherits and no other one creates. *)
+  val import_contract_artifact_unit_blockers :
+    JSON.value -> string -> string option -> term * string list
 
   (* Raw artifact import, checking only the artifact format. Callers own the
    * compiler/profile/settings contract and source/core validation; normal

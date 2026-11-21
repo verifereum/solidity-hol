@@ -5,7 +5,88 @@
  *)
 Theory solidityEvaluatorProps
 Ancestors
-  solidityEvaluator
+  solidityEvaluator yulEvaluatorProps
+
+(* An inline assembly block runs the Yul evaluator with the same fuel. *)
+Theorem eval_assembly_fuel_stable[local]:
+  (eval_assembly n env code refs st gas).completion ≠ FuelExhausted ∧ n ≤ m ⇒
+  eval_assembly m env code refs st gas = eval_assembly n env code refs st gas
+Proof
+  simp[eval_assembly_def] >> rw[] >>
+  Cases_on ‘assembly_inputs env st refs’ >> gvs[] >>
+  rename1 ‘SOME p’ >> PairCases_on ‘p’ >> gvs[] >>
+  qmatch_goalsub_abbrev_tac ‘run_yul m c m0’ >>
+  Cases_on ‘(run_yul n c m0).completion = YulOutOfFuel’
+  >- gvs[assembly_result_def, abrupt_result_def] >>
+  ‘run_yul m c m0 = run_yul n c m0’ by metis_tac[run_yul_fuel_stable] >>
+  simp[]
+QED
+
+Theorem pop_storage_array_fuel_stable[local]:
+  (pop_storage_array n env x annotation a st gas).completion <> FuelExhausted /\
+  n <= m ==>
+  pop_storage_array m env x annotation a st gas =
+  pop_storage_array n env x annotation a st gas
+Proof
+  simp[pop_storage_array_def] >> rpt strip_tac >>
+  Cases_on ‘st.frame.static_context’ >> gvs[] >>
+  Cases_on ‘eval_atom st.scopes a’ >> gvs[] >>
+  rename1 ‘SOME v’ >> Cases_on ‘v’ >> gvs[] >>
+  rename1 ‘ReferenceValue ref’ >> Cases_on ‘ref’ >> gvs[] >>
+  rename1 ‘StorageReference space addr slot offset ty layout’ >>
+  Cases_on ‘ty’ >> gvs[] >>
+  rename1 ‘ArrayT element bound’ >> Cases_on ‘bound’ >> gvs[] >>
+  Cases_on ‘space’ >> gvs[] >> Cases_on ‘offset’ >> gvs[] >>
+  IF_CASES_TAC >> gvs[] >>
+  Cases_on ‘fixed_array_element env addr (mapping_slot [] slot) element
+    (w2n (lookup_storage slot (lookup_account addr st.world.accounts).storage))
+    layout (&(w2n (lookup_storage slot (lookup_account addr st.world.accounts).storage) - 1))’ >> gvs[] >>
+  rename1 ‘ValueOk v’ >> Cases_on ‘v’ >> gvs[] >>
+  rename1 ‘ReferenceValue ref’ >> Cases_on ‘ref’ >> gvs[] >>
+  rename1 ‘StorageReference space ignored data offset ignored_ty ignored_layout’ >>
+  Cases_on ‘space’ >> gvs[] >>
+  Cases_on ‘clear_storage_value env (n + LENGTH env.type_declarations)
+    st.world.accounts addr data offset element = INR FuelExhausted’
+  >- gvs[abrupt_result_def] >>
+  ‘clear_storage_value env (m + LENGTH env.type_declarations)
+    st.world.accounts addr data offset element =
+   clear_storage_value env (n + LENGTH env.type_declarations)
+    st.world.accounts addr data offset element’ by
+    (irule (cj 1 solidityStorageTheory.clear_storage_fuel_stable) >> simp[]) >>
+  simp[]
+QED
+
+Theorem reset_target_fuel_stable[local]:
+  (reset_target n env t ty st gas).completion ≠ FuelExhausted ∧ n ≤ m ⇒
+  reset_target m env t ty st gas = reset_target n env t ty st gas
+Proof
+  simp[reset_target_def] >> rpt strip_tac >>
+  Cases_on ‘FLOOKUP st.targets (ast_key t)’ >> gvs[] >>
+  rename1 ‘SOME target’ >> Cases_on ‘target’ >> gvs[] >>
+  rename1 ‘ValueTarget ref’ >> Cases_on ‘ref’ >> gvs[] >>
+  rename1 ‘StorageReference space addr slot offset stored_ty layout’ >>
+  Cases_on ‘space’ >> gvs[] >>
+  Cases_on ‘st.frame.static_context’ >> gvs[] >>
+  Cases_on ‘clear_storage_value env (n + LENGTH env.type_declarations)
+    st.world.accounts addr slot offset stored_ty = INR FuelExhausted’
+  >- gvs[abrupt_result_def] >>
+  ‘clear_storage_value env (m + LENGTH env.type_declarations)
+    st.world.accounts addr slot offset stored_ty =
+   clear_storage_value env (n + LENGTH env.type_declarations)
+    st.world.accounts addr slot offset stored_ty’ by
+    (irule (cj 1 solidityStorageTheory.clear_storage_fuel_stable) >> simp[]) >>
+  simp[]
+QED
+
+Theorem simple_stmt_fuel_stable[local]:
+  (simple_stmt n env s st gas).completion <> FuelExhausted /\ n <= m ==>
+  simple_stmt m env s st gas = simple_stmt n env s st gas
+Proof
+  Cases_on ‘s’
+  >~ [‘DefineStmt x ty op’] >-
+    (Cases_on ‘op’ >> simp[simple_stmt_def, pop_storage_array_fuel_stable]) >>
+  simp[simple_stmt_def, reset_target_fuel_stable]
+QED
 
 Theorem eval_fuel_stable[local]:
   (∀n env ss st gas m.
@@ -26,14 +107,28 @@ Theorem eval_fuel_stable[local]:
 Proof
   ho_match_mp_tac eval_block_ind >> rpt strip_tac >>
   qpat_x_assum ‘_.completion ≠ FuelExhausted’ mp_tac >>
-  once_rewrite_tac[eval_block_def] >>
-  (* statements without nested evaluation, and the empty block *)
-  TRY (strip_tac >> REFL_TAC >> NO_TAC)
+  once_rewrite_tac[eval_block_def]
+  (* The empty block, and statements without nested evaluation. *)
+  >~ [‘normal_result st gas = normal_result st gas’] >- simp[]
+  >>~- ([‘simple_stmt’], metis_tac[simple_stmt_fuel_stable])
+  >~ [‘eval_assembly’] >- metis_tac[eval_assembly_fuel_stable]
   >~ [‘eval_stmt _ _ _ _ _’] >-
    (strip_tac >> first_x_assum (qspec_then ‘m’ assume_tac) >>
     rename1 ‘eval_stmt _ _ s _ _’ >>
     Cases_on ‘(eval_stmt n env s st gas).completion = NormalCompletion’ >>
     gvs[])
+  >~ [‘panic_zero_function’] >-
+   (strip_tac >>
+    Cases_on ‘eval_atom st.scopes g’ >> gvs[] >>
+    rename1 ‘eval_atom _ _ = SOME gv’ >> Cases_on ‘gv’ >> gvs[] >>
+    rename1 ‘eval_atom _ _ = SOME (ScalarValue gs)’ >> Cases_on ‘gs’ >> gvs[] >>
+    rename1 ‘eval_atom _ _ = SOME (ScalarValue (InternalFunctionValue go))’ >>
+    Cases_on ‘go’ >> Cases_on ‘eval_atoms st.scopes atoms’ >> gvs[] >>
+    rename1 ‘invoke_source _ _ f vs _ _’ >>
+    Cases_on ‘st.immutables = NONE’ >>
+    Cases_on ‘MEM f env.creation_function_ids’ >> gvs[] >>
+    Cases_on ‘(invoke_source n env f vs st gas).completion = FuelExhausted’ >>
+    gvs[bind_call_result_def])
   >~ [‘bind_call_result’] >-
    (strip_tac >> Cases_on ‘eval_atoms st.scopes atoms’ >> gvs[] >>
     rename1 ‘invoke_source _ _ f vs _ _’ >>

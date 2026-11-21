@@ -28,23 +28,42 @@
  * carries the table the frame's caller supplies, keyed by that name, and a
  * name it does not carry is an invalid outcome.
  *
+ * Creation frames also carry their code image, named object extents and
+ * immutable patch offsets. Constructor arguments follow the initcode in the
+ * code image; they are not calldata.
+ *
  * The transaction and block the frame runs in are Verifereum's transaction
  * parameters, read by origin(), gasprice(), chainid(), number(),
- * timestamp(), coinbase(), basefee() and gaslimit().
+ * timestamp(), coinbase(), basefee(), gaslimit() and prevrandao().
  *
  * Gas is not modelled, but a frame still has a budget: gas_limit is what the
- * frame's caller gave it, gas() reads it, and a message call hands the call's
- * own gas argument on to the callee, capped at this budget.  Nothing in the
- * frame spends any of it, so it never falls; the
- * callee's own gas is the callee's frame's, which is Verifereum's.
+ * frame's caller gave it, a bare gas() as a call's gas argument stands for it,
+ * and a message call hands the call's own gas argument on to the callee,
+ * capped at this budget.  Nothing in the frame spends any of it, so it never
+ * falls; the callee's own gas is the callee's frame's, which is Verifereum's.
+ * The gas left, which any other gas() reads, is not computed: each such read
+ * consumes the next of gas_observations, the readings observed for the frame.
  *
  * return_data is the frame's buffer for the return data of its last message
  * call, a frame input like the call data: empty before any call, and what
  * returndatasize() and returndatacopy() read.
+ *
+ * transient is the transaction's transient storage, every account's, as the
+ * frame's caller hands it over: tload() and tstore() read and write the
+ * executing account's part of it, and a message call passes it to the callee
+ * and takes back what the callee left, as it does the accounts. It is not
+ * part of the world a frame's caller sees: a fresh transaction starts with
+ * none, and nothing that reads a frame's outcome looks at it.
+ *
+ * original and to_delete are the transaction's original accounts and the
+ * accounts its calls left pending deletion, as in the source world: a
+ * message call or creation passes them to Verifereum and takes back what it
+ * left, so a SELFDESTRUCT can tell an account created in this transaction
+ * (EIP-6780). Nothing in the frame reads them.
  *)
 Theory yulState
 Ancestors
-  vfmContext
+  vfmContext solidityState
 
 Datatype:
   yul_world = <|
@@ -56,6 +75,7 @@ End
 Datatype:
   yul_machine = <|
     accounts : evm_accounts;
+    transient : transient_storage;
     logs : event list;
     self_address : address;
     caller_address : address;
@@ -63,11 +83,17 @@ Datatype:
     call_data : byte list;
     return_data : byte list;
     immutables : string |-> bytes32;
+    code : byte list;
+    objects : string |-> num # num;
+    immutable_offsets : string |-> num list;
     memory : num |-> word8;
     memory_size : num;
     gas_limit : num;
+    gas_observations : gas_observation list;
     scopes : (string |-> bytes32) list;
-    transaction_parameters : transaction_parameters
+    transaction_parameters : transaction_parameters;
+    original : evm_accounts;
+    to_delete : address list
   |>
 End
 
@@ -80,6 +106,7 @@ Datatype:
   = YulNormal
   | YulReturn (byte list)
   | YulRevert (byte list)
+  | YulAbort
   | YulInvalid string
   | YulOutOfFuel
   | YulBreak
@@ -95,6 +122,7 @@ Datatype:
   yul_frame_observation
   = YulFrameSuccess (byte list) yul_world
   | YulFrameRevert (byte list) yul_world
+  | YulFrameAbort yul_world
   | YulFrameInvalid string
   | YulFrameResourceLimit
 End
@@ -113,6 +141,7 @@ Definition finish_yul_frame_def:
       YulNormal => YulFrameSuccess [] (yul_machine_world final)
     | YulReturn data => YulFrameSuccess data (yul_machine_world final)
     | YulRevert data => YulFrameRevert data (yul_machine_world initial)
+    | YulAbort => YulFrameAbort (yul_machine_world initial)
     | YulInvalid reason => YulFrameInvalid reason
     | YulOutOfFuel => YulFrameResourceLimit
     | YulBreak => YulFrameInvalid "break escaped frame"

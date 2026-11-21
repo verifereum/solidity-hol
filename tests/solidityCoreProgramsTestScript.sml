@@ -263,7 +263,7 @@ End
 
 Definition programs_def:
   programs = <|
-    procedures := [
+    unsupported_procedures := []; procedures := [
       binop_proc 1 u8 CheckedArithmetic AddOp;
       binop_proc 2 u8 UncheckedArithmetic AddOp;
       binop_proc 3 u256 CheckedArithmetic SubtractOp;
@@ -271,8 +271,8 @@ Definition programs_def:
       binop_proc 5 u256 UncheckedArithmetic DivideOp;
       count_proc; nested_proc; fact_proc; fib_proc; divmod_proc; swap_proc;
       spin_proc; deep_proc; inner_proc; middle_proc; outer_proc];
-    struct_layouts := []; type_declarations := [];
-    state_variables := [];
+    struct_layouts := []; function_ids := []; creation_function_ids := []; type_declarations := [];
+    state_variables := []; immutables := [];
     entry_procedure := AstId 16;
     external_functions := []; receive_procedure := NONE;
     fallback_procedure := NONE; creation_procedure := NONE
@@ -293,7 +293,7 @@ Definition programs_state_def:
   programs_state = <|
     world := <| accounts := empty_accounts;
                 transient := empty_transient_storage;
-                logs := [] |>;
+                logs := []; original := empty_accounts; to_delete := [] |>;
     frame := <| self_address := 0w; code_address := 0w; sender_address := 0w;
                 call_value := 0; call_data := []; static_context := F;
                 tx_params := <| origin := 0w; gasPrice := 0; baseFeePerGas := 0;
@@ -302,9 +302,10 @@ Definition programs_state_def:
                   prevHashes := []; blobHashes := []; chainId := 0;
                   authRefund := 0 |> |>;
     scopes := [];
-    heap := FEMPTY;
-    next_heap_id := 0;
-    targets := FEMPTY
+    (* the free memory pointer at 0x40 holds 0x80, as the prologue leaves it *)
+    memory := FEMPTY |+ (0x5F, 0x80w); memory_size := 96;
+    immutables := SOME FEMPTY;
+    targets := FEMPTY; return_data := SOME []
   |>
 End
 
