@@ -231,21 +231,36 @@ fun keccak_conv tm =
 
 (* A clause reaches the constants of its right-hand side through the entries
  * that were in the set when it was compiled, so `ext_code_hash`, which hashes
- * an account's code and was compiled with the unrestricted `Keccak_256_w64`
- * clauses, would keep expanding the hash of a symbolic byte. It is compiled
- * again once the rule above is in place. *)
+ * an account's code, and the CREATE and CREATE2 address derivations, which hash
+ * the creator and its nonce or the initcode, were compiled with the
+ * unrestricted `Keccak_256_w64` clauses and would keep expanding the hash of a
+ * symbolic byte. They are compiled again once the rule above is in place. *)
 val ext_code_hash_c =
   prim_mk_const {Thy = "yulEvaluator", Name = "ext_code_hash"}
+val address_for_create_c =
+  prim_mk_const {Thy = "vfmContext", Name = "address_for_create"}
+val address_for_create2_c =
+  prim_mk_const {Thy = "vfmExecution", Name = "address_for_create2"}
+val run_create_call_c =
+  prim_mk_const {Thy = "externalCall", Name = "run_create_call"}
+val yul_create_c =
+  prim_mk_const {Thy = "yulEvaluator", Name = "yul_create"}
 
 fun add_literal_convs cs =
   let
     val cs = List.foldl (fn (c, cs) => computeLib.scrub_const cs c)
                         cs [word_exp_c, word_exp_tailrec_c, keccak_c,
-                            ext_code_hash_c]
+                            ext_code_hash_c, address_for_create_c,
+                            address_for_create2_c, run_create_call_c,
+                            yul_create_c]
     val cs = computeLib.add_conv (word_exp_c, 2, word_exp_conv) cs
     val cs = computeLib.add_conv (keccak_c, 1, keccak_conv) cs
   in
-    computeLib.add_thms [yulEvaluatorTheory.ext_code_hash_def] cs
+    computeLib.add_thms [yulEvaluatorTheory.ext_code_hash_def,
+                         vfmContextTheory.address_for_create_def,
+                         vfmExecutionTheory.address_for_create2_def,
+                         externalCallTheory.run_create_call_def,
+                         yulEvaluatorTheory.yul_create_def] cs
   end
 
 val test_compset =
