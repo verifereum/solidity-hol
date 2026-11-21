@@ -1439,8 +1439,8 @@ Definition simple_stmt_def:
                   if st.frame.static_context then
                     abrupt_result (InvalidCompletion "array copy in static frame") st gas
                   else
-                  (case array_copy_value env T st cty src of
-                     (INL v, st1) =>
+                  (case array_copy_value env T 0 st cty src of
+                     (INL v, _, st1) =>
                        (case copy_to_storage env st1.world.accounts cty v
                                dst st.frame.static_context of
                           INL accounts =>
@@ -1451,7 +1451,7 @@ Definition simple_stmt_def:
                                | _ => NONE)
                               (st1 with world := st1.world with accounts := accounts)) gas
                         | INR c => abrupt_result c st gas)
-                   | (INR c, _) => abrupt_result c st gas)
+                   | (INR c, _, _) => abrupt_result c st gas)
               | NONE =>
                 case copy_byte_contents src dst st of
                   INL st' => normal_result st' gas

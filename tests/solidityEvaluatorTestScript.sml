@@ -776,8 +776,8 @@ Definition run_asm_array_def:
         let r = invoke_source 20 env (AstId 140)
                   [ReferenceValue (MemoryReference 0x80 ty)] st [] in
         (r.completion,
-         case memory_value env F 0 ty (ReferenceValue (MemoryReference 0x80 ty)) r.state of
-           (INL (TupleValue us), _) => us
+         case memory_value env F 0 ty (ReferenceValue (MemoryReference 0x80 ty)) 0 r.state of
+           (INL (TupleValue us), _, _) => us
          | _ => [])
     | _ => (InvalidCompletion "not an array", [])
 End
@@ -891,9 +891,9 @@ Definition asm_alloc_object_def:
   asm_alloc_object env (st : source_state) v =
     case v of
       ReferenceValue (MemoryReference p ty) =>
-        (case memory_value env F 0 ty v st of
-           (INL u, _) => SOME (p, u)
-         | (INR _, _) => NONE)
+        (case memory_value env F 0 ty v 0 st of
+           (INL u, _, _) => SOME (p, u)
+         | (INR _, _, _) => NONE)
     | _ => NONE
 End
 
@@ -2208,6 +2208,100 @@ val () = cv_auto_trans stored_emit_guard_check_def;
 Theorem stored_emit_preimage_pointer_move_fails_closed:
   stored_emit_guard_check =
     InvalidCompletion "unsupported: encoder reach overlaps a free memory pointer moved by an event's hash preimage"
+Proof
+  CONV_TAC cv_eval
+QED
+
+(* The encoders compare the free memory pointer with the byte reach of their
+ * reads. With the pointer at 0xb8, 24 bytes past a word boundary, an empty
+ * byte sequence at 0x98 ends at the pointer and is encoded, though its length
+ * word's memory word reaches past it; one byte longer fails closed. *)
+Definition encoder_byte_reach_checks_def:
+  encoder_byte_reach_checks =
+    let ty = LocatedT MemoryLoc BytesT;
+        v = ReferenceValue (MemoryReference 0x98 BytesT);
+        at_pointer = memory_store 0x98 0 (memory_store 64 0xb8 initial_state);
+        past_pointer = memory_store 0x98 1 (memory_store 64 0xb8 initial_state) in
+    (ISL (encoded_runtime_values static_copy_env at_pointer [ty] [v]),
+     encoded_runtime_values static_copy_env past_pointer [ty] [v],
+     ISL (packed_encoding static_copy_env at_pointer [ty] [v]),
+     packed_encoding static_copy_env past_pointer [ty] [v])
+End
+
+val () = cv_auto_trans encoder_byte_reach_checks_def;
+
+Theorem encoder_input_ending_at_unaligned_pointer:
+  encoder_byte_reach_checks =
+    (T, INR (InvalidCompletion "unsupported: encoder input at or above the free memory pointer"),
+     T, INR (InvalidCompletion "unsupported: encoder input at or above the free memory pointer"))
+Proof
+  CONV_TAC cv_eval
+QED
+
+(* A 5-byte sequence at 0 reaches 37, below the free memory pointer at 0x28.
+ * The indexed key's hash preimage, written at the pointer, moves it to the
+ * key's last word: to 37 the emit succeeds, to 36 it fails closed, since the
+ * log's data written there would overwrite the sequence before it is read. *)
+Definition keyed_emit_def:
+  keyed_emit least =
+    (emit_event static_copy_env NONE
+       [(LocatedT CalldataLoc BytesT, T, BoundAtom (AstId 1));
+        (LocatedT MemoryLoc BytesT, F, BoundAtom (AstId 2))]
+       (memory_store 64 0x28 (memory_store 0 5 initial_state) with <|
+          frame := initial_state.frame with
+            call_data := REPLICATE 24 0x11w ++ num_to_bytes 32 least;
+          scopes := [FEMPTY
+            |+ (1, <| binding_type := SingleType (LocatedT CalldataLoc BytesT);
+                      binding_value := ReferenceValue (CalldataReference 0 56 BytesT) |>)
+            |+ (2, <| binding_type := SingleType (LocatedT MemoryLoc BytesT);
+                      binding_value := ReferenceValue (MemoryReference 0 BytesT) |>)] |>)
+       []).completion
+End
+
+val () = cv_auto_trans keyed_emit_def;
+
+Theorem emit_preimage_moving_pointer_to_reach:
+  keyed_emit 37 = NormalCompletion ∧
+  keyed_emit 36 =
+    InvalidCompletion "unsupported: encoder reach overlaps a free memory pointer moved by an event's hash preimage"
+Proof
+  CONV_TAC cv_eval
+QED
+
+(* A stored dynamic array's encoding hashes its slot in scratch word 0, which
+ * the compiled encoder does after writing its output's head: with the free
+ * memory pointer below 32 that overwrites the output, so abi.encode and emit
+ * fail closed; from 32 they don't. *)
+Definition stored_array_emit_def:
+  stored_array_emit free =
+    let ty = LocatedT StorageLoc (ArrayT u256 NONE) in
+    (emit_event static_copy_env NONE [(ty, F, BoundAtom (AstId 1))]
+       (memory_store 64 free initial_state with scopes := [FEMPTY
+          |+ (1, <| binding_type := SingleType ty;
+                    binding_value := ReferenceValue (static_copy_dst 6w (ArrayT u256 NONE)) |>)])
+       []).completion
+End
+
+val () = cv_auto_trans stored_array_emit_def;
+
+Definition scratch_reach_checks_def:
+  scratch_reach_checks =
+    let arr = ArrayT u256 NONE;
+        ty = LocatedT StorageLoc arr;
+        v = ReferenceValue (static_copy_dst 6w arr) in
+    (encoded_runtime_values static_copy_env (memory_store 64 0 initial_state) [ty] [v],
+     stored_array_emit 0,
+     ISL (encoded_runtime_values static_copy_env (memory_store 64 32 initial_state) [ty] [v]),
+     stored_array_emit 32)
+End
+
+val () = cv_auto_trans scratch_reach_checks_def;
+
+Theorem stored_input_below_scratch_pointer_fails_closed:
+  scratch_reach_checks =
+    (INR (InvalidCompletion "unsupported: encoder input at or above the free memory pointer"),
+     InvalidCompletion "unsupported: encoder input at or above the free memory pointer",
+     T, NormalCompletion)
 Proof
   CONV_TAC cv_eval
 QED
