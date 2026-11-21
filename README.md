@@ -68,8 +68,7 @@ and non-canonical words written back to locals by inline assembly, fail with
 storage array copies and ABI encoding too. `solidityStorage` owns packed access and
 navigation; the evaluator owns bindings, frame checks and control flow.
 Scalar writes, reference
-rebinding and content copying are distinct core operations; the latter two
-remain extension points rather than implemented aggregate semantics.
+rebinding and content copying are distinct core operations.
 
 An inline assembly block (`AssemblyStmt`) runs on the Yul evaluator over the
 frame's own memory. Solidity code and assembly share one byte-addressed
