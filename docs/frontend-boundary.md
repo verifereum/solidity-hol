@@ -251,7 +251,7 @@ case, rather than guessing. There are nine such cases:
 - an indexed event argument that is a stored array or struct whose in-place
   encoding ends in an empty byte sequence;
 - an event whose indexed arguments' hash preimages move the free memory
-  pointer below the last byte the event read (its memory arguments, and the
+  pointer below the end of what the event read (its memory arguments, and the
   scratch words hashed to read its stored ones): the compiled emit reads the pointer
   anew for each preimage and for the log's data, so a later preimage can land
   on an argument before it is read, or a scratch hash on the log's data;
