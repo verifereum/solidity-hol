@@ -1203,7 +1203,7 @@ Definition event_state_def:
         let (least, st3) = write_at_each temps st2 in
         if least < st1.memory_size then
           INR (InvalidCompletion
-            "unsupported: an event's hash preimage moved the free memory pointer")
+            "unsupported: encoder reach overlaps a free memory pointer moved by an event's hash preimage")
         else INL st3
 End
 

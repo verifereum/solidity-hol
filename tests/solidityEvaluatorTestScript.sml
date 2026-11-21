@@ -2179,7 +2179,7 @@ Theorem read_failures_surface_after_fail_closed_checks:
     (INR (InvalidCompletion "unsupported: encoder input at or above the free memory pointer"),
      INR (InvalidCompletion "unsupported: encoder input at or above the free memory pointer"),
      INR (InvalidCompletion "unsupported: encoder input at or above the free memory pointer"),
-     InvalidCompletion "unsupported: an event's hash preimage moved the free memory pointer")
+     InvalidCompletion "unsupported: encoder reach overlaps a free memory pointer moved by an event's hash preimage")
 Proof
   CONV_TAC cv_eval
 QED
