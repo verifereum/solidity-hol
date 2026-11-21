@@ -375,6 +375,36 @@ val () =
     | SOME () => print "yulConvTest: symbolic Keccak stays folded and literal Keccak computes\n"
   end
 
+(* EXTCODEHASH of a known account whose code holds a symbolic byte reaches the
+ * hash through `ext_code_hash`, not through the `keccak256` builtin, so it
+ * must stay folded as well: the hash is expanded into a term of millions of
+ * nodes otherwise. *)
+val () =
+  let
+    val fns = “yul_env
+      [YulFunction "code_hash" [] ["hash"]
+        [YulAssign ["hash"]
+           (YulBuiltin YExtCodeHash [YulLit (LitNumber 5w)])]]”
+    val m = “^yul_conv_machine_term with accounts :=
+               (5w =+ (empty_account_state with code := [b : word8; 0w]))
+                 empty_accounts”
+    val call = “invoke_yul 20 ^fns "code_hash" [] ^m”
+    val hash = “Keccak_256_w64 [b : word8; 0w]”
+    fun check () =
+      let val form = rhs (concl (yulConvLib.yul_invoke_conv [] call)) in
+        if not (can (find_term (aconv hash)) form) then
+          fail "extcodehash did not keep the hash of a symbolic byte folded"
+        else if not (yulConvLib.is_closed_form form andalso
+                     yulConvLib.is_fixed_point [] form) then
+          fail "extcodehash left unfinished Yul evaluation"
+        else ()
+      end
+  in
+    case under_clock 60.0 check of
+      NONE => fail "extcodehash conversion did not come back within 60s"
+    | SOME () => print "yulConvTest: extcodehash of a symbolic byte stays folded\n"
+  end
+
 fun convert f =
   let val t = call_term f in
     case under_clock 60.0 (fn () => yulConvLib.yul_invoke_conv table_defs t) of
