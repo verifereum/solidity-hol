@@ -430,19 +430,22 @@ val () =
     val create2 =
       fns “YulBuiltin YCreate2 [YulLit (LitNumber 0w); YulLit (LitNumber 0w);
                                 YulLit (LitNumber 32w); YulName "s"]”
-    val create_call_c =
-      prim_mk_const {Thy = "externalCall", Name = "run_create_call"}
     fun check (nm, fn_table, m) () =
       let
         val call = “invoke_yul 20 ^fn_table "f" [^a0; ^salt] ^m”
         val form = rhs (concl (yulConvLib.yul_invoke_conv [] call))
+        val res = yulConvLib.residues form
+        val allowed = [("externalCall", "run_create_call"), memory_read_residue,
+                       ("yulEvaluator", "yul_memory_write")]
       in
-        if null (find_terms (fn t => is_comb t andalso
-                                      same_const (rator t) create_call_c) form) then
+        if not (Lib.mem ("externalCall", "run_create_call") res) then
           fail (nm ^ " did not leave the creation folded")
         else if not (yulConvLib.is_closed_form form andalso
                      yulConvLib.is_fixed_point [] form) then
-          fail (nm ^ " left unfinished Yul evaluation")
+          fail (nm ^ " left unfinished Yul evaluation: " ^ show_residues res)
+        else if not (List.all (fn k => Lib.mem k allowed) res) then
+          fail (nm ^ ": the scopes after the creation are not resolved: " ^
+                show_residues res)
         else ()
       end
     fun run (nm, t, m) =
