@@ -617,9 +617,12 @@ End
  * copy_struct_to_storage, copy_byte_array_to_storage). v is a memory object,
  * read word by word as the walk reaches it, or the value a calldata or
  * storage source gave, whose reads touch no memory. An array reads its length
- * (Panic(0x41) at 2^64 or more), resizes the stored array, clearing a shrunk
- * tail, hashes a dynamic array's slot in scratch word 0 (array_dataslot, even
- * when empty), then copies its elements in order, each completely before the
+ * (Panic(0x41) at 2^64 or more for scalar elements, as the copy checks; past
+ * 2^64 otherwise, as only resize_array does), resizes the stored array,
+ * clearing a shrunk tail, whose clears leave their hashes in scratch word 0,
+ * hashes a dynamic array's slot there (array_dataslot, even when empty; a
+ * static array's data slot is not hashed, so a tail clear's slot stays),
+ * then copies its elements in order, each completely before the
  * next one's word is read; a struct copies its fields the same way. Scalar
  * arrays write complete packed slots; retained structs overwrite members,
  * preserving scalar-slot padding and mappings. The state reached is returned
@@ -636,7 +639,8 @@ Definition store_storage_value_def:
         (case source_length src v st of
            (INR c, st1) => (INR c, st1)
          | (INL length, st1) =>
-             if 2 ** 64 ≤ length then (INR (PanicCompletion 65), st1) else
+             if (if is_stored_scalar_type e' then 2 ** 64 ≤ length else 2 ** 64 < length)
+             then (INR (PanicCompletion 65), st1) else
              let accounts = st1.world.accounts in
              case storage_array_data accounts addr slot dst of
                (old_length, data) =>
@@ -654,9 +658,9 @@ Definition store_storage_value_def:
                           accounts1 addr data e' length (old_length - length) in
                  case resized of
                    INR c => (INR c, st1)
-                 | INL (accounts2, _) =>
+                 | INL (accounts2, cleared) =>
                      store_storage_elements env fuel addr data e e' v 0 length
-                       (scratch_write (if l = NONE then SOME slot else NONE)
+                       (scratch_write (if l = NONE then SOME slot else cleared)
                           (st1 with world := st1.world with accounts := accounts2)))
     | (StructT _, StructT s) =>
         (case (lookup_struct env s, lookup_struct_layout env s) of

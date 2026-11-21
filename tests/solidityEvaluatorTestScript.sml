@@ -2162,6 +2162,36 @@ Proof
   CONV_TAC cv_eval
 QED
 
+(* A nested array's copy has no length check of its own, only resize_array's
+ * Panic(0x41) past 2^64: a source of exactly 2^64 arrays goes on to its first
+ * element, at 0x300 here, whose own length of 2^64 panics. Memory grows to
+ * 0x320, the end of that length word. *)
+Definition oversized_nested_copy_def:
+  oversized_nested_copy =
+    let ty = ArrayT (ArrayT u256 NONE) NONE in
+    let st = initial_state with
+      scopes := [FEMPTY
+        |+ (1, <| binding_type := SingleType (LocatedT MemoryLoc ty);
+                  binding_value := ReferenceValue (MemoryReference 0x200 ty) |>)
+        |+ (2, <| binding_type := SingleType (LocatedT StorageLoc ty);
+                  binding_value := ReferenceValue (static_copy_dst 0w ty) |>)] in
+    let seeded = memory_store 0x300 (2 ** 64) (memory_store 0x220 0x300
+                   (memory_store 0x200 (2 ** 64) st)) in
+    let r = simple_stmt 10 static_copy_env
+              (CopyContentsStmt (LocatedT MemoryLoc ty) (LocatedT StorageLoc ty)
+                 (BoundAtom (AstId 1)) (BoundAtom (AstId 2)))
+              (seeded with memory_size := st.memory_size) [] in
+    (r.completion, r.state.memory_size)
+End
+
+val () = cv_auto_trans oversized_nested_copy_def;
+
+Theorem oversized_nested_copy_reaches_first_element:
+  oversized_nested_copy = (PanicCompletion 65, 0x320)
+Proof
+  CONV_TAC cv_eval
+QED
+
 (* abi.decode of memory bytes at 0 whose 64 bytes, [32, 96), cover the free
  * memory pointer's word fails closed: the compiled decoder rewrites that
  * word as it allocates, so a later read of it could see the new pointer.

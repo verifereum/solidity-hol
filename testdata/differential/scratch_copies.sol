@@ -31,7 +31,7 @@ contract ScratchCopies {
         uint256[] memory m;
         assembly {
             m := 0
-            mstore(0, 1)
+            mstore(0, 2)
             mstore(0x20, 7)
         }
         s1 = m;
@@ -108,6 +108,18 @@ contract ScratchCopies {
         m[0][0] = 0x22;
         assembly {
             mstore(add(m, 0x20), 0)
+            mstore(0, 3)
+        }
+        bs2 = m;
+        assembly { return(0, add(mload(0x40), 0x100)) }
+    }
+
+    function fixedTailAtZero() external {
+        bs2[1] = new bytes(40);
+        bytes[1] memory m;
+        assembly {
+            mstore(m, 0)
+            mstore(0, 3)
         }
         bs2 = m;
         assembly { return(0, add(mload(0x40), 0x100)) }
