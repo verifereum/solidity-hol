@@ -406,38 +406,40 @@ val () =
   end
 
 
-(* CREATE and CREATE2 hash the creator and nonce, or the creator, salt and
- * initcode, to derive the new address, through `address_for_create` and
- * `address_for_create2`, which `run_create_call` (and `yul_create` above it)
- * reaches.  Those were compiled with the unrestricted Keccak clauses as well,
- * so a symbolic salt or creator expanded the hash and the conversion did not
- * come back.  Each of these keeps the hash folded now.
- *
- * Not covered, and not about the hash: a symbolic nonce makes `n2l` itself
- * unfold forever, and symbolic initcode is executed by the EVM, which does not
- * close either; the hash of a symbolic initcode is checked on its own below. *)
+(* CREATE and CREATE2 are a message call like CALL: `run_create_call` runs the
+ * initcode as a frame of the EVM, so it stays folded as a residue, as
+ * `run_external_call` does, and the form closes with the binding after it
+ * resolved.  Unfolded, a symbolic nonce sent `n2l` into an unfolding that never
+ * ends, a symbolic initcode (a memory read the conversion leaves standing) went
+ * to the EVM's own steps, and a symbolic salt or creator expanded the address
+ * hash; none of them came back. *)
 val () =
   let
     val a0 = hd arg_names
-    val sa = mk_var ("sa", wordsSyntax.mk_int_word_type 160)
     val salt = “salt : bytes32”
+    val sa = mk_var ("sa", wordsSyntax.mk_int_word_type 160)
     val m0 = yul_conv_machine_term
-    fun fns body = “yul_env [YulFunction "f" ["x"; "s"] ["r"] ^body]”
-    val create2 = fns “[YulAssign ["r"] (YulBuiltin YCreate2
-                    [YulLit (LitNumber 0w); YulLit (LitNumber 0w);
-                     YulLit (LitNumber 0w); YulName "s"])]”
-    val create = fns “[YulAssign ["r"] (YulBuiltin YCreate
-                    [YulLit (LitNumber 0w); YulLit (LitNumber 0w);
-                     YulLit (LitNumber 0w)])]”
-    val keccak_c = prim_mk_const {Thy = "keccak", Name = "Keccak_256_w64"}
+    fun fns create = “yul_env
+      [YulFunction "f" ["x"; "s"] ["r"]
+        [YulExprStmt (YulBuiltin YMStore [YulLit (LitNumber 0w); YulName "x"]);
+         YulLet ["t"] (SOME ^create);
+         YulAssign ["r"] (YulBuiltin YAdd [YulName "t"; YulName "x"])]]”
+    val create =
+      fns “YulBuiltin YCreate [YulLit (LitNumber 0w); YulLit (LitNumber 0w);
+                               YulLit (LitNumber 32w)]”
+    val create2 =
+      fns “YulBuiltin YCreate2 [YulLit (LitNumber 0w); YulLit (LitNumber 0w);
+                                YulLit (LitNumber 32w); YulName "s"]”
+    val create_call_c =
+      prim_mk_const {Thy = "externalCall", Name = "run_create_call"}
     fun check (nm, fn_table, m) () =
       let
         val call = “invoke_yul 20 ^fn_table "f" [^a0; ^salt] ^m”
         val form = rhs (concl (yulConvLib.yul_invoke_conv [] call))
       in
         if null (find_terms (fn t => is_comb t andalso
-                                      same_const (rator t) keccak_c) form) then
-          fail (nm ^ " lost its hash")
+                                      same_const (rator t) create_call_c) form) then
+          fail (nm ^ " did not leave the creation folded")
         else if not (yulConvLib.is_closed_form form andalso
                      yulConvLib.is_fixed_point [] form) then
           fail (nm ^ " left unfinished Yul evaluation")
@@ -449,8 +451,36 @@ val () =
       | SOME () => print ("yulConvTest: " ^ nm ^ " stays folded\n")
   in
     List.app run
-      [("create2 with a symbolic salt", create2, m0),
-       ("create with a symbolic creator", create, “^m0 with self_address := ^sa”)]
+      [("create of a stored word", create, m0),
+       ("create with a symbolic creator", create, “^m0 with self_address := ^sa”),
+       ("create with a symbolic nonce", create,
+        “^m0 with accounts :=
+           (0w =+ (empty_account_state with nonce := n)) empty_accounts”),
+       ("create2 with a symbolic salt", create2, m0)]
+  end
+
+(* The address derivations themselves, reached outside a creation, keep a hash
+ * of a symbolic creator or salt folded. *)
+val () =
+  let
+    val sa = mk_var ("sa", wordsSyntax.mk_int_word_type 160)
+    val sl = mk_var ("sl", bytes32_ty)
+    fun check (nm, t) () =
+      let val form = rhs (concl (yulConvLib.yul_eval_conv []
+                                   “fns : (string |-> yul_function)” t)) in
+        if not (can (find_term (fn x => is_comb x andalso
+                                         aconv (rator x) “Keccak_256_w64”)) form)
+        then fail (nm ^ " lost its hash")
+        else ()
+      end
+    fun run (nm, t) =
+      case under_clock 60.0 (check (nm, t)) of
+        NONE => fail (nm ^ " did not come back within 60s")
+      | SOME () => print ("yulConvTest: " ^ nm ^ " stays folded\n")
+  in
+    List.app run
+      [("the CREATE address of a symbolic creator", “address_for_create ^sa 0”),
+       ("the CREATE2 address of a symbolic salt", “address_for_create2 0w ^sl []”)]
   end
 
 val () =
