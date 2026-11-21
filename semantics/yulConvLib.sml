@@ -229,13 +229,23 @@ fun keccak_conv tm =
       else raise Conv.UNCHANGED
   | NONE => raise Conv.UNCHANGED
 
+(* A clause reaches the constants of its right-hand side through the entries
+ * that were in the set when it was compiled, so `ext_code_hash`, which hashes
+ * an account's code and was compiled with the unrestricted `Keccak_256_w64`
+ * clauses, would keep expanding the hash of a symbolic byte. It is compiled
+ * again once the rule above is in place. *)
+val ext_code_hash_c =
+  prim_mk_const {Thy = "yulEvaluator", Name = "ext_code_hash"}
+
 fun add_literal_convs cs =
   let
     val cs = List.foldl (fn (c, cs) => computeLib.scrub_const cs c)
-                        cs [word_exp_c, word_exp_tailrec_c, keccak_c]
+                        cs [word_exp_c, word_exp_tailrec_c, keccak_c,
+                            ext_code_hash_c]
     val cs = computeLib.add_conv (word_exp_c, 2, word_exp_conv) cs
+    val cs = computeLib.add_conv (keccak_c, 1, keccak_conv) cs
   in
-    computeLib.add_conv (keccak_c, 1, keccak_conv) cs
+    computeLib.add_thms [yulEvaluatorTheory.ext_code_hash_def] cs
   end
 
 val test_compset =
