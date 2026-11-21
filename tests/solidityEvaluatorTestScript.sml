@@ -2134,7 +2134,9 @@ QED
 
 (* A copy from memory whose length word is 2^64 panics with 0x41 having read
  * only that word, as the compiled copy checks the length before it reads
- * any data: memory stays at 0x220, the end of the length word at 0x200. *)
+ * any data: memory grows to 0x220, the end of the length word at 0x200, and
+ * no further. The length word is seeded without touching memory, so the
+ * size shows the copy's own read survives the panic. *)
 Definition oversized_copy_def:
   oversized_copy ty =
     let st = initial_state with
@@ -2146,7 +2148,8 @@ Definition oversized_copy_def:
     let r = simple_stmt 10 static_copy_env
               (CopyContentsStmt (LocatedT MemoryLoc ty) (LocatedT StorageLoc ty)
                  (BoundAtom (AstId 1)) (BoundAtom (AstId 2)))
-              (memory_store 0x200 (2 ** 64) st) [] in
+              (memory_store 0x200 (2 ** 64) st with memory_size := st.memory_size)
+              [] in
     (r.completion, r.state.memory_size)
 End
 
@@ -2161,23 +2164,27 @@ QED
 
 (* abi.decode of memory bytes at 0 whose 64 bytes, [32, 96), cover the free
  * memory pointer's word fails closed: the compiled decoder rewrites that
- * word as it allocates, so a later read of it could see the new pointer. *)
+ * word as it allocates, so a later read of it could see the new pointer.
+ * Two words decode; three are too many for the input and fail closed too,
+ * where the decode would otherwise revert. *)
 Definition decode_over_free_pointer_def:
-  decode_over_free_pointer =
+  decode_over_free_pointer tys =
     let st = initial_state with
       scopes := [FEMPTY
         |+ (1, <| binding_type := SingleType (LocatedT MemoryLoc BytesT);
                   binding_value := ReferenceValue (MemoryReference 0 BytesT) |>)] in
     (simple_stmt 10 static_copy_env
-       (DefineStmt (AstId 3) (ProductType [SingleType u256; SingleType u256])
-          (AbiDecodeOperation [u256; u256] (BoundAtom (AstId 1))))
+       (DefineStmt (AstId 3) (ProductType (MAP SingleType tys))
+          (AbiDecodeOperation tys (BoundAtom (AstId 1))))
        (memory_store 0 64 st) []).completion
 End
 
 val () = cv_auto_trans decode_over_free_pointer_def;
 
 Theorem decode_over_free_pointer_fails_closed:
-  decode_over_free_pointer =
+  decode_over_free_pointer [u256; u256] =
+    InvalidCompletion "unsupported: abi.decode input overlapping the free memory pointer" ∧
+  decode_over_free_pointer [u256; u256; u256] =
     InvalidCompletion "unsupported: abi.decode input overlapping the free memory pointer"
 Proof
   CONV_TAC cv_eval
