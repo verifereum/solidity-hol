@@ -109,6 +109,7 @@ Ancestors
   solidityDifferentialCorpus_revert_arguments
   solidityDifferentialCorpus_revert_payloads
   solidityDifferentialCorpus_scalars
+  solidityDifferentialCorpus_scratch_copies
   solidityDifferentialCorpus_selfdestructs
   solidityDifferentialCorpus_sha256_blockhash
   solidityDifferentialCorpus_shadowed_builtins

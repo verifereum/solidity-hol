@@ -417,15 +417,15 @@ Termination
 End
 
 (* The value tree of a memory, calldata or storage array, struct or byte
- * sequence of type ty, as a copy to storage (copying) and the encoder read
- * it. Calldata
+ * sequence of type ty, as the encoder reads it; a copy to storage reads a
+ * calldata or storage source this way too. Calldata
  * is read through the calldata accessors; a calldata array's own data span
  * was checked when it was decoded. *)
 Definition array_copy_value_def:
-  array_copy_value env copying (st : source_state) ty r =
+  array_copy_value env (st : source_state) ty r =
     case r of
       MemoryReference _ _ =>
-        memory_value env copying (LENGTH env.type_declarations) ty (ReferenceValue r) st
+        memory_value env (LENGTH env.type_declarations) ty (ReferenceValue r) st
     | CalldataReference data n rty =>
         if rty ≠ ty then (INR (InvalidCompletion "bad calldata array reference"), st)
         else (calldata_value env (LENGTH env.type_declarations)
@@ -567,7 +567,7 @@ Definition runtime_abi_value_def:
                   (LENGTH env.type_declarations) st.world.accounts addr slot rty) st)
               | INR c => (INR c, st))
     | _ =>
-      case (case v of ReferenceValue r => array_copy_value env F st ty' r | _ => (INL v, st)) of
+      case (case v of ReferenceValue r => array_copy_value env st ty' r | _ => (INL v, st)) of
         (INR c, st1) => (INR c, st1)
       | (INL tree, st1) =>
         let t = abi_type env (LENGTH env.type_declarations) ty' in
@@ -956,7 +956,9 @@ End
  * scalars is written at the free memory pointer first and its allocation
  * finalized after, as the compiled copy encodes at allocate_unbounded() and
  * then calls finalize_allocation; an array of references or a struct is
- * allocated before its members. Scalars are read cleaned, and a byte
+ * allocated before its members. A dynamic array, and a long byte sequence,
+ * hashes its slot in scratch word 0 (array_dataslot) right after its length
+ * is written, before its data. Scalars are read cleaned, and a byte
  * sequence keeps whole data words (storage_byte_data); an empty one still
  * writes its slot's word after its length, past the allocation. A length of
  * 2^64 or more panics with 0x41 where the copy allocates first; where it
@@ -976,7 +978,8 @@ Definition materialize_storage_def:
            case finalize_allocation p ((length + 31) DIV 32 * 32 + 32)
                   (memory_write (p + 32)
                      (storage_byte_data accounts addr slot length)
-                     (memory_store p length st1)) of
+                     (scratch_write (long_bytes_scratch accounts addr slot)
+                        (memory_store p length st1))) of
              INR c => INR c
            | INL st2 => INL (ReferenceValue (MemoryReference p ty), st2))
     else case ty of
@@ -994,7 +997,9 @@ Definition materialize_storage_def:
                    else allocate_memory size st) of
                INR c => INR c
              | INL (p, st1) =>
-                 let st2 = if l = NONE then memory_store p length st1 else st1 in
+                 let st2 = if l = NONE then
+                             scratch_write (SOME slot) (memory_store p length st1)
+                           else st1 in
                  case materialize_storage_elements env fuel accounts addr data element
                         0 length (if l = NONE then p + 32 else p) st2 of
                    INL st3 =>

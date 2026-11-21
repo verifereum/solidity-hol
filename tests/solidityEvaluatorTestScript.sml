@@ -394,11 +394,11 @@ QED
 (* The compiler inspects both length tags before its first storage write. *)
 Definition static_byte_copy_def:
   static_byte_copy bad_src bad_dst =
-    copy_byte_contents
+    FST (copy_byte_contents
       (StorageReference PersistentStorage 0w 0w 0 BytesT (LayoutId 1))
       (StorageReference PersistentStorage 0w 1w 0 BytesT (LayoutId 2))
       (static_state with world := static_state.world with accounts :=
-        set_storage_word (set_storage_word empty_accounts 0w 0w bad_src) 0w 1w bad_dst)
+        set_storage_word (set_storage_word empty_accounts 0w 0w bad_src) 0w 1w bad_dst))
 End
 
 val () = cv_auto_trans static_byte_copy_def;
@@ -776,7 +776,7 @@ Definition run_asm_array_def:
         let r = invoke_source 20 env (AstId 140)
                   [ReferenceValue (MemoryReference 0x80 ty)] st [] in
         (r.completion,
-         case memory_value env F 0 ty (ReferenceValue (MemoryReference 0x80 ty)) r.state of
+         case memory_value env 0 ty (ReferenceValue (MemoryReference 0x80 ty)) r.state of
            (INL (TupleValue us), _) => us
          | _ => [])
     | _ => (InvalidCompletion "not an array", [])
@@ -891,7 +891,7 @@ Definition asm_alloc_object_def:
   asm_alloc_object env (st : source_state) v =
     case v of
       ReferenceValue (MemoryReference p ty) =>
-        (case memory_value env F 0 ty v st of
+        (case memory_value env 0 ty v st of
            (INL u, _) => SOME (p, u)
          | (INR _, _) => NONE)
     | _ => NONE
@@ -2128,6 +2128,57 @@ Theorem static_aggregate_copy_fails_closed_before_read:
      InvalidCompletion "array copy in static frame", PanicCompletion 33,
      InvalidCompletion "array copy in static frame", PanicCompletion 33,
      NormalCompletion)
+Proof
+  CONV_TAC cv_eval
+QED
+
+(* A copy from memory whose length word is 2^64 panics with 0x41 having read
+ * only that word, as the compiled copy checks the length before it reads
+ * any data: memory stays at 0x220, the end of the length word at 0x200. *)
+Definition oversized_copy_def:
+  oversized_copy ty =
+    let st = initial_state with
+      scopes := [FEMPTY
+        |+ (1, <| binding_type := SingleType (LocatedT MemoryLoc ty);
+                  binding_value := ReferenceValue (MemoryReference 0x200 ty) |>)
+        |+ (2, <| binding_type := SingleType (LocatedT StorageLoc ty);
+                  binding_value := ReferenceValue (static_copy_dst 0w ty) |>)] in
+    let r = simple_stmt 10 static_copy_env
+              (CopyContentsStmt (LocatedT MemoryLoc ty) (LocatedT StorageLoc ty)
+                 (BoundAtom (AstId 1)) (BoundAtom (AstId 2)))
+              (memory_store 0x200 (2 ** 64) st) [] in
+    (r.completion, r.state.memory_size)
+End
+
+val () = cv_auto_trans oversized_copy_def;
+
+Theorem oversized_memory_copy_panics_before_reading_data:
+  oversized_copy (ArrayT u256 NONE) = (PanicCompletion 65, 0x220) ∧
+  oversized_copy BytesT = (PanicCompletion 65, 0x220)
+Proof
+  CONV_TAC cv_eval
+QED
+
+(* abi.decode of memory bytes at 0 whose 64 bytes, [32, 96), cover the free
+ * memory pointer's word fails closed: the compiled decoder rewrites that
+ * word as it allocates, so a later read of it could see the new pointer. *)
+Definition decode_over_free_pointer_def:
+  decode_over_free_pointer =
+    let st = initial_state with
+      scopes := [FEMPTY
+        |+ (1, <| binding_type := SingleType (LocatedT MemoryLoc BytesT);
+                  binding_value := ReferenceValue (MemoryReference 0 BytesT) |>)] in
+    (simple_stmt 10 static_copy_env
+       (DefineStmt (AstId 3) (ProductType [SingleType u256; SingleType u256])
+          (AbiDecodeOperation [u256; u256] (BoundAtom (AstId 1))))
+       (memory_store 0 64 st) []).completion
+End
+
+val () = cv_auto_trans decode_over_free_pointer_def;
+
+Theorem decode_over_free_pointer_fails_closed:
+  decode_over_free_pointer =
+    InvalidCompletion "unsupported: abi.decode input overlapping the free memory pointer"
 Proof
   CONV_TAC cv_eval
 QED

@@ -360,70 +360,57 @@ Definition new_memory_array_def:
         | _ => INL (p, memory_write (p + 32) (REPLICATE size 0w) st2)
 End
 
-(* The compiler's copy into storage reads a memory source's data in whole
- * words, the last one too. *)
-Definition copy_source_reads_def:
-  copy_source_reads src n st =
-    case src of
-      MemoryReference p _ => memory_touch (p + 32) (32 * ((n + 31) DIV 32)) st
-    | _ => st
-End
-
-(* The value of a memory array or struct, as a copy reads it: the tuple of
- * its elements or fields, byte sequences as their bytes. The fuel bounds the
- * struct nesting. A copy into storage (copying) reads each byte sequence in
- * whole words, as the compiler's copy loop does; the encoder reads its
- * bytes. *)
+(* The value of a memory array or struct, as the encoder reads it: the tuple
+ * of its elements or fields, byte sequences as their bytes. The fuel bounds
+ * the struct nesting. *)
 Definition memory_value_def:
-  (memory_value env copying (fuel : num) ty v st =
+  (memory_value env (fuel : num) ty v st =
     case (ty, v) of
       (ArrayT element length, ReferenceValue (MemoryReference p rty)) =>
         if rty ≠ ty then (INR (InvalidCompletion "bad memory array reference"), st) else
         let (n, st1) = memory_length ty p st in
-        let (r, st2) = memory_elements env copying fuel element (memory_data ty p) n st1 in
+        let (r, st2) = memory_elements env fuel element (memory_data ty p) n st1 in
         ((case r of INL vs => INL (TupleValue vs) | INR c => INR c), st2)
     | (StructT s, ReferenceValue (MemoryReference p rty)) =>
         if rty ≠ ty then (INR (InvalidCompletion "bad memory struct reference"), st) else
         (case lookup_struct env s of
            SOME fields =>
              if fuel = 0 then (INR (InvalidCompletion "struct nesting"), st) else
-             let (r, st1) = memory_fields env copying (fuel - 1) (MAP SND fields) p st in
+             let (r, st1) = memory_fields env (fuel - 1) (MAP SND fields) p st in
              ((case r of INL vs => INL (TupleValue vs) | INR c => INR c), st1)
          | NONE => (INR (InvalidCompletion "unknown struct"), st))
     | (_, ReferenceValue (MemoryReference p rty)) =>
         if byte_sequence_type rty then
           let (bs, st1) = memory_bytes p st in
-          (INL (ScalarValue (BytesValue bs)),
-           if copying then copy_source_reads (MemoryReference p rty) (LENGTH bs) st1
-           else st1)
+          (INL (ScalarValue (BytesValue bs)), st1)
         else (INR (InvalidCompletion "bad memory value"), st)
     | (_, ScalarValue _) => (INL v, st)
     | _ => (INR (InvalidCompletion "bad memory value"), st)) ∧
-  (memory_elements env copying fuel element p n st =
+  (memory_elements env fuel element p n st =
     if n = 0 then (INL [], st) else
     case read_memory_word env element p st of
       (INR c, st1) => (INR c, st1)
     | (INL w, st1) =>
-        case memory_value env copying fuel element w st1 of
+        case memory_value env fuel element w st1 of
           (INR c, st2) => (INR c, st2)
         | (INL v, st2) =>
-            let (r, st3) = memory_elements env copying fuel element (p + 32) (n - 1) st2 in
+            let (r, st3) = memory_elements env fuel element (p + 32) (n - 1) st2 in
             ((case r of INL vs => INL (v :: vs) | INR c => INR c), st3)) ∧
-  (memory_fields env copying fuel [] p st = (INL [], st)) ∧
-  (memory_fields env copying fuel (ty :: tys) p st =
+  (memory_fields env fuel [] p st = (INL [], st)) ∧
+  (memory_fields env fuel (ty :: tys) p st =
     case read_memory_word env ty p st of
       (INR c, st1) => (INR c, st1)
     | (INL w, st1) =>
-        case memory_value env copying fuel ty w st1 of
+        case memory_value env fuel ty w st1 of
           (INR c, st2) => (INR c, st2)
         | (INL v, st2) =>
-            let (r, st3) = memory_fields env copying fuel tys (p + 32) st2 in
+            let (r, st3) = memory_fields env fuel tys (p + 32) st2 in
             ((case r of INL vs => INL (v :: vs) | INR c => INR c), st3))
 Termination
   WF_REL_TAC ‘inv_image ($< LEX $< LEX $<) (λx. case x of
-    INL (env, copying, fuel, ty, v, st) => (fuel, sol_type_size ty, 0n)
-  | INR (INL (env, copying, fuel, element, p, n, st)) => (fuel, sol_type_size element, n + 1)
-  | INR (INR (env, copying, fuel, tys, p, st)) => (fuel, list_size sol_type_size tys, 1))’ >>
+    INL (env, fuel, ty, v, st) => (fuel, sol_type_size ty, 0n)
+  | INR (INL (env, fuel, element, p, n, st)) => (fuel, sol_type_size element, n + 1)
+  | INR (INR (env, fuel, tys, p, st)) => (fuel, list_size sol_type_size tys, 1))’ >>
   rw[solidityASTTheory.sol_type_size_def, listTheory.list_size_def] >>
   qpat_x_assum ‘(_, _) = _’ (assume_tac o SYM) >> gvs[]
 End
@@ -509,36 +496,232 @@ Definition decode_bound_def:
     | _ => n
 End
 
+(* Whether a decoder's reads of r, its length word and up to reach bytes
+ * after it, overlap the free memory pointer's word [64, 96), which the
+ * compiled decoder rewrites as it allocates. *)
+Definition decode_reads_free_pointer_def:
+  decode_reads_free_pointer r (reach : num) =
+    case r of
+      MemoryReference p _ => p < 96 ∧ 64 < p + 32 + reach
+    | _ => F
+End
+
+(* A byte sequence copied into storage at slot, as the compiled copy
+ * (copy_byte_array_to_storage) touches memory: the new length, Panic(0x41) at
+ * 2^64 or more, the old length (Panic(0x22) on a bad length tag), the data
+ * area's hash in scratch word 0 when the old or the new contents are long,
+ * and only then the source's data, from the state after that hash. A memory
+ * source's data is read in whole words, the last one too, as the copy loop
+ * reads it; bytes another source gave touch no memory. The state reached is
+ * returned on a failure too. *)
+Definition copy_bytes_to_storage_def:
+  copy_bytes_to_storage addr slot v static st =
+    case (case v of
+            ReferenceValue (MemoryReference p ty) =>
+              if byte_sequence_type ty then INL (memory_load p st)
+              else INR (InvalidCompletion "bad memory byte sequence")
+          | ScalarValue (BytesValue bs) => INL (LENGTH bs, st)
+          | _ => INR (InvalidCompletion "bad stored byte sequence")) of
+      INR c => (INR c, st)
+    | INL (n, st1) =>
+        if 2 ** 64 ≤ n then (INR (PanicCompletion 65), st1) else
+        case storage_byte_length st1.world.accounts addr slot of
+          INR c => (INR c, st1)
+        | INL old =>
+            if static then (INR (InvalidCompletion "byte copy in static frame"), st1) else
+            let st2 = scratch_write (if 32 ≤ n ∨ 32 ≤ old then SOME slot else NONE) st1;
+                (bs, st3) =
+                  (case v of
+                     ReferenceValue (MemoryReference p _) =>
+                       let (ws, st3) = memory_read (p + 32) (32 * ((n + 31) DIV 32)) st2 in
+                       (TAKE n ws, st3)
+                   | ScalarValue (BytesValue bs) => (bs, st2)
+                   | _ => ([], st2)) in
+            case replace_storage_bytes st3.world.accounts addr slot bs F of
+              INL accounts => (INL (), st3 with world := st3.world with accounts := accounts)
+            | INR c => (INR c, st3)
+End
+
 (* A byte copy into storage; one from the slot it targets changes nothing,
  * since the compiler's copy returns before it writes or uses its scratch. *)
 Definition copy_byte_contents_def:
   copy_byte_contents src dst st =
     case dst of
-      StorageReference PersistentStorage dst_addr dst_slot _ _ _ =>
+      StorageReference PersistentStorage dst_addr dst_slot dst_offset dst_ty _ =>
         (case src of
            StorageReference PersistentStorage src_addr src_slot _ _ _ =>
-             if src_addr = dst_addr ∧ src_slot = dst_slot then INL st else
+             if src_addr = dst_addr ∧ src_slot = dst_slot then (INL (), st) else
              (case copy_storage_bytes st.world.accounts src dst st.frame.static_context of
                 INL accounts =>
                   let accounts0 = st.world.accounts in
-                  INL (scratch_write
+                  (INL (), scratch_write
                     (if IS_SOME (long_bytes_scratch accounts0 src_addr src_slot)
                      then SOME dst_slot
                      else long_bytes_scratch accounts0 dst_addr dst_slot)
                     (st with world := st.world with accounts := accounts))
-              | INR c => INR c)
-         | _ => case byte_contents st src of
-             INR c => INR c
-           | INL (bs, st0) =>
-               let st1 = copy_source_reads src (LENGTH bs) st0 in
-               case store_storage_bytes st1.world.accounts dst bs st1.frame.static_context of
-                 INL accounts =>
-                   INL (scratch_write
-                     (if 32 ≤ LENGTH bs then SOME dst_slot
-                      else long_bytes_scratch st1.world.accounts dst_addr dst_slot)
-                     (st1 with world := st1.world with accounts := accounts))
-               | INR c => INR c)
-    | _ => INR (InvalidCompletion "bad storage byte copy")
+              | INR c => (INR c, st))
+         | _ =>
+             if dst_offset ≠ 0 ∨ ¬byte_sequence_type dst_ty then
+               (INR (InvalidCompletion "not storage bytes"), st)
+             else
+             case src of
+               MemoryReference _ _ =>
+                 copy_bytes_to_storage dst_addr dst_slot (ReferenceValue src)
+                   st.frame.static_context st
+             | _ =>
+                 case byte_contents st src of
+                   INR c => (INR c, st)
+                 | INL (bs, st1) =>
+                     copy_bytes_to_storage dst_addr dst_slot (ScalarValue (BytesValue bs))
+                       st.frame.static_context st1)
+    | _ => (INR (InvalidCompletion "bad storage byte copy"), st)
+End
+
+(* The length of an aggregate copy's source: a memory array's length word (a
+ * static one's is its type's), or the number of values a calldata or storage
+ * source gave. *)
+Definition source_length_def:
+  source_length ty v st =
+    case v of
+      ReferenceValue (MemoryReference p _) =>
+        let (n, st1) = memory_length ty p st in (INL n, st1)
+    | TupleValue vs => (INL (LENGTH vs), st)
+    | _ => (INR (InvalidCompletion "bad stored array"), st)
+End
+
+(* Element or field i of an aggregate copy's source, of type ty: the word a
+ * memory array or struct holds for it, or the value a calldata or storage
+ * source gave. *)
+Definition source_part_def:
+  source_part env ty v (i : num) st =
+    case v of
+      ReferenceValue (MemoryReference p rty) =>
+        read_memory_word env ty
+          ((case rty of StructT _ => p | _ => memory_data rty p) + 32 * i) st
+    | TupleValue vs =>
+        (case DROP i vs of
+           x :: _ => (INL x, st)
+         | [] => (INR (InvalidCompletion "bad stored value"), st))
+    | _ => (INR (InvalidCompletion "bad stored value"), st)
+End
+
+Definition store_storage_word_def:
+  store_storage_word addr slot offset ty x (st : source_state) =
+    case write_storage st.world.accounts addr slot offset ty x of
+      SOME accounts => (INL (), st with world := st.world with accounts := accounts)
+    | NONE => (INR (InvalidCompletion "bad storage write"), st)
+End
+
+(* Copy the value v of type src into storage at slot, of type dst, in one walk
+ * that touches memory as the compiled copy does (copy_array_to_storage,
+ * copy_struct_to_storage, copy_byte_array_to_storage). v is a memory object,
+ * read word by word as the walk reaches it, or the value a calldata or
+ * storage source gave, whose reads touch no memory. An array reads its length
+ * (Panic(0x41) at 2^64 or more), resizes the stored array, clearing a shrunk
+ * tail, hashes a dynamic array's slot in scratch word 0 (array_dataslot, even
+ * when empty), then copies its elements in order, each completely before the
+ * next one's word is read; a struct copies its fields the same way. Scalar
+ * arrays write complete packed slots; retained structs overwrite members,
+ * preserving scalar-slot padding and mappings. The state reached is returned
+ * on a failure too. The fuel bounds the struct nesting. *)
+Definition store_storage_value_def:
+  (store_storage_value env (fuel : num) addr slot src dst v st =
+    if (case v of
+          ReferenceValue (MemoryReference _ rty) => rty ≠ src
+        | _ => F)
+    then (INR (InvalidCompletion "bad memory reference"), st)
+    else if byte_sequence_type dst then copy_bytes_to_storage addr slot v F st
+    else case (src, dst) of
+      (ArrayT e _, ArrayT e' l) =>
+        (case source_length src v st of
+           (INR c, st1) => (INR c, st1)
+         | (INL length, st1) =>
+             if 2 ** 64 ≤ length then (INR (PanicCompletion 65), st1) else
+             let accounts = st1.world.accounts in
+             case storage_array_data accounts addr slot dst of
+               (old_length, data) =>
+                 if 2 ** 64 ≤ old_length then (INR FuelExhausted, st1) else
+                 let accounts1 = if l = NONE then
+                                   set_storage_word accounts addr slot (n2w length)
+                                 else accounts in
+                 let resized =
+                   if is_stored_scalar_type e' then
+                     (case fixed_storage_slots env
+                             (ArrayT e' (SOME (MAX old_length length))) of
+                        SOME slots => INL (clear_byte_slots slots accounts1 addr data, NONE)
+                      | NONE => INL (accounts1, NONE))
+                   else clear_storage_elements env (LENGTH env.type_declarations)
+                          accounts1 addr data e' length (old_length - length) in
+                 case resized of
+                   INR c => (INR c, st1)
+                 | INL (accounts2, _) =>
+                     store_storage_elements env fuel addr data e e' v 0 length
+                       (scratch_write (if l = NONE then SOME slot else NONE)
+                          (st1 with world := st1.world with accounts := accounts2)))
+    | (StructT _, StructT s) =>
+        (case (lookup_struct env s, lookup_struct_layout env s) of
+           (SOME fields, SOME layout) =>
+             if fuel = 0 then (INR (InvalidCompletion "struct nesting"), st) else
+             store_storage_fields env (fuel - 1) addr slot layout.struct_fields
+               fields v 0 st
+         | _ => (INR (InvalidCompletion "missing struct layout"), st))
+    | _ => (INR (InvalidCompletion "bad stored array"), st)) ∧
+  (store_storage_elements env fuel addr data src dst v i n st =
+    if n = 0 then (INL (), st) else
+    case storage_element_location env data dst i of
+      NONE => (INR (InvalidCompletion "bad array element type"), st)
+    | SOME (s, offset) =>
+        case source_part env src v i st of
+          (INR c, st1) => (INR c, st1)
+        | (INL x, st1) =>
+            case (if is_stored_scalar_type dst then
+                    (case x of
+                       ScalarValue y =>
+                         (case eval_conversion env src dst y of
+                            ScalarOk z => store_storage_word addr s offset dst z st1
+                          | _ => (INR (InvalidCompletion "bad element conversion"), st1))
+                     | _ => (INR (InvalidCompletion "bad stored element"), st1))
+                  else store_storage_value env fuel addr s src dst x st1) of
+              (INR c, st2) => (INR c, st2)
+            | (INL _, st2) =>
+                store_storage_elements env fuel addr data src dst v (i + 1) (n - 1) st2) ∧
+  (store_storage_fields env fuel addr slot layout [] v j st = (INL (), st)) ∧
+  (store_storage_fields env fuel addr slot layout ((f, ty) :: fields) v j st =
+    case ALOOKUP (MAP (λm. (m.state_id, m)) layout) f of
+      NONE => (INR (InvalidCompletion "missing field layout"), st)
+    | SOME l =>
+        case source_part env ty v j st of
+          (INR c, st1) => (INR c, st1)
+        | (INL x, st1) =>
+            let s = slot + l.state_slot in
+            case (if is_stored_scalar_type ty then
+                    (case x of
+                       ScalarValue y => store_storage_word addr s l.state_offset ty y st1
+                     | _ => (INR (InvalidCompletion "bad stored field"), st1))
+                  else case ty of
+                    MappingT _ _ => (INL (), st1)
+                  | _ => store_storage_value env fuel addr s ty ty x st1) of
+              (INR c, st2) => (INR c, st2)
+            | (INL _, st2) =>
+                store_storage_fields env fuel addr slot layout fields v (j + 1) st2)
+Termination
+  WF_REL_TAC ‘inv_image ($< LEX $< LEX $<) (λx. case x of
+    INL (env, fuel, addr, slot, src, dst, v, st) => (fuel, sol_type_size dst, 0n)
+  | INR (INL (env, fuel, addr, data, src, dst, v, i, n, st)) =>
+      (fuel, sol_type_size dst, n + 1)
+  | INR (INR (env, fuel, addr, slot, layout, fields, v, j, st)) =>
+      (fuel, list_size (sol_type_size o SND) fields, 1))’ >>
+  rw[solidityASTTheory.sol_type_size_def, listTheory.list_size_def]
+End
+
+(* Copy the value v of type src into the storage reference dst. *)
+Definition copy_to_storage_def:
+  copy_to_storage env src v dst static st =
+    case dst of
+      StorageReference PersistentStorage addr slot 0 ty _ =>
+        if static then (INR (InvalidCompletion "array copy in static frame"), st) else
+        store_storage_value env (LENGTH env.type_declarations) addr slot src ty v st
+    | _ => (INR (InvalidCompletion "bad storage array reference"), st)
 End
 
 (* Reference conversion preserves identity and location; copying is a statement. *)
@@ -611,17 +794,17 @@ val () = cv_auto_trans new_memory_array_def;
 val memory_value_pre_def = cv_auto_trans_pre_rec
   "memory_value_pre memory_elements_pre memory_fields_pre" memory_value_def (
   WF_REL_TAC ‘inv_image ($< LEX $< LEX $<) (λx. case x of
-    INL (env, copying, fuel, ty, v, st) => (cv$c2n fuel, cv_size ty, 0)
-  | INR (INL (env, copying, fuel, element, p, n, st)) =>
+    INL (env, fuel, ty, v, st) => (cv$c2n fuel, cv_size ty, 0)
+  | INR (INL (env, fuel, element, p, n, st)) =>
       (cv$c2n fuel, cv_size element, cv$c2n n + 1)
-  | INR (INR (env, copying, fuel, tys, p, st)) => (cv$c2n fuel, cv_size tys, 1))’ >>
+  | INR (INR (env, fuel, tys, p, st)) => (cv$c2n fuel, cv_size tys, 1))’ >>
   cv_termination_tac
 );
 
 Theorem memory_value_pre[cv_pre]:
-  (∀env copying fuel ty v st. memory_value_pre env copying fuel ty v st) ∧
-  (∀env copying fuel element p n st. memory_elements_pre env copying fuel element p n st) ∧
-  (∀env copying fuel tys p st. memory_fields_pre env copying fuel tys p st)
+  (∀env fuel ty v st. memory_value_pre env fuel ty v st) ∧
+  (∀env fuel element p n st. memory_elements_pre env fuel element p n st) ∧
+  (∀env fuel tys p st. memory_fields_pre env fuel tys p st)
 Proof
   ho_match_mp_tac memory_value_ind >> rpt strip_tac >>
   simp[Once memory_value_pre_def] >> rw[] >> gvs[]
@@ -633,5 +816,46 @@ val () = cv_auto_trans byte_contents_def;
 val () = cv_auto_trans decode_source_def;
 val () = cv_auto_trans decode_reads_def;
 val () = cv_auto_trans decode_bound_def;
+val () = cv_auto_trans decode_reads_free_pointer_def;
+val () = cv_auto_trans copy_bytes_to_storage_def;
 val () = cv_auto_trans copy_byte_contents_def;
+val () = cv_auto_trans source_length_def;
+val () = cv_auto_trans source_part_def;
+val () = cv_auto_trans store_storage_word_def;
+
+val store_storage_value_pre_def = cv_auto_trans_pre_rec
+  "store_storage_value_pre store_storage_elements_pre store_storage_fields_pre"
+  store_storage_value_def (
+  WF_REL_TAC ‘inv_image ($< LEX $< LEX $<) (λx. case x of
+    INL (env, fuel, addr, slot, src, dst, v, st) => (cv$c2n fuel, cv_size dst, 0)
+  | INR (INL (env, fuel, addr, data, src, dst, v, i, n, st)) =>
+      (cv$c2n fuel, cv_size dst, cv$c2n n + 1)
+  | INR (INR (env, fuel, addr, slot, layout, fields, v, j, st)) =>
+      (cv$c2n fuel, cv_size fields, 1))’ >>
+  cv_termination_tac
+);
+
+Theorem store_storage_value_pre[cv_pre]:
+  (∀env fuel addr slot src dst v st.
+     store_storage_value_pre env fuel addr slot src dst v st) ∧
+  (∀env fuel addr data src dst v i n st.
+     store_storage_elements_pre env fuel addr data src dst v i n st) ∧
+  (∀env fuel addr slot layout fields v j st.
+     store_storage_fields_pre env fuel addr slot layout fields v j st)
+Proof
+  ho_match_mp_tac store_storage_value_ind >> rpt strip_tac >>
+  simp[Once store_storage_value_pre_def] >> rw[] >> gvs[] >>
+  (* the precondition holds the resized state as a record literal *)
+  qmatch_goalsub_abbrev_tac ‘scratch_write _ s3’ >>
+  qmatch_asmsub_abbrev_tac ‘scratch_write _ s2’ >>
+  ‘s3 = s2’ by (
+    unabbrev_all_tac >>
+    rename1 ‘storage_array_data s1.world.accounts’ >> Cases_on ‘s1’ >>
+    rename1 ‘source_state w’ >> Cases_on ‘w’ >>
+    simp[solidityStateTheory.source_state_component_equality,
+         solidityStateTheory.source_world_component_equality]) >>
+  gvs[]
+QED
+
+val () = cv_auto_trans copy_to_storage_def;
 val () = cv_auto_trans convert_byte_reference_def;

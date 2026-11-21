@@ -242,7 +242,7 @@ hold (one assembly left dirty) fails closed.
 
 Where the compiled code's memory behaviour depends on something the model
 does not track, execution stops with an `unsupported:` completion naming the
-case, rather than guessing. There are nine such cases:
+case, rather than guessing. There are ten such cases:
 
 - an encoder input at or above the free memory pointer, which the compiled
   encoder overwrites before it reads it;
@@ -255,6 +255,9 @@ case, rather than guessing. There are nine such cases:
   on an argument before it is read, or a scratch hash on the log's data;
 - an `abi.decode` of memory that reads at or past the free memory pointer,
   where the compiled decoder allocates while it reads;
+- an `abi.decode` of memory whose input covers the free memory pointer's
+  word `[0x40, 0x60)`, which the compiled decoder's allocations rewrite while
+  it reads;
 - a decoding into memory (from calldata, an `abi.decode` or a call's
   results) that allocates with the free memory pointer below 96, where an
   allocated object can cover the pointer's word, which the compiled decoder
@@ -670,8 +673,12 @@ read, so a dirty element reverts when it is indexed, copied or re-encoded.
 Storage arrays of the same element types are values too: they copy to memory
 (reading every element, panic `0x41` past the allocation limit), are assigned
 from memory, calldata or another storage array, and are ABI-encoded in place as
-return values and external call arguments. An assignment from another
-array reads the source first, clears the destination (shrinking it, nested
+return values and external call arguments. An assignment from memory walks
+the source as the compiled copy does: it resizes the destination, then reads
+each element as it writes it, so the slot hashes the copy leaves in the
+scratch word are what a later element at that address reads. An assignment
+from calldata or another storage array reads the source first, which reads no
+memory. Either clears the destination (shrinking it, nested
 data included) and writes the elements, converting them as the compiler's
 implicit conversions allow (`uint8[]` to `uint16[]`, `bytes8` to `bytes10`,
 static to dynamic, a static array into a longer static one, whose remaining
