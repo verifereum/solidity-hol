@@ -247,9 +247,13 @@ case, rather than guessing. There are nine such cases:
 - an encoder input with a byte at or above the free memory pointer, which the
   compiled encoder overwrites before it reads it; an input ending at the
   pointer is encoded, even when the pointer is not word-aligned. A stored
-  input fails closed when the pointer is below 32: the compiled encoder
-  hashes its slot in the scratch word at 0 after it has begun writing its
-  output there, overwriting that output;
+  input whose read hashes a slot (a dynamic array, a long byte sequence, or
+  an aggregate holding one) also fails closed when the pointer is below 32:
+  the compiled code hashes the slot in the scratch word at 0, which can
+  overwrite output already written from the pointer, as an event's data is.
+  `abi.encode` and its variants write from 32 bytes past the pointer and
+  store the length word there only after encoding, so for them this
+  rejection is conservative;
 - an indexed event argument that is a stored array or struct whose in-place
   encoding ends in an empty byte sequence;
 - an event whose indexed arguments' hash preimages move the free memory
