@@ -102,8 +102,9 @@ where the EVM runs out of gas. High-level external calls and
 the low-level `call`, `staticcall` and `delegatecall` run the callee on
 Verifereum through `externalCall`, a provisional adapter with a fixed gas
 budget (a `gas` option caps it) and a fresh callee frame; a delegate call's
-frame runs the callee's code in the caller's account. Creation is not
-connected yet. Core well-formedness alone does not rule out `InvalidCompletion`:
+frame runs the callee's code in the caller's account. Source `new C` and
+Yul `create`/`create2` run the compiler's initcode on Verifereum through
+`run_create_call`. Core well-formedness alone does not rule out `InvalidCompletion`:
 for example, a storage write in a static frame is deliberately invalid.
 
 ## Yul
