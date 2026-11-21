@@ -2035,20 +2035,20 @@ Proof
   EVAL_TAC
 QED
 
-(* Event hash preimages written one after another at the free memory pointer,
- * which starts at p. *)
-Definition preimages_moved_def:
-  preimages_moved p temps =
+(* The least free memory pointer read while writing event hash preimages one
+ * after another at the pointer, which starts at p. *)
+Definition preimages_least_def:
+  preimages_least p temps =
     FST (write_at_each temps (memory_store 64 p initial_state))
 End
 
-val () = cv_auto_trans preimages_moved_def;
+val () = cv_auto_trans preimages_least_def;
 
-(* A preimage that moves the pointer counts even when the next one, written
- * where it moved, moves it back. *)
-Theorem preimage_restoring_the_pointer_still_moved_it:
-  preimages_moved 64 [REPLICATE 32 0w; REPLICATE 64 0w ++ num_to_bytes 32 64] ∧
-  ¬preimages_moved 128 [REPLICATE 64 1w; REPLICATE 32 2w]
+(* A preimage that moves the pointer down counts even when the next one,
+ * written where it moved, moves it back. *)
+Theorem preimage_restoring_the_pointer_still_counts:
+  preimages_least 64 [REPLICATE 32 0w; REPLICATE 64 0w ++ num_to_bytes 32 64] = 0 ∧
+  preimages_least 128 [REPLICATE 64 1w; REPLICATE 32 2w] = 128
 Proof
   CONV_TAC cv_eval
 QED
@@ -2179,7 +2179,35 @@ Theorem read_failures_surface_after_fail_closed_checks:
     (INR (InvalidCompletion "unsupported: encoder input at or above the free memory pointer"),
      INR (InvalidCompletion "unsupported: encoder input at or above the free memory pointer"),
      INR (InvalidCompletion "unsupported: encoder input at or above the free memory pointer"),
-     InvalidCompletion "unsupported: an event's hash preimage moved the free memory pointer")
+     InvalidCompletion "unsupported: encoder reach overlaps a free memory pointer moved by an event's hash preimage")
+Proof
+  CONV_TAC cv_eval
+QED
+
+(* With no argument in memory, an indexed calldata preimage that moves the free
+ * memory pointer below a stored array's slot hash fails closed: the compiled
+ * encoder would write the log's data where that hash later overwrites it. *)
+Definition stored_emit_guard_check_def:
+  stored_emit_guard_check =
+    let arr = ArrayT u256 NONE in
+    (emit_event static_copy_env NONE
+       [(LocatedT CalldataLoc BytesT, T, BoundAtom (AstId 1));
+        (LocatedT StorageLoc arr, F, BoundAtom (AstId 2))]
+       (memory_store 64 0x40 initial_state with <|
+          frame := initial_state.frame with call_data := REPLICATE 32 0w;
+          scopes := [FEMPTY
+            |+ (1, <| binding_type := SingleType (LocatedT CalldataLoc BytesT);
+                      binding_value := ReferenceValue (CalldataReference 0 32 BytesT) |>)
+            |+ (2, <| binding_type := SingleType (LocatedT StorageLoc arr);
+                      binding_value := ReferenceValue (static_copy_dst 6w arr) |>)] |>)
+       []).completion
+End
+
+val () = cv_auto_trans stored_emit_guard_check_def;
+
+Theorem stored_emit_preimage_pointer_move_fails_closed:
+  stored_emit_guard_check =
+    InvalidCompletion "unsupported: encoder reach overlaps a free memory pointer moved by an event's hash preimage"
 Proof
   CONV_TAC cv_eval
 QED

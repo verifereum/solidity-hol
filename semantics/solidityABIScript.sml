@@ -1120,22 +1120,15 @@ End
 (* Temporaries written one after another, each at the free memory pointer
  * as memory holds it when the temporary is written: the compiler reads the
  * pointer anew for each, which an earlier temporary may have overwritten.
- * Also says whether any temporary changed the pointer. *)
+ * Also gives the least pointer read, counting the one read after the last
+ * temporary. *)
 Definition write_at_each_def:
-  (write_at_each [] st = (F, st)) ∧
+  (write_at_each [] st = (FST (memory_load 64 st), st)) ∧
   (write_at_each (bs :: rest) st =
      let (p, st1) = memory_load 64 st in
      let st2 = memory_write p bs st1 in
-     let (moved, st3) = write_at_each rest st2 in
-     (moved ∨ FST (memory_load 64 st2) ≠ p, st3))
-End
-
-(* Whether an event reads an argument from memory. *)
-Definition has_memory_argument_def:
-  (has_memory_argument [] = F) ∧
-  (has_memory_argument ((ty, indexed, v) :: args) =
-     ((case v of ReferenceValue (MemoryReference _ _) => T | _ => F) ∨
-      has_memory_argument args))
+     let (least, st3) = write_at_each rest st2 in
+     (MIN p least, st3))
 End
 
 (* One event argument: an indexed array or struct hashes its in-place
@@ -1197,18 +1190,20 @@ Definition event_parts_def:
 End
 
 (* The post-read fail-closed checks for emit: the encoder's free-pointer reach
- * check, then writing the indexed hash preimages at the free memory pointer;
- * a preimage that changes the pointer while any argument is in memory fails
- * closed before any read failure surfaces. *)
+ * check, then writing the indexed hash preimages at the free memory pointer.
+ * The compiled emit reads the pointer anew for each preimage and for the
+ * log's data, so a preimage that moves the pointer below the reads' reach
+ * fails closed before any read failure surfaces: a later preimage or the
+ * data could overwrite an input, or a scratch hash the data. *)
 Definition event_state_def:
-  event_state st args temps st1 =
+  event_state st temps st1 =
     case encoder_state st st1 of
       INR c => INR c
     | INL st2 =>
-        let (moved, st3) = write_at_each temps st2 in
-        if moved ∧ has_memory_argument args then
+        let (least, st3) = write_at_each temps st2 in
+        if least < st1.memory_size then
           INR (InvalidCompletion
-            "unsupported: an event's hash preimage moved the free memory pointer")
+            "unsupported: encoder reach overlaps a free memory pointer moved by an event's hash preimage")
         else INL st3
 End
 
@@ -1220,7 +1215,7 @@ Definition event_log_def:
       event_parts env (st with memory_size := 0)
         (FILTER (λ(ty, indexed, v). indexed) args ++
          FILTER (λ(ty, indexed, v). ¬indexed) args) in
-    case guard_result (event_state st args temps st1) r of
+    case guard_result (event_state st temps st1) r of
       INL ((topics, parts, spill), st2) =>
         INL ((<| logger := logger;
                  topics := (case topic0 of SOME t => t :: topics | NONE => topics);
@@ -1500,7 +1495,6 @@ Proof
 QED
 
 val () = cv_auto_trans write_at_each_def;
-val () = cv_auto_trans has_memory_argument_def;
 val () = cv_auto_trans
   (REWRITE_RULE [GSYM byteTheory.word_of_bytes_be_def] event_part_def);
 
