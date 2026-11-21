@@ -1,7 +1,7 @@
 (* Calls where an input read fails after reaching at or above the free memory
- * pointer, or after an event hash preimage moved the free memory pointer:
- * bytecode outcomes are checked independently, and the source model must fail
- * closed instead of surfacing the read failure. *)
+ * pointer, or where an event hash preimage moved the free memory pointer below
+ * what the event read: bytecode outcomes are checked independently, and the
+ * source model must fail closed instead of surfacing any read failure. *)
 Theory solidityReadFailureGuardTest
 Ancestors solidityCoreWf solidityDifferentialCorpus_read_failure_guards
 Libs solidityBytecodeLib cv_transLib
@@ -80,6 +80,17 @@ Theorem emit_pointer_move_fails_closed:
   source_execution bytecode_rejected_read_failure_guards_code
     corpus_read_failure_guards_unit corpus_read_failure_guards_program 1000
     ^(rejected_case "emit_pointer_move") =
+  (Diagnostic InvalidCompletion, NONE, [])
+Proof
+  CONV_TAC cv_eval
+QED
+
+(* No argument is read from memory, but the moved pointer puts the log's data
+ * in scratch, where hashing the stored array's slot overwrites its offset. *)
+Theorem emit_stored_pointer_move_fails_closed:
+  source_execution bytecode_rejected_read_failure_guards_code
+    corpus_read_failure_guards_unit corpus_read_failure_guards_program 1000
+    ^(rejected_case "emit_stored_pointer_move") =
   (Diagnostic InvalidCompletion, NONE, [])
 Proof
   CONV_TAC cv_eval

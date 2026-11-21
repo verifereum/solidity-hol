@@ -7,11 +7,13 @@ contract ReadFailureGuards {
 
     error Err(uint256, E[1]);
     event Ev(bytes indexed a, bytes indexed c, E[] indexed b);
+    event Stored(bytes indexed k, uint256[] v);
 
     E[] s;
     S t;
     E[2] u;
     E[33] w;
+    uint256[] items;
 
     // Encoder: reading a failing input at the free memory pointer.
     function encoderOverlapReturn() public pure returns (uint256, E[1] memory) {
@@ -84,7 +86,19 @@ contract ReadFailureGuards {
         emit Ev(a, c, b);
     }
 
+    // Event: an indexed hash preimage moves the free pointer into scratch, so
+    // the compiled encoder writes the log's data where hashing the stored
+    // array's slot later overwrites it.
+    function emitStoredPointerMove(bytes calldata k) external {
+        assembly { mstore(0x40, 0x40) }
+        emit Stored(k, items);
+    }
+
     // Agreeing controls: all reads below the free pointer, pointer unmoved.
+    function emitStored(bytes calldata k) external {
+        emit Stored(k, items);
+    }
+
     function encoderBelowFpPanics() public pure returns (uint256, E[1] memory) {
         E[1] memory a;
         assembly {

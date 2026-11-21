@@ -248,10 +248,11 @@ case, rather than guessing. There are nine such cases:
   encoder overwrites before it reads it;
 - an indexed event argument that is a stored array or struct whose in-place
   encoding ends in an empty byte sequence;
-- an event that reads an argument from memory and whose indexed arguments'
-  hash preimages overwrite the free memory pointer: the compiled emit reads
-  the pointer anew for each preimage and for the log's data, so a later
-  preimage can land on that argument before it is read;
+- an event whose indexed arguments' hash preimages move the free memory
+  pointer below what the event read (its memory arguments, and the scratch
+  words hashed to read its stored ones): the compiled emit reads the pointer
+  anew for each preimage and for the log's data, so a later preimage can land
+  on an argument before it is read, or a scratch hash on the log's data;
 - an `abi.decode` of memory that reads at or past the free memory pointer,
   where the compiled decoder allocates while it reads;
 - a decoding into memory (from calldata, an `abi.decode` or a call's
