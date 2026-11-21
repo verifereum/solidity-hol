@@ -427,19 +427,17 @@ Definition array_copy_value_def:
       MemoryReference _ _ =>
         memory_value env copying (LENGTH env.type_declarations) ty (ReferenceValue r) st
     | CalldataReference data n rty =>
-        if rty ≠ ty then INR (InvalidCompletion "bad calldata array reference")
-        else (case calldata_value env (LENGTH env.type_declarations)
-                     st.frame.call_data ty data n of
-                INL v => INL (v, st)
-              | INR c => INR c)
+        if rty ≠ ty then (INR (InvalidCompletion "bad calldata array reference"), st)
+        else (calldata_value env (LENGTH env.type_declarations)
+                st.frame.call_data ty data n, st)
     | StorageReference PersistentStorage addr slot 0 rty _ =>
-        if rty ≠ ty then INR (InvalidCompletion "bad storage array reference")
+        if rty ≠ ty then (INR (InvalidCompletion "bad storage array reference"), st)
         else (case storage_array_value env (LENGTH env.type_declarations)
                      st.world.accounts addr slot ty of
-                INL v => INL (v, scratch_write (read_scratch env
+                INL v => (INL v, scratch_write (read_scratch env
                   (LENGTH env.type_declarations) st.world.accounts addr slot ty) st)
-              | INR c => INR c)
-    | _ => INR (InvalidCompletion "bad array reference")
+              | INR c => (INR c, st))
+    | _ => (INR (InvalidCompletion "bad array reference"), st)
 End
 
 (* Zero bytes the compiler's encoder writes past the end of an encoding of a
@@ -562,47 +560,49 @@ Definition runtime_abi_value_def:
     let ty' = case ty of LocatedT _ t => t | t => t in
     case v of
       ReferenceValue (StorageReference PersistentStorage addr slot 0 rty _) =>
-        if rty ≠ ty' then INR (InvalidCompletion "bad ABI value")
+        if rty ≠ ty' then (INR (InvalidCompletion "bad ABI value"), st)
         else (case storage_abi_value env (LENGTH env.type_declarations)
                      st.world.accounts addr slot rty of
-                INL (a, bs, sp) => INL ((a, bs, sp), scratch_write (read_scratch env
+                INL (a, bs, sp) => (INL (a, bs, sp), scratch_write (read_scratch env
                   (LENGTH env.type_declarations) st.world.accounts addr slot rty) st)
-              | INR c => INR c)
+              | INR c => (INR c, st))
     | _ =>
-      case (case v of ReferenceValue r => array_copy_value env F st ty' r | _ => INL (v, st)) of
-        INR c => INR c
-      | INL (tree, st1) =>
+      case (case v of ReferenceValue r => array_copy_value env F st ty' r | _ => (INL v, st)) of
+        (INR c, st1) => (INR c, st1)
+      | (INL tree, st1) =>
         let t = abi_type env (LENGTH env.type_declarations) ty' in
         case value_abi_value env ty' tree of
           SOME a =>
-            INL ((a, enc t a, REPLICATE (abi_spill (encoding_source v) t a) 0w), st1)
-        | NONE => INR (InvalidCompletion "bad ABI value")
+            (INL (a, enc t a, REPLICATE (abi_spill (encoding_source v) t a) 0w), st1)
+        | NONE => (INR (InvalidCompletion "bad ABI value"), st1)
 End
 
 Definition runtime_abi_values_def:
   (runtime_abi_values env (st : source_state) [] [] =
-     (INL (([], NONE), st) :
-        (((contractABI$abi_type # byte list) list # byte list option) # source_state) +
-        source_completion)) ∧
+     ((INL ([], NONE), st) :
+        (((contractABI$abi_type # byte list) list # byte list option) +
+         source_completion) # source_state)) ∧
   (runtime_abi_values env st (ty :: tys) (v :: vs) =
     case runtime_abi_value env st ty v of
-      INR c => INR c
-    | INL ((a, encoded_body, sp), st1) =>
-      (case runtime_abi_values env st1 tys vs of
-         INL ((encoded, spill), st2) =>
-           let t = abi_type env (LENGTH env.type_declarations) ty in
-           INL (((t, encoded_body) :: encoded, later_spill t sp spill), st2)
-       | INR c => INR c)) ∧
-  (runtime_abi_values _ _ _ _ = INR (InvalidCompletion "bad ABI arguments"))
+      (INR c, st1) => (INR c, st1)
+    | (INL (a, encoded_body, sp), st1) =>
+      let (r, st2) = runtime_abi_values env st1 tys vs in
+      ((case r of
+          INL (encoded, spill) =>
+            let t = abi_type env (LENGTH env.type_declarations) ty in
+            INL ((t, encoded_body) :: encoded, later_spill t sp spill)
+        | INR c => INR c), st2)) ∧
+  (runtime_abi_values _ st _ _ = (INR (InvalidCompletion "bad ABI arguments"), st))
 End
 
 (* An encoder writes at the free memory pointer, and the compiled one reads
  * each input only when it reaches it, after writing what comes before it.
  * The encoders here read their inputs first, from memory as it was, which
  * gives the same bytes when every input lies below the free pointer. The
- * reads run from a memory size of zero, so the size they leave covers what
- * they read; an input read at or above the free pointer is unsupported and
- * fails closed. Otherwise the size is what reading from st leaves. When
+ * reads run from a memory size of zero, so the size they leave covers every
+ * read attempted up to and including a failing read; an input read at or
+ * above the free pointer is unsupported and fails closed before any read
+ * failure surfaces. Otherwise the size is what reading from st leaves. When
  * reading an input ends the frame with a panic or a revert, these encoders
  * have written nothing, where the compiled one has written what comes before
  * that input, so the frame's final memory differs from the compiled one's. *)
@@ -615,12 +615,10 @@ End
 
 Definition encoded_runtime_values_def:
   encoded_runtime_values env st tys vs =
-    case runtime_abi_values env (st with memory_size := 0) tys vs of
-      INL ((parts, spill), st1) =>
-        (case encoder_state st st1 of
-           INL st2 =>
-             INL ((encoded_abi_tuple parts, (case spill of SOME sp => sp | NONE => [])), st2)
-         | INR c => INR c)
+    let (r, st1) = runtime_abi_values env (st with memory_size := 0) tys vs in
+    case guard_result (encoder_state st st1) r of
+      INL ((parts, spill), st2) =>
+        INL ((encoded_abi_tuple parts, (case spill of SOME sp => sp | NONE => [])), st2)
     | INR c => INR c
 End
 
@@ -632,53 +630,53 @@ Definition packed_value_def:
     case ty of
       LocatedT _ (ArrayT element length) =>
         if ¬is_stored_scalar_type element then
-          INR (InvalidCompletion "bad packed array")
+          (INR (InvalidCompletion "bad packed array"), st)
         else
           (case runtime_abi_value env st ty v of
-             INL ((_, bs, _), st1) =>
-               INL ((case length of NONE => DROP 32 bs | SOME _ => bs), st1)
-           | INR c => INR c)
+             (INL (_, bs, _), st1) =>
+               (INL (case length of NONE => DROP 32 bs | SOME _ => bs), st1)
+           | (INR c, st1) => (INR c, st1))
     | LocatedT _ _ =>
         (case v of
-           ReferenceValue r => byte_contents st r
-         | ScalarValue (BytesValue bs) => INL (bs, st)
-         | _ => INR (InvalidCompletion "bad packed value"))
+           ReferenceValue r =>
+             (case byte_contents st r of
+                INL (bs, st1) => (INL bs, st1)
+              | INR c => (INR c, st))
+         | ScalarValue (BytesValue bs) => (INL bs, st)
+         | _ => (INR (InvalidCompletion "bad packed value"), st))
     | _ =>
       case (abi_value ty v, storage_bytes ty) of
         (SOME a, SOME width) =>
           let word = enc (abi_type env 0 ty) a in
-          INL ((case ty of
+          (INL (case ty of
                   FixedBytesT _ => TAKE width word
                 | _ => DROP (32 - width) word), st)
-      | _ => INR (InvalidCompletion "bad packed value")
+      | _ => (INR (InvalidCompletion "bad packed value"), st)
 End
 
 (* The parts written one after another, and the bytes left past their end:
  * the later parts' own, then what of a part's tail reaches past those. *)
 Definition packed_values_def:
   (packed_values env st [] [] =
-     (INL (([], []), st) : ((byte list # byte list) # source_state) + source_completion)) ∧
+     ((INL ([], []), st) : ((byte list # byte list) + source_completion) # source_state)) ∧
   (packed_values env st (ty :: tys) (v :: vs) =
     case packed_value env st ty v of
-      INR c => INR c
-    | INL (bs, st1) =>
-      case packed_values env st1 tys vs of
-        INL ((rest, spill), st2) =>
-          let tail = packed_tail st1.world.accounts ty v bs in
-          INL ((bs ++ rest,
-                spill ++ DROP (LENGTH rest + LENGTH spill) tail), st2)
-      | INR c => INR c) ∧
-  (packed_values _ _ _ _ = INR (InvalidCompletion "bad packed values"))
+      (INR c, st1) => (INR c, st1)
+    | (INL bs, st1) =>
+      let (r, st2) = packed_values env st1 tys vs in
+      ((case r of
+          INL (rest, spill) =>
+            let tail = packed_tail st1.world.accounts ty v bs in
+            INL (bs ++ rest,
+                 spill ++ DROP (LENGTH rest + LENGTH spill) tail)
+        | INR c => INR c), st2)) ∧
+  (packed_values _ st _ _ = (INR (InvalidCompletion "bad packed values"), st))
 End
 
 Definition packed_encoding_def:
   packed_encoding env st tys vs =
-    case packed_values env (st with memory_size := 0) tys vs of
-      INL (r, st1) =>
-        (case encoder_state st st1 of
-           INL st2 => INL (r, st2)
-         | INR c => INR c)
-    | INR c => INR c
+    let (r, st1) = packed_values env (st with memory_size := 0) tys vs in
+    guard_result (encoder_state st st1) r
 End
 
 Definition abi_runtime_values_def:
@@ -1119,25 +1117,35 @@ Termination
   rw[contractABITheory.abi_value_size_def, listTheory.list_size_def]
 End
 
-(* Event arguments split into indexed topics and data. An indexed array or
- * struct hashes its in-place encoding, a byte sequence its bytes; a scalar
- * topic is its ABI word. *)
-Definition event_parts_def:
-  (event_parts env st [] = INL (([], [], NONE, []), st)) ∧
-  (event_parts env st ((ty, indexed, v) :: args) =
+(* Temporaries written one after another, each at the free memory pointer
+ * as memory holds it when the temporary is written: the compiler reads the
+ * pointer anew for each, which an earlier temporary may have overwritten.
+ * Also gives the least pointer read, counting the one read after the last
+ * temporary. *)
+Definition write_at_each_def:
+  (write_at_each [] st = (FST (memory_load 64 st), st)) ∧
+  (write_at_each (bs :: rest) st =
+     let (p, st1) = memory_load 64 st in
+     let st2 = memory_write p bs st1 in
+     let (least, st3) = write_at_each rest st2 in
+     (MIN p least, st3))
+End
+
+(* One event argument: an indexed array or struct hashes its in-place
+ * encoding, an indexed byte sequence its bytes, an indexed scalar its ABI
+ * word, and a non-indexed argument contributes to the log's data. *)
+Definition event_part_def:
+  event_part env st ty indexed v =
     case runtime_abi_value env st ty v of
-      INR c => INR c
-    | INL ((a, encoded_body, sp), st1) =>
-      (case event_parts env st1 args of
-         INR c => INR c
-       | INL ((topics, parts, spill, temps), st2) =>
+      (INR c, st1) => (INR c, st1)
+    | (INL (a, encoded_body, sp), st1) =>
         let t = abi_type env (LENGTH env.type_declarations) ty in
         let composite = (case t of Array _ _ => T | Tuple _ => T | _ => F) in
         if indexed then
           let src = encoding_source v in
           if composite ∧ src = StoredBytes ∧ inplace_spill src t a ≠ 0 then
-            INR (InvalidCompletion
-                   "unsupported: an indexed stored array or struct ending in empty bytes")
+            (INR (InvalidCompletion
+                    "unsupported: an indexed stored array or struct ending in empty bytes"), st1)
           else
           (* the topic, and the bytes hashed for it at the free memory pointer *)
           let topic =
@@ -1153,26 +1161,66 @@ Definition event_parts_def:
                       else (word_of_bytes T (0w : bytes32) encoded_body, []))
             | _ => SOME (word_of_bytes T (0w : bytes32) encoded_body, []) in
           (case topic of
-             SOME (word, temp) => INL ((word :: topics, parts, spill, temp ++ temps), st2)
-           | NONE => INR (InvalidCompletion "bad indexed event argument"))
-        else INL ((topics, (t, encoded_body) :: parts, later_spill t sp spill, temps), st2)))
+             SOME (word, temp) => (INL (INL (word, temp)), st1)
+           | NONE => (INR (InvalidCompletion "bad indexed event argument"), st1))
+        else (INL (INR (t, encoded_body, sp)), st1)
+End
+
+(* Event arguments split into indexed topics and data, preserving every
+ * indexed hash preimage produced before a failing read and the state reached
+ * up to and including that read. *)
+Definition event_parts_def:
+  (event_parts env st [] = (INL ([], [], NONE), [], st)) ∧
+  (event_parts env st ((ty, indexed, v) :: args) =
+    case event_part env st ty indexed v of
+      (INR c, st1) => (INR c, [], st1)
+    | (INL (INL (word, temp)), st1) =>
+        let (r, temps, st2) = event_parts env st1 args in
+        (case r of
+           INL (topics, parts, spill) =>
+             (INL (word :: topics, parts, spill), temp ++ temps, st2)
+         | INR c => (INR c, temp ++ temps, st2))
+    | (INL (INR (t, encoded_body, sp)), st1) =>
+        let (r, temps, st2) = event_parts env st1 args in
+        (case r of
+           INL (topics, parts, spill) =>
+             (INL (topics, (t, encoded_body) :: parts, later_spill t sp spill),
+              temps, st2)
+         | INR c => (INR c, temps, st2)))
+End
+
+(* The post-read fail-closed checks for emit: the encoder's free-pointer reach
+ * check, then writing the indexed hash preimages at the free memory pointer.
+ * The compiled emit reads the pointer anew for each preimage and for the
+ * log's data, so a preimage that moves the pointer below the reads' reach
+ * fails closed before any read failure surfaces: a later preimage or the
+ * data could overwrite an input, or a scratch hash the data. *)
+Definition event_state_def:
+  event_state st temps st1 =
+    case encoder_state st st1 of
+      INR c => INR c
+    | INL st2 =>
+        let (least, st3) = write_at_each temps st2 in
+        if least < st1.memory_size then
+          INR (InvalidCompletion
+            "unsupported: encoder reach overlaps a free memory pointer moved by an event's hash preimage")
+        else INL st3
 End
 
 (* The compiled emit reads the indexed arguments for their topics before it
  * encodes the others as the log's data. *)
 Definition event_log_def:
   event_log env st logger topic0 args =
-    case event_parts env (st with memory_size := 0)
-           (FILTER (λ(ty, indexed, v). indexed) args ++
-            FILTER (λ(ty, indexed, v). ¬indexed) args) of
-      INL ((topics, parts, spill, temps), st1) =>
-        (case encoder_state st st1 of
-           INL st2 =>
-             INL ((<| logger := logger;
-                      topics := (case topic0 of SOME t => t :: topics | NONE => topics);
-                      data := encoded_abi_tuple parts |>,
-                   (case spill of SOME sp => sp | NONE => []), temps), st2)
-         | INR c => INR c)
+    let (r, temps, st1) =
+      event_parts env (st with memory_size := 0)
+        (FILTER (λ(ty, indexed, v). indexed) args ++
+         FILTER (λ(ty, indexed, v). ¬indexed) args) in
+    case guard_result (event_state st temps st1) r of
+      INL ((topics, parts, spill), st2) =>
+        INL ((<| logger := logger;
+                 topics := (case topic0 of SOME t => t :: topics | NONE => topics);
+                 data := encoded_abi_tuple parts |>,
+              (case spill of SOME sp => sp | NONE => [])), st2)
     | INR c => INR c
 End
 
@@ -1446,8 +1494,11 @@ Proof
   simp[Once indexed_data_pre_def] >> rw[] >> gvs[]
 QED
 
-val event_parts_pre_def = cv_auto_trans_pre "event_parts_pre"
-  (REWRITE_RULE [GSYM byteTheory.word_of_bytes_be_def] event_parts_def);
+val () = cv_auto_trans write_at_each_def;
+val () = cv_auto_trans
+  (REWRITE_RULE [GSYM byteTheory.word_of_bytes_be_def] event_part_def);
+
+val event_parts_pre_def = cv_auto_trans_pre "event_parts_pre" event_parts_def;
 
 Theorem event_parts_pre[cv_pre,local]:
   ∀env st args. event_parts_pre env st args
@@ -1456,4 +1507,5 @@ Proof
   simp[Once event_parts_pre_def] >> rw[] >> gvs[]
 QED
 
+val () = cv_auto_trans event_state_def;
 val () = cv_auto_trans event_log_def;

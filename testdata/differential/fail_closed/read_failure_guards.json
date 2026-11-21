@@ -1,0 +1,89 @@
+{
+  "name": "rejected_read_failure_guards",
+  "source": "testdata/differential/read_failure_guards.sol",
+  "contract": "ReadFailureGuards",
+  "artifact": "testdata/differential/expected/read_failure_guards.json",
+  "cases": [
+    {
+      "name": "encoder_overlap_return",
+      "calldata": "0xc01b8cb6",
+      "expect": {
+        "returned": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    {
+      "name": "encoder_overlap_first",
+      "calldata": "0x47f61447",
+      "expect": {
+        "panic": 33
+      }
+    },
+    {
+      "name": "encoder_earlier_valid_overlap",
+      "calldata": "0xb70ef201000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000002",
+      "expect": {
+        "panic": 33
+      }
+    },
+    {
+      "name": "packed_earlier_valid_overlap",
+      "function": "packedEarlierValidOverlap",
+      "args": [],
+      "expect": {
+        "panic": 33
+      }
+    },
+    {
+      "name": "revert_overlap",
+      "function": "revertOverlap",
+      "args": [],
+      "expect": {
+        "revert": "0xc00eb37e00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    {
+      "name": "emit_pointer_move",
+      "function": "emitPointerMove",
+      "args": [
+        "0x"
+      ],
+      "expect": {
+        "return": []
+      },
+      "logs": [
+        {
+          "topics": [
+            "0x632eda677fe7bca0dc550b74f30a4620bbc5bf0b1e24fa8975bcd0698594bd0d",
+            "0xbc36789e7a1e281436464229828f817d6612f7b477d66591ff96a9e064bcc98a",
+            "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470",
+            "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"
+          ],
+          "data": "0x"
+        }
+      ]
+    },
+    {
+      "name": "emit_stored_pointer_move",
+      "function": "emitStoredPointerMove",
+      "args": [
+        "0x0000000000000000000000000000000000000000000000000000000000000000"
+      ],
+      "storage": {
+        "6": 1,
+        "111414077815863400510004064629973595961579173665589224203503662149373724986687": 7
+      },
+      "expect": {
+        "return": []
+      },
+      "logs": [
+        {
+          "topics": [
+            "0xb1936bd0bf47b9ab3968b48bcfcf0b49fcd43d7211624ffb0fc943e8b5bb6053",
+            "0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563"
+          ],
+          "data": "0x000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000007"
+        }
+      ]
+    }
+  ]
+}

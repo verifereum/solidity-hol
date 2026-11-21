@@ -92,6 +92,7 @@ Definition dispatch_def:
              case decode_arguments env (MAP SND p.parameters) (DROP 4 data) 4 128 of
                INL args => DispatchCall p args CallEntry
              | INR (PanicCompletion n) => DispatchPanic n
+             | INR (InvalidCompletion reason) => DispatchInvalid reason
              | INR _ => DispatchRevert)
     | NONE =>
         case (data, prog.receive_procedure, prog.fallback_procedure) of
@@ -317,6 +318,8 @@ Definition deploy_contract_frame_def:
               (128 + reserved) of
               INR (PanicCompletion n) =>
                 (unconsumed_gas_result gas (ContractReverted (panic_data n) w), NONE)
+            | INR (InvalidCompletion reason) =>
+                (unconsumed_gas_result gas (ContractInvalid reason), NONE)
             | INR _ => (unconsumed_gas_result gas (ContractReverted [] w), NONE)
             | INL args =>
                 let (r, image) =
@@ -334,26 +337,28 @@ End
 
 Theorem deploy_contract_with_gas_thm:
   deploy_contract_with_gas fuel prog fr w gas =
-    let env = core_program_environment prog in
     case prog.creation_procedure of
       NONE => unconsumed_gas_result gas (ContractInvalid "no creation procedure")
     | SOME (f, payable) =>
         if ¬payable ∧ fr.call_value ≠ 0 then
           unconsumed_gas_result gas (ContractReverted [] w)
         else
-        case lookup_procedure env f of
+        case lookup_procedure (core_program_environment prog) f of
           NONE => unconsumed_gas_result gas (ContractInvalid "unknown procedure")
         | SOME p =>
-            let reserved = 32 * LENGTH prog.immutables +
-                           (if p.parameters = [] then 0
-                            else 32 * ((LENGTH fr.call_data + 31) DIV 32)) in
-            case decode_arguments env (MAP SND p.parameters) fr.call_data 0
-              (128 + reserved) of
+            case decode_arguments (core_program_environment prog)
+              (MAP SND p.parameters) fr.call_data 0
+              (128 + (32 * LENGTH prog.immutables +
+                      if p.parameters = [] then 0
+                      else 32 * ((LENGTH fr.call_data + 31) DIV 32))) of
               INR (PanicCompletion n) =>
                 unconsumed_gas_result gas (ContractReverted (panic_data n) w)
+            | INR (InvalidCompletion reason) =>
+                unconsumed_gas_result gas (ContractInvalid reason)
             | INR _ => unconsumed_gas_result gas (ContractReverted [] w)
             | INL args =>
-                run_entry_with_gas fuel env p args (fr with call_data := []) w
+                run_entry_with_gas fuel (core_program_environment prog) p args
+                  (fr with call_data := []) w
                   NONE (32 * LENGTH prog.immutables)
                   (if p.parameters = [] then NONE else SOME fr.call_data)
                   CreationEntry gas

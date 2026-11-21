@@ -836,91 +836,44 @@ Definition convert_operand_def:
          | INR why => INR why)
 End
 
-(* Every operand list goes through here: the operands' values converted to
- * their targets in order, ids being the operands' node ids and id the
- * node's, for a count mismatch. Every operand that fails is reported, under
- * its own id. *)
+(* Every operand list goes through here: the operands' outcomes, each its
+ * value or the blockers of its elaboration, converted to their targets in
+ * order, ids being the operands' node ids and id the node's, for a count
+ * mismatch. Every operand that fails, to elaborate or to convert, is
+ * reported, under its own id. *)
 Definition convert_operands_def:
   (convert_operands n (id : num) [] [] [] = INL ([], [], [], n)) ∧
-  (convert_operands n id (i :: ids) (t :: ts) ((a, vt) :: vs) =
+  (convert_operands n id (i :: ids) (t :: ts) (INL (a, vt) :: os) =
     case convert_operand n t a vt of
       INL ((ss, ty, a'), n1) =>
-        (case convert_operands n1 id ids ts vs of
+        (case convert_operands n1 id ids ts os of
            INL (ss', tys, as, n2) => INL (ss ++ ss', ty :: tys, a' :: as, n2)
          | INR bs => INR bs)
-    | INR why => INR ((i, why) :: blockers (convert_operands n id ids ts vs))) ∧
-  (convert_operands n id _ _ _ = INR [(id, "value count mismatch")])
+    | INR why => INR ((i, why) :: blockers (convert_operands n id ids ts os))) ∧
+  (convert_operands n id (_ :: ids) (_ :: ts) (INR bs :: os) =
+    INR (bs ++ blockers (convert_operands n id ids ts os))) ∧
+  (convert_operands n id _ _ os =
+    INR ((id, "value count mismatch") :: FLAT (MAP blockers os)))
 End
 
-(* The targets of operands that convert_operands would convert, for the
- * operands of a node whose siblings fail to elaborate, so that the failure
- * of each operand that did elaborate is reported as well: some_targets for
- * targets given in operand order, source_targets for targets given in the
- * order of arrange order (ids the operands' node ids), an operand with no
- * target left unchecked. *)
-Definition some_targets_def:
-  (some_targets [] = ([] : operand_target option list)) ∧
-  (some_targets (t :: ts) = SOME t :: some_targets ts)
+(* The operands' values when every outcome is one, else the blockers of
+ * every operand that failed. *)
+Definition outcome_values_def:
+  (outcome_values [] = INL []) ∧
+  (outcome_values (INL v :: os) =
+    case outcome_values os of
+      INL vs => INL (v :: vs)
+    | INR bs => INR bs) ∧
+  (outcome_values (INR bs :: os) = INR (bs ++ blockers (outcome_values os)))
 End
 
-Definition uniform_targets_def:
-  (uniform_targets t [] = ([] : operand_target option list)) ∧
-  (uniform_targets t (_ :: ids) = SOME t :: uniform_targets t ids)
-End
-
-(* The target of the operand at position q among those arrange order moves:
- * that of the first j with order j = q. *)
-Definition suffix_target_def:
-  (suffix_target (q : num) [] ts = (NONE : operand_target option)) ∧
-  (suffix_target q (i :: is) ts =
-     case ts of
-       [] => NONE
-     | t :: ts' => if i = q then SOME t else suffix_target q is ts')
-End
-
-Definition operand_targets_def:
-  (operand_targets (order : num list) (k : num) ts (p : num) [] =
-     ([] : operand_target option list)) ∧
-  (operand_targets order k ts p (_ :: ids) =
-     (if p < k then oEL p ts else suffix_target (p - k) order (DROP k ts)) ::
-     operand_targets order k ts (p + 1) ids)
-End
-
-Definition source_targets_def:
-  source_targets order ts (ids : num list) =
-    operand_targets order (LENGTH ids - LENGTH order) ts 0 ids
-End
-
-(* The targets of abi_encoding's operands, ids the operands' node ids. *)
-Definition abi_targets_def:
-  abi_targets form (ids : num list) =
-    case form of
-      AbiPacked => uniform_targets (Encoded T) ids
-    | AbiStringConcat => uniform_targets (Encoded T) ids
-    | AbiPlain => uniform_targets (Encoded F) ids
-    | AbiWithSignature _ => uniform_targets (Encoded F) ids
-    | AbiWithSelector =>
-        (case ids of [] => [] | _ :: rest => SOME AbiSelector :: uniform_targets (Encoded F) rest)
-    | AbiCall tids =>
-        (case ids of
-           [] => []
-         | _ :: rest =>
-             SOME AbiSelector :: (case all_some (MAP abi_call_parameter tids) of
-                        SOME tys => some_targets (encoded_as tys)
-                      | NONE => []))
-End
-
-(* The call-level blocker of abi_encoding that its operands do not decide:
- * the parameter types of abi.encodeCall name a type that has no ABI
- * encoding. *)
-Definition abi_form_blockers_def:
-  abi_form_blockers form (id : num) =
-    case form of
-      AbiCall tids =>
-        (case all_some (MAP abi_call_parameter tids) of
-           NONE => [(id, "abi encoding of this type")]
-         | SOME _ => [])
-    | _ => []
+(* The operands elaborated by elab_arg_values, for a node that needs them all
+ * before it converts any: their statements and values, or the blockers. *)
+Definition operand_values_def:
+  operand_values ((ss, os), n : num) =
+    case outcome_values os of
+      INL vs => INL ((ss, vs), n)
+    | INR bs => INR bs
 End
 
 (* The ids of the values of a returned tuple: those of its components, or
@@ -934,17 +887,17 @@ Definition return_ids_def:
     | _ => REPLICATE len (expr_id e)
 End
 
-(* A builtin on its operands' values, each converted to its operand's target.
+(* A builtin on its operands' outcomes, each converted to its operand's target.
  * The hash of a literal is a constant, as the compiler folds it without
  * allocating memory. *)
 Definition elab_builtin_def:
-  elab_builtin n id ids op vs =
+  elab_builtin n id ids op os =
     let (operands, result) = builtin_signature op in
-    case (op, vs) of
-      (Keccak256Builtin, [(ConstantAtom (BytesValue bs), ElabBytesLiteral)]) =>
+    case (op, os) of
+      (Keccak256Builtin, [INL (ConstantAtom (BytesValue bs), ElabBytesLiteral)]) =>
         INL (([], ConstantAtom (BytesValue (Keccak_256_w64 bs))), n)
     | _ =>
-      case convert_operands n id ids (builtin_targets operands) vs of
+      case convert_operands n id ids (builtin_targets operands) os of
         INL (cs, _, atoms, n1) =>
           let (rs, r) = bind_value n1 result (BuiltinOperation op atoms) in
           INL ((cs ++ rs, r), n1 + 1)
@@ -957,46 +910,49 @@ End
  * arguments are scalars, arrays without structs or byte sequences (arrays and
  * integer literals only unpacked, as the compiler requires). *)
 Definition selector_encoding_def:
-  selector_encoding (i : num) s svt r =
-    case r of
-      INL (css, tys, args, n1) =>
-        (case coerce n1 (FixedBytesT 4) s svt of
-           INL ((ss, s'), n2) =>
+  selector_encoding (i : num) so r =
+    case (so, r) of
+      (INL (s, svt), INL (css, tys, args, n1)) =>
+        (case convert_operand n1 AbiSelector s svt of
+           INL ((ss, _, s'), n2) =>
              INL ((css ++ ss, AbiEncodeOperation (SOME s') tys args), n2)
-         | INR _ => INR [(i, "selector not a bytes4")])
-    | INR bs =>
-        INR ((if ISL (coerce 0 (FixedBytesT 4) s svt) then []
-              else [(i, "selector not a bytes4")]) ++ bs)
+         | INR why => INR [(i, why)])
+    | (INL (s, svt), INR bs) =>
+        INR ((case convert_operand 0 AbiSelector s svt of
+                INL _ => []
+              | INR why => [(i, why)]) ++ bs)
+    | (INR sbs, _) => INR (sbs ++ blockers r)
 End
 
 Definition abi_encoding_def:
-  abi_encoding n (id : num) ids form vs =
-    case (form, ids, vs) of
-      (AbiWithSelector, i :: rest_ids, (s, svt) :: rest) =>
-        selector_encoding i s svt
+  abi_encoding n (id : num) ids form os =
+    case (form, ids, os) of
+      (AbiWithSelector, i :: rest_ids, s :: rest) =>
+        selector_encoding i s
           (convert_operands n id rest_ids (REPLICATE (LENGTH rest) (Encoded F)) rest)
-    | (AbiCall tids, i :: rest_ids, (s, svt) :: rest) =>
+    | (AbiCall tids, i :: rest_ids, s :: rest) =>
         (case all_some (MAP abi_call_parameter tids) of
            SOME tys =>
-             selector_encoding i s svt (convert_operands n id rest_ids (encoded_as tys) rest)
+             selector_encoding i s (convert_operands n id rest_ids (encoded_as tys) rest)
          | NONE =>
-             selector_encoding i s svt (INR [(id, "abi encoding of this type")]))
+             selector_encoding i s
+               (INR ((id, "abi encoding of this type") :: FLAT (MAP blockers rest))))
     | (AbiWithSelector, _, _) => INR [(id, "missing selector")]
     | (AbiCall _, _, _) => INR [(id, "missing selector")]
     | (AbiPacked, _, _) =>
-        (case convert_operands n id ids (REPLICATE (LENGTH vs) (Encoded T)) vs of
+        (case convert_operands n id ids (REPLICATE (LENGTH os) (Encoded T)) os of
            INL (_, tys, args, _) => INL (([], AbiEncodePackedOperation tys args), n)
          | INR bs => INR bs)
     | (AbiStringConcat, _, _) =>
-        (case convert_operands n id ids (REPLICATE (LENGTH vs) (Encoded T)) vs of
+        (case convert_operands n id ids (REPLICATE (LENGTH os) (Encoded T)) os of
            INL (_, tys, args, _) => INL (([], AbiEncodePackedOperation tys args), n)
          | INR bs => INR bs)
     | (AbiPlain, _, _) =>
-        (case convert_operands n id ids (REPLICATE (LENGTH vs) (Encoded F)) vs of
+        (case convert_operands n id ids (REPLICATE (LENGTH os) (Encoded F)) os of
            INL (_, tys, args, _) => INL (([], AbiEncodeOperation NONE tys args), n)
          | INR bs => INR bs)
     | (AbiWithSignature signature, _, _) =>
-        (case convert_operands n id ids (REPLICATE (LENGTH vs) (Encoded F)) vs of
+        (case convert_operands n id ids (REPLICATE (LENGTH os) (Encoded F)) os of
            INL (_, tys, args, _) =>
              INL (([], AbiEncodeOperation
                          (SOME (ConstantAtom (BytesValue (TAKE 4 (Keccak_256_w64 signature)))))
@@ -1327,7 +1283,7 @@ Definition revert_arguments_def:
     else
       case (arrange order vs, arrange order ids) of
         (SOME values, SOME nodes) =>
-          (case convert_operands n id nodes (encoded_as params) values of
+          (case convert_operands n id nodes (encoded_as params) (MAP INL values) of
              INL (ss, _, atoms, n1) =>
                INL (ss, RevertErrorStmt selector params atoms, n1)
            | INR bs => INR bs)
@@ -1570,7 +1526,7 @@ Definition create_contract_def:
            (SOME vs, SOME ids) =>
              (case convert_operands next info.node_id ids
                 (encoded_as ((MAP (λk. if k = SaltOption then FixedBytesT 32
-                                      else UintT 256) opts) ++ params)) vs of
+                                      else UintT 256) opts) ++ params)) (MAP INL vs) of
                 INL (cs, _, atoms, n1) =>
                   let options = TAKE (LENGTH opts) atoms in
                   let (rs, a) = bind_value n1 (AddressT NonpayableAddress)
@@ -1700,12 +1656,12 @@ Definition elab_expr_def:
                       | (SOME a, NONE) => [a]
                       | (NONE, SOME b) => [b]
                       | (SOME a, SOME b) => [a; b] in
-             (case elab_arg_values ctx n2 es of
+             (case operand_values (elab_arg_values ctx n2 es) of
                 INL ((bs, vs), n3) =>
                   if ¬EVERY (λ(a, vt). index_value_ok a vt) vs
                   then INR [(info.node_id, "slice bound of this type")] else
                   (case convert_operands n3 info.node_id (MAP expr_id es)
-                          (REPLICATE (LENGTH es) (ValueOf (UintT 256))) vs of
+                          (REPLICATE (LENGTH es) (ValueOf (UintT 256))) (MAP INL vs) of
                      INL (cs, _, atoms, n4) =>
                        (case (case (start, end_bound, atoms) of
                                 (NONE, NONE, []) =>
@@ -1828,7 +1784,7 @@ Definition elab_expr_def:
                            (info.node_id, "type annotation mismatch")
                          (case convert_operands n3 info.node_id [expr_id l; expr_id r]
                                  [ValueOf ty; ValueOf (right_operand_type aop ty)]
-                                 [(al', vl); (ar, vr)] of
+                                 [INL (al', vl); INL (ar, vr)] of
                             INL (cs, _, [al''; ar'], n5) =>
                               let (ss, v) = bind_value n5 ty
                                               (ScalarOperation ty ctx.mode aop [al''; ar']) in
@@ -1839,7 +1795,7 @@ Definition elab_expr_def:
                          ensure (annotation_matches tid (ElabType BoolT))
                            (info.node_id, "type annotation mismatch")
                          (case convert_operands n3 info.node_id [expr_id l; expr_id r]
-                                 [ValueOf ty; ValueOf ty] [(al', vl); (ar, vr)] of
+                                 [ValueOf ty; ValueOf ty] [INL (al', vl); INL (ar, vr)] of
                             INL (cs, _, [al''; ar'], n5) =>
                               (case comparison n5 ty op al'' ar' of
                                  SOME ((ss, v), n6) =>
@@ -1928,7 +1884,7 @@ Definition elab_expr_def:
                INR [(info.node_id, "unsupported tuple type")] else
              (case convert_operands n1 info.node_id
                      (MAP (λc. case c of NONE => info.node_id | SOME e => expr_id e) cs)
-                     (values_of tys) vs of
+                     (values_of tys) (MAP INL vs) of
                 INL (cs', _, atoms, n2) =>
                   INL ((ss ++ cs' ++ [DefineStmt (AstId n2) (ProductType (MAP SingleType tys))
                            (TupleOperation atoms)], BoundAtom (AstId n2), ElabTuple tys), n2 + 1)
@@ -1947,11 +1903,11 @@ Definition elab_expr_def:
                   (case pushed_element rty of
                      NONE =>
                        reject (info.node_id, "unsupported array member call")
-                         (elab_arg_values ctx n args)
+                         (operand_values (elab_arg_values ctx n args))
                    | SOME element =>
                      if order ≠ []
                      then reject (info.node_id, "unsupported array member call")
-                            (elab_arg_values ctx n args) else
+                            (operand_values (elab_arg_values ctx n args)) else
                      if member = "push" then
                        (case args of
                           [] =>
@@ -1982,14 +1938,14 @@ Definition elab_expr_def:
                                   | INR why => INR [(expr_id arg, why)])
                              | INR bs => INR bs)
                         | _ => reject (info.node_id, "unsupported array member call")
-                                 (elab_arg_values ctx n args))
+                                 (operand_values (elab_arg_values ctx n args)))
                      else if member = "pop" ∧ args = [] ∧ tid = "t_tuple$__$" then
                        INL ((ss ++ [DefineStmt (AstId n1) (ProductType [])
                                       (ArrayPopOperation ref)],
                              ConstantAtom (BoolValue F), ElabTuple []), n1 + 1)
                      else reject (info.node_id, "unsupported array member call")
-                            (elab_arg_values ctx n args))
-              | INR bs => INR (bs ++ blockers (elab_arg_values ctx n args)))
+                            (operand_values (elab_arg_values ctx n args)))
+              | INR bs => INR (bs ++ blockers (operand_values (elab_arg_values ctx n args))))
          | _ => INR [(info.node_id, "unsupported callee")])
         else
              (case direct_callee ctx callee of
@@ -1997,7 +1953,7 @@ Definition elab_expr_def:
                   (case call_target ctx expression of
                      INL (callee, params, rets) =>
                        bind_call callee rets (elab_args ctx n info.node_id (early_call_arguments expression) order (values_of params) args)
-                   | INR b => reject b (elab_arg_values ctx n args))
+                   | INR b => reject b (operand_values (elab_arg_values ctx n args)))
               | NONE =>
                   (* a call through an internal function value: the callee,
                      copied before the arguments can change it, then the
@@ -2009,7 +1965,7 @@ Definition elab_expr_def:
                            if order ≠ [] ∨ LENGTH args ≠ LENGTH ps ∨
                               decode_type_identifier tid ≠ SOME (call_value_type rs)
                            then reject (info.node_id, "call does not match the function type")
-                                  (elab_arg_values ctx n args) else
+                                  (operand_values (elab_arg_values ctx n args)) else
                            let (gs, g') = bind_value n1 gty (ConvertOperation gty g) in
                            (case elab_args ctx (n1 + 1) info.node_id 0 [] (values_of ps) args of
                               INL ((sa, atoms), n2) =>
@@ -2020,20 +1976,20 @@ Definition elab_expr_def:
                             | INR bs => INR bs)
                        | NONE =>
                            INR (callee_failure info.node_id callee ::
-                                blockers (elab_arg_values ctx n args)))
+                                blockers (operand_values (elab_arg_values ctx n args))))
                   | INR _ =>
                       INR (callee_failure info.node_id callee ::
-                           blockers (elab_arg_values ctx n args)))
+                           blockers (operand_values (elab_arg_values ctx n args))))
     | SrcSuperCall info r args order tid =>
         (case call_target ctx expression of
            INL (callee, params, rets) =>
              bind_call callee rets (elab_args ctx n info.node_id 0 order (values_of params) args)
-         | INR b => reject b (elab_arg_values ctx n args))
+         | INR b => reject b (operand_values (elab_arg_values ctx n args)))
     | SrcBaseCall info _ args order _ =>
         (case call_target ctx expression of
            INL (callee, params, rets) =>
              bind_call callee rets (elab_args ctx n info.node_id 0 order (values_of params) args)
-         | INR b => reject b (elab_arg_values ctx n args))
+         | INR b => reject b (operand_values (elab_arg_values ctx n args)))
     | SrcBuiltinCall info _ builtin condition message tid =>
         if ¬(builtin_shape builtin condition message ∧ tid = "t_tuple$__$") then
           INR ((info.node_id, "unsupported builtin call") ::
@@ -2045,7 +2001,7 @@ Definition elab_expr_def:
                (case message of
                   NONE => INL (builtin_result n [] NONE (builtin_failure builtin))
                 | SOME m =>
-                    (case elab_arg_values ctx n [m] of
+                    (case operand_values (elab_arg_values ctx n [m]) of
                        INL ((ss, vs), n1) =>
                          (case revert_arguments ctx.enums ctx.structs n1 info.node_id [0x08w; 0xc3w; 0x79w; 0xa0w]
                                  [LocatedT MemoryLoc StringT] [] [expr_id m] vs of
@@ -2061,7 +2017,7 @@ Definition elab_expr_def:
                      | INL _ => INR [(expr_id c, "condition not a bool")]
                      | INR bs => INR bs)
                 | SOME m =>
-                    (case elab_arg_values ctx n [c; m] of
+                    (case operand_values (elab_arg_values ctx n [c; m]) of
                        INL ((ss, (v, ElabType BoolT) :: vs), n1) =>
                          (case revert_arguments ctx.enums ctx.structs n1 info.node_id [0x08w; 0xc3w; 0x79w; 0xa0w]
                                  [LocatedT MemoryLoc StringT] [] [expr_id m] vs of
@@ -2072,14 +2028,14 @@ Definition elab_expr_def:
     | SrcRequireError info _ condition err args order tid =>
         (case all_some (MAP event_variable_type err.error_parameters) of
            NONE => INR (variables_blockers (MAP SOME err.error_parameters) ++
-                        blockers (elab_arg_values ctx n (condition :: args)))
+                        blockers (operand_values (elab_arg_values ctx n (condition :: args))))
          | SOME params =>
              if tid ≠ "t_tuple$__$" ∨
                 ¬revert_shape ctx.enums ctx.structs err.error_selector params order (LENGTH args) then
                reject (info.node_id, "require does not match the error")
-                 (elab_arg_values ctx n (condition :: args))
+                 (operand_values (elab_arg_values ctx n (condition :: args)))
              else
-               (case elab_arg_values ctx n (condition :: args) of
+               (case operand_values (elab_arg_values ctx n (condition :: args)) of
                   INL ((ss, (v, ElabType BoolT) :: vs), n1) =>
                     (case revert_arguments ctx.enums ctx.structs n1 info.node_id err.error_selector params order
                             (expr_ids args) vs of
@@ -2094,7 +2050,7 @@ Definition elab_expr_def:
              (external_operand_targets ctx.structs callee opts) operands)
     | SrcCreate info callee opts operands order tid =>
         create_contract ctx info callee opts operands order tid
-          (elab_arg_values ctx n operands)
+          (operand_values (elab_arg_values ctx n operands))
     (* S(args): the arguments in the call's order, then the struct is
        allocated, and each field converted and written in declaration order *)
     | SrcStructConstructor info id args order tid =>
@@ -2106,14 +2062,14 @@ Definition elab_expr_def:
                    argument_order_ok order (LENGTH args) ∧
                    memory_binding_ok ctx.enums ctx.structs sty)
              (info.node_id, "unsupported struct constructor")
-           (case elab_arg_values ctx n args of
+           (case operand_values (elab_arg_values ctx n args) of
               INL ((ss, vs), n1) =>
                 (case (arrange order vs, arrange order (expr_ids args)) of
                    (SOME vs', SOME ids) =>
                      let (cs, a) = bind_value n1 sty
                        (AllocateMemoryOperation (StructT (AstId id))
                           (ConstantAtom (IntegerValue (&LENGTH fields)))) in
-                     (case convert_operands (n1 + 1) info.node_id ids (field_values fields) vs' of
+                     (case convert_operands (n1 + 1) info.node_id ids (field_values fields) (MAP INL vs') of
                         INL (css, _, as, n2) =>
                           let (ws, n3) = field_writes n2 a fields as in
                           INL ((ss ++ cs ++ css ++ ws, a, ElabType sty), n3)
@@ -2135,7 +2091,7 @@ Definition elab_expr_def:
                 INL (ss, n1) => INL ((cs ++ ss, a, ElabType ty), n1)
               | INR bs => INR bs)
          | _ => INR ((info.node_id, "type annotation mismatch") ::
-                     blockers (elab_arg_values ctx n es)))
+                     blockers (operand_values (elab_arg_values ctx n es))))
     (* new T(n) of a byte sequence or dynamic memory array type *)
     | SrcNew info tn e tid =>
         (case elab_expr ctx n e of
@@ -2190,10 +2146,10 @@ Definition elab_expr_def:
                        (case elab_values ctx n2 f of
                           INL ((sf, vf), n3) =>
                             (case convert_operands n3 info.node_id
-                                    (REPLICATE (LENGTH vt) (expr_id t)) (values_of tys) vt of
+                                    (REPLICATE (LENGTH vt) (expr_id t)) (values_of tys) (MAP INL vt) of
                                INL (ct, _, at, n4) =>
                                  (case convert_operands n4 info.node_id
-                                         (REPLICATE (LENGTH vf) (expr_id f)) (values_of tys) vf of
+                                         (REPLICATE (LENGTH vf) (expr_id f)) (values_of tys) (MAP INL vf) of
                                     INL (cf, _, af, n5) =>
                                       (case conditional_targets n5 tys at af of
                                          SOME (ds, ts, fs, atoms, n6) =>
@@ -2262,43 +2218,31 @@ Definition elab_expr_def:
     | SrcBuiltinOperation info _ op args tid =>
         let result = SND (builtin_signature op) in
         ensure (source_type_matches result tid) (info.node_id, "type annotation mismatch")
-        (case elab_arg_values ctx n args of
-           INL ((ss, vs), n1) =>
-             (case elab_builtin n1 info.node_id (expr_ids args) op vs of
-                INL ((cs, r), n2) => INL ((ss ++ cs, r, ElabType result), n2)
-              | INR bs => INR bs)
-         | INR _ =>
-             INR (elab_arg_failures ctx n
-                    (some_targets (builtin_targets (FST (builtin_signature op)))) args))
+        (let ((ss, os), n1) = elab_arg_values ctx n args in
+         case elab_builtin n1 info.node_id (expr_ids args) op os of
+           INL ((cs, r), n2) => INL ((ss ++ cs, r, ElabType result), n2)
+         | INR bs => INR bs)
     | SrcModular info _ op args tid =>
         (* the operands in order, then the modulus check and the operation *)
         ensure (source_type_matches (UintT 256) tid) (info.node_id, "type annotation mismatch")
-        (case elab_arg_values ctx n args of
-           INL ((ss, vs), n1) =>
-             (case convert_operands n1 info.node_id (expr_ids args)
-                     (values_of [UintT 256; UintT 256; UintT 256]) vs of
-                INL (cs, _, as, n2) =>
-                  let (rs, r) = bind_value n2 (UintT 256)
-                                  (ScalarOperation (UintT 256) CheckedArithmetic op as) in
-                  INL ((ss ++ cs ++ rs, r, ElabType (UintT 256)), n2 + 1)
-              | INR bs => INR bs)
-         | INR _ =>
-             INR (elab_arg_failures ctx n
-                    (some_targets (values_of [UintT 256; UintT 256; UintT 256])) args))
+        (let ((ss, os), n1) = elab_arg_values ctx n args in
+         case convert_operands n1 info.node_id (expr_ids args)
+                (values_of [UintT 256; UintT 256; UintT 256]) os of
+           INL (cs, _, as, n2) =>
+             let (rs, r) = bind_value n2 (UintT 256)
+                             (ScalarOperation (UintT 256) CheckedArithmetic op as) in
+             INL ((ss ++ cs ++ rs, r, ElabType (UintT 256)), n2 + 1)
+         | INR bs => INR bs)
     | SrcAbiEncode info _ form args tid =>
         (let ty = LocatedT MemoryLoc
                     (if form = AbiStringConcat then StringT else BytesT) in
          ensure (source_type_matches ty tid) (info.node_id, "type annotation mismatch")
-         (case elab_arg_values ctx n args of
-            INL ((ss, vs), n1) =>
-              (case abi_encoding n1 info.node_id (expr_ids args) form vs of
-                 INL ((cs, op), n2) =>
-                   let (es, r) = bind_value n2 ty op in
-                   INL ((ss ++ cs ++ es, r, ElabType ty), n2 + 1)
-               | INR bs => INR bs)
-          | INR _ =>
-              INR (abi_form_blockers form info.node_id ++
-                   elab_arg_failures ctx n (abi_targets form (expr_ids args)) args)))
+         (let ((ss, os), n1) = elab_arg_values ctx n args in
+          case abi_encoding n1 info.node_id (expr_ids args) form os of
+            INL ((cs, op), n2) =>
+              let (es, r) = bind_value n2 ty op in
+              INL ((ss ++ cs ++ es, r, ElabType ty), n2 + 1)
+          | INR bs => INR bs))
     (* The operands are the target, the call options in source order and
        the data, evaluated in that order. Only call sends value. *)
     | SrcLowLevelCall info _ kind opts operands tid =>
@@ -2308,15 +2252,15 @@ Definition elab_expr_def:
              ¬MEM SaltOption opts ∧
              (kind ≠ LowLevelCall ⇒ ¬MEM ValueOption opts))
         then reject (info.node_id, "unsupported low-level call")
-               (elab_arg_values ctx n operands) else
-        (case elab_arg_values ctx n operands of
+               (operand_values (elab_arg_values ctx n operands)) else
+        (case operand_values (elab_arg_values ctx n operands) of
            INL ((ss, vs), n1) =>
              (case (REVERSE vs, REVERSE (expr_ids operands)) of
                 ((d, dvt) :: rvs, did :: rids) =>
                   (case (convert_operands n1 info.node_id (REVERSE rids)
                            (ValueOf (AddressT NonpayableAddress) ::
                             REPLICATE (LENGTH opts) (ValueOf (UintT 256)))
-                           (REVERSE rvs),
+                           (MAP INL (REVERSE rvs)),
                          low_level_data d dvt) of
                      (INL (cs, _, t :: atoms, n2), SOME d') =>
                        let tys = [BoolT; LocatedT MemoryLoc BytesT] in
@@ -2457,35 +2401,41 @@ Definition elab_expr_def:
          | INR bs =>
              INR (bs ++ type_name_blockers (info.node_id, "unsupported type name") tn))
     | SrcUnsupportedExpr info msg es =>
-        INR ((info.node_id, msg) :: blockers (elab_arg_values ctx n es))) ∧
+        INR ((info.node_id, msg) :: blockers (operand_values (elab_arg_values ctx n es)))) ∧
   (* The early prefix belongs to forming the callee. Remaining arguments
    * are all evaluated before conversion, in source order, then arranged in
    * parameter order. Both schedules use assignment's coerce. *)
   (elab_args ctx n (id : num) early order tys es =
     if early = 0 then
-      case elab_arg_values ctx n es of
-        INL ((ss, vs), n1) =>
-          (case (arrange order vs, arrange order (expr_ids es)) of
-             (SOME vs', SOME ids) =>
-               (case convert_operands n1 id ids tys vs' of
-                  INL (cs, _, as, n2) => INL ((ss ++ cs, as), n2)
-                | INR bs => INR bs)
-           | _ => INR [(id, "argument order")])
-      | INR _ =>
-          INR (elab_arg_failures ctx n (source_targets order tys (expr_ids es)) es)
+      let ((ss, os), n1) = elab_arg_values ctx n es in
+      case (arrange order os, arrange order (expr_ids es)) of
+        (SOME os', SOME ids) =>
+          (case convert_operands n1 id ids tys os' of
+             INL (cs, _, as, n2) =>
+               if EVERY ISL os then INL ((ss ++ cs, as), n2)
+               else INR (FLAT (MAP blockers os))
+           | INR bs =>
+               (* an order that isn't a permutation can drop an operand *)
+               INR (if argument_order_ok order (LENGTH order) then bs
+                    else bs ++ FLAT (MAP blockers os)))
+      | _ => INR ((id, "argument order") :: FLAT (MAP blockers os))
     else
       case es of
         [] => INR [(id, "value count mismatch")]
       | e :: rest =>
         case tys of
-          [] => INR [(id, "value count mismatch")]
+          [] =>
+            let ((_, os), _) = elab_arg_values ctx n es in
+            INR ((id, "value count mismatch") :: FLAT (MAP blockers os))
         | ty :: ts =>
           let suffix_order =
             case order of
               [] => SOME []
             | i :: is => if i = 0 ∧ ¬MEM 0 is then SOME (MAP PRE is) else NONE in
           case suffix_order of
-            NONE => INR [(id, "argument order")]
+            NONE =>
+              let ((_, os), _) = elab_arg_values ctx n es in
+              INR ((id, "argument order") :: FLAT (MAP blockers os))
           | SOME remaining =>
           (case elab_expr ctx n e of
              INL ((ss, a, vt), n1) =>
@@ -2509,11 +2459,11 @@ Definition elab_expr_def:
                        INL ((ss', as), n3) =>
                          INL ((ss ++ cs ++ saved ++ ss', value :: as), n3)
                      | INR bs => INR bs)
-                | INR why => INR ((expr_id e, why) ::
-                                    elab_arg_failures ctx n
-                                      (source_targets remaining ts (expr_ids rest)) rest))
-           | INR bs => INR (bs ++ elab_arg_failures ctx n
-                                    (source_targets remaining ts (expr_ids rest)) rest))) ∧
+                | INR why =>
+                    INR ((expr_id e, why) ::
+                         blockers (elab_args ctx n id (early - 1) remaining ts rest)))
+           | INR bs =>
+               INR (bs ++ blockers (elab_args ctx n id (early - 1) remaining ts rest)))) ∧
   (* Multiple values: tuple expressions, and calls with several returns. *)
   (elab_values ctx n e =
     case e of
@@ -2666,19 +2616,19 @@ Definition elab_expr_def:
              call_location info.node_id
                (bind_call callee rets
                  (elab_args ctx n info.node_id (early_call_arguments e) order (values_of params) args))
-         | INR b => reject b (elab_arg_values ctx n args))
+         | INR b => reject b (operand_values (elab_arg_values ctx n args)))
     | SrcSuperCall info _ args order _ =>
         (case call_target ctx e of
            INL (callee, params, rets) =>
              call_location info.node_id
                (bind_call callee rets (elab_args ctx n info.node_id 0 order (values_of params) args))
-         | INR b => reject b (elab_arg_values ctx n args))
+         | INR b => reject b (operand_values (elab_arg_values ctx n args)))
     | SrcBaseCall info _ args order _ =>
         (case call_target ctx e of
            INL (callee, params, rets) =>
              call_location info.node_id
                (bind_call callee rets (elab_args ctx n info.node_id 0 order (values_of params) args))
-         | INR b => reject b (elab_arg_values ctx n args))
+         | INR b => reject b (operand_values (elab_arg_values ctx n args)))
     | SrcTupleExpression info [SOME e'] tid =>
         (case elab_location ctx n e' of
            INL ((ss, ref, ty), n1) =>
@@ -2709,7 +2659,7 @@ Definition elab_expr_def:
          | INL _ => INR [(expr_id c, "condition not a bool")]
          | INR bs => INR bs)
     | SrcUnsupportedExpr info msg es =>
-        INR ((info.node_id, msg) :: blockers (elab_arg_values ctx n es))
+        INR ((info.node_id, msg) :: blockers (operand_values (elab_arg_values ctx n es)))
     | _ => INR [(expr_id e, "not a storage location")]) ∧
   (elab_destination ctx n e =
     case e of
@@ -2774,17 +2724,21 @@ Definition elab_expr_def:
             INL ((ss, ReferenceDestination ref ty), n1)
         | INR bs => INR bs)
   ∧
-  (elab_arg_values ctx n [] = INL (([], []), n)) ∧
+  (* Each operand's outcome, in source order: its value, or the blockers of
+   * its elaboration. The statements are those of the operands that
+   * elaborate, for a node to use when all of them do. *)
+  (elab_arg_values ctx n [] = (([], []), n)) ∧
   (elab_arg_values ctx n (e :: es) =
     case elab_expr ctx n e of
       INL ((ss, a, vt), n1) =>
         let (captured, n2) =
           if exprs_assign es then snapshot n1 a vt else (([], a), n1) in
         let (saved, a') = captured in
-        (case elab_arg_values ctx n2 es of
-           INL ((ss', vs), n3) => INL ((ss ++ saved ++ ss', (a', vt) :: vs), n3)
-         | INR bs => INR bs)
-    | INR bs => INR (bs ++ blockers (elab_arg_values ctx n es))) ∧
+        let ((ss', os), n3) = elab_arg_values ctx n2 es in
+        ((ss ++ saved ++ ss', INL (a', vt) :: os), n3)
+    | INR bs =>
+        let ((ss', os), n3) = elab_arg_values ctx n es in
+        ((ss', INR bs :: os), n3)) ∧
   (elab_destinations ctx n [] = INL (([], []), n)) ∧
   (elab_destinations ctx n (NONE :: cs) =
     case elab_destinations ctx n cs of
@@ -2818,23 +2772,7 @@ Definition elab_expr_def:
         (case elab_inline_elements ctx n2 a element (i + 1) es of
            INL (ss', n3) => INL (ss ++ ws ++ ss', n3)
          | INR bs => INR bs)
-    | INR bs => INR (bs ++ blockers (elab_inline_elements ctx n a element (i + 1) es))) ∧
-  (* The blockers of every operand of a node some operand of which fails to
-   * elaborate: an operand's own, or else those of its conversion to its
-   * target when it has one. An operand that elaborates has no sibling's
-   * value to wait for. *)
-  (elab_arg_failures ctx n tgts [] = []) ∧
-  (elab_arg_failures ctx n tgts (e :: es) =
-    (case elab_expr ctx n e of
-       INL ((ss, a, vt), n1) =>
-         (case tgts of
-            SOME target :: _ =>
-              (case convert_operand n1 target a vt of
-                 INL _ => []
-               | INR why => [(expr_id e, why)])
-          | _ => [])
-     | INR bs => bs) ++
-    elab_arg_failures ctx n (DROP 1 tgts) es)
+    | INR bs => INR (bs ++ blockers (elab_inline_elements ctx n a element (i + 1) es)))
 Termination
   qexists_tac ‘measure (λx. case x of
      INL (ctx, n, e) => 4 * src_expr_size e + 2
@@ -2847,10 +2785,8 @@ Termination
    | INR (INR (INR (INR (INR (INR (INL (ctx, n, es))))))) => 4 * list_size src_expr_size es
    | INR (INR (INR (INR (INR (INR (INR (INL (ctx, n, cs)))))))) =>
        4 * list_size (option_size src_expr_size) cs + 3
-   | INR (INR (INR (INR (INR (INR (INR (INR (INL (ctx, n, a, element, i, es))))))))) =>
-       4 * list_size src_expr_size es + 2
-   | INR (INR (INR (INR (INR (INR (INR (INR (INR (ctx, n, tgts, es))))))))) =>
-       4 * list_size src_expr_size es)’ >>
+   | INR (INR (INR (INR (INR (INR (INR (INR (ctx, n, a, element, i, es)))))))) =>
+       4 * list_size src_expr_size es + 2)’ >>
   conj_tac >- simp[prim_recTheory.WF_measure] >>
   (* only the equations naming the node matter: the case hypotheses about
      the children's results are large, so they are dropped, not simplified.
@@ -3318,7 +3254,7 @@ Definition elab_stmts_def:
     (case elab_values ctx n e of
        INL ((ss, vs), n1) =>
          (case convert_operands n1 (expr_id e) (return_ids e (LENGTH vs))
-                 (values_of (MAP SND ctx.returns)) vs of
+                 (values_of (MAP SND ctx.returns)) (MAP INL vs) of
             INL (cs, _, as, n2) => INL ((ss ++ cs ++ [ReturnStmt as], ctx), n2)
           | INR bs => INR (if MEM ctx.returns_id ctx.bad_ids then [] else bs))
      | INR bs => INR bs)) ∧
@@ -3335,13 +3271,13 @@ Definition elab_stmts_def:
                 if EVERY (abi_binding_ok ctx.enums ctx.structs o FST) ps then INL (e, ps)
                 else INR (info.node_id, "unsupported event parameter type")
             | NONE => INR (info.node_id, "unsupported event parameter type"))) in
-    case (event, elab_arg_values ctx n args) of
+    case (event, operand_values (elab_arg_values ctx n args)) of
       (INR b, r) => reject b r
     | (INL _, INR bs) => INR bs
     | (INL (e, ps), INL ((ss, vs0), next)) =>
         case (arrange order vs0, arrange order (expr_ids args)) of
           (SOME vs, SOME ids) =>
-            (case convert_operands next info.node_id ids (encoded_as (MAP FST ps)) vs of
+            (case convert_operands next info.node_id ids (encoded_as (MAP FST ps)) (MAP INL vs) of
                INL (cs, _, as, n1) =>
                  INL ((ss ++ cs ++ [EmitStmt (event_topic e) (emit_arguments ps as)],
                        ctx), n1)
@@ -3350,13 +3286,13 @@ Definition elab_stmts_def:
   (elab_stmt ctx n (SrcRevertError info err args order) =
     case all_some (MAP event_variable_type err.error_parameters) of
       NONE => INR (variables_blockers (MAP SOME err.error_parameters) ++
-                   blockers (elab_arg_values ctx n args))
+                   blockers (operand_values (elab_arg_values ctx n args)))
     | SOME params =>
         if ¬revert_shape ctx.enums ctx.structs err.error_selector params order (LENGTH args)
         then reject (info.node_id, "revert does not match the error")
-               (elab_arg_values ctx n args)
+               (operand_values (elab_arg_values ctx n args))
         else
-          (case elab_arg_values ctx n args of
+          (case operand_values (elab_arg_values ctx n args) of
              INR bs => INR bs
            | INL ((ss, vs), n1) =>
                (case revert_arguments ctx.enums ctx.structs n1 info.node_id err.error_selector params order
@@ -3383,7 +3319,7 @@ Definition elab_stmts_def:
         if own = [] then INL ((ss ++ [AssemblyStmt code rs], ctx), n1) else INR own
     | INR bs => INR (own ++ bs)) ∧
   (elab_stmt ctx n (SrcUnsupportedStmt info msg es ss) =
-    INR ((info.node_id, msg) :: blockers (elab_arg_values ctx n es) ++
+    INR ((info.node_id, msg) :: blockers (operand_values (elab_arg_values ctx n es)) ++
          blockers (elab_stmts ctx n ss))) ∧
   (* An optional for initialization or loop expression. *)
   (elab_for_init ctx n NONE = INL (([], ctx), n)) ∧
@@ -4368,13 +4304,8 @@ Proof
   simp[Once convert_operands_pre_def] >> rw[] >> fs[]
 QED
 
-val () = cv_auto_trans some_targets_def;
-val () = cv_auto_trans uniform_targets_def;
-val () = cv_auto_trans suffix_target_def;
-val () = cv_auto_trans operand_targets_def;
-val () = cv_auto_trans source_targets_def;
-val () = cv_auto_trans abi_targets_def;
-val () = cv_auto_trans abi_form_blockers_def;
+val () = cv_auto_trans outcome_values_def;
+val () = cv_auto_trans operand_values_def;
 val () = cv_auto_trans return_ids_def;
 val () = cv_auto_trans elab_builtin_def;
 val () = cv_auto_trans selector_encoding_def;
@@ -4426,7 +4357,7 @@ val () = cv_auto_trans finish_array_location_length_def;
 val () = cv_auto_trans finish_selector_def;
 
 val elab_expr_pre_def = cv_auto_trans_pre_rec
-  "elab_expr_pre elab_args_pre elab_values_pre elab_components_pre elab_location_pre elab_destination_pre elab_arg_values_pre elab_destinations_pre elab_inline_elements_pre elab_arg_failures_pre"
+  "elab_expr_pre elab_args_pre elab_values_pre elab_components_pre elab_location_pre elab_destination_pre elab_arg_values_pre elab_destinations_pre elab_inline_elements_pre"
   elab_expr_def (
   WF_REL_TAC ‘measure (λx. case x of
      INL (ctx, n, e) => 4 * cv_size e + 2
@@ -4437,10 +4368,8 @@ val elab_expr_pre_def = cv_auto_trans_pre_rec
    | INR (INR (INR (INR (INR (INL (ctx, n, e)))))) => 4 * cv_size e + 2
    | INR (INR (INR (INR (INR (INR (INL (ctx, n, es))))))) => 4 * cv_size es
    | INR (INR (INR (INR (INR (INR (INR (INL (ctx, n, cs)))))))) => 4 * cv_size cs + 3
-   | INR (INR (INR (INR (INR (INR (INR (INR (INL (ctx, n, a, element, i, es))))))))) =>
-       4 * cv_size es + 2
-   | INR (INR (INR (INR (INR (INR (INR (INR (INR (ctx, n, tgts, es))))))))) =>
-       4 * cv_size es)’ >>
+   | INR (INR (INR (INR (INR (INR (INR (INR (ctx, n, a, element, i, es)))))))) =>
+       4 * cv_size es + 2)’ >>
   cv_termination_tac >>
   rpt IF_CASES_TAC >> gvs[] >>
   simp[cvTheory.cv_size_def] >>
@@ -4467,9 +4396,7 @@ Theorem elab_pre_bounded[local]:
   (!ctx n cs. 4 * list_size (option_size src_expr_size) cs + 3 < b ==>
      elab_destinations_pre ctx n cs) /\
   (!ctx n a element i es. 4 * list_size src_expr_size es + 2 < b ==>
-     elab_inline_elements_pre ctx n a element i es) /\
-  (!ctx n tgts es. 4 * list_size src_expr_size es < b ==>
-     elab_arg_failures_pre ctx n tgts es)
+     elab_inline_elements_pre ctx n a element i es)
 Proof
   completeInduct_on ‘b’ >> rpt conj_tac >> rpt gen_tac >> disch_tac >>
   qpat_x_assum ‘!m. m < b ==> _’ (drule_then strip_assume_tac)
@@ -4497,9 +4424,6 @@ Proof
     (Cases_on ‘cs’ >> simp_tac std_ss [Once elab_expr_pre_def] >>
      simp[listTheory.list_size_def, basicSizeTheory.option_size_def])
   >~ [‘elab_inline_elements_pre ctx n a element i es’] >-
-    (Cases_on ‘es’ >> simp_tac std_ss [Once elab_expr_pre_def] >>
-     simp[listTheory.list_size_def])
-  >~ [‘elab_arg_failures_pre ctx n tgts es’] >-
     (Cases_on ‘es’ >> simp_tac std_ss [Once elab_expr_pre_def] >>
      simp[listTheory.list_size_def])
   >~ [‘elab_components_pre ctx n cs’] >-
@@ -4548,13 +4472,6 @@ Theorem elab_destinations_pre[cv_pre,local]:
 Proof
   rpt gen_tac >> irule (cj 8 elab_pre_bounded) >>
   qexists_tac ‘4 * list_size (option_size src_expr_size) cs + 4’ >> simp[]
-QED
-
-Theorem elab_arg_failures_pre[cv_pre,local]:
-  ∀ctx n tgts es. elab_arg_failures_pre ctx n tgts es
-Proof
-  rpt gen_tac >> irule (cj 10 elab_pre_bounded) >>
-  qexists_tac ‘4 * list_size src_expr_size es + 1’ >> simp[]
 QED
 
 val () = cv_auto_trans elab_condition_def;

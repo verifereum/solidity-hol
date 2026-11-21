@@ -765,6 +765,23 @@ Proof
   EVAL_TAC
 QED
 
+(* A selector that fails to elaborate next to an argument that fails to
+ * convert: both are reported. *)
+Theorem abi_selector_failure_reports_arguments:
+  ^(reports “elab_expr ^ctx0 10
+               (SrcAbiEncode ^(at 30) ^(at 31) AbiWithSelector
+                  [^(bad_at 32);
+                   SrcLiteral ^(at 33) NumberLiteral "0.5" "t_rational_1_by_2"]
+                  "t_bytes_memory_ptr")”
+     [“(32, "bad")”, “(33, "abi encoding of this type")”]) ∧
+  ^(reports “elab_expr ^ctx0 10
+               (SrcAbiEncode ^(at 30) ^(at 31) (AbiCall ["t_bool"])
+                  [^(bad_at 32); ^(string_at 33)] "t_bytes_memory_ptr")”
+     [“(32, "bad")”, “(33, "string literal conversion")”])
+Proof
+  EVAL_TAC
+QED
+
 (* A call that names its arguments converts each to its own parameter's type:
  * with the parameters (uint256, bytes1) taken in the order [1; 0], the string
  * literal is converted to uint256 in the first call and to bytes1 in the
@@ -801,6 +818,25 @@ Theorem attached_call_mixed_operands_report:
   ^(reports “elab_args ^ctx0 10 30 1 [] [ValueOf (UintT 256); ValueOf (UintT 256)]
                [^(string_at 32); ^(bad_at 33)]”
      [“(32, "string literal conversion")”, “(33, "bad")”])
+Proof
+  EVAL_TAC
+QED
+
+(* A call whose argument order isn't a permutation, or that has more
+ * arguments than parameters, still reports every failing argument. *)
+Theorem malformed_call_operands_report:
+  ^(reports “elab_args ^ctx0 10 30 0 [0; 0] [ValueOf (UintT 256); ValueOf (UintT 256)]
+               [^(string_at 32); ^(bad_at 33)]”
+     [“(32, "string literal conversion")”, “(33, "bad")”]) ∧
+  ^(reports “elab_args ^ctx0 10 30 0 [0; 0] [ValueOf (UintT 256); ValueOf (UintT 256)]
+               [^(one_at 32); ^(bad_at 33)]”
+     [“(33, "bad")”]) ∧
+  ^(reports “elab_args ^ctx0 10 30 2 [] [ValueOf (UintT 256)]
+               [^(bad_at 32); ^(bad_at 33)]”
+     bad_32_33) ∧
+  ^(reports “elab_args ^ctx0 10 30 1 [1; 0] [ValueOf (UintT 256); ValueOf (UintT 256)]
+               [^(bad_at 32); ^(bad_at 33)]”
+     (“(30, "argument order")” :: bad_32_33))
 Proof
   EVAL_TAC
 QED
@@ -847,6 +883,30 @@ Theorem array_member_arguments_report:
      array_reports)
 Proof
   EVAL_TAC
+QED
+
+(* Each level of a deep nesting of rejected operand lists reports its own
+ * failing operand, and the innermost one is reported once. The operands are
+ * elaborated in one pass: elaborating a rejected list's operands again to
+ * report them would visit the innermost one 2^30 times. *)
+fun nested_modular 0 = bad_at 1000
+  | nested_modular k =
+      “SrcModular ^(at (1000 + 4 * k)) ^(at (1001 + 4 * k)) AddModOp
+         [^(nested_modular (k - 1)); ^(string_at (1002 + 4 * k)); ^(one_at (1003 + 4 * k))]
+         "t_uint256"”;
+val nested_reports =
+  listSyntax.mk_list
+    (“(1000, "bad")” ::
+     List.tabulate (30, fn k =>
+       “(^(numSyntax.term_of_int (1006 + 4 * k)), "string literal conversion")”),
+     “:num # string”);
+
+val nested_reported = EVAL “blockers (elab_expr ^ctx0 10 ^(nested_modular 30))”;
+
+Theorem nested_rejected_operands_report:
+  blockers (elab_expr ^ctx0 10 ^(nested_modular 30)) = ^nested_reports
+Proof
+  REWRITE_TAC [nested_reported]
 QED
 
 (* The unit elaborates, so nothing in it fails. *)

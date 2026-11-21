@@ -191,13 +191,27 @@ Definition word_value_def:
       | NONE => INR (InvalidCompletion "bad memory word type")
 End
 
-(* The value of type ty in the word at a. *)
+(* Run a post-read fail-closed check before surfacing any read failure, so a
+ * fail-closed guard takes precedence over a panic or revert from reading inputs. *)
+Definition guard_result_def:
+  guard_result (check : 'b + source_completion) (r : 'a + source_completion) =
+    case check of
+      INR c => INR c
+    | INL x =>
+        case r of
+          INL v => INL (v, x)
+        | INR c => INR c
+End
+
+Definition read_result_def:
+  read_result (r, st : source_state) = guard_result (INL st) r
+End
+
+(* The value of type ty in the word at a, and the state after loading it
+ * (whether or not the word is valid, so callers know what was read). *)
 Definition read_memory_word_def:
   read_memory_word env ty a st =
-    let (w, st1) = memory_load a st in
-    case word_value env ty w of
-      INL v => INL (v, st1)
-    | INR c => INR c
+    let (w, st1) = memory_load a st in (word_value env ty w, st1)
 End
 
 Definition write_memory_word_def:
@@ -364,51 +378,47 @@ Definition memory_value_def:
   (memory_value env copying (fuel : num) ty v st =
     case (ty, v) of
       (ArrayT element length, ReferenceValue (MemoryReference p rty)) =>
-        if rty ≠ ty then INR (InvalidCompletion "bad memory array reference") else
+        if rty ≠ ty then (INR (InvalidCompletion "bad memory array reference"), st) else
         let (n, st1) = memory_length ty p st in
-        (case memory_elements env copying fuel element (memory_data ty p) n st1 of
-           INL (vs, st2) => INL (TupleValue vs, st2)
-         | INR c => INR c)
+        let (r, st2) = memory_elements env copying fuel element (memory_data ty p) n st1 in
+        ((case r of INL vs => INL (TupleValue vs) | INR c => INR c), st2)
     | (StructT s, ReferenceValue (MemoryReference p rty)) =>
-        if rty ≠ ty then INR (InvalidCompletion "bad memory struct reference") else
+        if rty ≠ ty then (INR (InvalidCompletion "bad memory struct reference"), st) else
         (case lookup_struct env s of
            SOME fields =>
-             if fuel = 0 then INR (InvalidCompletion "struct nesting") else
-             (case memory_fields env copying (fuel - 1) (MAP SND fields) p st of
-                INL (vs, st1) => INL (TupleValue vs, st1)
-              | INR c => INR c)
-         | NONE => INR (InvalidCompletion "unknown struct"))
+             if fuel = 0 then (INR (InvalidCompletion "struct nesting"), st) else
+             let (r, st1) = memory_fields env copying (fuel - 1) (MAP SND fields) p st in
+             ((case r of INL vs => INL (TupleValue vs) | INR c => INR c), st1)
+         | NONE => (INR (InvalidCompletion "unknown struct"), st))
     | (_, ReferenceValue (MemoryReference p rty)) =>
         if byte_sequence_type rty then
           let (bs, st1) = memory_bytes p st in
-          INL (ScalarValue (BytesValue bs),
-               if copying then copy_source_reads (MemoryReference p rty) (LENGTH bs) st1
-               else st1)
-        else INR (InvalidCompletion "bad memory value")
-    | (_, ScalarValue _) => INL (v, st)
-    | _ => INR (InvalidCompletion "bad memory value")) ∧
+          (INL (ScalarValue (BytesValue bs)),
+           if copying then copy_source_reads (MemoryReference p rty) (LENGTH bs) st1
+           else st1)
+        else (INR (InvalidCompletion "bad memory value"), st)
+    | (_, ScalarValue _) => (INL v, st)
+    | _ => (INR (InvalidCompletion "bad memory value"), st)) ∧
   (memory_elements env copying fuel element p n st =
-    if n = 0 then INL ([], st) else
+    if n = 0 then (INL [], st) else
     case read_memory_word env element p st of
-      INR c => INR c
-    | INL (w, st1) =>
+      (INR c, st1) => (INR c, st1)
+    | (INL w, st1) =>
         case memory_value env copying fuel element w st1 of
-          INR c => INR c
-        | INL (v, st2) =>
-            case memory_elements env copying fuel element (p + 32) (n - 1) st2 of
-              INL (vs, st3) => INL (v :: vs, st3)
-            | INR c => INR c) ∧
-  (memory_fields env copying fuel [] p st = INL ([], st)) ∧
+          (INR c, st2) => (INR c, st2)
+        | (INL v, st2) =>
+            let (r, st3) = memory_elements env copying fuel element (p + 32) (n - 1) st2 in
+            ((case r of INL vs => INL (v :: vs) | INR c => INR c), st3)) ∧
+  (memory_fields env copying fuel [] p st = (INL [], st)) ∧
   (memory_fields env copying fuel (ty :: tys) p st =
     case read_memory_word env ty p st of
-      INR c => INR c
-    | INL (w, st1) =>
+      (INR c, st1) => (INR c, st1)
+    | (INL w, st1) =>
         case memory_value env copying fuel ty w st1 of
-          INR c => INR c
-        | INL (v, st2) =>
-            case memory_fields env copying fuel tys (p + 32) st2 of
-              INL (vs, st3) => INL (v :: vs, st3)
-            | INR c => INR c)
+          (INR c, st2) => (INR c, st2)
+        | (INL v, st2) =>
+            let (r, st3) = memory_fields env copying fuel tys (p + 32) st2 in
+            ((case r of INL vs => INL (v :: vs) | INR c => INR c), st3))
 Termination
   WF_REL_TAC ‘inv_image ($< LEX $< LEX $<) (λx. case x of
     INL (env, copying, fuel, ty, v, st) => (fuel, sol_type_size ty, 0n)

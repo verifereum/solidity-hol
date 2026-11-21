@@ -103,6 +103,7 @@ Ancestors
   solidityDifferentialCorpus_pure_core
   solidityDifferentialCorpus_qualified_base_calls
   solidityDifferentialCorpus_qualified_events
+  solidityDifferentialCorpus_read_failure_guards
   solidityDifferentialCorpus_receive
   solidityDifferentialCorpus_reference_forms
   solidityDifferentialCorpus_revert_arguments

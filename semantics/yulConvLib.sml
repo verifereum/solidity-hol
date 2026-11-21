@@ -198,13 +198,13 @@ fun cond_conv tm =
 val word_exp_c = prim_mk_const {Thy = "words", Name = "word_exp"}
 val word_exp_tailrec_c =
   prim_mk_const {Thy = "words", Name = "word_exp_tailrec"}
+val keccak_c = prim_mk_const {Thy = "keccak", Name = "Keccak_256_w64"}
 
-(* The literal case, on a set that has the word library's own rules: `n2w` of a
- * numeral is what makes `word_exp 2w 3w` a value rather than a term.  A copy,
+(* The literal cases use the word library's own rules. This set is a copy
  * because `add_words_compset` adds to the compset it is given and a compset's
  * per-constant entries are shared refs -- building it on `the_compset ()` would
  * put the word library into the global set, and with it `EVAL`. *)
-val exp_compset =
+val literal_compset =
   wordsLib.add_words_compset true (computeLib.copy (computeLib.the_compset ()))
 
 (* Both arguments literal is the only case worth taking: with a symbolic base
@@ -214,16 +214,36 @@ fun word_exp_conv tm =
   case Lib.total (fn () => snd (strip_comb tm)) () of
     SOME [a, b] =>
       if wordsSyntax.is_word_literal a andalso wordsSyntax.is_word_literal b
-      then computeLib.CBV_CONV exp_compset tm
+      then computeLib.CBV_CONV literal_compset tm
       else raise Conv.UNCHANGED
   | _ => raise Conv.UNCHANGED
 
+(* Hashing symbolic bytes can expand the padding and permutation into a
+ * large term. Both sets use the same literal test because reducing a scope
+ * lookup can expose a hash even when the original guard contains none. *)
+fun keccak_conv tm =
+  case Lib.total listSyntax.dest_list (rand tm) of
+    SOME (bytes, _) =>
+      if List.all wordsSyntax.is_word_literal bytes
+      then computeLib.CBV_CONV literal_compset tm
+      else raise Conv.UNCHANGED
+  | NONE => raise Conv.UNCHANGED
+
+fun add_literal_convs cs =
+  let
+    val cs = List.foldl (fn (c, cs) => computeLib.scrub_const cs c)
+                        cs [word_exp_c, word_exp_tailrec_c, keccak_c]
+    val cs = computeLib.add_conv (word_exp_c, 2, word_exp_conv) cs
+  in
+    computeLib.add_conv (keccak_c, 1, keccak_conv) cs
+  end
+
 val test_compset =
-  computeLib.add_conv (word_exp_c, 2, word_exp_conv)
+  add_literal_convs
     (List.foldl (fn (c, cs) => computeLib.scrub_const cs c)
        (computeLib.copy (computeLib.the_compset ()))
-       [eval_yul_block_c, invoke_c, eval_yul_loop_c, word_exp_c,
-        word_exp_tailrec_c, run_external_call_c, run_delegate_call_c])
+       [eval_yul_block_c, invoke_c, eval_yul_loop_c,
+        run_external_call_c, run_delegate_call_c])
 
 fun eval_test tm = computeLib.CBV_CONV test_compset tm
 
@@ -1464,9 +1484,8 @@ fun let_yul_conv tm =
  * evaluator reaches its memory through `w2n` of an address and EVAL's set
  * alone leaves `w2n 0w` standing, which is enough to strand every memory
  * operation -- the byte it would read never becomes a list to recurse on.
- * The word library's exponentiation recursion is taken back out, with the
- * literal-only rule for `word_exp` put in its place (see `test_compset`
- * above).
+ * The definitions for exponentiation and Keccak give way to the same
+ * literal-only rules `test_compset` uses.
  *
  * On a copy of the global set: `add_words_compset` adds the word library's
  * rules to the compset it is given, and a compset's per-constant entries are
@@ -1496,12 +1515,7 @@ val eval_compset =
                        eval_yul_loop_c)
                     run_external_call_c
         val cs1 = computeLib.scrub_const cs1 run_delegate_call_c
-        val cs2 = wordsLib.add_words_compset true cs1
-        val cs3 =
-          computeLib.scrub_const
-            (computeLib.scrub_const cs2 word_exp_c)
-            word_exp_tailrec_c
-        val cs4 = computeLib.add_conv (word_exp_c, 2, word_exp_conv) cs3
+        val cs4 = add_literal_convs (wordsLib.add_words_compset true cs1)
         val cs4 = computeLib.add_conv (with_zero_c, 3, with_zero_conv)
                     (computeLib.scrub_const cs4 with_zero_c)
         val cs4 = computeLib.add_conv (modular_word_c, 4, modular_word_conv)
@@ -1882,13 +1896,13 @@ fun yul_loop_conv defs tm =
  * residue as a statement, the scope readers and the binding operations, which
  * it unfolds only while their input is a value it has, FLOOKUP itself, which is
  * the way a scope that did not come out is seen, the result and value helpers,
- * and the calls it leaves folded.  A name in this list that is still in a term
- * is a step the conversion either could not take or declined; `residues` is
- * what a caller reads to see which. *)
+ * and the calls and hashes it leaves folded. A name in this list that is
+ * still in a term is a step the conversion either could not take or declined.
+ * `residues` is what a caller reads to see which. *)
 val conversion_consts =
   List.map (const_key o dest_thy_const)
     (flookup_tm :: invoke_c :: eval_yul_loop_c :: eval_yul_builtin_c ::
-     run_external_call_c :: run_delegate_call_c :: yul_lookup_c ::
+     run_external_call_c :: run_delegate_call_c :: keccak_c :: yul_lookup_c ::
      yul_lookup_names_c ::
      (clause_heads (evaluator_clauses @ helper_defs @ block_def_clauses) @
       List.map (fn (c, _, _) => c) guarded_helpers))
@@ -1898,8 +1912,8 @@ fun residues tm =
 
 (* What a form may still be standing on: the call and the loop it left folded,
  * the message call a `call` builtin made (`run_external_call`, or
- * `run_delegate_call` for `delegatecall`), and the
- * operations whose input is a value nobody has -- the frame and memory
+ * `run_delegate_call` for `delegatecall`), a Keccak hash on symbolic bytes, and
+ * the operations whose input is a value nobody has -- the frame and memory
  * operations of `guarded_helper_defs` (a binding over a machine that holds a
  * call, an `FLOOKUP` of a scope that came out of the callee's frame), the scope
  * readers, which are unguarded and so always unfold, but whose read of a scope
@@ -1916,7 +1930,7 @@ val permitted_residues =
   :: ("externalCall", "run_external_call")
   :: ("externalCall", "run_delegate_call")
   :: List.map (const_key o dest_thy_const)
-       (flookup_tm :: yul_lookup_c :: yul_lookup_names_c ::
+       (flookup_tm :: yul_lookup_c :: yul_lookup_names_c :: keccak_c ::
         (clause_heads helper_defs @
          List.map (fn (c, _, _) => c) guarded_helpers))
 

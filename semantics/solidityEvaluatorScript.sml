@@ -415,11 +415,11 @@ Definition eval_operation_def:
     | ReadOperation ty a =>
         (case eval_atom st.scopes a of
            SOME (ReferenceValue (MemoryReference p rty)) =>
-             if ty = FixedBytesT 1 ∧ rty = ty then read_memory_word env ty p st
+             if ty = FixedBytesT 1 ∧ rty = ty then read_result (read_memory_word env ty p st)
              else INR (InvalidCompletion "bad memory read type")
          | SOME (ReferenceValue (MemoryWordReference p rty)) =>
              if (case ty of LocatedT MemoryLoc t => t | t => t) = rty
-             then read_memory_word env rty p st
+             then read_result (read_memory_word env rty p st)
              else INR (InvalidCompletion "bad memory read type")
          | SOME (ReferenceValue (CalldataReference head n rty)) =>
              if (case ty of LocatedT _ t => t | t => t) ≠ rty then
@@ -433,7 +433,7 @@ Definition eval_operation_def:
              (case st.immutables of
                 NONE =>
                   (case immutable_offset x env.immutables of
-                     SOME (p, ity) => read_memory_word env ity p st
+                     SOME (p, ity) => read_result (read_memory_word env ity p st)
                    | NONE => INR (InvalidCompletion "bad immutable reference"))
               | SOME imm =>
                   case FLOOKUP imm (ast_key x) of
@@ -495,12 +495,12 @@ Definition eval_operation_def:
                       | INR c => INR c)
                  | MemoryReference p (ArrayT element length) =>
                      (case memory_array_element (ArrayT element length) p i st of
-                        INL (q, element, st1) => read_memory_word env element q st1
+                        INL (q, element, st1) => read_result (read_memory_word env element q st1)
                       | INR c => INR c)
                  | MemoryReference p ty =>
                      if ¬byte_sequence_type ty then INR (InvalidCompletion "bad indexed value")
                      else (case memory_byte_element p i st of
-                        INL (q, st1) => read_memory_word env (FixedBytesT 1) q st1
+                        INL (q, st1) => read_result (read_memory_word env (FixedBytesT 1) q st1)
                       | INR c => INR c)
                  | _ =>
                      case byte_contents st r of
@@ -814,35 +814,12 @@ Definition eval_event_args_def:
     | _ => NONE)
 End
 
-(* Temporaries written one after another, each at the free memory pointer
- * as memory holds it when the temporary is written: the compiler reads the
- * pointer anew for each, which an earlier temporary may have overwritten.
- * Also says whether any temporary changed the pointer. *)
-Definition write_at_each_def:
-  (write_at_each [] st = (F, st)) ∧
-  (write_at_each (bs :: rest) st =
-     let (p, st1) = memory_load 64 st in
-     let st2 = memory_write p bs st1 in
-     let (moved, st3) = write_at_each rest st2 in
-     (moved ∨ FST (memory_load 64 st2) ≠ p, st3))
-End
-
-(* Whether an event reads an argument from memory. *)
-Definition has_memory_argument_def:
-  (has_memory_argument [] = F) ∧
-  (has_memory_argument ((ty, indexed, v) :: args) =
-     ((case v of ReferenceValue (MemoryReference _ _) => T | _ => F) ∨
-      has_memory_argument args))
-End
-
 (* A log of the executing account, appended to the world's logs, so a revert
  * of the frame discards it with the rest of the world. As with storage
  * writes, an emit in a static frame fails. The compiler encodes the log's
  * data at the free memory pointer, which it does not move, reading the
- * pointer after the indexed arguments' hash preimages are written. A
- * preimage that changes the pointer, even one a later preimage changes
- * back, moves where the next write goes, which may be over a memory
- * argument the model read before: that fails closed.
+ * pointer after the indexed arguments' hash preimages are written
+ * (event_log).
  *)
 Definition emit_event_def:
   emit_event env topic args (st : source_state) gas =
@@ -850,20 +827,15 @@ Definition emit_event_def:
       NONE => abrupt_result (InvalidCompletion "unbound atom") st gas
     | SOME vs =>
         case event_log env st st.frame.self_address topic vs of
-          INL ((e, spill, temps), st1) =>
+          INL ((e, spill), st1) =>
             if st.frame.static_context then
               abrupt_result (InvalidCompletion "emit in static frame") st gas
             else
-              let (moved, st2) = write_at_each temps st1 in
-              let (p, st3) = memory_load 64 st2 in
-              if moved ∧ has_memory_argument vs then
-                abrupt_result (InvalidCompletion
-                  "unsupported: an event's hash preimage moved the free memory pointer") st gas
-              else
+              let (p, st2) = memory_load 64 st1 in
               normal_result
                 (memory_write (p + LENGTH e.data) spill
-                   (memory_write p e.data st3) with
-                   world := st3.world with logs := st3.world.logs ++ [e]) gas
+                   (memory_write p e.data st2) with
+                   world := st2.world with logs := st2.world.logs ++ [e]) gas
         | INR c => abrupt_result c st gas
 End
 
@@ -1464,8 +1436,11 @@ Definition simple_stmt_def:
                           src_addr = dst_addr ∧ src_slot = dst_slot
                       | _ => F)
                   then normal_result st gas else
+                  if st.frame.static_context then
+                    abrupt_result (InvalidCompletion "array copy in static frame") st gas
+                  else
                   (case array_copy_value env T st cty src of
-                     INL (v, st1) =>
+                     (INL v, st1) =>
                        (case copy_to_storage env st1.world.accounts cty v
                                dst st.frame.static_context of
                           INL accounts =>
@@ -1476,7 +1451,7 @@ Definition simple_stmt_def:
                                | _ => NONE)
                               (st1 with world := st1.world with accounts := accounts)) gas
                         | INR c => abrupt_result c st gas)
-                   | INR c => abrupt_result c st gas)
+                   | (INR c, _) => abrupt_result c st gas)
               | NONE =>
                 case copy_byte_contents src dst st of
                   INL st' => normal_result st' gas
