@@ -1288,7 +1288,7 @@ Definition simple_stmt_def:
              (case materialize_storage env (LENGTH env.type_declarations)
                      st.world.accounts addr slot rty st of
                 INL (v', st') => normal_result (define_binding x ty v' st') gas
-              | INR c => abrupt_result c st gas)
+              | INR (c, st') => abrupt_result c st' gas)
          | _ => abrupt_result (InvalidCompletion "bad object copy") st gas)
     (* Decoded memory values are allocated, as external call results are. A
      * memory input is decoded in place: only its bytes below the memory size
