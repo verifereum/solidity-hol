@@ -360,57 +360,92 @@ Definition new_memory_array_def:
         | _ => INL (p, memory_write (p + 32) (REPLICATE size 0w) st2)
 End
 
+(* How far a read of n bytes at a reaches, raised from reach: the byte after
+ * its last one, nothing for an empty read. The encoders' free-pointer checks
+ * compare against it. *)
+Definition touched_reach_def:
+  touched_reach reach a (n : num) =
+    MAX reach (if n = 0 then 0 else a MOD 2 ** 256 + n)
+End
+
+(* The reach of a scratch hash (scratch_write), which writes [0, 32). *)
+Definition scratch_reach_def:
+  scratch_reach reach (w : bytes32 option) =
+    case w of NONE => reach | SOME _ => MAX reach 32
+End
+
+(* The reach of a byte sequence's reads (memory_bytes) at p: its length word
+ * and its bytes. *)
+Theorem touched_reach_memory_bytes:
+  p + 32 < 2 ** 256 ⇒
+  touched_reach (touched_reach reach p 32) (p + 32) n = MAX reach (p + 32 + n)
+Proof
+  strip_tac >> ‘p < 2 ** 256’ by decide_tac >>
+  rw[touched_reach_def, arithmeticTheory.LESS_MOD, arithmeticTheory.MAX_DEF]
+QED
+
 (* The value of a memory array or struct, as the encoder reads it: the tuple
- * of its elements or fields, byte sequences as their bytes. The fuel bounds
- * the struct nesting. *)
+ * of its elements or fields, byte sequences as their bytes, and how far the
+ * reads reach, raised from reach (touched_reach), on a failed read too. The
+ * fuel bounds the struct nesting. *)
 Definition memory_value_def:
-  (memory_value env (fuel : num) ty v st =
+  (memory_value env (fuel : num) ty v reach st =
     case (ty, v) of
       (ArrayT element length, ReferenceValue (MemoryReference p rty)) =>
-        if rty ≠ ty then (INR (InvalidCompletion "bad memory array reference"), st) else
+        if rty ≠ ty then (INR (InvalidCompletion "bad memory array reference"), reach, st) else
         let (n, st1) = memory_length ty p st in
-        let (r, st2) = memory_elements env fuel element (memory_data ty p) n st1 in
-        ((case r of INL vs => INL (TupleValue vs) | INR c => INR c), st2)
+        let reach1 = (case length of NONE => touched_reach reach p 32 | SOME _ => reach) in
+        let (r, reach2, st2) =
+          memory_elements env fuel element (memory_data ty p) n reach1 st1 in
+        ((case r of INL vs => INL (TupleValue vs) | INR c => INR c), reach2, st2)
     | (StructT s, ReferenceValue (MemoryReference p rty)) =>
-        if rty ≠ ty then (INR (InvalidCompletion "bad memory struct reference"), st) else
+        if rty ≠ ty then (INR (InvalidCompletion "bad memory struct reference"), reach, st) else
         (case lookup_struct env s of
            SOME fields =>
-             if fuel = 0 then (INR (InvalidCompletion "struct nesting"), st) else
-             let (r, st1) = memory_fields env (fuel - 1) (MAP SND fields) p st in
-             ((case r of INL vs => INL (TupleValue vs) | INR c => INR c), st1)
-         | NONE => (INR (InvalidCompletion "unknown struct"), st))
+             if fuel = 0 then (INR (InvalidCompletion "struct nesting"), reach, st) else
+             let (r, reach1, st1) =
+               memory_fields env (fuel - 1) (MAP SND fields) p reach st in
+             ((case r of INL vs => INL (TupleValue vs) | INR c => INR c), reach1, st1)
+         | NONE => (INR (InvalidCompletion "unknown struct"), reach, st))
     | (_, ReferenceValue (MemoryReference p rty)) =>
         if byte_sequence_type rty then
           let (bs, st1) = memory_bytes p st in
-          (INL (ScalarValue (BytesValue bs)), st1)
-        else (INR (InvalidCompletion "bad memory value"), st)
-    | (_, ScalarValue _) => (INL v, st)
-    | _ => (INR (InvalidCompletion "bad memory value"), st)) ∧
-  (memory_elements env fuel element p n st =
-    if n = 0 then (INL [], st) else
+          (INL (ScalarValue (BytesValue bs)),
+           touched_reach (touched_reach reach p 32) (p + 32) (LENGTH bs), st1)
+        else (INR (InvalidCompletion "bad memory value"), reach, st)
+    | (_, ScalarValue _) => (INL v, reach, st)
+    | _ => (INR (InvalidCompletion "bad memory value"), reach, st)) ∧
+  (memory_elements env fuel element p n reach st =
+    if n = 0 then (INL [], reach, st) else
+    let reach1 = touched_reach reach p 32 in
     case read_memory_word env element p st of
-      (INR c, st1) => (INR c, st1)
+      (INR c, st1) => (INR c, reach1, st1)
     | (INL w, st1) =>
-        case memory_value env fuel element w st1 of
-          (INR c, st2) => (INR c, st2)
-        | (INL v, st2) =>
-            let (r, st3) = memory_elements env fuel element (p + 32) (n - 1) st2 in
-            ((case r of INL vs => INL (v :: vs) | INR c => INR c), st3)) ∧
-  (memory_fields env fuel [] p st = (INL [], st)) ∧
-  (memory_fields env fuel (ty :: tys) p st =
+        case memory_value env fuel element w reach1 st1 of
+          (INR c, reach2, st2) => (INR c, reach2, st2)
+        | (INL v, reach2, st2) =>
+            let (r, reach3, st3) =
+              memory_elements env fuel element (p + 32) (n - 1) reach2 st2 in
+            ((case r of INL vs => INL (v :: vs) | INR c => INR c), reach3, st3)) ∧
+  (memory_fields env fuel [] p reach st = (INL [], reach, st)) ∧
+  (memory_fields env fuel (ty :: tys) p reach st =
+    let reach1 = touched_reach reach p 32 in
     case read_memory_word env ty p st of
-      (INR c, st1) => (INR c, st1)
+      (INR c, st1) => (INR c, reach1, st1)
     | (INL w, st1) =>
-        case memory_value env fuel ty w st1 of
-          (INR c, st2) => (INR c, st2)
-        | (INL v, st2) =>
-            let (r, st3) = memory_fields env fuel tys (p + 32) st2 in
-            ((case r of INL vs => INL (v :: vs) | INR c => INR c), st3))
+        case memory_value env fuel ty w reach1 st1 of
+          (INR c, reach2, st2) => (INR c, reach2, st2)
+        | (INL v, reach2, st2) =>
+            let (r, reach3, st3) =
+              memory_fields env fuel tys (p + 32) reach2 st2 in
+            ((case r of INL vs => INL (v :: vs) | INR c => INR c), reach3, st3))
 Termination
   WF_REL_TAC ‘inv_image ($< LEX $< LEX $<) (λx. case x of
-    INL (env, fuel, ty, v, st) => (fuel, sol_type_size ty, 0n)
-  | INR (INL (env, fuel, element, p, n, st)) => (fuel, sol_type_size element, n + 1)
-  | INR (INR (env, fuel, tys, p, st)) => (fuel, list_size sol_type_size tys, 1))’ >>
+    INL (env, fuel, ty, v, reach, st) => (fuel, sol_type_size ty, 0n)
+  | INR (INL (env, fuel, element, p, n, reach, st)) =>
+      (fuel, sol_type_size element, n + 1)
+  | INR (INR (env, fuel, tys, p, reach, st)) =>
+      (fuel, list_size sol_type_size tys, 1))’ >>
   rw[solidityASTTheory.sol_type_size_def, listTheory.list_size_def] >>
   qpat_x_assum ‘(_, _) = _’ (assume_tac o SYM) >> gvs[]
 End
@@ -794,21 +829,24 @@ Proof
 QED
 
 val () = cv_auto_trans new_memory_array_def;
+val () = cv_auto_trans touched_reach_def;
+val () = cv_auto_trans scratch_reach_def;
 
 val memory_value_pre_def = cv_auto_trans_pre_rec
   "memory_value_pre memory_elements_pre memory_fields_pre" memory_value_def (
   WF_REL_TAC ‘inv_image ($< LEX $< LEX $<) (λx. case x of
-    INL (env, fuel, ty, v, st) => (cv$c2n fuel, cv_size ty, 0)
-  | INR (INL (env, fuel, element, p, n, st)) =>
+    INL (env, fuel, ty, v, reach, st) => (cv$c2n fuel, cv_size ty, 0)
+  | INR (INL (env, fuel, element, p, n, reach, st)) =>
       (cv$c2n fuel, cv_size element, cv$c2n n + 1)
-  | INR (INR (env, fuel, tys, p, st)) => (cv$c2n fuel, cv_size tys, 1))’ >>
+  | INR (INR (env, fuel, tys, p, reach, st)) => (cv$c2n fuel, cv_size tys, 1))’ >>
   cv_termination_tac
 );
 
 Theorem memory_value_pre[cv_pre]:
-  (∀env fuel ty v st. memory_value_pre env fuel ty v st) ∧
-  (∀env fuel element p n st. memory_elements_pre env fuel element p n st) ∧
-  (∀env fuel tys p st. memory_fields_pre env fuel tys p st)
+  (∀env fuel ty v reach st. memory_value_pre env fuel ty v reach st) ∧
+  (∀env fuel element p n reach st.
+     memory_elements_pre env fuel element p n reach st) ∧
+  (∀env fuel tys p reach st. memory_fields_pre env fuel tys p reach st)
 Proof
   ho_match_mp_tac memory_value_ind >> rpt strip_tac >>
   simp[Once memory_value_pre_def] >> rw[] >> gvs[]

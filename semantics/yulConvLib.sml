@@ -77,6 +77,8 @@ val run_external_call_c =
   prim_mk_const {Thy = "externalCall", Name = "run_external_call"}
 val run_delegate_call_c =
   prim_mk_const {Thy = "externalCall", Name = "run_delegate_call"}
+val run_create_call_c =
+  prim_mk_const {Thy = "externalCall", Name = "run_create_call"}
 
 
 (* The constants are recognised by theory and name, reading the record
@@ -229,13 +231,31 @@ fun keccak_conv tm =
       else raise Conv.UNCHANGED
   | NONE => raise Conv.UNCHANGED
 
+(* A clause reaches the constants of its right-hand side through the entries
+ * that were in the set when it was compiled, so `ext_code_hash`, which hashes
+ * an account's code, and the CREATE and CREATE2 address derivations, which hash
+ * the creator and its nonce or the initcode, were compiled with the
+ * unrestricted `Keccak_256_w64` clauses and would keep expanding the hash of a
+ * symbolic byte. They are compiled again once the rule above is in place. *)
+val ext_code_hash_c =
+  prim_mk_const {Thy = "yulEvaluator", Name = "ext_code_hash"}
+val address_for_create_c =
+  prim_mk_const {Thy = "vfmContext", Name = "address_for_create"}
+val address_for_create2_c =
+  prim_mk_const {Thy = "vfmExecution", Name = "address_for_create2"}
+
 fun add_literal_convs cs =
   let
     val cs = List.foldl (fn (c, cs) => computeLib.scrub_const cs c)
-                        cs [word_exp_c, word_exp_tailrec_c, keccak_c]
+                        cs [word_exp_c, word_exp_tailrec_c, keccak_c,
+                            ext_code_hash_c, address_for_create_c,
+                            address_for_create2_c]
     val cs = computeLib.add_conv (word_exp_c, 2, word_exp_conv) cs
+    val cs = computeLib.add_conv (keccak_c, 1, keccak_conv) cs
   in
-    computeLib.add_conv (keccak_c, 1, keccak_conv) cs
+    computeLib.add_thms [yulEvaluatorTheory.ext_code_hash_def,
+                         vfmContextTheory.address_for_create_def,
+                         vfmExecutionTheory.address_for_create2_def] cs
   end
 
 val test_compset =
@@ -243,7 +263,7 @@ val test_compset =
     (List.foldl (fn (c, cs) => computeLib.scrub_const cs c)
        (computeLib.copy (computeLib.the_compset ()))
        [eval_yul_block_c, invoke_c, eval_yul_loop_c,
-        run_external_call_c, run_delegate_call_c])
+        run_external_call_c, run_delegate_call_c, run_create_call_c])
 
 fun eval_test tm = computeLib.CBV_CONV test_compset tm
 
@@ -390,7 +410,7 @@ val guarded_helper_defs = [
   yul_update_def,
   yul_memory_byte_def, yul_memory_read_def, yul_memory_write_def,
   touched_size_def, yul_memory_touch_def, yul_memory_region_def, yul_mload_def, yul_mstore_def,
-  yul_sload_def, yul_sstore_def, yul_tload_def, yul_tstore_def, yul_call_def,
+  yul_sload_def, yul_sstore_def, yul_tload_def, yul_tstore_def, yul_call_def, yul_create_def,
   yul_return_data_copy_def, yul_name_of_bytes_def,
   eval_yul_builtin_call_def, yul_set_immutable_def
 ]
@@ -1515,6 +1535,7 @@ val eval_compset =
                        eval_yul_loop_c)
                     run_external_call_c
         val cs1 = computeLib.scrub_const cs1 run_delegate_call_c
+        val cs1 = computeLib.scrub_const cs1 run_create_call_c
         val cs4 = add_literal_convs (wordsLib.add_words_compset true cs1)
         val cs4 = computeLib.add_conv (with_zero_c, 3, with_zero_conv)
                     (computeLib.scrub_const cs4 with_zero_c)
@@ -1902,7 +1923,8 @@ fun yul_loop_conv defs tm =
 val conversion_consts =
   List.map (const_key o dest_thy_const)
     (flookup_tm :: invoke_c :: eval_yul_loop_c :: eval_yul_builtin_c ::
-     run_external_call_c :: run_delegate_call_c :: keccak_c :: yul_lookup_c ::
+     run_external_call_c :: run_delegate_call_c :: run_create_call_c ::
+     keccak_c :: yul_lookup_c ::
      yul_lookup_names_c ::
      (clause_heads (evaluator_clauses @ helper_defs @ block_def_clauses) @
       List.map (fn (c, _, _) => c) guarded_helpers))
@@ -1912,7 +1934,8 @@ fun residues tm =
 
 (* What a form may still be standing on: the call and the loop it left folded,
  * the message call a `call` builtin made (`run_external_call`, or
- * `run_delegate_call` for `delegatecall`), a Keccak hash on symbolic bytes, and
+ * `run_delegate_call` for `delegatecall`), the creation a `create` builtin made
+ * (`run_create_call`), a Keccak hash on symbolic bytes, and
  * the operations whose input is a value nobody has -- the frame and memory
  * operations of `guarded_helper_defs` (a binding over a machine that holds a
  * call, an `FLOOKUP` of a scope that came out of the callee's frame), the scope
@@ -1929,6 +1952,7 @@ val permitted_residues =
   ("yulEvaluator", "invoke_yul") :: ("yulEvaluator", "eval_yul_loop")
   :: ("externalCall", "run_external_call")
   :: ("externalCall", "run_delegate_call")
+  :: ("externalCall", "run_create_call")
   :: List.map (const_key o dest_thy_const)
        (flookup_tm :: yul_lookup_c :: yul_lookup_names_c :: keccak_c ::
         (clause_heads helper_defs @

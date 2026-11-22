@@ -1449,7 +1449,9 @@ Definition simple_stmt_def:
                   (* A memory source is read as the copy reaches it. *)
                   (case (case src of
                            MemoryReference _ _ => (INL (ReferenceValue src), st)
-                         | _ => array_copy_value env st cty src) of
+                         | _ =>
+                             (case array_copy_value env 0 st cty src of
+                                (r, _, st1) => (r, st1))) of
                      (INL v, st1) =>
                        (case copy_to_storage env cty v dst st.frame.static_context st1 of
                           (INL _, st2) => normal_result st2 gas

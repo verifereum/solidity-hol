@@ -55,6 +55,7 @@ Ancestors
   solidityDifferentialCorpus_dynamic_storage_arrays
   solidityDifferentialCorpus_ecrecovers
   solidityDifferentialCorpus_encode_calls
+  solidityDifferentialCorpus_encoder_reach
   solidityDifferentialCorpus_enum_bounds
   solidityDifferentialCorpus_enum_errors
   solidityDifferentialCorpus_enum_keys_getters
