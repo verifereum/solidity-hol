@@ -394,11 +394,11 @@ QED
 (* The compiler inspects both length tags before its first storage write. *)
 Definition static_byte_copy_def:
   static_byte_copy bad_src bad_dst =
-    copy_byte_contents
+    FST (copy_byte_contents
       (StorageReference PersistentStorage 0w 0w 0 BytesT (LayoutId 1))
       (StorageReference PersistentStorage 0w 1w 0 BytesT (LayoutId 2))
       (static_state with world := static_state.world with accounts :=
-        set_storage_word (set_storage_word empty_accounts 0w 0w bad_src) 0w 1w bad_dst)
+        set_storage_word (set_storage_word empty_accounts 0w 0w bad_src) 0w 1w bad_dst))
 End
 
 val () = cv_auto_trans static_byte_copy_def;
@@ -776,7 +776,7 @@ Definition run_asm_array_def:
         let r = invoke_source 20 env (AstId 140)
                   [ReferenceValue (MemoryReference 0x80 ty)] st [] in
         (r.completion,
-         case memory_value env F 0 ty (ReferenceValue (MemoryReference 0x80 ty)) 0 r.state of
+         case memory_value env 0 ty (ReferenceValue (MemoryReference 0x80 ty)) 0 r.state of
            (INL (TupleValue us), _, _) => us
          | _ => [])
     | _ => (InvalidCompletion "not an array", [])
@@ -891,7 +891,7 @@ Definition asm_alloc_object_def:
   asm_alloc_object env (st : source_state) v =
     case v of
       ReferenceValue (MemoryReference p ty) =>
-        (case memory_value env F 0 ty v 0 st of
+        (case memory_value env 0 ty v 0 st of
            (INL u, _, _) => SOME (p, u)
          | (INR _, _, _) => NONE)
     | _ => NONE
@@ -1070,13 +1070,13 @@ Definition long_storage_failures_def:
         INR c => SOME c | INL _ => NONE);
      (case materialize_storage test_env 0 long_bytes_accounts 0w 0w BytesT
              initial_state of
-        INR c => SOME c | INL _ => NONE);
+        INR (c, _) => SOME c | INL _ => NONE);
      (case materialize_storage test_env 0 long_array_accounts 0w 0w
              (ArrayT u256 NONE) initial_state of
-        INR c => SOME c | INL _ => NONE);
+        INR (c, _) => SOME c | INL _ => NONE);
      (case materialize_storage test_env 0 long_array_accounts 0w 0w
              (ArrayT (ArrayT u256 NONE) NONE) initial_state of
-        INR c => SOME c | INL _ => NONE)]
+        INR (c, _) => SOME c | INL _ => NONE)]
 End
 
 val () = List.app cv_auto_trans
@@ -2128,6 +2128,162 @@ Theorem static_aggregate_copy_fails_closed_before_read:
      InvalidCompletion "array copy in static frame", PanicCompletion 33,
      InvalidCompletion "array copy in static frame", PanicCompletion 33,
      NormalCompletion)
+Proof
+  CONV_TAC cv_eval
+QED
+
+(* A copy from memory whose length word is 2^64 panics with 0x41 having read
+ * only that word, as the compiled copy checks the length before it reads
+ * any data: memory grows to 0x220, the end of the length word at 0x200, and
+ * no further. The length word is seeded without touching memory, so the
+ * size shows the copy's own read survives the panic. *)
+Definition oversized_copy_def:
+  oversized_copy ty =
+    let st = initial_state with
+      scopes := [FEMPTY
+        |+ (1, <| binding_type := SingleType (LocatedT MemoryLoc ty);
+                  binding_value := ReferenceValue (MemoryReference 0x200 ty) |>)
+        |+ (2, <| binding_type := SingleType (LocatedT StorageLoc ty);
+                  binding_value := ReferenceValue (static_copy_dst 0w ty) |>)] in
+    let r = simple_stmt 10 static_copy_env
+              (CopyContentsStmt (LocatedT MemoryLoc ty) (LocatedT StorageLoc ty)
+                 (BoundAtom (AstId 1)) (BoundAtom (AstId 2)))
+              (memory_store 0x200 (2 ** 64) st with memory_size := st.memory_size)
+              [] in
+    (r.completion, r.state.memory_size)
+End
+
+val () = cv_auto_trans oversized_copy_def;
+
+Theorem oversized_memory_copy_panics_before_reading_data:
+  oversized_copy (ArrayT u256 NONE) = (PanicCompletion 65, 0x220) ∧
+  oversized_copy BytesT = (PanicCompletion 65, 0x220)
+Proof
+  CONV_TAC cv_eval
+QED
+
+(* A nested array's copy has no length check of its own, only resize_array's
+ * Panic(0x41) past 2^64: a source of exactly 2^64 arrays goes on to its first
+ * element, at 0x300 here, whose own length of 2^64 panics. Memory grows to
+ * 0x320, the end of that length word. *)
+Definition oversized_nested_copy_def:
+  oversized_nested_copy =
+    let ty = ArrayT (ArrayT u256 NONE) NONE in
+    let st = initial_state with
+      scopes := [FEMPTY
+        |+ (1, <| binding_type := SingleType (LocatedT MemoryLoc ty);
+                  binding_value := ReferenceValue (MemoryReference 0x200 ty) |>)
+        |+ (2, <| binding_type := SingleType (LocatedT StorageLoc ty);
+                  binding_value := ReferenceValue (static_copy_dst 0w ty) |>)] in
+    let seeded = memory_store 0x300 (2 ** 64) (memory_store 0x220 0x300
+                   (memory_store 0x200 (2 ** 64) st)) in
+    let r = simple_stmt 10 static_copy_env
+              (CopyContentsStmt (LocatedT MemoryLoc ty) (LocatedT StorageLoc ty)
+                 (BoundAtom (AstId 1)) (BoundAtom (AstId 2)))
+              (seeded with memory_size := st.memory_size) [] in
+    (r.completion, r.state.memory_size)
+End
+
+val () = cv_auto_trans oversized_nested_copy_def;
+
+Theorem oversized_nested_copy_reaches_first_element:
+  oversized_nested_copy = (PanicCompletion 65, 0x320)
+Proof
+  CONV_TAC cv_eval
+QED
+
+(* Storage whose byte sequences have invalid length tags: slot 0 holds a
+ * short tag with the long bit set, and slot 1 a bytes[] of length 1 whose
+ * element has that tag. *)
+Definition bad_tag_accounts_def:
+  bad_tag_accounts =
+    update_account 0w (empty_account_state with
+      storage := update_storage 0w 1w
+                   (update_storage 1w 1w
+                      (update_storage (mapping_slot [] 1w) 1w empty_storage)))
+      empty_accounts
+End
+
+(* A byte copy from memory reads the source's length word, then the
+ * destination's length tag, which panics with 0x22 before any data is read:
+ * memory grows to 0x220, the end of the length word at 0x200, though the
+ * data words past it lie beyond the memory size. *)
+Definition bad_tag_byte_copy_def:
+  bad_tag_byte_copy =
+    let st = initial_state with <|
+      world := initial_state.world with accounts := bad_tag_accounts;
+      scopes := [FEMPTY
+        |+ (1, <| binding_type := SingleType (LocatedT MemoryLoc BytesT);
+                  binding_value := ReferenceValue (MemoryReference 0x200 BytesT) |>)
+        |+ (2, <| binding_type := SingleType (LocatedT StorageLoc BytesT);
+                  binding_value := ReferenceValue (static_copy_dst 0w BytesT) |>)] |> in
+    let r = simple_stmt 10 static_copy_env
+              (CopyContentsStmt (LocatedT MemoryLoc BytesT) (LocatedT StorageLoc BytesT)
+                 (BoundAtom (AstId 1)) (BoundAtom (AstId 2)))
+              (memory_store 0x200 40 st with memory_size := st.memory_size) [] in
+    (r.completion, r.state.memory_size)
+End
+
+val () = cv_auto_trans bad_tag_accounts_def;
+val () = cv_auto_trans bad_tag_byte_copy_def;
+
+Theorem bad_tag_byte_copy_panics_after_length:
+  bad_tag_byte_copy = (PanicCompletion 34, 0x220)
+Proof
+  CONV_TAC cv_eval
+QED
+
+(* A storage bytes[] copied to memory allocates its copy at 0x80 and writes
+ * its length before its element's invalid tag panics with 0x22: the panic
+ * keeps that memory, grown to 0xa0 with the free memory pointer at 0xc0.
+ * (The scratch word it hashed is overwritten by the panic's error data.) *)
+Definition bad_tag_storage_copy_def:
+  bad_tag_storage_copy =
+    let ty = ArrayT BytesT NONE in
+    let st = initial_state with <|
+      world := initial_state.world with accounts := bad_tag_accounts;
+      scopes := [FEMPTY
+        |+ (1, <| binding_type := SingleType (LocatedT StorageLoc ty);
+                  binding_value := ReferenceValue (static_copy_dst 1w ty) |>)] |> in
+    let r = simple_stmt 10 static_copy_env
+              (DefineStmt (AstId 3) (SingleType (LocatedT MemoryLoc ty))
+                 (CopyToMemoryOperation (BoundAtom (AstId 1)))) st [] in
+    (r.completion, r.state.memory_size, FST (memory_load 0x80 r.state),
+     FST (memory_load 64 r.state))
+End
+
+val () = cv_auto_trans bad_tag_storage_copy_def;
+
+Theorem bad_tag_storage_copy_keeps_memory:
+  bad_tag_storage_copy = (PanicCompletion 34, 0xa0, 1, 0xc0)
+Proof
+  CONV_TAC cv_eval
+QED
+
+(* abi.decode of memory bytes at 0 whose 64 bytes, [32, 96), cover the free
+ * memory pointer's word fails closed: the compiled decoder rewrites that
+ * word as it allocates, so a later read of it could see the new pointer.
+ * Two words decode; three are too many for the input and fail closed too,
+ * where the decode would otherwise revert. *)
+Definition decode_over_free_pointer_def:
+  decode_over_free_pointer tys =
+    let st = initial_state with
+      scopes := [FEMPTY
+        |+ (1, <| binding_type := SingleType (LocatedT MemoryLoc BytesT);
+                  binding_value := ReferenceValue (MemoryReference 0 BytesT) |>)] in
+    (simple_stmt 10 static_copy_env
+       (DefineStmt (AstId 3) (ProductType (MAP SingleType tys))
+          (AbiDecodeOperation tys (BoundAtom (AstId 1))))
+       (memory_store 0 64 st) []).completion
+End
+
+val () = cv_auto_trans decode_over_free_pointer_def;
+
+Theorem decode_over_free_pointer_fails_closed:
+  decode_over_free_pointer [u256; u256] =
+    InvalidCompletion "unsupported: abi.decode input overlapping the free memory pointer" ∧
+  decode_over_free_pointer [u256; u256; u256] =
+    InvalidCompletion "unsupported: abi.decode input overlapping the free memory pointer"
 Proof
   CONV_TAC cv_eval
 QED

@@ -382,8 +382,8 @@ End
  * pointer, which is not raised. *)
 Definition key_preimage_write_def:
   key_preimage_write bs slot st =
-    let p = FST (memory_load 64 st) in
-    memory_store (p + LENGTH bs) (w2n slot) (memory_write p bs st)
+    let (p, st1) = memory_load 64 st in
+    memory_store (p + LENGTH bs) (w2n slot) (memory_write p bs st1)
 End
 
 
@@ -1286,11 +1286,9 @@ Definition simple_stmt_def:
               | INR c => abrupt_result c st gas)
          | SOME (ReferenceValue (StorageReference PersistentStorage addr slot 0 rty _)) =>
              (case materialize_storage env (LENGTH env.type_declarations)
-                     st.world.accounts addr slot rty
-                     (scratch_write (read_scratch env (LENGTH env.type_declarations)
-                        st.world.accounts addr slot rty) st) of
+                     st.world.accounts addr slot rty st of
                 INL (v', st') => normal_result (define_binding x ty v' st') gas
-              | INR c => abrupt_result c st gas)
+              | INR (c, st') => abrupt_result c st' gas)
          | _ => abrupt_result (InvalidCompletion "bad object copy") st gas)
     (* Decoded memory values are allocated, as external call results are. A
      * memory input is decoded in place: only its bytes below the memory size
@@ -1300,7 +1298,8 @@ Definition simple_stmt_def:
      * free memory pointer as it reads, so a decode that reads there is left
      * unsupported, as is a failing one whose input reaches past the memory
      * size or the free memory pointer, since its failure does not say how
-     * far it read. The decoder compares the input's length with the heads'
+     * far it read. Its allocations rewrite the pointer's own word, so a
+     * decode reading [64, 96) is unsupported too. The decoder compares the input's length with the heads'
      * as signed words, slt(sub(dataEnd, headStart), size), so a length word
      * of 2^255 or more reverts before anything is read. *)
     | DefineStmt x ty (AbiDecodeOperation tys a) =>
@@ -1317,6 +1316,10 @@ Definition simple_stmt_def:
                          abrupt_result (InvalidCompletion
                            "unsupported: abi.decode reading at the free memory pointer")
                            st gas
+                       else if decode_reads_free_pointer r reach then
+                         abrupt_result (InvalidCompletion
+                           "unsupported: abi.decode input overlapping the free memory pointer")
+                           st gas
                        else
                        (case materialize_arguments env tys vs (decode_reads r reach st0) of
                           INL (values, st1) =>
@@ -1326,6 +1329,10 @@ Definition simple_stmt_def:
                        if LENGTH bs < input_len ∨ bound < input_len then
                          abrupt_result (InvalidCompletion
                            "unsupported: abi.decode failing on an input past the memory size or the free memory pointer")
+                           st gas
+                       else if decode_reads_free_pointer r input_len then
+                         abrupt_result (InvalidCompletion
+                           "unsupported: abi.decode input overlapping the free memory pointer")
                            st gas
                        else abrupt_result c st0 gas)
               | INR c => abrupt_result c st gas)
@@ -1439,23 +1446,21 @@ Definition simple_stmt_def:
                   if st.frame.static_context then
                     abrupt_result (InvalidCompletion "array copy in static frame") st gas
                   else
-                  (case array_copy_value env T 0 st cty src of
-                     (INL v, _, st1) =>
-                       (case copy_to_storage env st1.world.accounts cty v
-                               dst st.frame.static_context of
-                          INL accounts =>
-                            normal_result (scratch_write
-                              (case dst of
-                                 StorageReference _ addr slot _ ty _ =>
-                                   store_scratch env st1.world.accounts addr slot ty v
-                               | _ => NONE)
-                              (st1 with world := st1.world with accounts := accounts)) gas
-                        | INR c => abrupt_result c st gas)
-                   | (INR c, _, _) => abrupt_result c st gas)
+                  (* A memory source is read as the copy reaches it. *)
+                  (case (case src of
+                           MemoryReference _ _ => (INL (ReferenceValue src), st)
+                         | _ =>
+                             (case array_copy_value env 0 st cty src of
+                                (r, _, st1) => (r, st1))) of
+                     (INL v, st1) =>
+                       (case copy_to_storage env cty v dst st.frame.static_context st1 of
+                          (INL _, st2) => normal_result st2 gas
+                        | (INR c, st2) => abrupt_result c st2 gas)
+                   | (INR c, st1) => abrupt_result c st1 gas)
               | NONE =>
                 case copy_byte_contents src dst st of
-                  INL st' => normal_result st' gas
-                | INR c => abrupt_result c st gas)
+                  (INL _, st1) => normal_result st1 gas
+                | (INR c, st1) => abrupt_result c st1 gas)
          | _ => abrupt_result (InvalidCompletion "bad byte sequence copy") st gas)
     | ResetTargetStmt t ty => reset_target n env t ty st gas
     | WriteScalarStmt t ty a =>

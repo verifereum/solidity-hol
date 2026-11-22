@@ -417,16 +417,17 @@ Termination
 End
 
 (* The value tree of a memory, calldata or storage array, struct or byte
- * sequence of type ty, as a copy to storage (copying) and the encoder read
- * it, and how far its memory reads reach, raised from reach (memory_value);
- * a storage one's reach is its scratch hash's. Calldata
+ * sequence of type ty, as the encoder reads it, and how far its memory reads
+ * reach, raised from reach (memory_value); a storage one's reach is its
+ * scratch hash's. A copy to storage reads a calldata or storage source this
+ * way too. Calldata
  * is read through the calldata accessors; a calldata array's own data span
  * was checked when it was decoded. *)
 Definition array_copy_value_def:
-  array_copy_value env copying reach (st : source_state) ty r =
+  array_copy_value env reach (st : source_state) ty r =
     case r of
       MemoryReference _ _ =>
-        memory_value env copying (LENGTH env.type_declarations) ty (ReferenceValue r) reach st
+        memory_value env (LENGTH env.type_declarations) ty (ReferenceValue r) reach st
     | CalldataReference data n rty =>
         if rty ≠ ty then (INR (InvalidCompletion "bad calldata array reference"), reach, st)
         else (calldata_value env (LENGTH env.type_declarations)
@@ -574,7 +575,7 @@ Definition runtime_abi_value_def:
               | INR c => (INR c, reach, st))
     | _ =>
       case (case v of
-              ReferenceValue r => array_copy_value env F reach st ty' r
+              ReferenceValue r => array_copy_value env reach st ty' r
             | _ => (INL v, reach, st)) of
         (INR c, reach1, st1) => (INR c, reach1, st1)
       | (INL tree, reach1, st1) =>
@@ -974,29 +975,34 @@ End
  * scalars is written at the free memory pointer first and its allocation
  * finalized after, as the compiled copy encodes at allocate_unbounded() and
  * then calls finalize_allocation; an array of references or a struct is
- * allocated before its members. Scalars are read cleaned, and a byte
+ * allocated before its members. A dynamic array, and a long byte sequence,
+ * hashes its slot in scratch word 0 (array_dataslot) right after its length
+ * is written, before its data. Scalars are read cleaned, and a byte
  * sequence keeps whole data words (storage_byte_data); an empty one still
  * writes its slot's word after its length, past the allocation. A length of
  * 2^64 or more panics with 0x41 where the copy allocates first; where it
  * encodes first it is unsupported, as the compiled encoder has no length
- * check (it runs out of gas, or panics cleaning an element). The fuel bounds
+ * check (it runs out of gas, or panics cleaning an element). A failure keeps
+ * the state it reached, with the memory written before it. The fuel bounds
  * the struct nesting. *)
 Definition materialize_storage_def:
   (materialize_storage env (fuel : num) accounts addr slot ty st =
     if byte_sequence_type ty then
       (case storage_byte_length accounts addr slot of
-         INR c => INR c
+         INR c => INR (c, st)
        | INL length =>
            if 2 ** 64 ≤ length then
              INR (InvalidCompletion
-                    "unsupported: a stored sequence of 2^64 or more elements encoded to memory") else
-           let (p, st1) = memory_load 64 st in
-           case finalize_allocation p ((length + 31) DIV 32 * 32 + 32)
-                  (memory_write (p + 32)
-                     (storage_byte_data accounts addr slot length)
-                     (memory_store p length st1)) of
-             INR c => INR c
-           | INL st2 => INL (ReferenceValue (MemoryReference p ty), st2))
+                    "unsupported: a stored sequence of 2^64 or more elements encoded to memory",
+                  st) else
+           let (p, st1) = memory_load 64 st;
+               st2 = memory_write (p + 32)
+                       (storage_byte_data accounts addr slot length)
+                       (scratch_write (long_bytes_scratch accounts addr slot)
+                          (memory_store p length st1)) in
+           case finalize_allocation p ((length + 31) DIV 32 * 32 + 32) st2 of
+             INR c => INR (c, st2)
+           | INL st3 => INL (ReferenceValue (MemoryReference p ty), st3))
     else case ty of
       ArrayT element l =>
         (case storage_array_data accounts addr slot ty of
@@ -1007,69 +1013,71 @@ Definition materialize_storage_def:
                INR (if scalars then
                       InvalidCompletion
                         "unsupported: a stored sequence of 2^64 or more elements encoded to memory"
-                    else PanicCompletion 65) else
+                    else PanicCompletion 65, st) else
              case (if scalars then INL (memory_load 64 st)
                    else allocate_memory size st) of
-               INR c => INR c
+               INR c => INR (c, st)
              | INL (p, st1) =>
-                 let st2 = if l = NONE then memory_store p length st1 else st1 in
+                 let st2 = if l = NONE then
+                             scratch_write (SOME slot) (memory_store p length st1)
+                           else st1 in
                  case materialize_storage_elements env fuel accounts addr data element
                         0 length (if l = NONE then p + 32 else p) st2 of
                    INL st3 =>
                      (case (if scalars then finalize_allocation p size st3
                             else INL st3) of
                         INL st4 => INL (ReferenceValue (MemoryReference p ty), st4)
-                      | INR c => INR c)
-                 | INR c => INR c)
+                      | INR c => INR (c, st3))
+                 | INR r => INR r)
     | StructT s =>
         (case (lookup_struct env s, lookup_struct_layout env s) of
            (SOME fields, SOME layout) =>
-             if fuel = 0 then INR (InvalidCompletion "struct nesting") else
+             if fuel = 0 then INR (InvalidCompletion "struct nesting", st) else
              (case allocate_memory (32 * LENGTH fields) st of
-                INR c => INR c
+                INR c => INR (c, st)
               | INL (p, st1) =>
                   case materialize_storage_fields env (fuel - 1) accounts addr slot
                          layout.struct_fields fields p st1 of
                     INL st2 => INL (ReferenceValue (MemoryReference p ty), st2)
-                  | INR c => INR c)
-         | _ => INR (InvalidCompletion "missing struct layout"))
-    | _ => INR (InvalidCompletion "bad storage array type")) ∧
+                  | INR r => INR r)
+         | _ => INR (InvalidCompletion "missing struct layout", st))
+    | _ => INR (InvalidCompletion "bad storage array type", st)) ∧
   (materialize_storage_elements env fuel accounts addr data element i n q st =
     if n = 0 then INL st else
     case storage_element_location env data element i of
-      NONE => INR (InvalidCompletion "bad array element type")
+      NONE => INR (InvalidCompletion "bad array element type", st)
     | SOME (s, offset) =>
         let value =
           if is_stored_scalar_type element then
             (case read_storage env accounts addr s offset element of
                SOME v => INL (ScalarValue v, st)
-             | NONE => INR (InvalidCompletion "bad storage read"))
+             | NONE => INR (InvalidCompletion "bad storage read", st))
           else materialize_storage env fuel accounts addr s element st in
         case value of
-          INR c => INR c
+          INR r => INR r
         | INL (v, st1) =>
             case write_memory_word env element q v st1 of
-              INR c => INR c
+              INR c => INR (c, st1)
             | INL st2 =>
                 materialize_storage_elements env fuel accounts addr data element
                   (i + 1) (n - 1) (q + 32) st2) ∧
   (materialize_storage_fields env fuel accounts addr slot layout [] q st = INL st) ∧
   (materialize_storage_fields env fuel accounts addr slot layout ((f, ty) :: fields) q st =
     case ALOOKUP (MAP (λv. (v.state_id, v)) layout) f of
-      NONE => INR (InvalidCompletion "missing field layout")
+      NONE => INR (InvalidCompletion "missing field layout", st)
     | SOME v =>
         let s = slot + v.state_slot in
         let value =
           if is_stored_scalar_type ty then
             (case read_storage env accounts addr s v.state_offset ty of
                SOME x => INL (ScalarValue x, st)
-             | NONE => INR (InvalidCompletion "bad storage read"))
+             | NONE => INR (InvalidCompletion "bad storage read", st))
           else materialize_storage env fuel accounts addr s ty st in
         case value of
-          INR c => INR c
+          INR r => INR r
         | INL (x, st1) =>
             case write_memory_word env ty q x st1 of
-              INR c => INR c
+              INR c => INR (c, st1)
             | INL st2 =>
                 materialize_storage_fields env fuel accounts addr slot layout fields
                   (q + 32) st2)
