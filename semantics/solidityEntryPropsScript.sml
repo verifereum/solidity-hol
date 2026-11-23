@@ -106,7 +106,7 @@ Proof
        EVAL “word_to_bytes (128w : bytes32) T = []”]
 QED
 
-Triviality elementary_abi_layout:
+Theorem elementary_abi_layout:
   is_elementary_type ty ⇒
   abi_type env fuel ty = abi_type env 0 ty ∧
   ¬is_dynamic (abi_type env 0 ty) ∧
