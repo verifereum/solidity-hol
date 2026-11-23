@@ -40,6 +40,23 @@ Proof
   metis_tac[dispatch_selector_hit]
 QED
 
+Theorem call_entry_frame_return:
+  entry_memory 0 NONE
+    <| world := w; frame := fr; immutables := imm; scopes := [];
+       memory := FEMPTY; memory_size := 0;
+       targets := FEMPTY; return_data := SOME [] |> = INL st0 ∧
+  materialize_arguments env (MAP SND p.parameters) args st0 =
+    INL (values, st1) ∧
+  invoke_source fuel env p.procedure_id values st1 gas = r ∧
+  finish_source_frame w r.state.world r.completion = FrameSuccess vs w' ∧
+  r.unused_gas_evidence = [] ∧
+  entry_output env p CallEntry r.state vs = (INL data, st') ⇒
+  run_entry_frame fuel env p args fr w imm 0 NONE CallEntry gas =
+    (ContractReturned data (settle_source_world w'), memory_image st')
+Proof
+  strip_tac >> simp[run_entry_frame_def]
+QED
+
 Theorem call_contract_nonpayable:
   4 ≤ LENGTH fr.call_data ∧
   lookup_external (TAKE 4 fr.call_data) prog.external_functions = SOME e ∧
@@ -237,7 +254,7 @@ Proof
   drule elementary_abi_layout >> strip_tac >> simp[encoded_abi_parts_def]
 QED
 
-Triviality memory_write_empty:
+Theorem memory_write_empty:
   memory_write p [] st = st
 Proof
   simp[solidityStateTheory.source_state_component_equality, memory_write_def,
