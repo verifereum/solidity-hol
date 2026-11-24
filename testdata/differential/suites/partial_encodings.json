@@ -1,0 +1,137 @@
+{
+  "name": "partial_encodings",
+  "source": "testdata/differential/partial_encodings.sol",
+  "contract": "PartialEncodings",
+  "artifact": "testdata/differential/expected/partial_encodings.json",
+  "cases": [
+    {
+      "name": "error_storage_header",
+      "function": "errorStorageHeader",
+      "args": [],
+      "expect": {
+        "panic": 34
+      },
+      "storage": {
+        "0": "47226055194461434745431958897357469009552817079588419131632412154350433992708",
+        "1": "1"
+      },
+      "memory_size": 320,
+      "memory_image": true
+    },
+    {
+      "name": "return_memory_enum",
+      "function": "returnEnum",
+      "args": [],
+      "expect": {
+        "panic": 33
+      },
+      "memory_size": 544,
+      "memory_image": true
+    },
+    {
+      "name": "encode_calldata_enum",
+      "calldata": "0x3c733312000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000007",
+      "expect": {
+        "revert": "0x"
+      },
+      "memory_size": 352,
+      "memory_image": true
+    },
+    {
+      "name": "encode_calldata_field_offset",
+      "calldata": "0x42303e6a000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000050000000000000000000000000000000000000000000000000000000000001000",
+      "expect": {
+        "revert": "0x"
+      },
+      "memory_size": 224,
+      "memory_image": true
+    },
+    {
+      "name": "encode_selector_memory_enum",
+      "function": "encodeSelector",
+      "args": [],
+      "expect": {
+        "panic": 33
+      },
+      "memory_size": 544,
+      "memory_image": true
+    },
+    {
+      "name": "encode_storage_field_header",
+      "function": "encodeStorageField",
+      "args": [],
+      "expect": {
+        "panic": 34
+      },
+      "storage": {
+        "2": "5",
+        "3": "1"
+      },
+      "memory_size": 256,
+      "memory_image": true
+    },
+    {
+      "name": "encode_packed_memory_enum",
+      "function": "encodePacked",
+      "args": [],
+      "expect": {
+        "panic": 33
+      },
+      "memory_size": 384,
+      "memory_image": true
+    },
+    {
+      "name": "call_prefix_memory_enum",
+      "function": "callPrefix",
+      "args": [],
+      "expect": {
+        "panic": 33
+      },
+      "memory_size": 608,
+      "memory_image": true
+    },
+    {
+      "name": "create_prefix_memory_enum",
+      "function": "createPrefix",
+      "args": [],
+      "expect": {
+        "panic": 33
+      },
+      "memory_size": 1440,
+      "memory_image": true
+    },
+    {
+      "name": "emit_data_memory_enum",
+      "function": "emitData",
+      "args": [],
+      "expect": {
+        "panic": 33
+      },
+      "memory_size": 352,
+      "memory_image": true
+    },
+    {
+      "name": "emit_indexed_memory_enum",
+      "function": "emitIndexed",
+      "args": [],
+      "expect": {
+        "panic": 33
+      },
+      "memory_size": 320,
+      "memory_image": true
+    },
+    {
+      "name": "emit_storage_header",
+      "function": "emitStorageHeader",
+      "args": [],
+      "expect": {
+        "panic": 34
+      },
+      "storage": {
+        "1": "1"
+      },
+      "memory_size": 160,
+      "memory_image": true
+    }
+  ]
+}

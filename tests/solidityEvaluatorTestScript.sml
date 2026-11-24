@@ -1058,13 +1058,13 @@ End
 Definition long_storage_failures_def:
   long_storage_failures =
     [(case storage_abi_value test_env 0 long_bytes_accounts 0w 0w BytesT of
-        INR c => SOME c | INL _ => NONE);
+        (INR (c, _), _) => SOME c | _ => NONE);
      (case storage_abi_value test_env 0 long_array_accounts 0w 0w
              (ArrayT u256 NONE) of
-        INR c => SOME c | INL _ => NONE);
+        (INR (c, _), _) => SOME c | _ => NONE);
      (case storage_abi_value test_env 0 long_array_accounts 0w 0w
              (ArrayT (ArrayT u256 NONE) NONE) of
-        INR c => SOME c | INL _ => NONE);
+        (INR (c, _), _) => SOME c | _ => NONE);
      (case storage_byte_contents long_bytes_accounts
              (StorageReference PersistentStorage 0w 0w 0 BytesT (LayoutId 0)) of
         INR c => SOME c | INL _ => NONE);
@@ -2303,17 +2303,17 @@ Definition encoder_and_emit_guard_checks_def:
         st_packed = memory_store 0xc0 1 (memory_store 0x80 2 (memory_store 64 0xa0 initial_state));
         st_emit =
           memory_store 64 0x41 (memory_store 0x20 5 (memory_store 0 1 initial_state)) in
-    (encoded_runtime_values static_copy_env st_overlap
+    (FST (encoded_runtime_values static_copy_env st_overlap
        [u256; LocatedT MemoryLoc arr1]
-       [ScalarValue (IntegerValue 0); ReferenceValue (MemoryReference 0x80 arr1)],
-     encoded_runtime_values static_copy_env st_earlier_valid
+       [ScalarValue (IntegerValue 0); ReferenceValue (MemoryReference 0x80 arr1)]),
+     FST (encoded_runtime_values static_copy_env st_earlier_valid
        [u256; LocatedT MemoryLoc arr1; LocatedT CalldataLoc dyn]
        [ScalarValue (IntegerValue 2); ReferenceValue (MemoryReference 0x80 arr1);
-        ReferenceValue (CalldataReference 0 1 dyn)],
-     packed_encoding static_copy_env st_packed
+        ReferenceValue (CalldataReference 0 1 dyn)]),
+     FST (packed_encoding static_copy_env st_packed
        [LocatedT MemoryLoc BytesT; LocatedT MemoryLoc arr1]
        [ReferenceValue (MemoryReference 0xc0 BytesT);
-        ReferenceValue (MemoryReference 0x80 arr1)],
+        ReferenceValue (MemoryReference 0x80 arr1)]),
      (emit_event static_copy_env NONE
         [(LocatedT MemoryLoc BytesT, T, BoundAtom (AstId 1));
          (LocatedT CalldataLoc BytesT, T, BoundAtom (AstId 2));
@@ -2332,9 +2332,9 @@ val () = cv_auto_trans encoder_and_emit_guard_checks_def;
 
 Theorem read_failures_surface_after_fail_closed_checks:
   encoder_and_emit_guard_checks =
-    (INR (InvalidCompletion "unsupported: encoder input at or above the free memory pointer"),
-     INR (InvalidCompletion "unsupported: encoder input at or above the free memory pointer"),
-     INR (InvalidCompletion "unsupported: encoder input at or above the free memory pointer"),
+    (INR (InvalidCompletion "unsupported: encoder input at or above the free memory pointer", []),
+     INR (InvalidCompletion "unsupported: encoder input at or above the free memory pointer", []),
+     INR (InvalidCompletion "unsupported: encoder input at or above the free memory pointer", []),
      InvalidCompletion "unsupported: encoder reach overlaps a free memory pointer moved by an event's hash preimage")
 Proof
   CONV_TAC cv_eval
@@ -2378,18 +2378,18 @@ Definition encoder_byte_reach_checks_def:
         v = ReferenceValue (MemoryReference 0x98 BytesT);
         at_pointer = memory_store 0x98 0 (memory_store 64 0xb8 initial_state);
         past_pointer = memory_store 0x98 1 (memory_store 64 0xb8 initial_state) in
-    (ISL (encoded_runtime_values static_copy_env at_pointer [ty] [v]),
-     encoded_runtime_values static_copy_env past_pointer [ty] [v],
-     ISL (packed_encoding static_copy_env at_pointer [ty] [v]),
-     packed_encoding static_copy_env past_pointer [ty] [v])
+    (ISL (FST (encoded_runtime_values static_copy_env at_pointer [ty] [v])),
+     FST (encoded_runtime_values static_copy_env past_pointer [ty] [v]),
+     ISL (FST (packed_encoding static_copy_env at_pointer [ty] [v])),
+     FST (packed_encoding static_copy_env past_pointer [ty] [v]))
 End
 
 val () = cv_auto_trans encoder_byte_reach_checks_def;
 
 Theorem encoder_input_ending_at_unaligned_pointer:
   encoder_byte_reach_checks =
-    (T, INR (InvalidCompletion "unsupported: encoder input at or above the free memory pointer"),
-     T, INR (InvalidCompletion "unsupported: encoder input at or above the free memory pointer"))
+    (T, INR (InvalidCompletion "unsupported: encoder input at or above the free memory pointer", []),
+     T, INR (InvalidCompletion "unsupported: encoder input at or above the free memory pointer", []))
 Proof
   CONV_TAC cv_eval
 QED
@@ -2445,9 +2445,9 @@ Definition scratch_reach_checks_def:
     let arr = ArrayT u256 NONE;
         ty = LocatedT StorageLoc arr;
         v = ReferenceValue (static_copy_dst 6w arr) in
-    (encoded_runtime_values static_copy_env (memory_store 64 0 initial_state) [ty] [v],
+    (FST (encoded_runtime_values static_copy_env (memory_store 64 0 initial_state) [ty] [v]),
      stored_array_emit 0,
-     ISL (encoded_runtime_values static_copy_env (memory_store 64 32 initial_state) [ty] [v]),
+     ISL (FST (encoded_runtime_values static_copy_env (memory_store 64 32 initial_state) [ty] [v])),
      stored_array_emit 32)
 End
 
@@ -2455,7 +2455,7 @@ val () = cv_auto_trans scratch_reach_checks_def;
 
 Theorem stored_input_below_scratch_pointer_fails_closed:
   scratch_reach_checks =
-    (INR (InvalidCompletion "unsupported: encoder input at or above the free memory pointer"),
+    (INR (InvalidCompletion "unsupported: encoder input at or above the free memory pointer", []),
      InvalidCompletion "unsupported: encoder input at or above the free memory pointer",
      T, NormalCompletion)
 Proof

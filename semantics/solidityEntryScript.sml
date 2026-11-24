@@ -120,15 +120,17 @@ End
 
 (* A frame's output, and the state after the compiled code writes the
  * encoding of its return values, and the encoder's spill past it, at the free
- * memory pointer; when the encoding panics, the panic's scratch write. *)
+ * memory pointer; when reading a value ends the frame, what the encoder wrote
+ * there before, then a panic's scratch write. *)
 Definition entry_output_def:
   entry_output env p kind st vs =
     if kind = FallbackEntry then fallback_output st vs
     else case encoded_runtime_values env st (MAP SND p.return_bindings) vs of
-      INL ((data, spill), st1) =>
+      (INL (data, spill), st1) =>
         (INL data, let q = FST (memory_load 64 st1) in
                    memory_write (q + LENGTH data) spill (memory_write q data st1))
-    | INR c => (INR c, completion_memory c st)
+    | (INR (c, ws), st1) =>
+        (INR c, completion_memory c (apply_writes (FST (memory_load 64 st1)) ws st1))
 End
 
 (* The end of the transaction: its pending deletions happen. *)

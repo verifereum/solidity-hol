@@ -819,7 +819,8 @@ End
  * writes, an emit in a static frame fails. The compiler encodes the log's
  * data at the free memory pointer, which it does not move, reading the
  * pointer after the indexed arguments' hash preimages are written
- * (event_log).
+ * (event_log). When reading an argument ends the frame, what the compiled
+ * emit wrote by then stays in memory.
  *)
 Definition emit_event_def:
   emit_event env topic args (st : source_state) gas =
@@ -827,7 +828,7 @@ Definition emit_event_def:
       NONE => abrupt_result (InvalidCompletion "unbound atom") st gas
     | SOME vs =>
         case event_log env st st.frame.self_address topic vs of
-          INL ((e, spill), st1) =>
+          (INL (e, spill), st1) =>
             if st.frame.static_context then
               abrupt_result (InvalidCompletion "emit in static frame") st gas
             else
@@ -836,7 +837,8 @@ Definition emit_event_def:
                 (memory_write (p + LENGTH e.data) spill
                    (memory_write p e.data st2) with
                    world := st2.world with logs := st2.world.logs ++ [e]) gas
-        | INR c => abrupt_result c st gas
+        | (INR (c, ws), st1) =>
+            abrupt_result c (apply_writes (FST (memory_load 64 st1)) ws st1) gas
 End
 
 (* The gas a high-level call gives its callee. The source does not track gas,
@@ -920,8 +922,9 @@ Definition call_create_def:
         let (p, st0) = memory_load 64 st in
         if 2 ** 64 ≤ p + LENGTH code then abrupt_result (PanicCompletion 65) st gas else
         (case encoded_runtime_values env st0 params vs of
-           INR c => abrupt_result c st gas
-         | INL ((data, spill), st1) =>
+           (INR (c, ws), st1) =>
+             abrupt_result c (apply_writes (p + LENGTH code) ws (memory_write p code st1)) gas
+         | (INL (data, spill), st1) =>
              let st2 = memory_write (p + LENGTH code + LENGTH data) spill
                          (memory_write p (code ++ data) st1) in
              case run_create_call st.frame.self_address salt (code ++ data)
@@ -969,8 +972,10 @@ Definition call_external_mode_def:
         else
         let (p, st0) = memory_load 64 st in
         (case encoded_runtime_values env st0 params vs of
-           INR c => abrupt_result c st gas
-         | INL ((data, spill), st1) =>
+           (INR (c, ws), st1) =>
+             abrupt_result c
+               (apply_writes (p + LENGTH selector) ws (write_call_data p selector [] st1)) gas
+         | (INL (data, spill), st1) =>
            let st2 = memory_write (p + LENGTH selector + LENGTH data) spill
                        (write_call_data p selector data st1) in
            let static = (kind = ExternalStaticCall ∨ st.frame.static_context) in
@@ -1208,8 +1213,12 @@ Definition abi_encode_def:
     case (selector_bytes st.scopes selector, eval_atoms st.scopes args) of
       (SOME prefix, SOME vs) =>
         (case encoded_runtime_values env st tys vs of
-           INL ((bs, spill), st1) => allocate_encoding x ty prefix bs spill st1 gas
-         | INR c => abrupt_result c st gas)
+           (INL (bs, spill), st1) => allocate_encoding x ty prefix bs spill st1 gas
+         | (INR (c, ws), st1) =>
+             let p = FST (memory_load 64 st1) in
+             abrupt_result c
+               (apply_writes (p + 32 + LENGTH prefix) ws
+                  (write_call_data (p + 32) prefix [] st1)) gas)
     | _ => abrupt_result (InvalidCompletion "bad abi.encode operands") st gas
 End
 
@@ -1218,8 +1227,9 @@ Definition abi_encode_packed_def:
     case eval_atoms st.scopes args of
       SOME vs =>
         (case packed_encoding env st tys vs of
-           INL ((bs, spill), st1) => allocate_encoding x ty [] bs spill st1 gas
-         | INR c => abrupt_result c st gas)
+           (INL (bs, spill), st1) => allocate_encoding x ty [] bs spill st1 gas
+         | (INR (c, ws), st1) =>
+             abrupt_result c (apply_writes (FST (memory_load 64 st1) + 32) ws st1) gas)
     | NONE => abrupt_result (InvalidCompletion "bad abi.encodePacked operands") st gas
 End
 
@@ -1451,7 +1461,8 @@ Definition simple_stmt_def:
                            MemoryReference _ _ => (INL (ReferenceValue src), st)
                          | _ =>
                              (case array_copy_value env 0 st cty src of
-                                (r, _, st1) => (r, st1))) of
+                                (INL v, _, st1) => (INL v, st1)
+                              | (INR (c, _), _, st1) => (INR c, st1))) of
                      (INL v, st1) =>
                        (case copy_to_storage env cty v dst st.frame.static_context st1 of
                           (INL _, st2) => normal_result st2 gas
@@ -1481,13 +1492,18 @@ Definition simple_stmt_def:
         (case eval_atoms st.scopes args of
            SOME vs =>
              (case encoded_runtime_values env st params vs of
-                INL ((data, spill), st1) =>
+                (r, st1) =>
                   let (p, st2) = if error_payload_at_scratch params then (0, st1)
                                  else memory_load 64 st1 in
-                  abrupt_result (RevertCompletion (selector ++ data))
-                    (memory_write (p + LENGTH selector + LENGTH data) spill
-                      (write_call_data p selector data st2)) gas
-              | INR c => abrupt_result c st gas)
+                  case r of
+                    INL (data, spill) =>
+                      abrupt_result (RevertCompletion (selector ++ data))
+                        (memory_write (p + LENGTH selector + LENGTH data) spill
+                          (write_call_data p selector data st2)) gas
+                  | INR (c, ws) =>
+                      abrupt_result c
+                        (apply_writes (p + LENGTH selector) ws
+                          (write_call_data p selector [] st2)) gas)
          | NONE =>
              abrupt_result
                (InvalidCompletion "unbound atom") st gas)
