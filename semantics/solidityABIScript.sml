@@ -12,10 +12,6 @@ Ancestors
 Libs
   cv_transLib wordsLib intLib
 
-(* contractABI and vfmCompute translate MAP (n2w o ORD) differently; keep
-   vfmCompute's, so every descendant sees one translation. *)
-val () = cv_rep_delete "contractABI.MAP_o_n2w_ORD_function_signatu_ho";
-
 (* The ABI type of ty, each struct the tuple of its fields' types. The fuel
  * bounds the struct nesting; callers pass the number of type declarations,
  * which a struct the ABI admits nests within. *)
