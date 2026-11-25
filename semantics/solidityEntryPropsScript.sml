@@ -26,6 +26,18 @@ Proof
   simp[call_contract_def, call_contract_with_gas_thm, run_entry_def]
 QED
 
+(* The frame form exposes the final memory image as well as the source result. *)
+Theorem call_contract_dispatch_call_frame:
+  dispatch (core_program_environment prog) prog fr = DispatchCall p args kind ⇒
+  call_contract_frame fuel prog imm fr w gas =
+    (FST (run_entry_frame fuel (core_program_environment prog) p args fr w
+      (SOME imm) 0 NONE kind gas),
+     SOME (SND (run_entry_frame fuel (core_program_environment prog) p args fr w
+      (SOME imm) 0 NONE kind gas)) )
+Proof
+  simp[call_contract_frame_def, pairTheory.UNCURRY]
+QED
+
 Theorem call_contract_selector_hit:
   4 ≤ LENGTH fr.call_data ∧
   lookup_external (TAKE 4 fr.call_data) prog.external_functions = SOME e ∧
