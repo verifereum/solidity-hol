@@ -15,9 +15,8 @@ Ancestors
 Libs
   cv_transLib wordsLib intLib
 
-(* Remove obsolete cv registrations from the pinned verifereum ancestors.
-   Names retained below still exist in their source theories and are deleted
-   here to keep this theory's cv environment stable. *)
+(* Delete duplicate crypto cv registrations from the pinned verifereum
+   ancestors. The list is trimmed to names still present at this pin. *)
 val () = List.app cv_rep_delete
   ["keccak.cv_word_to_bytes_thm",
    "keccak.cv_word_to_bytes_aux_thm",
