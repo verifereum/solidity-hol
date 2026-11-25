@@ -282,6 +282,22 @@ QED
 
 (* No elementary value reads memory during encoding or writes a spill.
  * The returned bytes are written at the free-memory pointer. *)
+Theorem entry_output_types_elementary:
+  EVERY (λ(ty,a,s). is_elementary_type ty ∧ abi_value ty (ScalarValue s) = SOME a) args ⇒
+  entry_output_types env (MAP FST args) CallEntry st (MAP (λ(ty,a,s). ScalarValue s) args) =
+    (INL (FLAT (MAP (λ(ty,a,s). enc (abi_type env 0 ty) a) args)),
+     memory_write (FST (memory_load 64 st))
+       (FLAT (MAP (λ(ty,a,s). enc (abi_type env 0 ty) a) args)) st)
+Proof
+  strip_tac >>
+  ‘EVERY (is_elementary_type o FST) args’ by
+    (qpat_x_assum ‘EVERY _ args’ mp_tac >>
+     simp[EVERY_MEM, pairTheory.FORALL_PROD] >> metis_tac[]) >>
+  simp[entry_output_types_def, encoded_runtime_values_def, runtime_abi_values_elementary,
+       encoder_state_def, guard_result_def, encoded_abi_tuple_def, encoded_elementary_parts,
+       memory_write_empty]
+QED
+
 Theorem entry_output_elementary:
   MAP SND p.return_bindings = MAP FST args ∧
   EVERY (λ(ty,a,s). is_elementary_type ty ∧ abi_value ty (ScalarValue s) = SOME a) args ⇒
@@ -291,12 +307,13 @@ Theorem entry_output_elementary:
        (FLAT (MAP (λ(ty,a,s). enc (abi_type env 0 ty) a) args)) st)
 Proof
   strip_tac >>
-  ‘EVERY (is_elementary_type o FST) args’ by
-    (qpat_x_assum ‘EVERY _ args’ mp_tac >>
-     simp[EVERY_MEM, pairTheory.FORALL_PROD] >> metis_tac[]) >>
-  simp[entry_output_def, entry_output_types_def, encoded_runtime_values_def, runtime_abi_values_elementary,
-       encoder_state_def, guard_result_def, encoded_abi_tuple_def, encoded_elementary_parts,
-       memory_write_empty]
+  ‘entry_output env p CallEntry st (MAP (λ(ty,a,s). ScalarValue s) args) =
+     entry_output_types env (MAP FST args) CallEntry st
+       (MAP (λ(ty,a,s). ScalarValue s) args)’ by
+    (irule entry_output_types >> first_assum ACCEPT_TAC) >>
+  rw[] >>
+  irule entry_output_types_elementary >>
+  first_assum ACCEPT_TAC
 QED
 
 (* These rules provide the ABI value for either direction of the codec and
