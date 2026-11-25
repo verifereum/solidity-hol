@@ -39,7 +39,7 @@ jobs:
       - uses: ./.github/actions/setup-holbuild
         id: holbuild
         with:
-          holbuild-ref: v0.15.2
+          holbuild-ref: v0.15.8
           polyml-rev: ${{ steps.polyml.outputs.polyml-rev }}
 
       - name: Report holbuild version
