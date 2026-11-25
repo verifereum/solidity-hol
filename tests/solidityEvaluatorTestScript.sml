@@ -1092,31 +1092,74 @@ Proof
   CONV_TAC cv_eval
 QED
 
-(* An array whose one element is a stored array of length 2^64: the outer
- * encoder has written its length and the element's offset word, and hashed
- * the outer slot for its data, the last scratch hash before the failure. *)
+(* An array at slot 5 whose one element is a stored array of length 2^64:
+ * the outer encoder has written its length and the element's offset word,
+ * and hashed the outer slot for its data, the last scratch hash before the
+ * failure. runtime_abi_value leaves that slot in scratch word 0, and the
+ * reach covers it. *)
 Definition nested_long_accounts_def:
   nested_long_accounts =
     update_account 0w (empty_account_state with
-      storage := update_storage (mapping_slot [] 0w) (n2w (2 ** 64))
-                   (update_storage 0w 1w empty_storage))
+      storage := update_storage (mapping_slot [] 5w) (n2w (2 ** 64))
+                   (update_storage 5w 1w empty_storage))
       empty_accounts
 End
 
 Definition nested_long_failure_def:
   nested_long_failure =
-    case storage_abi_value test_env 0 nested_long_accounts 0w 0w
+    case storage_abi_value test_env 0 nested_long_accounts 0w 5w
            (ArrayT (ArrayT u256 NONE) NONE) of
       (INR (c, p), w) => SOME (c, p, w)
     | _ => NONE
 End
 
+Definition nested_long_runtime_def:
+  nested_long_runtime =
+    let ty = ArrayT (ArrayT u256 NONE) NONE in
+    case runtime_abi_value test_env 0
+           (initial_state with world :=
+              initial_state.world with accounts := nested_long_accounts)
+           ty (ReferenceValue
+                 (StorageReference PersistentStorage 0w 5w 0 ty (LayoutId 0))) of
+      (INR (c, p), reach, st) => SOME (c, p, reach, FST (memory_load 0 st))
+    | _ => NONE
+End
+
 val () = cv_auto_trans nested_long_accounts_def;
 val () = cv_auto_trans nested_long_failure_def;
+val () = cv_auto_trans nested_long_runtime_def;
 
 Theorem storage_nested_too_long_unsupported:
   nested_long_failure =
-    SOME (long_storage_unsupported, PartialParts (SOME 1) [] T PartialNone, SOME 0w)
+    SOME (long_storage_unsupported, PartialParts (SOME 1) [] T PartialNone, SOME 5w) ∧
+  nested_long_runtime =
+    SOME (long_storage_unsupported, PartialParts (SOME 1) [] T PartialNone, 32, 5)
+Proof
+  CONV_TAC cv_eval
+QED
+
+(* A memory enum array whose length word was forged to 2^64 and whose first
+ * element is out of range: the encoder has written only the length when
+ * the element's read panics, and laying that out walks no other element. *)
+Definition forged_length_failure_def:
+  forged_length_failure =
+    let env = core_program_environment (storage_program [] with
+                type_declarations := [(AstId 900, EnumDeclaration 3)]) in
+    let ty = ArrayT (EnumT (AstId 900)) NONE in
+    case memory_value env 0 ty (ReferenceValue (MemoryReference 0x80 ty)) 0
+           (memory_store 0xa0 7 (memory_store 0x80 (2 ** 64) initial_state)) of
+      (INR (c, p), _, _) =>
+        SOME (c, partial_writes (abi_type env (LENGTH env.type_declarations) ty) p,
+              inplace_partial_writes CopiedBytes
+                (abi_type env (LENGTH env.type_declarations) ty) p)
+    | _ => NONE
+End
+
+val () = cv_auto_trans forged_length_failure_def;
+
+Theorem forged_length_partial_writes:
+  forged_length_failure =
+    SOME (PanicCompletion 33, [(0, enc (Uint 256) (NumV (2 ** 64)))], SOME [])
 Proof
   CONV_TAC cv_eval
 QED

@@ -173,14 +173,29 @@ Definition shift_writes_def:
 End
 
 (* The ABI types of the parts of a value of ABI type t, given a dynamic
- * array's length. *)
+ * array's length; an array's only up to its kth, since its length comes
+ * from its input and a partial needs the parts up to its failing one. *)
 Definition component_types_def:
-  component_types t len =
+  component_types t len (k : num) =
     case t of
       Tuple ts => ts
-    | Array (SOME n) e => REPLICATE n e
-    | Array NONE e => REPLICATE (case len of SOME n => n | NONE => 0) e
+    | Array (SOME n) e => REPLICATE (MIN n k) e
+    | Array NONE e => REPLICATE (MIN (case len of SOME n => n | NONE => 0) k) e
     | _ => []
+End
+
+(* The length of the heads of the parts of a value of ABI type t, given a
+ * dynamic array's length: head_lengths of all its component types, without
+ * listing an array's elements. *)
+Definition parts_head_length_def:
+  parts_head_length t len =
+    case t of
+      Tuple ts => head_lengths ts 0
+    | Array (SOME n) e => n * (if is_dynamic e then 32 else static_length e)
+    | Array NONE e =>
+        (case len of SOME n => n | NONE => 0) *
+        (if is_dynamic e then 32 else static_length e)
+    | _ => 0
 End
 
 (* The writes, relative to the start of the value's encoding, of a partial in
@@ -192,12 +207,13 @@ End
 Definition partial_writes_def:
   (partial_writes t PartialNone = [] : (num # byte list) list) ∧
   (partial_writes t (PartialParts len done w q) =
-    let ts = component_types t len in
+    let ts = component_types t len (SUC (LENGTH done)) in
+    let hl = parts_head_length t len in
     case len of
       SOME n =>
         (0, enc (Uint 256) (NumV n)) ::
-        shift_writes 32 (parts_writes (head_lengths ts 0) 0 0 ts done w q)
-    | NONE => parts_writes (head_lengths ts 0) 0 0 ts done w q) ∧
+        shift_writes 32 (parts_writes hl 0 0 ts done w q)
+    | NONE => parts_writes hl 0 0 ts done w q) ∧
   (parts_writes hl h tl [] done w q = []) ∧
   (parts_writes hl h tl (t :: ts) done w q =
     case done of
@@ -794,7 +810,7 @@ End
 Definition inplace_partial_writes_def:
   (inplace_partial_writes src t PartialNone = SOME ([] : (num # byte list) list)) ∧
   (inplace_partial_writes src t (PartialParts len done w q) =
-    inplace_parts_writes src 0 (component_types t len) done q) ∧
+    inplace_parts_writes src 0 (component_types t len (SUC (LENGTH done))) done q) ∧
   (inplace_parts_writes src off [] done q = SOME []) ∧
   (inplace_parts_writes src off (t :: ts) done q =
     case done of
@@ -1558,6 +1574,7 @@ QED
 val () = cv_auto_trans tree_part_def;
 val () = cv_auto_trans shift_writes_def;
 val () = cv_auto_trans component_types_def;
+val () = cv_auto_trans parts_head_length_def;
 val partial_writes_pre_def = cv_auto_trans_pre_rec
   "partial_writes_pre parts_writes_pre" partial_writes_def (
   WF_REL_TAC ‘inv_image ($< LEX $<) (λx. case x of
