@@ -17,8 +17,8 @@ tools/semantic_tests_coverage.py ../solidity-tests --solc /path/to/solc
 
 | outcome | tests |
 | --- | ---: |
-| admitted | 1349 |
-| partially-admitted | 113 |
+| admitted | 1354 |
+| partially-admitted | 108 |
 | elaboration-rejected | 52 |
 | import-rejected | 31 |
 | compile-failure | 0 |
@@ -30,7 +30,7 @@ tools/semantic_tests_coverage.py ../solidity-tests --solc /path/to/solc
 
 ## Functions of admitted units
 
-The 1462 admitted and partially admitted tests have 3642 functions that calls reach, library functions included; 3480 are supported and 162 unsupported, for these reasons (a function can have several):
+The 1462 admitted and partially admitted tests have 3642 functions that calls reach, library functions included; 3493 are supported and 149 unsupported, for these reasons (a function can have several):
 
 | reason | functions |
 | --- | ---: |
@@ -39,14 +39,12 @@ The 1462 admitted and partially admitted tests have 3642 functions that calls re
 | FunctionTypeName: external function types are not supported | 19 |
 | unsupported callee | 16 |
 | unsupported identifier | 15 |
-| calls an unsupported function | 11 |
 | MemberAccess: unsupported built-in member | 9 |
 | FunctionCall: abi.encodeWithSignature of a non-literal signature is not supported | 8 |
 | length of a non-array | 6 |
 | type annotation mismatch | 6 |
 | IndexAccess: expected ElementaryTypeNameExpression | 5 |
 | unsupported external call | 5 |
-| unsupported assembly memory use | 5 |
 | MemberAccess: unsupported selector | 4 |
 | unsupported variable type | 4 |
 | Identifier: unsupported built-in declaration ~29 | 4 |
@@ -56,6 +54,7 @@ The 1462 admitted and partially admitted tests have 3642 functions that calls re
 | unsupported type name | 3 |
 | Identifier: unsupported built-in declaration ~20 | 3 |
 | call of an unsupported function | 3 |
+| calls an unsupported function | 3 |
 | NewExpression: unsupported call options | 3 |
 | Identifier: built-in super is not supported | 3 |
 | InlineAssembly: YulFunctionCall: call to clz, which is neither a builtin nor a function the object defines | 3 |
@@ -65,6 +64,7 @@ The 1462 admitted and partially admitted tests have 3642 functions that calls re
 | InlineAssembly: YulFunctionCall: call to blobhash, which is neither a builtin nor a function the object defines | 2 |
 | InlineAssembly: unsupported reference fp.address | 2 |
 | InlineAssembly: unsupported reference fp.selector | 2 |
+| value count mismatch | 2 |
 | unsupported calldata slice type | 2 |
 | unsupported new expression | 2 |
 | unsupported declaration | 2 |
@@ -73,13 +73,13 @@ The 1462 admitted and partially admitted tests have 3642 functions that calls re
 | unsupported binary operator | 2 |
 | FunctionCall: abi.encodeCall of an unnamed function | 1 |
 | unsupported memory struct type | 1 |
-| Identifier: external calls only on contract-typed values | 1 |
 | unsupported ABI parameter or return type | 1 |
+| Identifier: external calls only on contract-typed values | 1 |
 | unsupported operator type | 1 |
 | unsupported contract creation | 1 |
 | FunctionCall: named arguments are not supported here | 1 |
-| InlineAssembly: unsupported reference g_ptr_dirty.address | 1 |
 | InlineAssembly: unsupported reference g_ptr_dirty.selector | 1 |
+| InlineAssembly: unsupported reference g_ptr_dirty.address | 1 |
 | IndexAccess: unsupported call options | 1 |
 | FunctionCallOptions: unsupported expression FunctionCallOptions | 1 |
 | TupleExpression: unsupported call options | 1 |
@@ -87,11 +87,11 @@ The 1462 admitted and partially admitted tests have 3642 functions that calls re
 | assembly reference of this type | 1 |
 | unsupported conditional type | 1 |
 | assignment to this target | 1 |
-| MemberAccess: unsupported built-in member encode | 1 |
 | MemberAccess: unsupported built-in member encodePacked | 1 |
-| MemberAccess: unsupported built-in member encodeWithSelector | 1 |
-| MemberAccess: unsupported built-in member decode | 1 |
 | MemberAccess: unsupported built-in member encodeWithSignature | 1 |
+| MemberAccess: unsupported built-in member decode | 1 |
+| MemberAccess: unsupported built-in member encodeWithSelector | 1 |
+| MemberAccess: unsupported built-in member encode | 1 |
 | MemberAccess: unsupported built-in member blobbasefee | 1 |
 | InlineAssembly: YulFunctionCall: call to blobbasefee, which is neither a builtin nor a function the object defines | 1 |
 | Identifier: built-in blobhash is not supported | 1 |
@@ -122,6 +122,7 @@ The 1462 admitted and partially admitted tests have 3642 functions that calls re
 | unsupported callee | 14 | 0 |
 | parameter type | 12 | 0 |
 | unsupported external call | 8 | 0 |
+| value count mismatch | 8 | 0 |
 | return type | 7 | 0 |
 | length of a non-array | 6 | 0 |
 | VariableDeclaration: state variable of a struct the core cannot hold | 5 | 0 |
@@ -136,7 +137,6 @@ The 1462 admitted and partially admitted tests have 3642 functions that calls re
 | unsupported type name | 3 | 0 |
 | unsupported variable type | 3 | 0 |
 | IndexAccess: external calls only on contract-typed values | 2 | 0 |
-| assembly reference of this type | 2 | 0 |
 | unsupported binary operator | 2 | 0 |
 | unsupported declaration | 2 | 0 |
 | unsupported event parameter type | 2 | 0 |
@@ -144,12 +144,12 @@ The 1462 admitted and partially admitted tests have 3642 functions that calls re
 | FunctionCall: abi.encodeCall of an unnamed function | 1 | 0 |
 | FunctionCall: abi.encodeWithSignature of a non-literal signature is not supported | 1 | 0 |
 | MemberAccess: unsupported selector | 1 | 0 |
+| assembly reference of this type | 1 | 0 |
 | no supported function or creation | 1 | 0 |
 | static call of an unsupported function | 1 | 0 |
 | unsupported ABI parameter or return type | 1 | 0 |
 | unsupported constructor parameters | 1 | 0 |
 | unsupported identifier | 1 | 0 |
-| value count mismatch | 1 | 0 |
 
 ## Features in order of tests admitted
 
@@ -172,11 +172,11 @@ Supporting the features in this order admits the most rejected tests at each ste
 | 13 | parameter type | 76 |
 | 14 | unsupported event parameter type | 78 |
 | 15 | unsupported callee | 79 |
-| 16 | unsupported external call | 81 |
-| 17 | return type | 84 |
-| 18 | unsupported parameter type | 87 |
-| 19 | type annotation mismatch | 88 |
-| 20 | unsupported type name | 91 |
+| 16 | return type | 81 |
+| 17 | type annotation mismatch | 82 |
+| 18 | unsupported type name | 85 |
+| 19 | unsupported parameter type | 86 |
+| 20 | unsupported variable type | 87 |
 
 ## Skipped and compile failures
 
@@ -911,6 +911,8 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `inlineAssembly/mcopy.sol`
 - `inlineAssembly/mcopy_empty.sol`
 - `inlineAssembly/mcopy_overlap.sol`
+- `inlineAssembly/optimize_memory_store_multi_block.sol`
+- `inlineAssembly/optimize_memory_store_multi_block_bugreport.sol`
 - `inlineAssembly/prevrandao.sol`
 - `inlineAssembly/returndatacopy_using_stale_returndatasize.sol`
 - `inlineAssembly/selfbalance.sol`
@@ -923,6 +925,7 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `inlineAssembly/transient_storage_multiple_calls_different_transactions.sol`
 - `inlineAssembly/transient_storage_multiple_transactions.sol`
 - `inlineAssembly/transient_storage_reset_between_creation_runtime.sol`
+- `inlineAssembly/transient_storage_sanity_checks.sol`
 - `inlineAssembly/transient_storage_selfdestruct.sol`
 - `inlineAssembly/transient_storage_simple_reentrancy_lock.sol`
 - `inlineAssembly/truefalse.sol`
@@ -1107,6 +1110,8 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `operators/userDefined/multiple_operator_definitions_same_type_same_function_same_directive.sol`
 - `operators/userDefined/operator_definition_shadowing_builtin_keccak256.sol`
 - `operators/userDefined/operator_evaluation_order.sol`
+- `operators/userDefined/operator_making_pure_external_call.sol`
+- `operators/userDefined/operator_making_view_external_call.sol`
 - `operators/userDefined/operator_parameter_and_return_cleanup_between_calls.sol`
 - `operators/userDefined/operator_parameter_cleanup.sol`
 - `operators/userDefined/operator_precendence.sol`
@@ -1617,9 +1622,6 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `inlineAssembly/external_function_pointer_selector.sol`
 - `inlineAssembly/external_function_pointer_selector_assignment.sol`
 - `inlineAssembly/inline_assembly_embedded_function_call.sol`
-- `inlineAssembly/optimize_memory_store_multi_block.sol`
-- `inlineAssembly/optimize_memory_store_multi_block_bugreport.sol`
-- `inlineAssembly/transient_storage_sanity_checks.sol`
 - `inlineAssembly/tstore_hidden_staticcall.sol`
 - `libraries/external_call_with_function_pointer_parameter.sol`
 - `libraries/internal_call_attached_with_parentheses.sol`
@@ -1632,8 +1634,6 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `modifiers/function_modifier_return_reference.sol`
 - `modifiers/function_return_parameter.sol`
 - `modifiers/function_return_parameter_complex.sol`
-- `operators/userDefined/operator_making_pure_external_call.sol`
-- `operators/userDefined/operator_making_view_external_call.sol`
 - `saltedCreate/salted_create.sol`
 - `specialFunctions/abi_encode_with_signature_from_string.sol`
 - `specialFunctions/abi_functions_member_access.sol`
