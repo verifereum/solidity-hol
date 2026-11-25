@@ -132,6 +132,21 @@
       },
       "memory_size": 160,
       "memory_image": true
+    },
+    {
+      "name": "emit_stored_spill_header",
+      "function": "emitStoredSpill",
+      "args": [],
+      "expect": {
+        "panic": 34
+      },
+      "storage": {
+        "4": "29400335157912315244266070412362164103369332044010299463143527189509193072640",
+        "5": "9",
+        "6": "1"
+      },
+      "memory_size": 160,
+      "memory_image": true
     }
   ]
 }

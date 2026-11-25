@@ -1092,6 +1092,35 @@ Proof
   CONV_TAC cv_eval
 QED
 
+(* An array whose one element is a stored array of length 2^64: the outer
+ * encoder has written its length and the element's offset word, and hashed
+ * the outer slot for its data, the last scratch hash before the failure. *)
+Definition nested_long_accounts_def:
+  nested_long_accounts =
+    update_account 0w (empty_account_state with
+      storage := update_storage (mapping_slot [] 0w) (n2w (2 ** 64))
+                   (update_storage 0w 1w empty_storage))
+      empty_accounts
+End
+
+Definition nested_long_failure_def:
+  nested_long_failure =
+    case storage_abi_value test_env 0 nested_long_accounts 0w 0w
+           (ArrayT (ArrayT u256 NONE) NONE) of
+      (INR (c, p), w) => SOME (c, p, w)
+    | _ => NONE
+End
+
+val () = cv_auto_trans nested_long_accounts_def;
+val () = cv_auto_trans nested_long_failure_def;
+
+Theorem storage_nested_too_long_unsupported:
+  nested_long_failure =
+    SOME (long_storage_unsupported, PartialParts (SOME 1) [] T PartialNone, SOME 0w)
+Proof
+  CONV_TAC cv_eval
+QED
+
 (* return(...) in a callee ends the whole frame with its bytes. *)
 Theorem asm_halt_passes_through_call:
   run_asm [YulExprStmt (YulBuiltin YMStore [ylit 0w; YulName "x"]);

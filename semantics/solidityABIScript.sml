@@ -779,11 +779,18 @@ Termination
   rw[contractABITheory.abi_value_size_def, listTheory.list_size_def]
 End
 
+(* The end of what writes ws cover, from n. *)
+Definition writes_end_def:
+  (writes_end (n : num) [] = n) ∧
+  (writes_end n ((off, bs : byte list) :: ws) = writes_end (MAX n (off + LENGTH bs)) ws)
+End
+
 (* The writes, relative to its start, of a partial in the in-place layout
  * (indexed_data): each completed part its in-place bytes and their spill at
  * a running offset, then the failing part's. NONE where the in-place
- * encoding of a whole value is unsupported or ill-formed: a stored part that
- * spills, or no in-place bytes. *)
+ * encoding of a whole value is unsupported or ill-formed: a stored part's
+ * spill that the later parts' writes don't cover (as inplace_spill counts
+ * it for a whole value), or no in-place bytes. *)
 Definition inplace_partial_writes_def:
   (inplace_partial_writes src t PartialNone = SOME ([] : (num # byte list) list)) ∧
   (inplace_partial_writes src t (PartialParts len done w q) =
@@ -796,9 +803,12 @@ Definition inplace_partial_writes_def:
            NONE => NONE
          | SOME bs =>
              let n = inplace_spill src t a in
-             if src = StoredBytes ∧ n ≠ 0 then NONE else
-             OPTION_MAP (λws. (off, bs ++ REPLICATE n 0w) :: ws)
-               (inplace_parts_writes src (off + LENGTH bs) ts rest q))
+             let next = off + LENGTH bs in
+             case inplace_parts_writes src next ts rest q of
+               NONE => NONE
+             | SOME ws =>
+                 if src = StoredBytes ∧ writes_end next ws < next + n then NONE
+                 else SOME ((off, bs ++ REPLICATE n 0w) :: ws))
     | [] => OPTION_MAP (shift_writes off) (inplace_partial_writes src t q))
 Termination
   WF_REL_TAC ‘inv_image ($< LEX $<) (λx. case x of
@@ -1700,6 +1710,7 @@ Proof
   simp[Once indexed_data_pre_def] >> rw[] >> gvs[]
 QED
 
+val () = cv_auto_trans writes_end_def;
 val inplace_partial_writes_pre_def = cv_auto_trans_pre_rec
   "inplace_partial_writes_pre inplace_parts_writes_pre" inplace_partial_writes_def (
   WF_REL_TAC ‘inv_image ($< LEX $<) (λx. case x of

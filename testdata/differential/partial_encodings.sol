@@ -15,6 +15,8 @@ struct Holder { uint256 a; string s; }
 
 struct Stored { uint256 k; string s; }
 
+struct Three { string e; uint256 k; string bad; }
+
 interface IPeer {
     function take(Pair[] calldata xs) external returns (uint256);
 }
@@ -31,12 +33,14 @@ contract PartialEncodings {
     string text;
     string data;
     Stored st;
+    Three th;
 
     error Dynamic(string a, string b, uint256 k);
 
     event Data(uint256 indexed k, Mixed m);
     event Indexed(Mixed indexed m);
     event Text(string s);
+    event StoredThree(Three indexed t);
 
     // Pairs [(1, A), (2, 7)]: the second's enum word is out of range.
     function badPairs() internal pure returns (Pair[] memory xs) {
@@ -106,5 +110,11 @@ contract PartialEncodings {
 
     function emitStorageHeader() external {
         emit Text(data);
+    }
+
+    // th.e is empty, its slot dirty past the length byte; th.bad's header
+    // is malformed. The empty string's spill is overwritten by th.k.
+    function emitStoredSpill() external {
+        emit StoredThree(th);
     }
 }
