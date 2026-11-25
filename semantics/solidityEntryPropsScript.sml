@@ -294,7 +294,7 @@ Proof
   ‘EVERY (is_elementary_type o FST) args’ by
     (qpat_x_assum ‘EVERY _ args’ mp_tac >>
      simp[EVERY_MEM, pairTheory.FORALL_PROD] >> metis_tac[]) >>
-  simp[entry_output_def, encoded_runtime_values_def, runtime_abi_values_elementary,
+  simp[entry_output_def, entry_output_types_def, encoded_runtime_values_def, runtime_abi_values_elementary,
        encoder_state_def, guard_result_def, encoded_abi_tuple_def, encoded_elementary_parts,
        memory_write_empty]
 QED
