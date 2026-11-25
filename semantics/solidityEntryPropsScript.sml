@@ -38,6 +38,25 @@ Proof
   simp[call_contract_frame_def, pairTheory.UNCURRY]
 QED
 
+(* Return encoding with the procedure record reduced to its return types. *)
+Definition entry_output_types_def:
+  entry_output_types env return_types kind st vs =
+    if kind = FallbackEntry then fallback_output st vs
+    else case encoded_runtime_values env st return_types vs of
+      (INL (data, spill), st1) =>
+        (INL data, let q = FST (memory_load 64 st1) in
+                   memory_write (q + LENGTH data) spill (memory_write q data st1))
+    | (INR (c, ws), st1) =>
+        (INR c, completion_memory c (apply_writes (FST (memory_load 64 st1)) ws st1))
+End
+
+Theorem entry_output_types:
+  MAP SND p.return_bindings = return_types ⇒
+  entry_output env p kind st vs = entry_output_types env return_types kind st vs
+Proof
+  strip_tac >> simp[entry_output_def, entry_output_types_def]
+QED
+
 Theorem call_contract_selector_hit:
   4 ≤ LENGTH fr.call_data ∧
   lookup_external (TAKE 4 fr.call_data) prog.external_functions = SOME e ∧
