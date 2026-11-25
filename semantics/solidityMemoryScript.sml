@@ -384,72 +384,6 @@ Proof
   rw[touched_reach_def, arithmeticTheory.LESS_MOD, arithmeticTheory.MAX_DEF]
 QED
 
-(* The value of a memory array or struct, as the encoder reads it: the tuple
- * of its elements or fields, byte sequences as their bytes, and how far the
- * reads reach, raised from reach (touched_reach), on a failed read too. The
- * fuel bounds the struct nesting. *)
-Definition memory_value_def:
-  (memory_value env (fuel : num) ty v reach st =
-    case (ty, v) of
-      (ArrayT element length, ReferenceValue (MemoryReference p rty)) =>
-        if rty ≠ ty then (INR (InvalidCompletion "bad memory array reference"), reach, st) else
-        let (n, st1) = memory_length ty p st in
-        let reach1 = (case length of NONE => touched_reach reach p 32 | SOME _ => reach) in
-        let (r, reach2, st2) =
-          memory_elements env fuel element (memory_data ty p) n reach1 st1 in
-        ((case r of INL vs => INL (TupleValue vs) | INR c => INR c), reach2, st2)
-    | (StructT s, ReferenceValue (MemoryReference p rty)) =>
-        if rty ≠ ty then (INR (InvalidCompletion "bad memory struct reference"), reach, st) else
-        (case lookup_struct env s of
-           SOME fields =>
-             if fuel = 0 then (INR (InvalidCompletion "struct nesting"), reach, st) else
-             let (r, reach1, st1) =
-               memory_fields env (fuel - 1) (MAP SND fields) p reach st in
-             ((case r of INL vs => INL (TupleValue vs) | INR c => INR c), reach1, st1)
-         | NONE => (INR (InvalidCompletion "unknown struct"), reach, st))
-    | (_, ReferenceValue (MemoryReference p rty)) =>
-        if byte_sequence_type rty then
-          let (bs, st1) = memory_bytes p st in
-          (INL (ScalarValue (BytesValue bs)),
-           touched_reach (touched_reach reach p 32) (p + 32) (LENGTH bs), st1)
-        else (INR (InvalidCompletion "bad memory value"), reach, st)
-    | (_, ScalarValue _) => (INL v, reach, st)
-    | _ => (INR (InvalidCompletion "bad memory value"), reach, st)) ∧
-  (memory_elements env fuel element p n reach st =
-    if n = 0 then (INL [], reach, st) else
-    let reach1 = touched_reach reach p 32 in
-    case read_memory_word env element p st of
-      (INR c, st1) => (INR c, reach1, st1)
-    | (INL w, st1) =>
-        case memory_value env fuel element w reach1 st1 of
-          (INR c, reach2, st2) => (INR c, reach2, st2)
-        | (INL v, reach2, st2) =>
-            let (r, reach3, st3) =
-              memory_elements env fuel element (p + 32) (n - 1) reach2 st2 in
-            ((case r of INL vs => INL (v :: vs) | INR c => INR c), reach3, st3)) ∧
-  (memory_fields env fuel [] p reach st = (INL [], reach, st)) ∧
-  (memory_fields env fuel (ty :: tys) p reach st =
-    let reach1 = touched_reach reach p 32 in
-    case read_memory_word env ty p st of
-      (INR c, st1) => (INR c, reach1, st1)
-    | (INL w, st1) =>
-        case memory_value env fuel ty w reach1 st1 of
-          (INR c, reach2, st2) => (INR c, reach2, st2)
-        | (INL v, reach2, st2) =>
-            let (r, reach3, st3) =
-              memory_fields env fuel tys (p + 32) reach2 st2 in
-            ((case r of INL vs => INL (v :: vs) | INR c => INR c), reach3, st3))
-Termination
-  WF_REL_TAC ‘inv_image ($< LEX $< LEX $<) (λx. case x of
-    INL (env, fuel, ty, v, reach, st) => (fuel, sol_type_size ty, 0n)
-  | INR (INL (env, fuel, element, p, n, reach, st)) =>
-      (fuel, sol_type_size element, n + 1)
-  | INR (INR (env, fuel, tys, p, reach, st)) =>
-      (fuel, list_size sol_type_size tys, 1))’ >>
-  rw[solidityASTTheory.sol_type_size_def, listTheory.list_size_def] >>
-  qpat_x_assum ‘(_, _) = _’ (assume_tac o SYM) >> gvs[]
-End
-
 (* Scalar defaults, for reads of what was never written. *)
 Definition default_elementary_def:
   default_elementary ty =
@@ -831,26 +765,6 @@ QED
 val () = cv_auto_trans new_memory_array_def;
 val () = cv_auto_trans touched_reach_def;
 val () = cv_auto_trans scratch_reach_def;
-
-val memory_value_pre_def = cv_auto_trans_pre_rec
-  "memory_value_pre memory_elements_pre memory_fields_pre" memory_value_def (
-  WF_REL_TAC ‘inv_image ($< LEX $< LEX $<) (λx. case x of
-    INL (env, fuel, ty, v, reach, st) => (cv$c2n fuel, cv_size ty, 0)
-  | INR (INL (env, fuel, element, p, n, reach, st)) =>
-      (cv$c2n fuel, cv_size element, cv$c2n n + 1)
-  | INR (INR (env, fuel, tys, p, reach, st)) => (cv$c2n fuel, cv_size tys, 1))’ >>
-  cv_termination_tac
-);
-
-Theorem memory_value_pre[cv_pre]:
-  (∀env fuel ty v reach st. memory_value_pre env fuel ty v reach st) ∧
-  (∀env fuel element p n reach st.
-     memory_elements_pre env fuel element p n reach st) ∧
-  (∀env fuel tys p reach st. memory_fields_pre env fuel tys p reach st)
-Proof
-  ho_match_mp_tac memory_value_ind >> rpt strip_tac >>
-  simp[Once memory_value_pre_def] >> rw[] >> gvs[]
-QED
 
 val () = cv_auto_trans default_elementary_def;
 val () = cv_auto_trans scratch_write_def;

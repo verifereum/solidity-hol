@@ -99,6 +99,7 @@ Ancestors
   solidityDifferentialCorpus_namespaced_storage
   solidityDifferentialCorpus_override_getters
   solidityDifferentialCorpus_oz_erc20
+  solidityDifferentialCorpus_partial_encodings
   solidityDifferentialCorpus_pointer_only_structs
   solidityDifferentialCorpus_public_getters
   solidityDifferentialCorpus_pure_core

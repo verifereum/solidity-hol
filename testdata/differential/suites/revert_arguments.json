@@ -280,7 +280,9 @@
       "storage": {
         "1": 1,
         "2": 1
-      }
+      },
+      "memory_size": 192,
+      "memory_image": true
     },
     {
       "name": "storageMessage_success_skips_invalid_storage_encoding",
@@ -310,7 +312,9 @@
       "storage": {
         "1": 1,
         "2": 1
-      }
+      },
+      "memory_size": 192,
+      "memory_image": true
     },
     {
       "name": "storage_reference_observes_later_argument_mutation",

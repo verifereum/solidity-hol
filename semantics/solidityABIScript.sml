@@ -96,6 +96,241 @@ Termination
   rw[solidityCoreTheory.runtime_value_size_def, listTheory.list_size_def]
 End
 
+(* Zero bytes the compiler's encoder writes past the end of an encoding of a
+ * value not in storage (a stored one gives its own, storage_abi_value). A
+ * byte sequence copied from memory or calldata is followed by a cleared
+ * word; a literal writes whole words. Only the encoding's last dynamic part,
+ * recursively, can spill past its end. *)
+Datatype:
+  encoding_source = CopiedBytes | StoredBytes | LiteralBytes
+End
+
+Definition encoding_source_def:
+  encoding_source v =
+    case v of
+      ReferenceValue (StorageReference _ _ _ _ _ _) => StoredBytes
+    | ReferenceValue _ => CopiedBytes
+    | _ => LiteralBytes
+End
+
+Definition padded_bytes_spill_def:
+  padded_bytes_spill src (l : num) =
+    case src of
+      CopiedBytes => if l MOD 32 = 0 then 32 else l MOD 32
+    | StoredBytes => if l = 0 then 32 else 0
+    | LiteralBytes => 0
+End
+
+(* The last dynamic part's spill, NONE when no part is dynamic. *)
+Definition later_spill_def:
+  later_spill t n rest =
+    case rest of
+      SOME m => SOME m
+    | NONE => if is_dynamic t then SOME n else NONE
+End
+
+Definition abi_spill_def:
+  (abi_spill src (Bytes NONE) (BytesV bs) = padded_bytes_spill src (LENGTH bs)) ∧
+  (abi_spill src String (BytesV bs) = padded_bytes_spill src (LENGTH bs)) ∧
+  (abi_spill src (Array _ t) (ListV vs) =
+    (case parts_spill src (REPLICATE (LENGTH vs) t) vs of SOME n => n | NONE => 0)) ∧
+  (abi_spill src (Tuple ts) (ListV vs) = (case parts_spill src ts vs of SOME n => n | NONE => 0)) ∧
+  (abi_spill src _ _ = 0) ∧
+  (parts_spill src (t :: ts) (v :: vs) =
+    later_spill t (abi_spill src t v) (parts_spill src ts vs)) ∧
+  (parts_spill src _ _ = NONE)
+Termination
+  WF_REL_TAC ‘measure (λx. case x of
+    INL (src, t, v) => abi_value_size v
+  | INR (src, ts, vs) => list_size abi_value_size vs)’ >>
+  rw[contractABITheory.abi_value_size_def, listTheory.list_size_def]
+End
+
+(* What the compiled encoder has written of a value when reading one of its
+ * parts ends the frame: it writes in place and reads each part only when it
+ * reaches it. Nothing, when the value's own read failed; else a dynamic
+ * array's length (written first), the parts it completed (each its ABI
+ * value, encoding and spill), whether the failing part's offset word is
+ * written before the part is read (a calldata struct field's is written only
+ * after its offset is validated), and what it wrote of the failing part. *)
+Datatype:
+  abi_partial =
+    PartialNone
+  | PartialParts (num option) ((abi_value # byte list # byte list) list) bool abi_partial
+End
+
+(* A completed part read as the value tree v of type ty from memory or
+ * calldata: its ABI value, encoding and spill. *)
+Definition tree_part_def:
+  tree_part env ty v =
+    let t = abi_type env (LENGTH env.type_declarations) ty in
+    OPTION_MAP (λa. (a, enc t a, REPLICATE (abi_spill CopiedBytes t a) (0w : word8)))
+      (value_abi_value env ty v)
+End
+
+Definition shift_writes_def:
+  shift_writes (n : num) (ws : (num # byte list) list) = MAP (λ(off, bs). (n + off, bs)) ws
+End
+
+(* The ABI types of the parts of a value of ABI type t, given a dynamic
+ * array's length; an array's only up to its kth, since its length comes
+ * from its input and a partial needs the parts up to its failing one. *)
+Definition component_types_def:
+  component_types t len (k : num) =
+    case t of
+      Tuple ts => ts
+    | Array (SOME n) e => REPLICATE (MIN n k) e
+    | Array NONE e => REPLICATE (MIN (case len of SOME n => n | NONE => 0) k) e
+    | _ => []
+End
+
+(* The length of the heads of the parts of a value of ABI type t, given a
+ * dynamic array's length: head_lengths of all its component types, without
+ * listing an array's elements. *)
+Definition parts_head_length_def:
+  parts_head_length t len =
+    case t of
+      Tuple ts => head_lengths ts 0
+    | Array (SOME n) e => n * (if is_dynamic e then 32 else static_length e)
+    | Array NONE e =>
+        (case len of SOME n => n | NONE => 0) *
+        (if is_dynamic e then 32 else static_length e)
+    | _ => 0
+End
+
+(* The writes, relative to the start of the value's encoding, of a partial in
+ * the standard head/tail layout: each completed part its head (its encoding
+ * when static, else its offset word) and a dynamic one its tail with its
+ * spill, which a later write may overwrite; then the failing part, its
+ * offset word written when it was written before the read or the part wrote
+ * anything. *)
+Definition partial_writes_def:
+  (partial_writes t PartialNone = [] : (num # byte list) list) ∧
+  (partial_writes t (PartialParts len done w q) =
+    let ts = component_types t len (SUC (LENGTH done)) in
+    let hl = parts_head_length t len in
+    case len of
+      SOME n =>
+        (0, enc (Uint 256) (NumV n)) ::
+        shift_writes 32 (parts_writes hl 0 0 ts done w q)
+    | NONE => parts_writes hl 0 0 ts done w q) ∧
+  (parts_writes hl h tl [] done w q = []) ∧
+  (parts_writes hl h tl (t :: ts) done w q =
+    case done of
+      (a, part_bs, sp) :: rest =>
+        if is_dynamic t then
+          (h, enc (Uint 256) (NumV (hl + tl))) :: (hl + tl, part_bs ++ sp) ::
+          parts_writes hl (h + 32) (tl + LENGTH part_bs) ts rest w q
+        else (h, part_bs) :: parts_writes hl (h + LENGTH part_bs) tl ts rest w q
+    | [] =>
+        if is_dynamic t then
+          (case (w, q) of
+             (F, PartialNone) => []
+           | _ => [(h, enc (Uint 256) (NumV (hl + tl)))]) ++
+          shift_writes (hl + tl) (partial_writes t q)
+        else shift_writes h (partial_writes t q))
+Termination
+  WF_REL_TAC ‘inv_image ($< LEX $<) (λx. case x of
+    INL (t, p) => (abi_partial_size p, 0n)
+  | INR (hl, h, tl, ts, done, w, q) => (abi_partial_size q, LENGTH ts + 1))’ >>
+  rw[]
+End
+
+(* A value's partial writes, laid out from start. *)
+Definition apply_writes_def:
+  (apply_writes (start : num) [] (st : source_state) = st) ∧
+  (apply_writes start ((off, bs) :: ws) st =
+    apply_writes start ws (memory_write (start + off) bs st))
+End
+
+(* The value of a memory array or struct, as the encoder reads it: the tuple
+ * of its elements or fields, byte sequences as their bytes; on a failed read,
+ * what the encoder has written of it (abi_partial: it writes a part's offset
+ * word after reading the part's pointer, which cannot fail). Also how far the
+ * reads reach, raised from reach (touched_reach), on a failed read too. The
+ * fuel bounds the struct nesting. *)
+Definition memory_value_def:
+  (memory_value env (fuel : num) ty v reach st =
+    case (ty, v) of
+      (ArrayT element length, ReferenceValue (MemoryReference p rty)) =>
+        if rty ≠ ty then
+          (INR (InvalidCompletion "bad memory array reference", PartialNone), reach, st) else
+        let (n, st1) = memory_length ty p st in
+        let reach1 = (case length of NONE => touched_reach reach p 32 | SOME _ => reach) in
+        let (r, reach2, st2) =
+          memory_elements env fuel element (memory_data ty p) n reach1 st1 in
+        ((case r of
+            INL vs => INL (TupleValue vs)
+          | INR (c, done, wr, q) =>
+              INR (c, PartialParts (if length = NONE then SOME n else NONE) done wr q)),
+         reach2, st2)
+    | (StructT s, ReferenceValue (MemoryReference p rty)) =>
+        if rty ≠ ty then
+          (INR (InvalidCompletion "bad memory struct reference", PartialNone), reach, st) else
+        (case lookup_struct env s of
+           SOME fields =>
+             if fuel = 0 then (INR (InvalidCompletion "struct nesting", PartialNone), reach, st) else
+             let (r, reach1, st1) =
+               memory_fields env (fuel - 1) (MAP SND fields) p reach st in
+             ((case r of
+                 INL vs => INL (TupleValue vs)
+               | INR (c, done, wr, q) => INR (c, PartialParts NONE done wr q)), reach1, st1)
+         | NONE => (INR (InvalidCompletion "unknown struct", PartialNone), reach, st))
+    | (_, ReferenceValue (MemoryReference p rty)) =>
+        if byte_sequence_type rty then
+          let (bs, st1) = memory_bytes p st in
+          (INL (ScalarValue (BytesValue bs)),
+           touched_reach (touched_reach reach p 32) (p + 32) (LENGTH bs), st1)
+        else (INR (InvalidCompletion "bad memory value", PartialNone), reach, st)
+    | (_, ScalarValue _) => (INL v, reach, st)
+    | _ => (INR (InvalidCompletion "bad memory value", PartialNone), reach, st)) ∧
+  (memory_elements env fuel element p n reach st =
+    if n = 0 then (INL [], reach, st) else
+    let reach1 = touched_reach reach p 32 in
+    case read_memory_word env element p st of
+      (INR c, st1) => (INR (c, [], T, PartialNone), reach1, st1)
+    | (INL x, st1) =>
+        case memory_value env fuel element x reach1 st1 of
+          (INR (c, q), reach2, st2) => (INR (c, [], T, q), reach2, st2)
+        | (INL v, reach2, st2) =>
+            let (r, reach3, st3) =
+              memory_elements env fuel element (p + 32) (n - 1) reach2 st2 in
+            ((case r of
+                INL vs => INL (v :: vs)
+              | INR (c, done, wr, q) =>
+                  (case tree_part env element v of
+                     SOME done1 => INR (c, done1 :: done, wr, q)
+                   | NONE => INR (InvalidCompletion "bad ABI value", [], T, PartialNone))),
+             reach3, st3)) ∧
+  (memory_fields env fuel [] p reach st = (INL [], reach, st)) ∧
+  (memory_fields env fuel (ty :: tys) p reach st =
+    let reach1 = touched_reach reach p 32 in
+    case read_memory_word env ty p st of
+      (INR c, st1) => (INR (c, [], T, PartialNone), reach1, st1)
+    | (INL x, st1) =>
+        case memory_value env fuel ty x reach1 st1 of
+          (INR (c, q), reach2, st2) => (INR (c, [], T, q), reach2, st2)
+        | (INL v, reach2, st2) =>
+            let (r, reach3, st3) =
+              memory_fields env fuel tys (p + 32) reach2 st2 in
+            ((case r of
+                INL vs => INL (v :: vs)
+              | INR (c, done, wr, q) =>
+                  (case tree_part env ty v of
+                     SOME done1 => INR (c, done1 :: done, wr, q)
+                   | NONE => INR (InvalidCompletion "bad ABI value", [], T, PartialNone))),
+             reach3, st3))
+Termination
+  WF_REL_TAC ‘inv_image ($< LEX $< LEX $<) (λx. case x of
+    INL (env, fuel, ty, v, reach, st) => (fuel, sol_type_size ty, 0n)
+  | INR (INL (env, fuel, element, p, n, reach, st)) =>
+      (fuel, sol_type_size element, n + 1)
+  | INR (INR (env, fuel, tys, p, reach, st)) =>
+      (fuel, list_size sol_type_size tys, 1))’ >>
+  rw[solidityASTTheory.sol_type_size_def, listTheory.list_size_def] >>
+  qpat_x_assum ‘(_, _) = _’ (assume_tac o SYM) >> gvs[]
+End
+
 (* Inverse of abi_value on values valid_enc accepts. *)
 Definition abi_runtime_value_def:
   (abi_runtime_value (UintT _) (NumV n) = SOME (ScalarValue (IntegerValue (&n)))) ∧
@@ -235,47 +470,58 @@ End
 (* The value of a calldata array, struct or byte sequence at data, read part
  * by part through the pinned compiler's calldata accessors, so an invalid
  * element or offset reverts: an array or struct as the tuple of its elements
- * or fields, a byte sequence as its bytes. The encoder and the copies to
- * storage read calldata this way. The fuel bounds the struct nesting. *)
+ * or fields, a byte sequence as its bytes; on a failed read, what the encoder
+ * has written of it (abi_partial). The encoder writes an array element's
+ * offset word before reading the element, and a struct field's only after
+ * reading the field's offset. The encoder and the copies to storage read
+ * calldata this way. The fuel bounds the struct nesting. *)
 Definition calldata_value_def:
   (calldata_value env (fuel : num) cd ty data length =
     case ty of
-      ArrayT element _ =>
+      ArrayT element l =>
         (case calldata_values env fuel cd element data 0 length of
            INL vs => INL (TupleValue vs)
-         | INR c => INR c)
+         | INR (c, done, w, q) =>
+             INR (c, PartialParts (if l = NONE then SOME length else NONE) done w q))
     | StructT s =>
         (case lookup_struct env s of
            SOME fields =>
-             if fuel = 0 then INR (InvalidCompletion "struct nesting") else
+             if fuel = 0 then INR (InvalidCompletion "struct nesting", PartialNone) else
              (case calldata_fields env (fuel - 1) cd (MAP SND fields) data data of
                 INL vs => INL (TupleValue vs)
-              | INR c => INR c)
-         | NONE => INR (InvalidCompletion "unknown struct"))
+              | INR (c, done, w, q) => INR (c, PartialParts NONE done w q))
+         | NONE => INR (InvalidCompletion "unknown struct", PartialNone))
     | _ => INL (ScalarValue (BytesValue
              (TAKE length (DROP data cd ++ REPLICATE length 0w))))) ∧
   (calldata_values env fuel cd element data i n =
     if n = 0 then INL [] else
     case calldata_part_value env fuel cd element data
            (data + i * abi_stride env element) of
-      INR c => INR c
+      INR (c, q) => INR (c, [], T, q)
     | INL v =>
         case calldata_values env fuel cd element data (i + 1) (n - 1) of
           INL vs => INL (v :: vs)
-        | INR c => INR c) ∧
+        | INR (c, done, w, q) =>
+            (case tree_part env element v of
+               SOME done1 => INR (c, done1 :: done, w, q)
+             | NONE => INR (InvalidCompletion "bad ABI value", [], T, PartialNone))) ∧
   (calldata_fields env fuel cd [] base head = INL []) ∧
   (calldata_fields env fuel cd (ty :: tys) base head =
     case calldata_part_value env fuel cd ty base head of
-      INR c => INR c
+      INR (c, q) => INR (c, [], F, q)
     | INL v =>
         case calldata_fields env fuel cd tys base (head + abi_stride env ty) of
           INL vs => INL (v :: vs)
-        | INR c => INR c) ∧
+        | INR (c, done, w, q) =>
+            (case tree_part env ty v of
+               SOME done1 => INR (c, done1 :: done, w, q)
+             | NONE => INR (InvalidCompletion "bad ABI value", [], T, PartialNone))) ∧
   (calldata_part_value env fuel cd ty base head =
     case calldata_part env cd ty base head of
       INL (ReferenceValue (CalldataReference pos length _)) =>
         calldata_value env fuel cd ty pos length
-    | result => result)
+    | INL v => INL v
+    | INR c => INR (c, PartialNone))
 Termination
   WF_REL_TAC ‘inv_image ($< LEX $< LEX $<) (λx. case x of
     INL (_, fuel, _, ty, _, _) => (fuel, sol_type_size ty, 0)
@@ -312,100 +558,110 @@ Definition last_spill_def:
 End
 
 (* A storage value encoded in place, as the pinned encoder does: its ABI
- * value, its encoding, and the bytes written past its end. Scalars are read
- * cleaned; a byte sequence copies whole data words, keeping unused dirty
- * bytes, except the length byte of a short one (storage_byte_data), and an
- * empty one still writes its slot's word past its end. A length of 2^64 or
- * more is unsupported: the compiled encoder has no length check, so it does
- * not panic with 0x41, and what it does instead (run out of gas, or panic
- * cleaning an element) the source does not track. The fuel bounds the struct
- * nesting. *)
+ * value, its encoding, and the bytes written past its end; on a failed read,
+ * what the encoder has written of it (abi_partial). Also the data slot it
+ * last hashed in scratch, failed reads included (as read_scratch on success).
+ * Scalars are read cleaned; a byte sequence copies whole data words, keeping
+ * unused dirty bytes, except the length byte of a short one
+ * (storage_byte_data), and an empty one still writes its slot's word past
+ * its end. A length of 2^64 or more is unsupported: the compiled encoder has
+ * no length check, so it does not panic with 0x41, and what it does instead
+ * (run out of gas, or panic cleaning an element) the source does not track.
+ * The fuel bounds the struct nesting. *)
 Definition storage_abi_value_def:
   (storage_abi_value env (fuel : num) accounts addr slot ty =
     if byte_sequence_type ty then
       (case storage_byte_length accounts addr slot of
-         INR c => INR c
+         INR c => (INR (c, PartialNone), NONE)
        | INL length =>
          if 2 ** 64 ≤ length then
-           INR (InvalidCompletion
-                  "unsupported: a stored sequence of 2^64 or more elements encoded to memory") else
+           (INR (InvalidCompletion
+                   "unsupported: a stored sequence of 2^64 or more elements encoded to memory",
+                 PartialNone), NONE) else
+         let w = if 32 ≤ length then SOME slot else NONE in
          let data = storage_byte_data accounts addr slot length in
          case abi_value ty (ScalarValue (BytesValue (TAKE length data))) of
            SOME a =>
-             if length = 0 then INL (a, enc (Uint 256) (NumV 0), data)
-             else INL (a, enc (Uint 256) (NumV length) ++ data, [])
-         | NONE => INR (InvalidCompletion "bad ABI value"))
+             if length = 0 then (INL (a, enc (Uint 256) (NumV 0), data), w)
+             else (INL (a, enc (Uint 256) (NumV length) ++ data, []), w)
+         | NONE => (INR (InvalidCompletion "bad ABI value", PartialNone), w))
     else case ty of
       ArrayT element l =>
         (case storage_array_data accounts addr slot ty of
            (length, data) =>
              if 2 ** 64 ≤ length then
-               INR (InvalidCompletion
-                      "unsupported: a stored sequence of 2^64 or more elements encoded to memory") else
-             case storage_abi_elements env fuel accounts addr data element 0 length of
+               (INR (InvalidCompletion
+                       "unsupported: a stored sequence of 2^64 or more elements encoded to memory",
+                     PartialNone), NONE) else
+             let (r, w) = storage_abi_elements env fuel accounts addr data element 0 length in
+             let w1 = later_scratch (if l = NONE then SOME slot else NONE) w in
+             case r of
                INL parts =>
                  let t = abi_type env (LENGTH env.type_declarations) element in
-                 INL (ListV (MAP FST parts),
-                      (if l = NONE then enc (Uint 256) (NumV length) else []) ++
-                      encoded_abi_tuple (MAP (λ(a, bs, sp). (t, bs)) parts),
-                      last_spill (MAP (λ(a, bs, sp). (t, sp)) parts))
-             | INR c => INR c)
+                 (INL (ListV (MAP FST parts),
+                       (if l = NONE then enc (Uint 256) (NumV length) else []) ++
+                       encoded_abi_tuple (MAP (λ(a, bs, sp). (t, bs)) parts),
+                       last_spill (MAP (λ(a, bs, sp). (t, sp)) parts)), w1)
+             | INR (c, done, q) =>
+                 (INR (c, PartialParts (if l = NONE then SOME length else NONE) done T q), w1))
     | StructT s =>
         (case (lookup_struct env s, lookup_struct_layout env s) of
            (SOME fields, SOME layout) =>
-             if fuel = 0 then INR (InvalidCompletion "struct nesting") else
+             if fuel = 0 then (INR (InvalidCompletion "struct nesting", PartialNone), NONE) else
              (case storage_abi_fields env (fuel - 1) accounts addr slot
                      layout.struct_fields fields of
-                INL parts =>
-                  INL (ListV (MAP FST parts),
-                       encoded_abi_tuple (MAP (λ(a, (t, bs), sp). (t, bs)) parts),
-                       last_spill (MAP (λ(a, (t, bs), sp). (t, sp)) parts))
-              | INR c => INR c)
-         | _ => INR (InvalidCompletion "missing struct layout"))
-    | _ => INR (InvalidCompletion "bad storage ABI type")) ∧
+                (INL parts, w) =>
+                  (INL (ListV (MAP FST parts),
+                        encoded_abi_tuple (MAP (λ(a, (t, bs), sp). (t, bs)) parts),
+                        last_spill (MAP (λ(a, (t, bs), sp). (t, sp)) parts)), w)
+              | (INR (c, done, q), w) => (INR (c, PartialParts NONE done T q), w))
+         | _ => (INR (InvalidCompletion "missing struct layout", PartialNone), NONE))
+    | _ => (INR (InvalidCompletion "bad storage ABI type", PartialNone), NONE)) ∧
   (storage_abi_elements env fuel accounts addr data element i n =
-    if n = 0 then INL [] else
+    if n = 0 then (INL [], NONE) else
     case storage_element_location env data element i of
-      NONE => INR (InvalidCompletion "bad array element type")
+      NONE => (INR (InvalidCompletion "bad array element type", [], PartialNone), NONE)
     | SOME (s, offset) =>
-        let value =
+        let (value, w) =
           if is_stored_scalar_type element then
-            (case read_storage env accounts addr s offset element of
-               SOME v =>
-                 (case abi_value element (ScalarValue v) of
-                    SOME a => INL (a, enc (abi_type env 0 element) a, [])
-                  | NONE => INR (InvalidCompletion "bad ABI value"))
-             | NONE => INR (InvalidCompletion "bad storage read"))
+            ((case read_storage env accounts addr s offset element of
+                SOME v =>
+                  (case abi_value element (ScalarValue v) of
+                     SOME a => INL (a, enc (abi_type env 0 element) a, [])
+                   | NONE => INR (InvalidCompletion "bad ABI value", PartialNone))
+              | NONE => INR (InvalidCompletion "bad storage read", PartialNone)), NONE)
           else storage_abi_value env fuel accounts addr s element in
         case value of
-          INR c => INR c
+          INR (c, q) => (INR (c, [], q), w)
         | INL entry =>
-            case storage_abi_elements env fuel accounts addr data element (i + 1) (n - 1) of
-              INL entries => INL (entry :: entries)
-            | INR c => INR c) ∧
-  (storage_abi_fields env fuel accounts addr slot layout [] = INL []) ∧
+            let (r, w') = storage_abi_elements env fuel accounts addr data element (i + 1) (n - 1) in
+            ((case r of
+                INL entries => INL (entry :: entries)
+              | INR (c, done, q) => INR (c, entry :: done, q)), later_scratch w w')) ∧
+  (storage_abi_fields env fuel accounts addr slot layout [] = (INL [], NONE)) ∧
   (storage_abi_fields env fuel accounts addr slot layout ((f, ty) :: fields) =
     case ALOOKUP (MAP (λv. (v.state_id, v)) layout) f of
-      NONE => INR (InvalidCompletion "missing field layout")
+      NONE => (INR (InvalidCompletion "missing field layout", [], PartialNone), NONE)
     | SOME v =>
         let s = slot + v.state_slot in
-        let value =
+        let (value, w) =
           if is_stored_scalar_type ty then
-            (case read_storage env accounts addr s v.state_offset ty of
-               SOME x =>
-                 (case abi_value ty (ScalarValue x) of
-                    SOME a => INL (a, enc (abi_type env 0 ty) a, [])
-                  | NONE => INR (InvalidCompletion "bad ABI value"))
-             | NONE => INR (InvalidCompletion "bad storage read"))
+            ((case read_storage env accounts addr s v.state_offset ty of
+                SOME x =>
+                  (case abi_value ty (ScalarValue x) of
+                     SOME a => INL (a, enc (abi_type env 0 ty) a, [])
+                   | NONE => INR (InvalidCompletion "bad ABI value", PartialNone))
+              | NONE => INR (InvalidCompletion "bad storage read", PartialNone)), NONE)
           else storage_abi_value env fuel accounts addr s ty in
         case value of
-          INR c => INR c
+          INR (c, q) => (INR (c, [], q), w)
         | INL (a, encoded, sp) =>
-            case storage_abi_fields env fuel accounts addr slot layout fields of
-              INL parts =>
-                INL ((a, (abi_type env (LENGTH env.type_declarations) ty, encoded), sp)
-                     :: parts)
-            | INR c => INR c)
+            let (r, w') = storage_abi_fields env fuel accounts addr slot layout fields in
+            ((case r of
+                INL parts =>
+                  INL ((a, (abi_type env (LENGTH env.type_declarations) ty, encoded), sp)
+                       :: parts)
+              | INR (c, done, q) => INR (c, (a, encoded, sp) :: done, q)), later_scratch w w'))
 Termination
   WF_REL_TAC ‘inv_image ($< LEX $< LEX $<) (λx. case x of
     INL (env, fuel, accounts, addr, slot, ty) => (fuel, sol_type_size ty, 0)
@@ -429,70 +685,23 @@ Definition array_copy_value_def:
       MemoryReference _ _ =>
         memory_value env (LENGTH env.type_declarations) ty (ReferenceValue r) reach st
     | CalldataReference data n rty =>
-        if rty ≠ ty then (INR (InvalidCompletion "bad calldata array reference"), reach, st)
+        if rty ≠ ty then
+          (INR (InvalidCompletion "bad calldata array reference", PartialNone), reach, st)
         else (calldata_value env (LENGTH env.type_declarations)
                 st.frame.call_data ty data n, reach, st)
     | StorageReference PersistentStorage addr slot 0 rty _ =>
-        if rty ≠ ty then (INR (InvalidCompletion "bad storage array reference"), reach, st)
+        if rty ≠ ty then
+          (INR (InvalidCompletion "bad storage array reference", PartialNone), reach, st)
         else (case storage_array_value env (LENGTH env.type_declarations)
                      st.world.accounts addr slot ty of
                 INL v =>
                   let w = read_scratch env (LENGTH env.type_declarations)
                             st.world.accounts addr slot ty in
                   (INL v, scratch_reach reach w, scratch_write w st)
-              | INR c => (INR c, reach, st))
-    | _ => (INR (InvalidCompletion "bad array reference"), reach, st)
+              | INR c => (INR (c, PartialNone), reach, st))
+    | _ => (INR (InvalidCompletion "bad array reference", PartialNone), reach, st)
 End
 
-(* Zero bytes the compiler's encoder writes past the end of an encoding of a
- * value not in storage (a stored one gives its own, storage_abi_value). A
- * byte sequence copied from memory or calldata is followed by a cleared
- * word; a literal writes whole words. Only the encoding's last dynamic part,
- * recursively, can spill past its end. *)
-Datatype:
-  encoding_source = CopiedBytes | StoredBytes | LiteralBytes
-End
-
-Definition encoding_source_def:
-  encoding_source v =
-    case v of
-      ReferenceValue (StorageReference _ _ _ _ _ _) => StoredBytes
-    | ReferenceValue _ => CopiedBytes
-    | _ => LiteralBytes
-End
-
-Definition padded_bytes_spill_def:
-  padded_bytes_spill src (l : num) =
-    case src of
-      CopiedBytes => if l MOD 32 = 0 then 32 else l MOD 32
-    | StoredBytes => if l = 0 then 32 else 0
-    | LiteralBytes => 0
-End
-
-(* The last dynamic part's spill, NONE when no part is dynamic. *)
-Definition later_spill_def:
-  later_spill t n rest =
-    case rest of
-      SOME m => SOME m
-    | NONE => if is_dynamic t then SOME n else NONE
-End
-
-Definition abi_spill_def:
-  (abi_spill src (Bytes NONE) (BytesV bs) = padded_bytes_spill src (LENGTH bs)) ∧
-  (abi_spill src String (BytesV bs) = padded_bytes_spill src (LENGTH bs)) ∧
-  (abi_spill src (Array _ t) (ListV vs) =
-    (case parts_spill src (REPLICATE (LENGTH vs) t) vs of SOME n => n | NONE => 0)) ∧
-  (abi_spill src (Tuple ts) (ListV vs) = (case parts_spill src ts vs of SOME n => n | NONE => 0)) ∧
-  (abi_spill src _ _ = 0) ∧
-  (parts_spill src (t :: ts) (v :: vs) =
-    later_spill t (abi_spill src t v) (parts_spill src ts vs)) ∧
-  (parts_spill src _ _ = NONE)
-Termination
-  WF_REL_TAC ‘measure (λx. case x of
-    INL (src, t, v) => abi_value_size v
-  | INR (src, ts, vs) => list_size abi_value_size vs)’ >>
-  rw[contractABITheory.abi_value_size_def, listTheory.list_size_def]
-End
 
 (* abi.encodePacked, the concatenations and indexed topics write a byte
  * sequence v without padding, and these bytes past its contents bs: a copied
@@ -555,6 +764,75 @@ Termination
   rw[contractABITheory.abi_value_size_def, listTheory.list_size_def]
 End
 
+(* The in-place encoding an indexed array or struct hashes: its elements or
+ * fields concatenated, without lengths or offsets, a nested byte sequence
+ * padded. Each part is taken from the part's encoded body (encoded), whose
+ * words keep any dirty padding the storage encoder copied. *)
+Definition indexed_data_def:
+  (indexed_data t a (encoded : byte list) =
+    case (t, a) of
+      (Array length element, ListV vs) =>
+        indexed_parts (REPLICATE (LENGTH vs) element) vs
+          (if length = NONE then DROP 32 encoded else encoded) 0
+    | (Tuple ts, ListV vs) => indexed_parts ts vs encoded 0
+    | (_, BytesV bs) =>
+        if is_dynamic t then SOME (TAKE (32 * ((LENGTH bs + 31) DIV 32)) (DROP 32 encoded))
+        else SOME (TAKE 32 encoded)
+    | _ => SOME (TAKE 32 encoded)) ∧
+  (indexed_parts [] [] encoded pos = SOME []) ∧
+  (indexed_parts (t :: ts) (v :: vs) encoded pos =
+    let dynamic = is_dynamic t in
+    let offset = if dynamic then abi_word encoded pos else pos in
+    case (indexed_data t v (DROP offset encoded),
+          indexed_parts ts vs encoded (pos + if dynamic then 32 else static_length t)) of
+      (SOME bs, SOME rest) => SOME (bs ++ rest)
+    | _ => NONE) ∧
+  (indexed_parts _ _ encoded pos = NONE)
+Termination
+  WF_REL_TAC ‘measure (λx. case x of
+    INL (t, a, encoded) => abi_value_size a
+  | INR (ts, vs, encoded, pos) => list_size abi_value_size vs)’ >>
+  rw[contractABITheory.abi_value_size_def, listTheory.list_size_def]
+End
+
+(* The end of what writes ws cover, from n. *)
+Definition writes_end_def:
+  (writes_end (n : num) [] = n) ∧
+  (writes_end n ((off, bs : byte list) :: ws) = writes_end (MAX n (off + LENGTH bs)) ws)
+End
+
+(* The writes, relative to its start, of a partial in the in-place layout
+ * (indexed_data): each completed part its in-place bytes and their spill at
+ * a running offset, then the failing part's. NONE where the in-place
+ * encoding of a whole value is unsupported or ill-formed: a stored part's
+ * spill that the later parts' writes don't cover (as inplace_spill counts
+ * it for a whole value), or no in-place bytes. *)
+Definition inplace_partial_writes_def:
+  (inplace_partial_writes src t PartialNone = SOME ([] : (num # byte list) list)) ∧
+  (inplace_partial_writes src t (PartialParts len done w q) =
+    inplace_parts_writes src 0 (component_types t len (SUC (LENGTH done))) done q) ∧
+  (inplace_parts_writes src off [] done q = SOME []) ∧
+  (inplace_parts_writes src off (t :: ts) done q =
+    case done of
+      (a, part_bs, sp) :: rest =>
+        (case indexed_data t a part_bs of
+           NONE => NONE
+         | SOME bs =>
+             let n = inplace_spill src t a in
+             let next = off + LENGTH bs in
+             case inplace_parts_writes src next ts rest q of
+               NONE => NONE
+             | SOME ws =>
+                 if src = StoredBytes ∧ writes_end next ws < next + n then NONE
+                 else SOME ((off, bs ++ REPLICATE n 0w) :: ws))
+    | [] => OPTION_MAP (shift_writes off) (inplace_partial_writes src t q))
+Termination
+  WF_REL_TAC ‘inv_image ($< LEX $<) (λx. case x of
+    INL (src, t, p) => (abi_partial_size p, 0n)
+  | INR (src, off, ts, done, q) => (abi_partial_size q, LENGTH ts + 1))’ >>
+  rw[]
+End
+
 (* The ABI value of v, of type ty, its encoding, the bytes the encoder
  * writes past its end, and how far its reads reach, raised from reach. A
  * storage value is encoded in place (storage_abi_value), its reach its
@@ -565,14 +843,10 @@ Definition runtime_abi_value_def:
     let ty' = case ty of LocatedT _ t => t | t => t in
     case v of
       ReferenceValue (StorageReference PersistentStorage addr slot 0 rty _) =>
-        if rty ≠ ty' then (INR (InvalidCompletion "bad ABI value"), reach, st)
+        if rty ≠ ty' then (INR (InvalidCompletion "bad ABI value", PartialNone), reach, st)
         else (case storage_abi_value env (LENGTH env.type_declarations)
                      st.world.accounts addr slot rty of
-                INL (a, bs, sp) =>
-                  let w = read_scratch env (LENGTH env.type_declarations)
-                            st.world.accounts addr slot rty in
-                  (INL (a, bs, sp), scratch_reach reach w, scratch_write w st)
-              | INR c => (INR c, reach, st))
+                (r, w) => (r, scratch_reach reach w, scratch_write w st))
     | _ =>
       case (case v of
               ReferenceValue r => array_copy_value env reach st ty' r
@@ -583,25 +857,35 @@ Definition runtime_abi_value_def:
         case value_abi_value env ty' tree of
           SOME a =>
             (INL (a, enc t a, REPLICATE (abi_spill (encoding_source v) t a) 0w), reach1, st1)
-        | NONE => (INR (InvalidCompletion "bad ABI value"), reach1, st1)
+        | NONE => (INR (InvalidCompletion "bad ABI value", PartialNone), reach1, st1)
 End
 
 Definition runtime_abi_values_def:
   (runtime_abi_values env reach (st : source_state) [] [] =
      ((INL ([], NONE), reach, st) :
         (((contractABI$abi_type # byte list) list # byte list option) +
-         source_completion) # num # source_state)) ∧
+         (source_completion # (abi_value # byte list # byte list) list # abi_partial)) #
+        num # source_state)) ∧
   (runtime_abi_values env reach st (ty :: tys) (v :: vs) =
     case runtime_abi_value env reach st ty v of
-      (INR c, reach1, st1) => (INR c, reach1, st1)
+      (INR (c, q), reach1, st1) => (INR (c, [], q), reach1, st1)
     | (INL (a, encoded_body, sp), reach1, st1) =>
       let (r, reach2, st2) = runtime_abi_values env reach1 st1 tys vs in
       ((case r of
           INL (encoded, spill) =>
             let t = abi_type env (LENGTH env.type_declarations) ty in
             INL ((t, encoded_body) :: encoded, later_spill t sp spill)
-        | INR c => INR c), reach2, st2)) ∧
-  (runtime_abi_values _ reach st _ _ = (INR (InvalidCompletion "bad ABI arguments"), reach, st))
+        | INR (c, done, q) => INR (c, (a, encoded_body, sp) :: done, q)), reach2, st2)) ∧
+  (runtime_abi_values _ reach st _ _ =
+     (INR (InvalidCompletion "bad ABI arguments", [], PartialNone), reach, st))
+End
+
+(* The writes of a tuple of values of types tys, of which the encoder
+ * completed done and wrote q of the next. *)
+Definition tuple_partial_writes_def:
+  tuple_partial_writes env tys done q =
+    partial_writes (Tuple (abi_types env (LENGTH env.type_declarations) tys))
+      (PartialParts NONE done T q)
 End
 
 (* An encoder writes at the free memory pointer, and the compiled one reads
@@ -611,9 +895,9 @@ End
  * reads' reach, from zero, is the byte after the last one they touch, a
  * failing read included; an input read at or above the free pointer is
  * unsupported and fails closed before any read failure surfaces. When
- * reading an input ends the frame with a panic or a revert, these encoders
- * have written nothing, where the compiled one has written what comes before
- * that input, so the frame's final memory differs from the compiled one's. *)
+ * reading an input ends the frame with a panic or a revert, the encoders
+ * give what the compiled one has written by then (abi_partial), as writes
+ * relative to where the encoding starts, which the caller makes. *)
 Definition encoder_state_def:
   encoder_state (st : source_state) reach (st1 : source_state) =
     if FST (memory_load 64 st) < reach then
@@ -624,10 +908,13 @@ End
 Definition encoded_runtime_values_def:
   encoded_runtime_values env st tys vs =
     let (r, reach, st1) = runtime_abi_values env 0 st tys vs in
-    case guard_result (encoder_state st reach st1) r of
-      INL ((parts, spill), st2) =>
-        INL ((encoded_abi_tuple parts, (case spill of SOME sp => sp | NONE => [])), st2)
-    | INR c => INR c
+    case encoder_state st reach st1 of
+      INR c => (INR (c, []), st)
+    | INL st2 =>
+        case r of
+          INL (parts, spill) =>
+            (INL (encoded_abi_tuple parts, (case spill of SOME sp => sp | NONE => [])), st2)
+        | INR (c, done, q) => (INR (c, tuple_partial_writes env tys done q), st2)
 End
 
 (* abi.encodePacked: a value in its own width, a bytesN left-aligned and the
@@ -640,12 +927,16 @@ Definition packed_value_def:
     case ty of
       LocatedT _ (ArrayT element length) =>
         if ¬is_stored_scalar_type element then
-          (INR (InvalidCompletion "bad packed array"), reach, st)
+          (INR (InvalidCompletion "bad packed array", []), reach, st)
         else
           (case runtime_abi_value env reach st ty v of
              (INL (_, bs, _), reach1, st1) =>
                (INL (case length of NONE => DROP 32 bs | SOME _ => bs), reach1, st1)
-           | (INR c, reach1, st1) => (INR c, reach1, st1))
+           | (INR (c, q), reach1, st1) =>
+               (case inplace_partial_writes (encoding_source v)
+                       (abi_type env (LENGTH env.type_declarations) ty) q of
+                  SOME ws => (INR (c, ws), reach1, st1)
+                | NONE => (INR (InvalidCompletion "bad packed array", []), reach1, st1)))
     | LocatedT _ _ =>
         (case v of
            ReferenceValue r =>
@@ -659,9 +950,9 @@ Definition packed_value_def:
                         scratch_reach reach (long_bytes_scratch st.world.accounts addr slot)
                     | _ => reach),
                    st1)
-              | INR c => (INR c, reach, st))
+              | INR c => (INR (c, []), reach, st))
          | ScalarValue (BytesValue bs) => (INL bs, reach, st)
-         | _ => (INR (InvalidCompletion "bad packed value"), reach, st))
+         | _ => (INR (InvalidCompletion "bad packed value", []), reach, st))
     | _ =>
       case (abi_value ty v, storage_bytes ty) of
         (SOME a, SOME width) =>
@@ -669,7 +960,7 @@ Definition packed_value_def:
           (INL (case ty of
                   FixedBytesT _ => TAKE width word
                 | _ => DROP (32 - width) word), reach, st)
-      | _ => (INR (InvalidCompletion "bad packed value"), reach, st)
+      | _ => (INR (InvalidCompletion "bad packed value", []), reach, st)
 End
 
 (* The parts written one after another, and the bytes left past their end:
@@ -677,25 +968,29 @@ End
 Definition packed_values_def:
   (packed_values env reach st [] [] =
      ((INL ([], []), reach, st) :
-        ((byte list # byte list) + source_completion) # num # source_state)) ∧
+        ((byte list # byte list) + (source_completion # (num # byte list) list)) #
+        num # source_state)) ∧
   (packed_values env reach st (ty :: tys) (v :: vs) =
     case packed_value env reach st ty v of
       (INR c, reach1, st1) => (INR c, reach1, st1)
     | (INL bs, reach1, st1) =>
       let (r, reach2, st2) = packed_values env reach1 st1 tys vs in
+      let tail = packed_tail st1.world.accounts ty v bs in
       ((case r of
           INL (rest, spill) =>
-            let tail = packed_tail st1.world.accounts ty v bs in
-            INL (bs ++ rest,
-                 spill ++ DROP (LENGTH rest + LENGTH spill) tail)
-        | INR c => INR c), reach2, st2)) ∧
-  (packed_values _ reach st _ _ = (INR (InvalidCompletion "bad packed values"), reach, st))
+            INL (bs ++ rest, spill ++ DROP (LENGTH rest + LENGTH spill) tail)
+        | INR (c, ws) => INR (c, (0, bs ++ tail) :: shift_writes (LENGTH bs) ws)),
+       reach2, st2)) ∧
+  (packed_values _ reach st _ _ =
+     (INR (InvalidCompletion "bad packed values", []), reach, st))
 End
 
 Definition packed_encoding_def:
   packed_encoding env st tys vs =
     let (r, reach, st1) = packed_values env 0 st tys vs in
-    guard_result (encoder_state st reach st1) r
+    case encoder_state st reach st1 of
+      INR c => (INR (c, []), st)
+    | INL st2 => (r, st2)
 End
 
 Definition abi_runtime_values_def:
@@ -1112,37 +1407,6 @@ Definition panic_data_def:
   panic_data n = [0x4Ew; 0x48w; 0x7Bw; 0x71w] ++ enc (Uint 256) (NumV n)
 End
 
-(* The in-place encoding an indexed array or struct hashes: its elements or
- * fields concatenated, without lengths or offsets, a nested byte sequence
- * padded. Each part is taken from the part's encoded body (encoded), whose
- * words keep any dirty padding the storage encoder copied. *)
-Definition indexed_data_def:
-  (indexed_data t a (encoded : byte list) =
-    case (t, a) of
-      (Array length element, ListV vs) =>
-        indexed_parts (REPLICATE (LENGTH vs) element) vs
-          (if length = NONE then DROP 32 encoded else encoded) 0
-    | (Tuple ts, ListV vs) => indexed_parts ts vs encoded 0
-    | (_, BytesV bs) =>
-        if is_dynamic t then SOME (TAKE (32 * ((LENGTH bs + 31) DIV 32)) (DROP 32 encoded))
-        else SOME (TAKE 32 encoded)
-    | _ => SOME (TAKE 32 encoded)) ∧
-  (indexed_parts [] [] encoded pos = SOME []) ∧
-  (indexed_parts (t :: ts) (v :: vs) encoded pos =
-    let dynamic = is_dynamic t in
-    let offset = if dynamic then abi_word encoded pos else pos in
-    case (indexed_data t v (DROP offset encoded),
-          indexed_parts ts vs encoded (pos + if dynamic then 32 else static_length t)) of
-      (SOME bs, SOME rest) => SOME (bs ++ rest)
-    | _ => NONE) ∧
-  (indexed_parts _ _ encoded pos = NONE)
-Termination
-  WF_REL_TAC ‘measure (λx. case x of
-    INL (t, a, encoded) => abi_value_size a
-  | INR (ts, vs, encoded, pos) => list_size abi_value_size vs)’ >>
-  rw[contractABITheory.abi_value_size_def, listTheory.list_size_def]
-End
-
 (* Temporaries written one after another, each at the free memory pointer
  * as memory holds it when the temporary is written: the compiler reads the
  * pointer anew for each, which an earlier temporary may have overwritten.
@@ -1157,63 +1421,58 @@ Definition write_at_each_def:
      (MIN p least, st3))
 End
 
-(* One event argument: an indexed array or struct hashes its in-place
- * encoding, an indexed byte sequence its bytes, an indexed scalar its ABI
- * word, and a non-indexed argument contributes to the log's data. *)
+(* An indexed event argument: an array or struct hashes its in-place
+ * encoding, a byte sequence its bytes, a scalar its ABI word. Gives the
+ * topic and the bytes hashed for it at the free memory pointer; on a failed
+ * read, what the compiled emit has written there of its in-place encoding. *)
 Definition event_part_def:
-  event_part env reach st ty indexed v =
+  event_part env reach st ty v =
+    let t = abi_type env (LENGTH env.type_declarations) ty in
+    let composite = (case t of Array _ _ => T | Tuple _ => T | _ => F) in
+    let src = encoding_source v in
     case runtime_abi_value env reach st ty v of
-      (INR c, reach1, st1) => (INR c, reach1, st1)
+      (INR (c, q), reach1, st1) =>
+        (case (if composite then inplace_partial_writes src t q else SOME []) of
+           SOME ws => (INR (c, ws), reach1, st1)
+         | NONE =>
+             (INR (InvalidCompletion
+                     "unsupported: a partial in-place encoding of an indexed array or struct",
+                   []), reach1, st1))
     | (INL (a, encoded_body, sp), reach1, st1) =>
-        let t = abi_type env (LENGTH env.type_declarations) ty in
-        let composite = (case t of Array _ _ => T | Tuple _ => T | _ => F) in
-        if indexed then
-          let src = encoding_source v in
-          if composite ∧ src = StoredBytes ∧ inplace_spill src t a ≠ 0 then
-            (INR (InvalidCompletion
-                    "unsupported: an indexed stored array or struct ending in empty bytes"),
-             reach1, st1)
-          else
-          (* the topic, and the bytes hashed for it at the free memory pointer *)
-          let topic =
-            if composite then
-              OPTION_MAP (λbs. (word_of_bytes_be (Keccak_256_w64 bs),
-                                [bs ++ REPLICATE (inplace_spill src t a) 0w]))
-                (indexed_data t a encoded_body)
-            else case a of
-              BytesV bs =>
-                SOME (if is_dynamic t then
-                        (word_of_bytes_be (Keccak_256_w64 bs),
-                         [bs ++ packed_bytes_tail st1.world.accounts v bs])
-                      else (word_of_bytes T (0w : bytes32) encoded_body, []))
-            | _ => SOME (word_of_bytes T (0w : bytes32) encoded_body, []) in
-          (case topic of
-             SOME (word, temp) => (INL (INL (word, temp)), reach1, st1)
-           | NONE => (INR (InvalidCompletion "bad indexed event argument"), reach1, st1))
-        else (INL (INR (t, encoded_body, sp)), reach1, st1)
+        if composite ∧ src = StoredBytes ∧ inplace_spill src t a ≠ 0 then
+          (INR (InvalidCompletion
+                  "unsupported: an indexed stored array or struct ending in empty bytes", []),
+           reach1, st1)
+        else
+        let topic =
+          if composite then
+            OPTION_MAP (λbs. (word_of_bytes_be (Keccak_256_w64 bs),
+                              [bs ++ REPLICATE (inplace_spill src t a) 0w]))
+              (indexed_data t a encoded_body)
+          else case a of
+            BytesV bs =>
+              SOME (if is_dynamic t then
+                      (word_of_bytes_be (Keccak_256_w64 bs),
+                       [bs ++ packed_bytes_tail st1.world.accounts v bs])
+                    else (word_of_bytes T (0w : bytes32) encoded_body, []))
+          | _ => SOME (word_of_bytes T (0w : bytes32) encoded_body, []) in
+        (case topic of
+           SOME (word, temp) => (INL (word, temp), reach1, st1)
+         | NONE => (INR (InvalidCompletion "bad indexed event argument", []), reach1, st1))
 End
 
-(* Event arguments split into indexed topics and data, preserving every
- * indexed hash preimage produced before a failing read, and the reach and
- * state reached up to and including that read. *)
+(* The indexed arguments' topics, every hash preimage produced before a
+ * failing read, and the reach and state reached up to and including that
+ * read. *)
 Definition event_parts_def:
-  (event_parts env reach st [] = (INL ([], [], NONE), [], reach, st)) ∧
-  (event_parts env reach st ((ty, indexed, v) :: args) =
-    case event_part env reach st ty indexed v of
+  (event_parts env reach st [] = (INL [], [], reach, st)) ∧
+  (event_parts env reach st ((ty, v) :: args) =
+    case event_part env reach st ty v of
       (INR c, reach1, st1) => (INR c, [], reach1, st1)
-    | (INL (INL (word, temp)), reach1, st1) =>
+    | (INL (word, temp), reach1, st1) =>
         let (r, temps, reach2, st2) = event_parts env reach1 st1 args in
-        (case r of
-           INL (topics, parts, spill) =>
-             (INL (word :: topics, parts, spill), temp ++ temps, reach2, st2)
-         | INR c => (INR c, temp ++ temps, reach2, st2))
-    | (INL (INR (t, encoded_body, sp)), reach1, st1) =>
-        let (r, temps, reach2, st2) = event_parts env reach1 st1 args in
-        (case r of
-           INL (topics, parts, spill) =>
-             (INL (topics, (t, encoded_body) :: parts, later_spill t sp spill),
-              temps, reach2, st2)
-         | INR c => (INR c, temps, reach2, st2)))
+        ((case r of INL topics => INL (word :: topics) | INR c => INR c),
+         temp ++ temps, reach2, st2))
 End
 
 (* The post-read fail-closed checks for emit: the encoder's free-pointer reach
@@ -1235,20 +1494,33 @@ Definition event_state_def:
 End
 
 (* The compiled emit reads the indexed arguments for their topics before it
- * encodes the others as the log's data. *)
+ * encodes the others as the log's data. On a failed read, the writes are
+ * relative to the free memory pointer after the hash preimages. *)
 Definition event_log_def:
   event_log env st logger topic0 args =
     let (r, temps, reach, st1) =
       event_parts env 0 st
-        (FILTER (λ(ty, indexed, v). indexed) args ++
-         FILTER (λ(ty, indexed, v). ¬indexed) args) in
-    case guard_result (event_state st temps reach st1) r of
-      INL ((topics, parts, spill), st2) =>
-        INL ((<| logger := logger;
-                 topics := (case topic0 of SOME t => t :: topics | NONE => topics);
-                 data := encoded_abi_tuple parts |>,
-              (case spill of SOME sp => sp | NONE => [])), st2)
-    | INR c => INR c
+        (MAP (λ(ty, indexed, v). (ty, v)) (FILTER (λ(ty, indexed, v). indexed) args)) in
+    let data_args = FILTER (λ(ty, indexed, v). ¬indexed) args in
+    let tys = MAP FST data_args in
+    case r of
+      INR (c, ws) =>
+        (case event_state st temps reach st1 of
+           INR c1 => (INR (c1, []), st)
+         | INL st2 => (INR (c, ws), st2))
+    | INL topics =>
+        let (r2, reach2, st2) =
+          runtime_abi_values env reach st1 tys (MAP (SND o SND) data_args) in
+        case event_state st temps reach2 st2 of
+          INR c => (INR (c, []), st)
+        | INL st3 =>
+            case r2 of
+              INL (parts, spill) =>
+                (INL (<| logger := logger;
+                         topics := (case topic0 of SOME t => t :: topics | NONE => topics);
+                         data := encoded_abi_tuple parts |>,
+                      (case spill of SOME sp => sp | NONE => [])), st3)
+            | INR (c, done, q) => (INR (c, tuple_partial_writes env tys done q), st3)
 End
 
 val abi_type_pre_def = cv_auto_trans_pre_rec "abi_type_pre abi_types_pre" abi_type_def (
@@ -1283,6 +1555,63 @@ Proof
   ho_match_mp_tac value_abi_value_ind >> rpt strip_tac >>
   simp[Once value_abi_value_pre_def] >> rw[] >> gvs[]
 QED
+val () = cv_auto_trans encoding_source_def;
+val () = cv_auto_trans padded_bytes_spill_def;
+val () = cv_auto_trans later_spill_def;
+val abi_spill_pre_def = cv_auto_trans_pre_rec "abi_spill_pre parts_spill_pre" abi_spill_def (
+  WF_REL_TAC ‘measure (λx. case x of
+    INL (src, t, v) => cv_size v
+  | INR (src, ts, vs) => cv_size vs)’ >>
+  cv_termination_tac
+);
+
+Theorem abi_spill_pre[cv_pre]:
+  (∀src t v. abi_spill_pre src t v) ∧ (∀src ts vs. parts_spill_pre src ts vs)
+Proof
+  ho_match_mp_tac abi_spill_ind >> rpt strip_tac >>
+  simp[Once abi_spill_pre_def] >> rw[] >> gvs[]
+QED
+val () = cv_auto_trans tree_part_def;
+val () = cv_auto_trans shift_writes_def;
+val () = cv_auto_trans component_types_def;
+val () = cv_auto_trans parts_head_length_def;
+val partial_writes_pre_def = cv_auto_trans_pre_rec
+  "partial_writes_pre parts_writes_pre" partial_writes_def (
+  WF_REL_TAC ‘inv_image ($< LEX $<) (λx. case x of
+    INL (t, p) => (cv_size p, 0n)
+  | INR (hl, h, tl, ts, done, w, q) => (cv_size q, cv_size ts + 1))’ >>
+  cv_termination_tac
+);
+
+Theorem partial_writes_pre[cv_pre]:
+  (∀t p. partial_writes_pre t p) ∧
+  (∀hl h tl ts done w q. parts_writes_pre hl h tl ts done w q)
+Proof
+  ho_match_mp_tac partial_writes_ind >> rpt strip_tac >>
+  simp[Once partial_writes_pre_def] >> rw[] >> gvs[]
+QED
+
+val () = cv_auto_trans apply_writes_def;
+val memory_value_pre_def = cv_auto_trans_pre_rec
+  "memory_value_pre memory_elements_pre memory_fields_pre" memory_value_def (
+  WF_REL_TAC ‘inv_image ($< LEX $< LEX $<) (λx. case x of
+    INL (env, fuel, ty, v, reach, st) => (cv$c2n fuel, cv_size ty, 0)
+  | INR (INL (env, fuel, element, p, n, reach, st)) =>
+      (cv$c2n fuel, cv_size element, cv$c2n n + 1)
+  | INR (INR (env, fuel, tys, p, reach, st)) => (cv$c2n fuel, cv_size tys, 1))’ >>
+  cv_termination_tac
+);
+
+Theorem memory_value_pre[cv_pre]:
+  (∀env fuel ty v reach st. memory_value_pre env fuel ty v reach st) ∧
+  (∀env fuel element p n reach st.
+     memory_elements_pre env fuel element p n reach st) ∧
+  (∀env fuel tys p reach st. memory_fields_pre env fuel tys p reach st)
+Proof
+  ho_match_mp_tac memory_value_ind >> rpt strip_tac >>
+  simp[Once memory_value_pre_def] >> rw[] >> gvs[]
+QED
+
 val () = cv_auto_trans abi_runtime_value_def;
 val () = cv_auto_trans abi_runtime_values_def;
 val () = cv_auto_trans abi_word_def;
@@ -1350,22 +1679,6 @@ Proof
   simp[Once storage_abi_value_pre_def] >> rw[] >> gvs[]
 QED
 val () = cv_auto_trans array_copy_value_def;
-val () = cv_auto_trans encoding_source_def;
-val () = cv_auto_trans padded_bytes_spill_def;
-val () = cv_auto_trans later_spill_def;
-val abi_spill_pre_def = cv_auto_trans_pre_rec "abi_spill_pre parts_spill_pre" abi_spill_def (
-  WF_REL_TAC ‘measure (λx. case x of
-    INL (src, t, v) => cv_size v
-  | INR (src, ts, vs) => cv_size vs)’ >>
-  cv_termination_tac
-);
-
-Theorem abi_spill_pre[cv_pre]:
-  (∀src t v. abi_spill_pre src t v) ∧ (∀src ts vs. parts_spill_pre src ts vs)
-Proof
-  ho_match_mp_tac abi_spill_ind >> rpt strip_tac >>
-  simp[Once abi_spill_pre_def] >> rw[] >> gvs[]
-QED
 
 val () = cv_auto_trans packed_bytes_tail_def;
 val () = cv_auto_trans packed_tail_def;
@@ -1398,6 +1711,38 @@ Proof
   ho_match_mp_tac inplace_spill_ind >> rpt strip_tac >>
   simp[Once inplace_spill_pre_def] >> rw[] >> gvs[]
 QED
+val indexed_data_pre_def = cv_auto_trans_pre_rec
+  "indexed_data_pre indexed_parts_pre" indexed_data_def (
+  WF_REL_TAC ‘measure (λx. case x of
+    INL (t, a, encoded) => cv_size a
+  | INR (ts, vs, encoded, pos) => cv_size vs)’ >>
+  cv_termination_tac
+);
+
+Theorem indexed_data_pre[cv_pre]:
+  (∀t a encoded. indexed_data_pre t a encoded) ∧
+  (∀ts vs encoded pos. indexed_parts_pre ts vs encoded pos)
+Proof
+  ho_match_mp_tac indexed_data_ind >> rpt strip_tac >>
+  simp[Once indexed_data_pre_def] >> rw[] >> gvs[]
+QED
+
+val () = cv_auto_trans writes_end_def;
+val inplace_partial_writes_pre_def = cv_auto_trans_pre_rec
+  "inplace_partial_writes_pre inplace_parts_writes_pre" inplace_partial_writes_def (
+  WF_REL_TAC ‘inv_image ($< LEX $<) (λx. case x of
+    INL (src, t, p) => (cv_size p, 0n)
+  | INR (src, off, ts, done, q) => (cv_size q, cv_size ts + 1))’ >>
+  cv_termination_tac
+);
+
+Theorem inplace_partial_writes_pre[cv_pre]:
+  (∀src t p. inplace_partial_writes_pre src t p) ∧
+  (∀src off ts done q. inplace_parts_writes_pre src off ts done q)
+Proof
+  ho_match_mp_tac inplace_partial_writes_ind >> rpt strip_tac >>
+  simp[Once inplace_partial_writes_pre_def] >> rw[] >> gvs[]
+QED
 val () = cv_auto_trans runtime_abi_value_def;
 val runtime_abi_values_pre_def =
   cv_auto_trans_pre "runtime_abi_values_pre" runtime_abi_values_def;
@@ -1408,6 +1753,7 @@ Proof
   ho_match_mp_tac runtime_abi_values_ind >> rpt strip_tac >>
   simp[Once runtime_abi_values_pre_def] >> rw[] >> gvs[]
 QED
+val () = cv_auto_trans tuple_partial_writes_def;
 
 val () = cv_auto_trans encoder_state_def;
 val () = cv_auto_trans encoded_runtime_values_def;
@@ -1505,21 +1851,6 @@ Proof
   simp[Once materialize_arguments_pre_def] >> rw[] >> fs[]
 QED
 val () = cv_auto_trans panic_data_def;
-val indexed_data_pre_def = cv_auto_trans_pre_rec
-  "indexed_data_pre indexed_parts_pre" indexed_data_def (
-  WF_REL_TAC ‘measure (λx. case x of
-    INL (t, a, encoded) => cv_size a
-  | INR (ts, vs, encoded, pos) => cv_size vs)’ >>
-  cv_termination_tac
-);
-
-Theorem indexed_data_pre[cv_pre]:
-  (∀t a encoded. indexed_data_pre t a encoded) ∧
-  (∀ts vs encoded pos. indexed_parts_pre ts vs encoded pos)
-Proof
-  ho_match_mp_tac indexed_data_ind >> rpt strip_tac >>
-  simp[Once indexed_data_pre_def] >> rw[] >> gvs[]
-QED
 
 val () = cv_auto_trans write_at_each_def;
 val () = cv_auto_trans
