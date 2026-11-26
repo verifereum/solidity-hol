@@ -1,0 +1,153 @@
+{
+  "name": "minor_builtins",
+  "source": "testdata/differential/minor_builtins.sol",
+  "contract": "MinorBuiltins",
+  "artifact": "testdata/differential/expected/minor_builtins.json",
+  "cases": [
+    {
+      "name": "clz_zero",
+      "function": "leadingZeros",
+      "args": [
+        0
+      ],
+      "expect": {
+        "return": [
+          256
+        ]
+      }
+    },
+    {
+      "name": "clz_one",
+      "function": "leadingZeros",
+      "args": [
+        1
+      ],
+      "expect": {
+        "return": [
+          255
+        ]
+      }
+    },
+    {
+      "name": "clz_high_bit",
+      "function": "leadingZeros",
+      "args": [
+        57896044618658097711785492504343953926634992332820282019728792003956564819968
+      ],
+      "expect": {
+        "return": [
+          0
+        ]
+      }
+    },
+    {
+      "name": "blobhash_no_blobs",
+      "function": "blobHash",
+      "args": [
+        0
+      ],
+      "expect": {
+        "return": [
+          "0x0000000000000000000000000000000000000000000000000000000000000000"
+        ]
+      }
+    },
+    {
+      "name": "assembly_blobhash_no_blobs",
+      "function": "assemblyBlobHash",
+      "args": [
+        0
+      ],
+      "expect": {
+        "return": [
+          "0x0000000000000000000000000000000000000000000000000000000000000000"
+        ]
+      }
+    },
+    {
+      "name": "blobbasefee",
+      "function": "blobBaseFee",
+      "args": [],
+      "expect": {
+        "return": [
+          1
+        ]
+      }
+    },
+    {
+      "name": "assembly_blobbasefee",
+      "function": "assemblyBlobBaseFee",
+      "args": [],
+      "expect": {
+        "return": [
+          1
+        ]
+      }
+    },
+    {
+      "name": "ripemd160_empty",
+      "function": "digest",
+      "args": [
+        "0x"
+      ],
+      "expect": {
+        "return": [
+          "0x9c1185a5c5e9fc54612808977ee8f548b2258d31",
+          "0x0000000000000000000000009c1185a5c5e9fc54612808977ee8f548b2258d31",
+          32
+        ]
+      }
+    },
+    {
+      "name": "ripemd160_calldata",
+      "function": "digest",
+      "args": [
+        "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f2021222324252627"
+      ],
+      "expect": {
+        "return": [
+          "0x5fbe6037f8d8efaa9a315c070ce3373080244496",
+          "0x0000000000000000000000005fbe6037f8d8efaa9a315c070ce3373080244496",
+          32
+        ]
+      }
+    },
+    {
+      "name": "erc7201_empty",
+      "function": "namespaceSlot",
+      "args": [
+        "0x"
+      ],
+      "expect": {
+        "return": [
+          30348469548119976384149824193117947667795829812057172845188107037932402691072,
+          "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a46f"
+        ]
+      }
+    },
+    {
+      "name": "erc7201_runtime",
+      "function": "namespaceSlot",
+      "args": [
+        "0x6578616d706c652e6e616d657370616365"
+      ],
+      "expect": {
+        "return": [
+          31528964597336120903400131267972714795203649382051901856674918989796535642624,
+          "0xd99d93e12d86dc9804f2b3da9fafc2c8e6696b15ab40ad4b9d5eb754e03fef70"
+        ]
+      }
+    },
+    {
+      "name": "erc7201_literal",
+      "function": "literalSlot",
+      "args": [],
+      "expect": {
+        "return": [
+          31528964597336120903400131267972714795203649382051901856674918989796535642624,
+          42
+        ]
+      }
+    }
+  ]
+}

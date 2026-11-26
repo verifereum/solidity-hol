@@ -112,7 +112,7 @@ Datatype:
   environment_field
   = MsgSender | MsgValue | MsgData | MsgSig | SelfAddress | TxOrigin | TxGasPrice
   | BlockNumber | BlockTimestamp | BlockChainId | BlockCoinbase
-  | BlockBaseFee | BlockGasLimit | BlockPrevRandao | GasLeft
+  | BlockBaseFee | BlockBlobBaseFee | BlockGasLimit | BlockPrevRandao | GasLeft
 End
 
 (* The builtin functions that compute a value from their operands and the
@@ -121,14 +121,16 @@ End
  * hash h recovers, or address(0) if it is invalid; a.code.length, the
  * account's code size, without a memory bytes allocation; a.balance;
  * a.codehash, the account's code hash as EXTCODEHASH reads it, 0 for an
- * empty account; sha256(a), the SHA-256 hash of the memory bytes a;
- * blockhash(n), the hash of block n if it is one of the 256 before the
- * current one, else 0; and a.code, the account's code as new memory bytes.
+ * empty account; sha256(a) and ripemd160(a), hashes of the bytes a;
+ * blockhash(n) and blobhash(n), the block or versioned blob hash read by
+ * the corresponding opcode; erc7201(s), the namespace slot for string s;
+ * and a.code, the account's code as new memory bytes.
  *)
 Datatype:
   builtin_op
   = Keccak256Builtin | EcrecoverBuiltin | CodeLengthBuiltin | BalanceBuiltin
   | CodeHashBuiltin | Sha256Builtin | BlockhashBuiltin | CodeBuiltin
+  | BlobhashBuiltin | Ripemd160Builtin | Erc7201Builtin
 End
 
 (* DefaultReferenceOperation loc ty: a placeholder reference that a source

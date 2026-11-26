@@ -887,16 +887,27 @@ Definition return_ids_def:
     | _ => REPLICATE len (expr_id e)
 End
 
-(* A builtin on its operands' outcomes, each converted to its operand's target.
- * The hash of a literal is a constant, as the compiler folds it without
- * allocating memory. *)
+(* Builtins the compiler folds on byte-string literals, without using memory. *)
+Definition builtin_literal_value_def:
+  builtin_literal_value op bs =
+    case op of
+      Keccak256Builtin => SOME (BytesValue (Keccak_256_w64 bs))
+    | Erc7201Builtin => SOME (IntegerValue (&(erc7201_slot (erc7201_preimage bs))))
+    | _ => NONE
+End
+
+(* A builtin on its operands' outcomes, folded on a literal when applicable
+ * or bound after converting the operands to their targets. *)
 Definition elab_builtin_def:
   elab_builtin n id ids op os =
     let (operands, result) = builtin_signature op in
-    case (op, os) of
-      (Keccak256Builtin, [INL (ConstantAtom (BytesValue bs), ElabBytesLiteral)]) =>
-        INL (([], ConstantAtom (BytesValue (Keccak_256_w64 bs))), n)
-    | _ =>
+    let literal = case os of
+          [INL (ConstantAtom (BytesValue bs), ElabBytesLiteral)] =>
+            builtin_literal_value op bs
+        | _ => NONE in
+    case literal of
+      SOME value => INL (([], ConstantAtom value), n)
+    | NONE =>
       case convert_operands n id ids (builtin_targets operands) os of
         INL (cs, _, atoms, n1) =>
           let (rs, r) = bind_value n1 result (BuiltinOperation op atoms) in

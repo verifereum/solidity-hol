@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity >=0.8.0;
 
-// A contract of supported and unsupported functions (ripemd160 is not
-// modelled, nor are halting assembly in a constructor or fixed-byte indexing
-// in a constant): the unsupported ones, and those calling them, have no
-// procedure, and calls of them are refused.
+// The unsupported functions, and those calling them, have no procedure.
+// callcode is unsupported at import, and halting constructor assembly is
+// unsupported at elaboration.
 contract Base {
-    function twice(uint256 x) public pure virtual returns (uint256) {
+    function twice(uint256 x) public virtual returns (uint256) {
         return x * 2;
     }
 }
 
 contract Mid is Base {
-    function twice(uint256 x) public pure virtual override returns (uint256) {
-        return uint256(uint160(ripemd160(abi.encodePacked(x))));
+    function twice(uint256 x) public virtual override returns (uint256) {
+        assembly { pop(callcode(0, 0, 0, 0, 0, 0, 0)) }
+        return x;
     }
 }
 
@@ -80,20 +80,21 @@ contract Partial is Mid {
         return total;
     }
 
-    function digest(bytes memory b) public pure returns (bytes32) {
-        return ripemd160(b);
+    function digest(bytes memory b) public returns (bytes32) {
+        assembly { pop(callcode(0, 0, 0, 0, 0, 0, 0)) }
+        return bytes32(b.length);
     }
 
-    function digestTwice(bytes memory b) public pure returns (bytes32) {
+    function digestTwice(bytes memory b) public returns (bytes32) {
         return digest(abi.encodePacked(digest(b)));
     }
 
     // super reaches Mid.twice, which is unsupported, not Base.twice
-    function twice(uint256 x) public pure override returns (uint256) {
+    function twice(uint256 x) public override returns (uint256) {
         return super.twice(x) + 1;
     }
 
-    function callsTwice(uint256 x) public pure returns (uint256) {
+    function callsTwice(uint256 x) public returns (uint256) {
         return twice(x);
     }
 
@@ -158,6 +159,7 @@ contract Partial is Mid {
     }
 
     fallback() external {
-        total = uint256(uint160(ripemd160(msg.data)));
+        assembly { pop(callcode(0, 0, 0, 0, 0, 0, 0)) }
+        total = msg.data.length;
     }
 }

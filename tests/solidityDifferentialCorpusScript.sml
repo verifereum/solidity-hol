@@ -93,6 +93,7 @@ Ancestors
   solidityDifferentialCorpus_memory_forwarding
   solidityDifferentialCorpus_memory_images
   solidityDifferentialCorpus_memory_structs
+  solidityDifferentialCorpus_minor_builtins
   solidityDifferentialCorpus_modifiers
   solidityDifferentialCorpus_modular
   solidityDifferentialCorpus_named_arguments
