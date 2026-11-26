@@ -3,14 +3,10 @@
  *)
 Theory solidityCore
 Ancestors
-  solidityAST vfmContext
+  solidityAST vfmContext yulAST
 
 Datatype:
   layout_id = LayoutId num
-End
-
-Datatype:
-  heap_id = HeapId num
 End
 
 Datatype:
@@ -19,13 +15,20 @@ End
 
 (* Captured locations, never source paths to reevaluate. The type identifies
  * the struct layout used by subsequent field navigation; layout_id preserves
- * the root declaration's identity through navigation.
+ * the root declaration's identity through navigation. An immutable is named
+ * by its declaration: its value lives in the deployed code, not in storage.
+ * A memory reference is a memory address and the type of what is there: an
+ * object (a byte sequence, array or struct) as the compiler lays it out, or,
+ * of type bytes1, one byte of a byte sequence. A memory word reference is the
+ * address of the word holding an array element or struct field, and its type.
  *)
 Datatype:
   reference
   = StorageReference storage_backend address bytes32 num sol_type layout_id
-  | MemoryReference heap_id num sol_type
+  | MemoryReference num sol_type
+  | MemoryWordReference num sol_type
   | CalldataReference num num sol_type
+  | ImmutableReference ast_id
 End
 
 Datatype:
@@ -34,7 +37,10 @@ Datatype:
   | IntegerValue int
   | AddressValue address
   | BytesValue (byte list)
-  | InternalFunctionValue ast_id
+  (* An internal function value: INL f calls procedure f; INR w is a word in
+   * the compiler's internal dispatch that no function has, such as the zero
+   * value INR 0, whose call panics. *)
+  | InternalFunctionValue (ast_id + num)
   | ExternalFunctionValue address (byte list)
 End
 
@@ -46,11 +52,14 @@ Datatype:
 End
 
 (* Operands are pure: effects and intermediate results have already been named.
- * Types belong to operations/bindings, not integer payloads.
+ * Types belong to operations/bindings, not integer payloads. SingleType
+ * includes located reference values; ReferenceType denotes a captured lvalue,
+ * including a scalar storage leaf.
  *)
 Datatype:
   core_value_type = SingleType sol_type | ReferenceType sol_type
                   | ProductType (core_value_type list)
+                  | RevertDataType
 End
 
 Datatype:
@@ -68,6 +77,7 @@ End
 Datatype:
   core_operator
   = AddOp | SubtractOp | MultiplyOp | DivideOp | RemainderOp | ExponentOp
+  | AddModOp | MulModOp
   | ShiftLeftOp | ShiftRightOp
   | EqualOp | LessThanOp | BitAndOp | BitOrOp | BitXorOp
   | NegateOp | BitNotOp | BoolNotOp
@@ -77,33 +87,78 @@ Datatype:
   navigation = FieldNavigation ast_id | IndexNavigation core_atom
 End
 
-(* BindTarget includes local variables and temporaries. ReferenceFieldTarget
- * supports rebinding a reference-valued memory member, not storage copying.
- *)
+(* BindTarget includes local variables and temporaries. *)
 Datatype:
   captured_target
   = BindTarget ast_id
   | ValueTarget reference
-  | ReferenceFieldTarget heap_id num sol_type
 End
 
 Datatype:
   external_kind = ExternalCall | ExternalStaticCall | ExternalDelegateCall
 End
 
+Datatype:
+  catch_kind = ErrorCatch | PanicCatch | GenericCatch
+End
+
 (* The call and transaction context a body reads: msg.sender, msg.value,
- * address(this), tx.origin, tx.gasprice and the block's scalars.
+ * address(this), tx.origin, tx.gasprice and the block's scalars. msg.data is
+ * the complete read-only calldata bytes, including the selector.
+ * BlockPrevRandao is block.prevrandao, and block.difficulty, which the
+ * compiler reads with the same PREVRANDAO instruction.
  *)
 Datatype:
   environment_field
-  = MsgSender | MsgValue | SelfAddress | TxOrigin | TxGasPrice
+  = MsgSender | MsgValue | MsgData | MsgSig | SelfAddress | TxOrigin | TxGasPrice
   | BlockNumber | BlockTimestamp | BlockChainId | BlockCoinbase
-  | BlockBaseFee | BlockGasLimit
+  | BlockBaseFee | BlockGasLimit | BlockPrevRandao | GasLeft
 End
 
-(* ExternalCallOperation kind selector parameter_types return_types target
- * value arguments: a high-level call I(target).f{value: value}(arguments) of
- * the function with that selector and those ABI types.
+(* The builtin functions that compute a value from their operands and the
+ * world without changing it: keccak256(a), the Keccak-256 hash of the memory
+ * bytes a; ecrecover(h, v, r, s), the address the signature (v, r, s) of the
+ * hash h recovers, or address(0) if it is invalid; a.code.length, the
+ * account's code size, without a memory bytes allocation; a.balance;
+ * a.codehash, the account's code hash as EXTCODEHASH reads it, 0 for an
+ * empty account; sha256(a), the SHA-256 hash of the memory bytes a;
+ * blockhash(n), the hash of block n if it is one of the 256 before the
+ * current one, else 0; and a.code, the account's code as new memory bytes.
+ *)
+Datatype:
+  builtin_op
+  = Keccak256Builtin | EcrecoverBuiltin | CodeLengthBuiltin | BalanceBuiltin
+  | CodeHashBuiltin | Sha256Builtin | BlockhashBuiltin | CodeBuiltin
+End
+
+(* DefaultReferenceOperation loc ty: a placeholder reference that a source
+ * variable must be assigned before reading, or a compiler join overwrites.
+ * DefaultMemoryOperation ty: the default value of a memory variable of type
+ * ty. AllocateMemoryOperation ty n: new ty(n), a zeroed byte sequence or
+ * dynamic array of length n; for a struct type, a new memory struct of n
+ * fields, a word per field, as a constructor allocates it before converting
+ * and writing each field. ArrayIndexOperation a i: element i of fixed bytes,
+ * or a located byte sequence or array a. CopyToMemoryOperation a: a new memory
+ * copy of the calldata or storage object a.
+ * BuiltinOperation op args: the builtin op on its operands, typed by
+ * builtin_signature (solidityCoreWf).
+ * AbiDecodeOperation types a: abi.decode(a, (types)) of the memory bytes a
+ * into values of those elementary types, one value or a tuple of them.
+ * AbiEncodeOperation selector types arguments: abi.encode(arguments) of the
+ * arguments as those ABI types, after the four bytes of the selector if any,
+ * as a new memory bytes. AbiEncodePackedOperation types arguments:
+ * abi.encodePacked(arguments), each value in its own width and each byte
+ * sequence as its contents, as a new memory bytes, or as a new memory string
+ * (string.concat) when the result is defined as one.
+ * ExternalCallOperation kind selector parameter_types return_types target
+ * value gas arguments: a high-level call
+ * I(target).f{value: value, gas: gas}(arguments) of the function with that
+ * selector and those ABI types; with no gas option, the callee gets the gas
+ * every call gives.
+ * LowLevelCallOperation kind target value gas data: the low-level
+ * target.call{value: value, gas: gas}(data), target.staticcall(data) or
+ * target.delegatecall(data) of the memory bytes or bytes literal data,
+ * giving whether it succeeded and its return data as a new memory bytes.
  *)
 Datatype:
   core_operation
@@ -112,15 +167,72 @@ Datatype:
   | TupleOperation (core_atom list)
   | TupleComponentOperation num core_atom
   | ReadOperation sol_type core_atom
+  (* The ABI word of a persistent, offset-zero storage reference. *)
+  | StorageSlotOperation sol_type core_atom
   | StateReferenceOperation ast_id
+  | ImmutableReferenceOperation ast_id
   | NavigateOperation sol_type core_atom navigation
+  | DefaultMemoryOperation sol_type
+  | DefaultReferenceOperation data_location sol_type
+  | BytesLiteralOperation sol_type (byte list)
+  | AllocateMemoryOperation sol_type core_atom
+  | BytesToFixedOperation num core_atom
+  | ArrayIndexOperation core_atom core_atom
+  (* Calldata view [start:end], with an omitted end using the current length. *)
+  | CalldataSliceOperation core_atom core_atom (core_atom option)
+  | CopyToMemoryOperation core_atom
   | ArrayLengthOperation core_atom
-  | ArrayPushOperation core_atom (core_atom option)
+  | BuiltinOperation builtin_op (core_atom list)
+  | AbiEncodeOperation (core_atom option) (sol_type list) (core_atom list)
+  | AbiEncodePackedOperation (sol_type list) (core_atom list)
+  | AbiDecodeOperation (sol_type list) core_atom
+  (* A non-reverting typed catch decoder, and the generic catch's lazy copy
+   * of the internal RevertDataType value into source memory. *)
+  | TryDecodeErrorOperation catch_kind core_atom
+  | MaterializeRevertDataOperation core_atom
+  | ArrayPushOperation core_atom
   | ArrayPopOperation core_atom
   | InternalCallOperation ast_id (core_atom list)
+  (* a call of the procedure an internal function value names *)
+  | FunctionValueCallOperation core_atom (core_atom list)
   | ExternalCallOperation external_kind (byte list) (sol_type list)
-      (sol_type list) core_atom core_atom (core_atom list)
+      (sol_type list) core_atom core_atom (core_atom option) (core_atom list)
+  | LowLevelCallOperation external_kind core_atom core_atom (core_atom option)
+      core_atom
+  | CreateContractOperation (byte list) (sol_type list) core_atom
+      (core_atom option) (core_atom list)
+  (* target.transfer(value): exact stipend, failure bytes forwarded, no
+   * return-data allocation. *)
+  | TransferOperation core_atom core_atom
+  (* success flag, scalar returns, RevertDataType; only a failed EVM call
+   * is caught. Operand and return-decoding failures still propagate. *)
+  | TryExternalCallOperation external_kind (byte list) (sol_type list)
+      (sol_type list) core_atom core_atom (core_atom option) (core_atom list)
   | EnvironmentOperation environment_field
+End
+
+(* What an inline assembly block's Yul variable stands for: a local of value
+ * type (read on entry, written back on exit), the storage slot or byte offset
+ * of a state variable (x.slot, x.offset), the slot or offset of the reference
+ * a storage pointer local holds (assigning its slot rebinds the local), the
+ * calldata offset or length of the reference a calldata local holds (x.offset
+ * and x.length of a byte sequence or dynamic array, the plain name of a
+ * static array; assigning either rebinds the local), the value of a constant
+ * of value type, held in an atom, or the memory address of a local holding a
+ * memory byte sequence of the given type (bytes or string). Only locals,
+ * storage pointer slots and calldata offsets and lengths are assignable.
+ *)
+Datatype:
+  assembly_reference
+  = AssemblyLocal ast_id sol_type
+  | AssemblySlot ast_id
+  | AssemblyOffset ast_id
+  | AssemblyPointerSlot ast_id
+  | AssemblyPointerOffset ast_id
+  | AssemblyCalldataOffset ast_id
+  | AssemblyCalldataLength ast_id
+  | AssemblyConstant core_atom sol_type
+  | AssemblyMemory ast_id sol_type
 End
 
 (* Explicitly separate scalar writes, reference binding, and content copying.
@@ -133,6 +245,7 @@ Datatype:
   | CaptureBindingStmt ast_id ast_id
   | CaptureValueStmt ast_id core_atom
   | CaptureReferenceFieldStmt ast_id core_atom navigation
+  | ResetTargetStmt ast_id sol_type
   | WriteScalarStmt ast_id sol_type core_atom
   | BindReferenceStmt ast_id sol_type core_atom
   | CopyContentsStmt sol_type sol_type core_atom core_atom
@@ -142,10 +255,16 @@ Datatype:
   | BreakStmt
   | ContinueStmt
   | RevertStmt core_atom
+  (* revert E(args): the error's selector, its parameter types and the
+   * arguments *)
+  | RevertErrorStmt (byte list) (sol_type list) (core_atom list)
   | PanicStmt num
   (* topic0 (NONE for an anonymous event), then each argument with its type
    * and whether it is indexed *)
   | EmitStmt (bytes32 option) ((sol_type # bool # core_atom) list)
+  (* assembly { code }, with the Yul names of the source declarations the
+   * code refers to *)
+  | AssemblyStmt (yul_stmt list) ((string # assembly_reference) list)
 End
 
 Datatype:
@@ -163,6 +282,7 @@ End
 Datatype:
   core_state_variable = <|
     state_id : ast_id;
+    state_backend : storage_backend;
     state_type : sol_type;
     state_slot : bytes32;
     state_offset : num
@@ -199,18 +319,31 @@ End
 (* Dispatch: external functions by selector; empty calldata reaches receive,
  * and any other unmatched calldata the fallback, given with whether it is
  * payable. Creation runs the creation procedure on the constructor's
- * arguments, given with whether it accepts value. *)
+ * arguments, given with whether it accepts value. The immutables are all the
+ * contract's immutables, unread ones included, with their types: creation
+ * reserves a memory word for each. The unsupported procedures are those of
+ * functions the frontend could not model: they have no procedure, so the
+ * dispatch entries naming them refuse, and no procedure can call them. The
+ * function ids give each procedure an internal function value can name the
+ * number the compiler holds that value as; the creation function ids are
+ * the functions the creation code's internal dispatch holds, those creation
+ * code names as values, and the only ones an internal function value calls
+ * during creation. *)
 Datatype:
   core_program = <|
     procedures : core_procedure list;
+    unsupported_procedures : ast_id list;
     state_variables : core_state_variable list;
+    immutables : (ast_id # sol_type) list;
     struct_layouts : core_struct_layout list;
     type_declarations : (ast_id # core_type_declaration) list;
     entry_procedure : ast_id;
     external_functions : core_external_function list;
     receive_procedure : ast_id option;
     fallback_procedure : (ast_id # bool) option;
-    creation_procedure : (ast_id # bool) option
+    creation_procedure : (ast_id # bool) option;
+    function_ids : (ast_id # num) list;
+    creation_function_ids : ast_id list
   |>
 End
 
@@ -224,6 +357,10 @@ Datatype:
   | BreakCompletion
   | ContinueCompletion
   | RevertCompletion (byte list)
+  | AbortCompletion
+  (* an inline assembly return(p, s) or stop(): the frame ends with these
+   * bytes as its return data *)
+  | HaltCompletion (byte list)
   | PanicCompletion num
   | InvalidCompletion string
   | FuelExhausted

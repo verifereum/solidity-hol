@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Sequence
 import json
 import os
 from pathlib import Path
@@ -15,6 +16,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_PROFILE = ROOT / "profiles" / "solc-0.8.37-via-ir-osaka.json"
+OPTIMIZED_PROFILE = ROOT / "profiles" / "solc-0.8.37-via-ir-osaka-optimized.json"
 PIN_FILE = ROOT / "SOLIDITY_PIN"
 VERSION_RE = re.compile(r"Version:\s*(\d+\.\d+\.\d+)\+commit\.([0-9a-fA-F]+)")
 
@@ -27,9 +29,8 @@ OUTPUT_SELECTION: dict[str, dict[str, list[str]]] = {
             "transientStorageLayout",
             "evm.bytecode.object",
             "evm.deployedBytecode.object",
+            "evm.deployedBytecode.immutableReferences",
             "evm.methodIdentifiers",
-            "ir",
-            "irOptimized",
         ],
     }
 }
@@ -76,6 +77,31 @@ def source_name(path: Path) -> str:
         raise SystemExit(f"source is outside the repository: {path}") from error
 
 
+def stack_depth_errors(errors: Any) -> bool:
+    """Whether every diagnostic is a compiler stack-depth failure."""
+    return isinstance(errors, list) and bool(errors) and all(
+        isinstance(error, dict)
+        and error.get("severity") == "error"
+        and error.get("type") in {"YulException", "CompilerError"}
+        and isinstance(error.get("message"), str)
+        and any(text in error["message"].lower()
+                for text in ("stack too deep", "too deep in the stack"))
+        for error in errors
+    )
+
+
+class CompilationError(SystemExit):
+    """A solc diagnostic failure, retaining structured errors for the fallback."""
+
+    def __init__(self, errors: list[dict[str, Any]]) -> None:
+        self.errors = errors
+        messages = "\n\n".join(
+            error.get("formattedMessage", json.dumps(error, sort_keys=True))
+            for error in errors
+        )
+        super().__init__(f"solc reported compilation errors:\n{messages}")
+
+
 def compile_standard_json(solc: Path, compiler_input: dict[str, Any]) -> dict[str, Any]:
     proc = subprocess.run(
         [str(solc), "--standard-json"],
@@ -97,16 +123,31 @@ def compile_standard_json(solc: Path, compiler_input: dict[str, Any]) -> dict[st
         if diagnostic.get("severity") == "error"
     ]
     if errors:
-        messages = "\n\n".join(
-            diagnostic.get("formattedMessage", json.dumps(diagnostic, sort_keys=True))
-            for diagnostic in errors
-        )
-        raise SystemExit(f"solc reported compilation errors:\n{messages}")
+        raise CompilationError(errors)
     return output
 
 
 def json_text(value: Any) -> str:
     return json.dumps(value, indent=2, sort_keys=True) + "\n"
+
+
+def library_addresses(output: dict[str, Any]) -> dict[str, dict[str, str]]:
+    """The compilation-wide AST IDs give libraries distinct, reproducible links."""
+    return {
+        source: {node["name"]: f"0x{0x100000 + node['id']:040x}" for node in libraries}
+        for source, value in output.get("sources", {}).items()
+        if (libraries := [node for node in value["ast"]["nodes"]
+                          if node.get("nodeType") == "ContractDefinition"
+                          and node.get("contractKind") == "library"])
+    }
+
+
+def needs_linking(output: dict[str, Any]) -> bool:
+    return any("__$" in evm.get(kind, {}).get("object", "")
+               for contracts in output.get("contracts", {}).values()
+               for contract in contracts.values()
+               for evm in [contract.get("evm", {})]
+               for kind in ("bytecode", "deployedBytecode"))
 
 
 def write_json_atomic(path: Path, value: Any) -> None:
@@ -144,14 +185,17 @@ def build_artifact(solc: Path, source_paths: list[Path], profile_path: Path) -> 
 
 
 def build_artifact_from_sources(
-    solc: Path, sources: dict[str, str], profile_path: Path
+    solc: Path, sources: dict[str, str], profile_path: Path,
+    remappings: Sequence[str] = (),
 ) -> dict[str, Any]:
-    """The artifact of sources given by Standard JSON name and content."""
+    """Compile named sources with optional solc import remappings."""
     pin = PIN_FILE.read_text(encoding="ascii").strip()
     if re.fullmatch(r"[0-9a-f]{40}", pin) is None:
         raise SystemExit(f"{PIN_FILE} must contain one lowercase 40-character SHA")
 
     profile = read_json(profile_path)
+    if profile != read_json(DEFAULT_PROFILE):
+        raise SystemExit("source artifacts must start with the pinned unoptimized profile")
     expected_version = profile.get("compilerVersion")
     settings = profile.get("settings")
     if not isinstance(expected_version, str) or not isinstance(settings, dict):
@@ -163,8 +207,24 @@ def build_artifact_from_sources(
         "sources": {name: {"content": sources[name]} for name in sorted(sources)},
         "settings": {**settings, "outputSelection": OUTPUT_SELECTION},
     }
-    compiler_output = compile_standard_json(solc, compiler_input)
-    return {
+    if remappings:
+        compiler_input["settings"]["remappings"] = list(remappings)
+    failure = None
+    try:
+        compiler_output = compile_standard_json(solc, compiler_input)
+    except CompilationError as error:
+        if not stack_depth_errors(error.errors):
+            raise
+        failure = {"profile": profile, "errors": error.errors}
+        profile = read_json(OPTIMIZED_PROFILE)
+        compiler_input["settings"] = {
+            **compiler_input["settings"], **profile["settings"],
+        }
+        compiler_output = compile_standard_json(solc, compiler_input)
+    if needs_linking(compiler_output):
+        compiler_input["settings"]["libraries"] = library_addresses(compiler_output)
+        compiler_output = compile_standard_json(solc, compiler_input)
+    artifact = {
         "format": "solidity-hol-solc-artifact-v1",
         "compiler": {
             "pin": pin,
@@ -174,6 +234,9 @@ def build_artifact_from_sources(
         "input": compiler_input,
         "output": compiler_output,
     }
+    if failure is not None:
+        artifact["unoptimizedFailure"] = failure
+    return artifact
 
 
 def main() -> None:

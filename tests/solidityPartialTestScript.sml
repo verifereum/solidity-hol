@@ -1,0 +1,368 @@
+(* Per-function admission (testdata/frontend/partial.sol): the unsupported
+ * functions of a unit, and those calling them, are marked with their reason
+ * and have no procedure; the rest is checked and runs, and a call of an
+ * unsupported function is refused rather than run as some other function.
+ *)
+Theory solidityPartialTest
+Ancestors
+  solidityDifferential
+Libs
+  solidityPrepareLib cv_transLib wordsLib
+
+fun holbuild_extra_deps (_ : string list) = ()
+val () = holbuild_extra_deps [
+  "../SOLIDITY_PIN", "../profiles/solc-0.8.37-via-ir-osaka.json",
+  "../testdata/frontend/expected/partial.json",
+  "../testdata/frontend/expected/fallback_params.json",
+  "../testdata/frontend/expected/creation_argument.json",
+  "../testdata/frontend/expected/function_type_limits.json",
+  "../testdata/frontend/expected/function_type_refused.json"
+]
+
+val prepared = #prepared (solidityPrepareLib.prepare_artifact
+  {root = "..", path = "../testdata/frontend/expected/partial.json",
+   source = "testdata/frontend/partial.sol"});
+
+(* add is supported; digest and the fallback use ripemd160, as does Mid.twice,
+ * which Partial.twice reaches by super, so Partial.twice, digestTwice and
+ * callsTwice call unsupported functions; the constructor's halting assembly
+ * does not elaborate. Once Partial.twice is unsupported its super calls
+ * reach nothing, so neither Mid.twice nor Base.twice is among the
+ * functions calls reach. The constant DIGITS and digits, which reads it,
+ * elaborate through the shared fixed-byte indexed access;
+ * pointer's assembly assigns a bytes local, which elaborates.
+ * hookCount's struct has a function-typed member, so the struct is left out
+ * and hookCount's local does not elaborate, while the unit still imports.
+ * nodeValue's local and nodeCount's new array hold a recursive struct in
+ * memory, which the core does not hold, and copyTree copies one in storage.
+ * encodePair, emitPair and putPair take a memory struct across an ABI
+ * boundary, which elaborates. Roles.Grant has an enum-keyed mapping, which
+ * storage holds, so grantParam's storage parameter elaborates, and so does
+ * grantCount's storage local, declared without a value and pointed by
+ * assembly.
+ * nodeModified's modifier takes a recursive struct in memory, which fails at
+ * elaboration rather than leaving the unit ill-formed; treeTuple's tuple holds
+ * a storage struct, as a reference, which elaborates. *)
+val outcomes = map (fn {name, reason, ...} => (name, reason)) (#functions prepared);
+fun reasons name =
+  map #2 (List.filter (fn (n, _) => n = name) outcomes);
+val calls_unsupported = SOME "calls an unsupported function";
+(* HOL's blocker lines are "<id>: <tag>"; the importer's name their node
+ * type first ("<node type> <id>: <reason>"). *)
+fun hol_blocker line =
+  case String.fields (fn c => c = #":") line of
+    id :: _ :: _ => id <> "" andalso CharVector.all Char.isDigit id
+  | _ => false;
+fun elaboration_failure r =
+  case r of
+    SOME m => List.all hol_blocker (String.tokens (fn c => c = #"\n") m)
+  | NONE => false;
+fun elaboration_failure_with tag r =
+  elaboration_failure r andalso String.isSubstring tag (valOf r);
+fun imported_failure r =
+  case r of
+    SOME m => not (String.isPrefix "calls" m) andalso not (elaboration_failure r)
+  | NONE => false;
+val () =
+  if reasons "add" = [NONE] andalso
+     reasons "total" = [] andalso
+     List.all imported_failure (reasons "digest") andalso
+     length (reasons "digest") = 1 andalso
+     length (reasons "") = 2 andalso
+     List.exists imported_failure (reasons "") andalso
+     List.exists elaboration_failure (reasons "") andalso
+     reasons "digestTwice" = [calls_unsupported] andalso
+     reasons "callsTwice" = [calls_unsupported] andalso
+     reasons "twice" = [calls_unsupported] andalso
+     reasons "digits" = [NONE] andalso
+     reasons "pointer" = [NONE] andalso
+     List.all elaboration_failure (reasons "hookCount") andalso
+     length (reasons "hookCount") = 1 andalso
+     List.all elaboration_failure (reasons "nodeValue") andalso
+     length (reasons "nodeValue") = 1 andalso
+     List.all elaboration_failure (reasons "nodeCount") andalso
+     length (reasons "nodeCount") = 1 andalso
+     List.all elaboration_failure (reasons "copyTree") andalso
+     length (reasons "copyTree") = 1 andalso
+     reasons "encodePair" = [NONE] andalso
+     reasons "emitPair" = [NONE] andalso
+     reasons "putPair" = [NONE] andalso
+     reasons "grantCount" = [NONE] andalso
+     reasons "grantParam" = [NONE] andalso
+     List.all (elaboration_failure_with "unsupported modifier parameter type")
+       (reasons "nodeModified") andalso
+     length (reasons "nodeModified") = 1 andalso
+     reasons "treeTuple" = [NONE] andalso
+     length outcomes = 20
+  then ()
+  else raise Fail ("unexpected function outcomes: " ^
+    String.concatWith "; " (map (fn (n, r) => n ^ " " ^
+      (case r of SOME m => m | NONE => "supported")) outcomes));
+
+Definition partial_program_def:
+  partial_program = ^(#program prepared)
+End
+
+val () = cv_auto_trans partial_program_def;
+
+Definition partial_call_def:
+  partial_call data =
+    call_contract 1000 partial_program FEMPTY
+      (differential_frame (n2w 0x1212) 0 data)
+      (differential_world empty_accounts)
+End
+
+val () = cv_auto_trans partial_call_def;
+
+fun selector hex =
+  map (fn i => “n2w ^(numSyntax.term_of_int
+         (valOf (StringCvt.scanString (Int.scan StringCvt.HEX)
+                   (String.substring (hex, 2 * i, 2))))) : word8”)
+    (List.tabulate (4, I));
+fun with_word hex n =
+  listSyntax.mk_list (selector hex, “:word8”) |> (fn s =>
+    “^s ++ word_to_bytes (n2w ^(numSyntax.term_of_int n) : bytes32) T”);
+
+(* add runs: add(5) returns 5. *)
+Theorem partial_add_runs:
+  ∃w. partial_call ^(with_word "1003e2d2" 5) =
+      ContractReturned (word_to_bytes (5w : bytes32) T) w
+Proof
+  CONV_TAC (QUANT_CONV (LAND_CONV cv_eval)) >> simp[] >> EVAL_TAC
+QED
+
+(* twice is refused, not run as Base.twice (10) or with Mid.twice skipped. *)
+Theorem partial_twice_refused:
+  partial_call ^(with_word "3cf3bbf4" 5) = ContractInvalid "unknown procedure"
+Proof
+  CONV_TAC (LAND_CONV cv_eval) >> REFL_TAC
+QED
+
+Theorem partial_digest_refused:
+  partial_call (^(listSyntax.mk_list (selector "1b27a36f", “:word8”)) ++
+                word_to_bytes (32w : bytes32) T ++ REPLICATE 32 0w) =
+  ContractInvalid "unknown procedure"
+Proof
+  CONV_TAC (LAND_CONV cv_eval) >> REFL_TAC
+QED
+
+Theorem partial_calls_twice_refused:
+  partial_call ^(with_word "b8afe286" 5) = ContractInvalid "unknown procedure"
+Proof
+  CONV_TAC (LAND_CONV cv_eval) >> REFL_TAC
+QED
+
+(* Both the constant getter and digits return bytes16(bytes1("0")). *)
+Theorem partial_constant_getter_runs:
+  ∃w. partial_call ^(listSyntax.mk_list (selector "d0263f8c", “:word8”)) =
+      ContractReturned (48w :: REPLICATE 31 0w) w
+Proof
+  CONV_TAC (QUANT_CONV (LAND_CONV cv_eval)) >> simp[] >> EVAL_TAC
+QED
+
+Theorem partial_digits_runs:
+  ∃w. partial_call ^(listSyntax.mk_list (selector "9e20437c", “:word8”)) =
+      ContractReturned (48w :: REPLICATE 31 0w) w
+Proof
+  CONV_TAC (QUANT_CONV (LAND_CONV cv_eval)) >> simp[] >> EVAL_TAC
+QED
+
+(* pointer's block points b at address 0, the scratch space; memory is
+ * bytes, so that is a pointer like any other, and p's 0 is returned. *)
+Theorem partial_pointer_runs:
+  ∃w. partial_call (^(listSyntax.mk_list (selector "8a237e56", “:word8”)) ++
+                    word_to_bytes (32w : bytes32) T ++ REPLICATE 32 0w) =
+      ContractReturned (REPLICATE 32 0w) w
+Proof
+  CONV_TAC (QUANT_CONV (LAND_CONV cv_eval)) >> simp[] >> EVAL_TAC
+QED
+
+(* Unknown calldata reaches the unsupported fallback, which refuses rather
+ * than reverting as a contract without one would. *)
+Theorem partial_fallback_refused:
+  partial_call [1w; 2w; 3w; 4w] = ContractInvalid "unknown procedure"
+Proof
+  CONV_TAC (LAND_CONV cv_eval) >> REFL_TAC
+QED
+
+(* The constructor is unsupported, so creation is refused. *)
+Theorem partial_creation_refused:
+  deploy_contract 1000 partial_program (differential_frame (n2w 0x1212) 0 [])
+    (differential_world empty_accounts) = ContractInvalid "unknown procedure"
+Proof
+  CONV_TAC (LAND_CONV cv_eval) >> REFL_TAC
+QED
+
+(* A fallback taking the calldata as bytes and returning bytes
+ * (testdata/frontend/fallback_params.sol) runs beside add: a call reaching
+ * it returns the calldata itself as the return data, not ABI encoded. *)
+val fallback_prepared = #prepared (solidityPrepareLib.prepare_artifact
+  {root = "..", path = "../testdata/frontend/expected/fallback_params.json",
+   source = "testdata/frontend/fallback_params.sol"});
+
+val fallback_outcomes =
+  map (fn {name, reason, ...} => (name, reason)) (#functions fallback_prepared);
+val () =
+  if (case fallback_outcomes of
+        [("add", NONE), ("", NONE)] => true
+      | _ => false)
+  then ()
+  else raise Fail ("unexpected fallback_params outcomes: " ^
+    String.concatWith "; " (map (fn (n, r) => n ^ " " ^
+      (case r of SOME m => m | NONE => "supported")) fallback_outcomes));
+
+Definition fallback_params_program_def:
+  fallback_params_program = ^(#program fallback_prepared)
+End
+
+val () = cv_auto_trans fallback_params_program_def;
+
+Definition fallback_params_call_def:
+  fallback_params_call data =
+    call_contract 1000 fallback_params_program FEMPTY
+      (differential_frame (n2w 0x1212) 0 data)
+      (differential_world empty_accounts)
+End
+
+val () = cv_auto_trans fallback_params_call_def;
+
+(* add(2, 3) returns 5. *)
+Theorem fallback_params_add_runs:
+  ∃w. fallback_params_call (^(listSyntax.mk_list (selector "771602f7", “:word8”)) ++
+                            word_to_bytes (2w : bytes32) T ++
+                            word_to_bytes (3w : bytes32) T) =
+      ContractReturned (word_to_bytes (5w : bytes32) T) w
+Proof
+  CONV_TAC (QUANT_CONV (LAND_CONV cv_eval)) >> simp[] >> EVAL_TAC
+QED
+
+Theorem fallback_params_fallback_echoes:
+  (∃w. fallback_params_call [1w; 2w; 3w; 4w; 5w] =
+       ContractReturned [1w; 2w; 3w; 4w; 5w] w) ∧
+  (∃w. fallback_params_call [] = ContractReturned [] w)
+Proof
+  CONV_TAC (BINOP_CONV (QUANT_CONV (LAND_CONV cv_eval))) >> simp[]
+QED
+
+(* Both constructor bodies elaborate, and so does readString, which the
+ * base-constructor argument calls, with its dynamic ABI decoding. *)
+val creation_prepared = #prepared (solidityPrepareLib.prepare_artifact
+  {root = "..", path = "../testdata/frontend/expected/creation_argument.json",
+   source = "testdata/frontend/creation_argument.sol"});
+
+val creation_outcomes =
+  map (fn {name, reason, ...} => (name, reason)) (#functions creation_prepared);
+val () =
+  if List.filter (fn (n, _) => n = "") creation_outcomes =
+       [("", NONE), ("", NONE)] andalso
+     List.filter (fn (n, _) => n = "value") creation_outcomes = [("value", NONE)] andalso
+     List.filter (fn (n, _) => n = "readString") creation_outcomes =
+       [("readString", NONE)]
+  then ()
+  else raise Fail "unexpected creation_argument function outcomes";
+
+Definition creation_argument_unit_def:
+  creation_argument_unit = ^(#unit creation_prepared)
+End
+
+val () = cv_auto_trans creation_argument_unit_def;
+
+Theorem creation_argument_constructor_bodies_supported:
+  MAP unsupported_creation creation_argument_unit.unit_contracts = [F]
+Proof
+  EVAL_TAC
+QED
+
+Definition creation_argument_program_def:
+  creation_argument_program = ^(#program creation_prepared)
+End
+
+val () = cv_auto_trans creation_argument_program_def;
+
+Theorem creation_argument_value_runs:
+  ∃w. call_contract 1000 creation_argument_program FEMPTY
+        (differential_frame (n2w 0x1212) 0
+          ^(listSyntax.mk_list (selector "3fa4f245", “:word8”)))
+        (differential_world empty_accounts) =
+      ContractReturned (word_to_bytes (7w : bytes32) T) w
+Proof
+  CONV_TAC (QUANT_CONV (LAND_CONV cv_eval)) >> simp[] >> EVAL_TAC
+QED
+
+(* With every creation procedure supported, a deployment without encoded
+ * constructor arguments reverts in their decoding, as solc's does. *)
+Theorem creation_argument_empty_deploy_reverts:
+  ∃w. deploy_contract 1000 creation_argument_program
+        (differential_frame (n2w 0x1212) 0 [])
+        (differential_world empty_accounts) = ContractReverted [] w
+Proof
+  CONV_TAC (QUANT_CONV (LAND_CONV cv_eval)) >> simp[]
+QED
+
+(* Function types the core does not model
+ * (testdata/frontend/function_type_limits.sol): a comparison of function
+ * values and a function value in inline assembly leave their functions
+ * unsupported, while a local internal function value runs. *)
+val limits_prepared = #prepared (solidityPrepareLib.prepare_artifact
+  {root = "..", path = "../testdata/frontend/expected/function_type_limits.json",
+   source = "testdata/frontend/function_type_limits.sol"});
+
+val limits_outcomes =
+  map (fn {name, reason, ...} => (name, reason)) (#functions limits_prepared);
+fun limits_reasons name =
+  map #2 (List.filter (fn (n, _) => n = name) limits_outcomes);
+val () =
+  if limits_reasons "local" = [NONE] andalso
+     limits_reasons "inc" = [NONE] andalso
+     List.all elaboration_failure (limits_reasons "compares") andalso
+     List.all elaboration_failure (limits_reasons "inAssembly") andalso
+     length limits_outcomes = 4
+  then ()
+  else raise Fail ("unexpected function_type_limits outcomes: " ^
+    String.concatWith "; " (map (fn (n, r) => n ^ " " ^
+      (case r of SOME m => m | NONE => "supported")) limits_outcomes));
+
+Definition limits_program_def:
+  limits_program = ^(#program limits_prepared)
+End
+
+val () = cv_auto_trans limits_program_def;
+
+Definition limits_call_def:
+  limits_call data =
+    call_contract 1000 limits_program FEMPTY
+      (differential_frame (n2w 0x1212) 0 data)
+      (differential_world empty_accounts)
+End
+
+val () = cv_auto_trans limits_call_def;
+
+(* local(4) calls inc through a function value and returns 5. *)
+Theorem limits_local_runs:
+  ∃w. limits_call ^(with_word "183d1e0c" 4) =
+      ContractReturned (word_to_bytes (5w : bytes32) T) w
+Proof
+  CONV_TAC (QUANT_CONV (LAND_CONV cv_eval)) >> simp[] >> EVAL_TAC
+QED
+
+Theorem limits_compares_refused:
+  limits_call ^(listSyntax.mk_list (selector "df6b2ec9", “:word8”)) =
+  ContractInvalid "unknown procedure"
+Proof
+  CONV_TAC (LAND_CONV cv_eval) >> REFL_TAC
+QED
+
+(* A function value in storage and an external function type parameter
+ * (testdata/frontend/function_type_refused.sol) each refuse the whole unit:
+ * the core models neither the storage layout nor the function's header. *)
+val () =
+  (ignore (solidityPrepareLib.prepare_artifact
+     {root = "..", path = "../testdata/frontend/expected/function_type_refused.json",
+      source = "testdata/frontend/function_type_refused.sol"});
+   raise Fail "function_type_refused unexpectedly prepared")
+  handle solidityPrepareLib.PreparationError
+           (solidityPrepareLib.UnsupportedImport, msg) =>
+    if String.isSubstring "unsupported state variable" msg andalso
+       String.isSubstring "external function types are not supported" msg
+    then ()
+    else raise Fail ("function_type_refused reason missing: " ^ msg);

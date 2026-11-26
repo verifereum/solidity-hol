@@ -1,0 +1,24 @@
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.37;
+
+contract ArrayPeer {
+    function rev(uint256[] calldata a) external pure returns (uint256[] memory r) {
+        r = new uint256[](a.length);
+        for (uint256 i = 0; i < a.length; i++) {
+            r[i] = a[a.length - 1 - i];
+        }
+    }
+
+    function count(uint256[][] calldata a) external pure returns (uint256 n) {
+        for (uint256 i = 0; i < a.length; i++) {
+            n += a[i].length;
+        }
+    }
+
+    function firstWord(bytes[] calldata a) external pure returns (uint256 w) {
+        bytes calldata e = a[0];
+        assembly {
+            w := calldataload(e.offset)
+        }
+    }
+}

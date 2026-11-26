@@ -195,10 +195,10 @@ End
 
 Definition test_program_def:
   test_program = <|
-    procedures := [add_proc; count_proc; pair_proc; first_proc; fact_proc;
+    unsupported_procedures := []; procedures := [add_proc; count_proc; pair_proc; first_proc; fact_proc;
                    wrapper_proc; void_proc; convert_proc; scope_proc];
-    struct_layouts := []; type_declarations := test_decls;
-    state_variables := [];
+    struct_layouts := []; function_ids := []; creation_function_ids := []; type_declarations := test_decls;
+    state_variables := []; immutables := [];
     entry_procedure := AstId 6;
     external_functions := []; receive_procedure := NONE;
     fallback_procedure := NONE; creation_procedure := NONE
@@ -265,7 +265,7 @@ Definition external_call_body_def:
   external_call_body kind value = [
     DefineStmt (AstId 82) (SingleType u256)
       (ExternalCallOperation kind [1w; 2w; 3w; 4w] [u256] [u256]
-         (ConstantAtom (AddressValue 0x5000w)) value
+         (ConstantAtom (AddressValue 0x5000w)) value NONE
          [BoundAtom (AstId 80)])]
 End
 
@@ -278,10 +278,131 @@ Proof
   EVAL_TAC
 QED
 
-Theorem external_delegate_call_rejected:
+Theorem external_byte_sequence_memory_results_accepted:
+  EVERY (λelement.
+    wf_core_procedure test_env (with_body [
+      DefineStmt (AstId 82) (SingleType (LocatedT MemoryLoc element))
+        (ExternalCallOperation ExternalCall [1w; 2w; 3w; 4w] []
+          [LocatedT MemoryLoc element]
+          (ConstantAtom (AddressValue 0x5000w))
+          (ConstantAtom (IntegerValue 0)) NONE [])])) [BytesT; StringT]
+Proof
+  EVAL_TAC
+QED
+
+Theorem external_byte_sequence_calldata_results_rejected:
+  EVERY (λelement.
+    ¬wf_core_procedure test_env (with_body [
+      DefineStmt (AstId 82) (SingleType (LocatedT CalldataLoc element))
+        (ExternalCallOperation ExternalCall [1w; 2w; 3w; 4w] []
+          [LocatedT CalldataLoc element]
+          (ConstantAtom (AddressValue 0x5000w))
+          (ConstantAtom (IntegerValue 0)) NONE [])])) [BytesT; StringT]
+Proof
+  EVAL_TAC
+QED
+
+(* A low-level call of a constant address with the parameter as gas. *)
+Definition low_level_call_body_def:
+  low_level_call_body kind value gas data = [
+    DefineStmt (AstId 82)
+      (call_result_type [BoolT; LocatedT MemoryLoc BytesT])
+      (LowLevelCallOperation kind (ConstantAtom (AddressValue 0x5000w)) value
+         gas data)]
+End
+
+val () = cv_auto_trans low_level_call_body_def;
+
+(* call sends value; every kind takes a gas option and a bytes literal. *)
+Theorem low_level_calls_accepted:
+  wf_core_procedure test_env
+    (with_body (low_level_call_body ExternalCall (ConstantAtom (IntegerValue 1))
+                  (SOME (BoundAtom (AstId 80))) (ConstantAtom (BytesValue [])))) ∧
+  EVERY (λkind.
+    wf_core_procedure test_env
+      (with_body (low_level_call_body kind (ConstantAtom (IntegerValue 0))
+                    (SOME (BoundAtom (AstId 80))) (ConstantAtom (BytesValue [1w])))))
+    [ExternalStaticCall; ExternalDelegateCall]
+Proof
+  EVAL_TAC
+QED
+
+(* Only call sends value, and the data is bytes, not a word. *)
+Theorem low_level_calls_rejected:
+  EVERY (λkind.
+    ¬wf_core_procedure test_env
+       (with_body (low_level_call_body kind (ConstantAtom (IntegerValue 1)) NONE
+                     (ConstantAtom (BytesValue [])))))
+    [ExternalStaticCall; ExternalDelegateCall] ∧
+  ¬wf_core_procedure test_env
+     (with_body (low_level_call_body ExternalCall (ConstantAtom (IntegerValue 0))
+                   NONE (BoundAtom (AstId 80))))
+Proof
+  EVAL_TAC
+QED
+
+(* Calldata bytes are call data too, read where they are; a calldata string
+   is not. *)
+Definition calldata_data_call_def:
+  calldata_data_call kind element =
+    with_body (low_level_call_body kind (ConstantAtom (IntegerValue 0)) NONE
+                 (BoundAtom (AstId 83))) with
+      parameters := [(AstId 80, u256); (AstId 83, LocatedT CalldataLoc element)]
+End
+
+Theorem low_level_calldata_data_accepted:
+  EVERY (λkind. wf_core_procedure test_env (calldata_data_call kind BytesT))
+    [ExternalCall; ExternalStaticCall; ExternalDelegateCall] ∧
+  ¬wf_core_procedure test_env (calldata_data_call ExternalCall StringT)
+Proof
+  EVAL_TAC
+QED
+
+Theorem external_call_gas_option_accepted:
+  wf_core_procedure test_env (with_body [
+    DefineStmt (AstId 82) (SingleType u256)
+      (ExternalCallOperation ExternalCall [1w; 2w; 3w; 4w] [u256] [u256]
+         (ConstantAtom (AddressValue 0x5000w)) (ConstantAtom (IntegerValue 0))
+         (SOME (BoundAtom (AstId 80))) [BoundAtom (AstId 80)])])
+Proof
+  EVAL_TAC
+QED
+
+Definition byte_constructor_program_def:
+  byte_constructor_program loc element = test_program with <|
+    procedures := [<|
+      procedure_id := AstId 8;
+      parameters := [(AstId 80, LocatedT loc element)];
+      return_bindings := []; body := [] |>];
+    entry_procedure := AstId 8;
+    creation_procedure := SOME (AstId 8, F) |>
+End
+
+Theorem byte_sequence_memory_constructor_accepted:
+  EVERY (λelement.
+    wf_core_program
+      (core_program_environment (byte_constructor_program MemoryLoc element))
+      (byte_constructor_program MemoryLoc element)) [BytesT; StringT]
+Proof
+  EVAL_TAC
+QED
+
+Theorem byte_sequence_calldata_constructor_rejected:
+  EVERY (λelement.
+    ¬wf_core_program
+      (core_program_environment (byte_constructor_program CalldataLoc element))
+      (byte_constructor_program CalldataLoc element)) [BytesT; StringT]
+Proof
+  EVAL_TAC
+QED
+
+Theorem external_delegate_call_accepted:
+  wf_core_procedure test_env
+     (with_body (external_call_body ExternalDelegateCall
+                   (ConstantAtom (IntegerValue 0)))) ∧
   ¬wf_core_procedure test_env
      (with_body (external_call_body ExternalDelegateCall
-                   (ConstantAtom (IntegerValue 0))))
+                   (ConstantAtom (IntegerValue 1))))
 Proof
   EVAL_TAC
 QED
@@ -397,9 +518,24 @@ Proof
   EVAL_TAC
 QED
 
-Theorem function_parameter_rejected:
-  ¬wf_core_procedure test_env
+Theorem internal_function_parameter_accepted:
+  wf_core_procedure test_env
      (with_body [] with parameters := [(AstId 80, FunctionT InternalFn PureMut [] [])])
+Proof
+  EVAL_TAC
+QED
+
+Theorem external_function_parameter_rejected:
+  ¬wf_core_procedure test_env
+     (with_body [] with parameters := [(AstId 80, FunctionT ExternalFn PureMut [] [])])
+Proof
+  EVAL_TAC
+QED
+
+Theorem payable_function_parameter_rejected:
+  ¬wf_core_procedure test_env
+     (with_body [] with parameters :=
+        [(AstId 80, FunctionT InternalFn PayableMut [] [])])
 Proof
   EVAL_TAC
 QED
@@ -453,6 +589,59 @@ QED
 Theorem emit_mistyped_argument_rejected:
   ¬wf_core_procedure test_env (with_body [
      EmitStmt NONE [(BoolT, F, BoundAtom (AstId 80))];
+     ReturnStmt [BoundAtom (AstId 80)]])
+Proof
+  EVAL_TAC
+QED
+
+(* Custom errors: a 4-byte selector and scalar arguments of their
+ * parameter types, including declared enums. *)
+Theorem revert_error_admitted:
+  wf_core_procedure test_env (with_body [
+     RevertErrorStmt [1w; 2w; 3w; 4w] [u256; BoolT]
+       [BoundAtom (AstId 80); ConstantAtom (BoolValue T)];
+     ReturnStmt [BoundAtom (AstId 80)]])
+Proof
+  EVAL_TAC
+QED
+
+Theorem revert_error_enum_admitted:
+  wf_core_procedure test_env (with_body [
+     RevertErrorStmt [1w; 2w; 3w; 4w] [EnumT (AstId 900)]
+       [ConstantAtom (IntegerValue 2)];
+     ReturnStmt [BoundAtom (AstId 80)]])
+Proof
+  EVAL_TAC
+QED
+
+Theorem revert_error_undeclared_enum_rejected:
+  ¬wf_core_procedure test_env (with_body [
+     RevertErrorStmt [1w; 2w; 3w; 4w] [EnumT (AstId 999)]
+       [ConstantAtom (IntegerValue 0)];
+     ReturnStmt [BoundAtom (AstId 80)]])
+Proof
+  EVAL_TAC
+QED
+
+Theorem revert_error_enum_out_of_range_rejected:
+  ¬wf_core_procedure test_env (with_body [
+     RevertErrorStmt [1w; 2w; 3w; 4w] [EnumT (AstId 900)]
+       [ConstantAtom (IntegerValue 3)];
+     ReturnStmt [BoundAtom (AstId 80)]])
+Proof
+  EVAL_TAC
+QED
+
+Theorem revert_error_short_selector_rejected:
+  ¬wf_core_procedure test_env (with_body [
+     RevertErrorStmt [1w; 2w; 3w] [] []; ReturnStmt [BoundAtom (AstId 80)]])
+Proof
+  EVAL_TAC
+QED
+
+Theorem revert_error_mistyped_argument_rejected:
+  ¬wf_core_procedure test_env (with_body [
+     RevertErrorStmt [1w; 2w; 3w; 4w] [BoolT] [BoundAtom (AstId 80)];
      ReturnStmt [BoundAtom (AstId 80)]])
 Proof
   EVAL_TAC
@@ -567,6 +756,61 @@ QED
 Theorem memory_struct_admitted:
   declared_type_ok struct_env (LocatedT MemoryLoc (StructT (AstId 912))) ∧
   declared_type_ok struct_env (LocatedT CalldataLoc (StructT (AstId 913)))
+Proof
+  EVAL_TAC
+QED
+
+(* Calldata structs take the memory field rule: no mapping reaches one. *)
+Theorem calldata_struct_binding_checked:
+  core_binding_type struct_env
+     (LocatedT CalldataLoc (ArrayT (StructT (AstId 912)) (SOME 1))) ∧
+  ¬core_binding_type struct_env
+     (LocatedT CalldataLoc (ArrayT (StructT (AstId 911)) (SOME 1)))
+Proof
+  EVAL_TAC
+QED
+
+Definition slice_struct_env_def:
+  slice_struct_env = test_env with type_declarations :=
+    [(AstId 914, StructDeclaration [(AstId 1, UintT 8)]);
+     (AstId 915, StructDeclaration [(AstId 1, BytesT)])]
+End
+
+Theorem calldata_struct_slices_require_static_fields:
+  wf_core_operation slice_struct_env
+    <| bindings := [(AstId 1, SingleType
+         (LocatedT CalldataLoc (ArrayT (StructT (AstId 914)) NONE)))];
+       targets := []; returns := []; in_loop := F |>
+    (SingleType (LocatedT CalldataLoc (ArrayT (StructT (AstId 914)) NONE)))
+    (CalldataSliceOperation (BoundAtom (AstId 1))
+       (ConstantAtom (IntegerValue 0)) NONE) ∧
+  ¬wf_core_operation slice_struct_env
+    <| bindings := [(AstId 1, SingleType
+         (LocatedT CalldataLoc (ArrayT (StructT (AstId 915)) NONE)))];
+       targets := []; returns := []; in_loop := F |>
+    (SingleType (LocatedT CalldataLoc (ArrayT (StructT (AstId 915)) NONE)))
+    (CalldataSliceOperation (BoundAtom (AstId 1))
+       (ConstantAtom (IntegerValue 0)) NONE)
+Proof
+  EVAL_TAC
+QED
+
+(* Storage struct copies are member-wise and never reach a mapping. *)
+Theorem storage_struct_copy_mapping_checked:
+  IS_SOME (check_core_stmts struct_env
+    <| bindings := [(AstId 1, SingleType (LocatedT StorageLoc (StructT (AstId 912))));
+                   (AstId 2, SingleType (LocatedT StorageLoc (StructT (AstId 912))))];
+       targets := []; returns := []; in_loop := F |>
+    [CopyContentsStmt (LocatedT StorageLoc (StructT (AstId 912)))
+       (LocatedT StorageLoc (StructT (AstId 912)))
+       (BoundAtom (AstId 1)) (BoundAtom (AstId 2))]) ∧
+  check_core_stmts struct_env
+    <| bindings := [(AstId 1, SingleType (LocatedT StorageLoc (StructT (AstId 911))));
+                   (AstId 2, SingleType (LocatedT StorageLoc (StructT (AstId 911))))];
+       targets := []; returns := []; in_loop := F |>
+    [CopyContentsStmt (LocatedT StorageLoc (StructT (AstId 911)))
+       (LocatedT StorageLoc (StructT (AstId 911)))
+       (BoundAtom (AstId 1)) (BoundAtom (AstId 2))] = NONE
 Proof
   EVAL_TAC
 QED
@@ -833,6 +1077,48 @@ Proof
   EVAL_TAC
 QED
 
+Theorem join_memory_annotation_checked:
+  wf_core_operation test_env
+    <| bindings := []; targets := []; returns := []; in_loop := F |>
+    (SingleType (LocatedT MemoryLoc (ArrayT (UintT 256) (SOME 1))))
+    (DefaultReferenceOperation MemoryLoc (ArrayT (UintT 256) (SOME 1))) ∧
+  ¬wf_core_operation test_env
+    <| bindings := []; targets := []; returns := []; in_loop := F |>
+    (SingleType (LocatedT MemoryLoc (UintT 256)))
+    (DefaultReferenceOperation MemoryLoc (UintT 256)) ∧
+  ¬wf_core_operation test_env
+    <| bindings := []; targets := []; returns := []; in_loop := F |>
+    (SingleType (LocatedT MemoryLoc (ArrayT (UintT 8) (SOME 1))))
+    (DefaultReferenceOperation MemoryLoc (ArrayT (UintT 256) (SOME 1)))
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem byte_mapping_storage_bases_checked:
+  EVERY (λbinding.
+    wf_core_operation test_env
+      <| bindings := [(AstId 1, binding);
+                      (AstId 2, SingleType (LocatedT CalldataLoc BytesT))];
+         targets := []; returns := []; in_loop := F |>
+      (ReferenceType (UintT 8))
+      (NavigateOperation (UintT 8) (BoundAtom (AstId 1))
+        (IndexNavigation (BoundAtom (AstId 2)))))
+    [ReferenceType (MappingT BytesT (UintT 8));
+     SingleType (LocatedT StorageLoc (MappingT BytesT (UintT 8)))] ∧
+  EVERY (λbinding.
+    ¬wf_core_operation test_env
+      <| bindings := [(AstId 1, binding);
+                      (AstId 2, SingleType (UintT 256))];
+         targets := []; returns := []; in_loop := F |>
+      (ReferenceType (UintT 8))
+      (NavigateOperation (UintT 8) (BoundAtom (AstId 1))
+        (IndexNavigation (BoundAtom (AstId 2)))))
+    [ReferenceType (MappingT BytesT (UintT 8));
+     SingleType (LocatedT StorageLoc (MappingT BytesT (UintT 8)))]
+Proof
+  EVAL_TAC
+QED
+
 Theorem mapping_key_signedness_checked:
   ¬wf_core_operation test_env
     <| bindings := [(AstId 1, ReferenceType (MappingT (IntT 8) (UintT 8)));
@@ -873,16 +1159,16 @@ Definition packed_struct_layout_def:
     struct_slots := 1;
     struct_fields :=
       [<| state_id := AstId 951; state_type := UintT 8;
-          state_slot := 0w; state_offset := 0 |>;
+          state_backend := PersistentStorage; state_slot := 0w; state_offset := 0 |>;
        <| state_id := AstId 952; state_type := IntT 16;
-          state_slot := 0w; state_offset := 1 |>]
+          state_backend := PersistentStorage; state_slot := 0w; state_offset := 1 |>]
   |>
 End
 
 Definition struct_layout_environment_def:
   struct_layout_environment layouts = core_program_environment
-    <| procedures := []; state_variables := []; struct_layouts := layouts;
-       type_declarations := MAP (λs. (s.struct_id, StructDeclaration
+    <| unsupported_procedures := []; procedures := []; state_variables := []; immutables := []; struct_layouts := layouts;
+       function_ids := []; creation_function_ids := []; type_declarations := MAP (λs. (s.struct_id, StructDeclaration
          (MAP (λv. (v.state_id, v.state_type)) s.struct_fields))) layouts;
        entry_procedure := AstId 0;
        external_functions := []; receive_procedure := NONE;
@@ -909,15 +1195,15 @@ Theorem malformed_struct_fields_rejected:
   ¬wf_core_environment
     (struct_layout_environment [packed_struct_layout with struct_fields :=
       [<| state_id := AstId 951; state_type := UintT 16;
-          state_slot := 0w; state_offset := 31 |>]]) ∧
+          state_backend := PersistentStorage; state_slot := 0w; state_offset := 31 |>]]) ∧
   ¬wf_core_environment
     (struct_layout_environment [packed_struct_layout with struct_fields :=
       [<| state_id := AstId 951; state_type := UintT 8;
-          state_slot := 1w; state_offset := 0 |>]]) ∧
+          state_backend := PersistentStorage; state_slot := 1w; state_offset := 0 |>]]) ∧
   ¬wf_core_environment
     (struct_layout_environment [packed_struct_layout with struct_fields :=
       [<| state_id := AstId 951; state_type := StructT (AstId 950);
-          state_slot := 0w; state_offset := 0 |>]])
+          state_backend := PersistentStorage; state_slot := 0w; state_offset := 0 |>]])
 Proof
   EVAL_TAC
 QED
@@ -948,10 +1234,10 @@ Theorem recursive_struct_behind_mapping_checked:
       struct_slots := 2;
       struct_fields :=
         [<| state_id := AstId 951; state_type := UintT 8;
-            state_slot := 0w; state_offset := 0 |>;
+            state_backend := PersistentStorage; state_slot := 0w; state_offset := 0 |>;
          <| state_id := AstId 952;
             state_type := MappingT (UintT 256) (StructT (AstId 950));
-            state_slot := 1w; state_offset := 0 |>] |>])
+            state_backend := PersistentStorage; state_slot := 1w; state_offset := 0 |>] |>])
 Proof
   EVAL_TAC
 QED
@@ -960,7 +1246,7 @@ QED
 Theorem array_push_missing_binding_rejected:
   ¬wf_core_operation test_env
     <| bindings := []; targets := []; returns := []; in_loop := F |>
-    (ReferenceType (UintT 8)) (ArrayPushOperation (BoundAtom (AstId 1)) NONE)
+    (ReferenceType (UintT 8)) (ArrayPushOperation (BoundAtom (AstId 1)))
 Proof
   CONV_TAC cv_eval
 QED
@@ -979,4 +1265,165 @@ Theorem layoutless_struct_declaration_retained:
   lookup_struct_layout (core_program_environment layoutless_program) (AstId 960) = NONE
 Proof
   CONV_TAC cv_eval
+QED
+
+(* Calldata bytes are read-only values, never writable storage locations. *)
+Theorem calldata_byte_is_not_a_writable_reference:
+  ¬wf_core_operation test_env
+    <| bindings := [(AstId 1, SingleType (LocatedT CalldataLoc BytesT))];
+       targets := []; returns := []; in_loop := F |>
+    (ReferenceType (FixedBytesT 1))
+    (ArrayIndexOperation (BoundAtom (AstId 1)) (ConstantAtom (IntegerValue 0))) ∧
+  ¬wf_core_operation test_env
+    <| bindings := [(AstId 1, SingleType (LocatedT CalldataLoc BytesT))];
+       targets := []; returns := []; in_loop := F |>
+    (ReferenceType (FixedBytesT 1))
+    (NavigateOperation (FixedBytesT 1) (BoundAtom (AstId 1))
+      (IndexNavigation (ConstantAtom (IntegerValue 0))))
+Proof
+  EVAL_TAC
+QED
+
+(* Memory enum arrays cross the ABI boundary with declared enums only; the
+ * codec validates each element as it decodes it. *)
+Theorem memory_enum_arrays_abi_boundary:
+  core_binding_type test_env
+    (LocatedT MemoryLoc (ArrayT (EnumT (AstId 900)) NONE)) ∧
+  ¬core_binding_type test_env
+    (LocatedT MemoryLoc (ArrayT (EnumT (AstId 901)) NONE)) ∧
+  memory_fields_ok test_env 1 [EnumT (AstId 900)] ∧
+  ¬memory_fields_ok test_env 1 [EnumT (AstId 901)] ∧
+  abi_type_ok test_env (LocatedT MemoryLoc (ArrayT (EnumT (AstId 900)) NONE)) ∧
+  abi_type_ok test_env
+    (LocatedT MemoryLoc (ArrayT (ArrayT (EnumT (AstId 900)) NONE) NONE)) ∧
+  ¬abi_type_ok test_env (LocatedT MemoryLoc (ArrayT (EnumT (AstId 901)) NONE))
+Proof
+  EVAL_TAC
+QED
+
+Theorem calldata_slice_locations:
+  MAP (λloc. wf_core_operation test_env
+    <| bindings := [(AstId 1, SingleType (LocatedT loc BytesT))];
+       targets := []; returns := []; in_loop := F |>
+    (SingleType (LocatedT loc BytesT))
+    (CalldataSliceOperation (BoundAtom (AstId 1)) (ConstantAtom (IntegerValue 0)) NONE))
+    [StorageLoc; MemoryLoc; CalldataLoc] = [F; F; T]
+Proof
+  simp_tac std_ss [listTheory.MAP] >> CONV_TAC cv_eval
+QED
+
+Theorem calldata_slice_rejects_dynamic_elements:
+  ¬wf_core_operation test_env
+    <| bindings := [(AstId 1, SingleType (LocatedT CalldataLoc (ArrayT BytesT NONE)))];
+       targets := []; returns := []; in_loop := F |>
+    (SingleType (LocatedT CalldataLoc (ArrayT BytesT NONE)))
+    (CalldataSliceOperation (BoundAtom (AstId 1)) (ConstantAtom (IntegerValue 0)) NONE)
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem calldata_slice_rejects_bool_bound:
+  ¬wf_core_operation test_env
+    <| bindings := [(AstId 1, SingleType (LocatedT CalldataLoc BytesT))];
+       targets := []; returns := []; in_loop := F |>
+    (SingleType (LocatedT CalldataLoc BytesT))
+    (CalldataSliceOperation (BoundAtom (AstId 1)) (ConstantAtom (BoolValue T)) NONE)
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem byte_prefix_rejects_bad_width_and_type:
+  ¬wf_core_operation test_env
+    <| bindings := [(AstId 1, SingleType (LocatedT MemoryLoc BytesT))];
+       targets := []; returns := []; in_loop := F |>
+    (SingleType (FixedBytesT 33)) (BytesToFixedOperation 33 (BoundAtom (AstId 1))) ∧
+  ¬wf_core_operation test_env
+    <| bindings := [(AstId 1, SingleType (LocatedT MemoryLoc StringT))];
+       targets := []; returns := []; in_loop := F |>
+    (SingleType (FixedBytesT 4)) (BytesToFixedOperation 4 (BoundAtom (AstId 1)))
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem reset_accepts_scalar_and_located_memory_targets:
+  EVERY (λty. IS_SOME (check_core_stmts test_env
+    <| bindings := []; targets := [(AstId 1, ty)]; returns := []; in_loop := F |>
+    [ResetTargetStmt (AstId 1) ty]))
+    [UintT 8; BoolT; EnumT (AstId 900);
+     FunctionT InternalFn PureMut [] [];
+     LocatedT MemoryLoc BytesT; LocatedT MemoryLoc (ArrayT (UintT 8) (SOME 2))]
+Proof
+  EVAL_TAC
+QED
+
+Theorem reset_accepts_captured_storage_objects:
+  EVERY (λty. IS_SOME (check_core_stmts
+    (struct_layout_environment [packed_struct_layout])
+    <| bindings := [(AstId 1, ReferenceType ty)]; targets := [];
+       returns := []; in_loop := F |>
+    [CaptureValueStmt (AstId 2) (BoundAtom (AstId 1)); ResetTargetStmt (AstId 2) ty]))
+    [BytesT; StringT; ArrayT (UintT 8) NONE; StructT (AstId 950)]
+Proof
+  EVAL_TAC
+QED
+
+Theorem reset_rejects_readonly_pointer_mapping_and_bad_targets:
+  EVERY (λty. ¬IS_SOME (check_core_stmts test_env
+    <| bindings := []; targets := [(AstId 1, ty)]; returns := []; in_loop := F |>
+    [ResetTargetStmt (AstId 1) ty]))
+    [LocatedT CalldataLoc BytesT; LocatedT StorageLoc BytesT;
+     MappingT (UintT 256) (UintT 256); StructT (AstId 999); UintT 7] ∧
+  ¬IS_SOME (check_core_stmts test_env
+    <| bindings := []; targets := [(AstId 1, UintT 8)]; returns := []; in_loop := F |>
+    [ResetTargetStmt (AstId 1) (UintT 16)]) ∧
+  ¬IS_SOME (check_core_stmts test_env
+    <| bindings := []; targets := []; returns := []; in_loop := F |>
+    [ResetTargetStmt (AstId 1) (UintT 8)])
+Proof
+  EVAL_TAC
+QED
+
+Theorem aggregate_capture_does_not_admit_scalar_assignment:
+  ¬IS_SOME (check_core_stmts test_env
+    <| bindings := [(AstId 1, ReferenceType (ArrayT (UintT 8) NONE))];
+       targets := []; returns := []; in_loop := F |>
+    [CaptureValueStmt (AstId 2) (BoundAtom (AstId 1));
+     WriteScalarStmt (AstId 2) (ArrayT (UintT 8) NONE) (ConstantAtom (IntegerValue 0))])
+Proof
+  EVAL_TAC
+QED
+
+Theorem packed_array_shape_checked:
+  packed_type (LocatedT MemoryLoc (ArrayT (UintT 8) NONE)) ∧
+  packed_type (LocatedT MemoryLoc (ArrayT (IntT 16) (SOME 2))) ∧
+  packed_type (LocatedT MemoryLoc (ArrayT (FixedBytesT 2) NONE)) ∧
+  ¬packed_type (LocatedT MemoryLoc (ArrayT (UintT 8) (SOME 0))) ∧
+  ¬packed_type (LocatedT MemoryLoc (ArrayT (ArrayT (UintT 8) NONE) NONE)) ∧
+  ¬packed_type (LocatedT MemoryLoc (ArrayT BytesT NONE)) ∧
+  ¬packed_type (LocatedT MemoryLoc (StructT (AstId 1)))
+Proof
+  EVAL_TAC
+QED
+
+Theorem assembly_balances_are_read_only_and_datacopy_is_unsupported:
+  assembly_expr_ok (assembly_unsupported ++ assembly_state_writes)
+    (YulBuiltin YBalance [YulLit (LitNumber 0w)]) ∧
+  assembly_expr_ok (assembly_unsupported ++ assembly_state_writes)
+    (YulBuiltin YSelfBalance []) ∧
+  ¬assembly_expr_ok assembly_unsupported
+    (YulBuiltin YDataCopy
+      [YulLit (LitNumber 0w); YulLit (LitNumber 0w); YulLit (LitNumber 0w)])
+Proof
+  EVAL_TAC
+QED
+
+(* codesize and codecopy pass the static check (a creation frame refuses
+ * them at run time). *)
+Theorem assembly_code_builtins_are_supported:
+  assembly_expr_ok assembly_unsupported (YulBuiltin YCodeSize []) ∧
+  assembly_expr_ok assembly_unsupported
+    (YulBuiltin YCodeCopy
+      [YulLit (LitNumber 0w); YulLit (LitNumber 0w); YulLit (LitNumber 32w)])
+Proof
+  EVAL_TAC
 QED

@@ -1,60 +1,37 @@
 (* Normalized source AST: the admitted subset of the pinned compiler's
  * analyzed Standard JSON AST, between the raw compiler output and the core.
+ * docs/frontend-boundary.md lists the admitted subset.
  *
  * solidityImportLib builds these terms from a compiler artifact and fails
  * closed: an unknown nodeType, a missing required field, or a feature outside
- * the subset (public, constant, immutable or initialised state variables,
- * modifiers, super, named or try calls, built-ins other than
- * require, assert, revert, members of msg, tx and block and address(this), literal subdenominations,
- * inline arrays, type names other than elementary types, arrays and mappings, ...)
- * raises ImportError. Semantic nodes keep their compiler id and source range;
- * declarations are referred to by id, and names are diagnostic only. Type
- * annotations are kept as the compiler's encoded typeIdentifier and decoded
- * here, never from the display typeString.
+ * the subset raises ImportError. Semantic nodes keep their compiler id and
+ * source range; declarations are referred to by id, and names are diagnostic
+ * only. Type annotations are kept as the compiler's encoded typeIdentifier
+ * and decoded here, never from the display typeString.
  *
  * A unit holds its deployable contracts: those neither abstract, nor an
  * interface, nor a base of another contract of the unit. Each is flattened
- * along its linearization (src_contract); its bases must be in the same unit.
+ * along its linearization (src_contract); its bases, the functions it calls
+ * and the structs it uses may come from any source unit of the compilation
+ * (unit_sources), since the AST refers to declarations by id across files.
+ * The internal functions, modifiers and constants of libraries it uses come
+ * with it.
  *
- * Types are normalized from elementary, array and mapping type-name nodes; value
- * types are decoded from typeIdentifiers. Both yield only valid shapes (normalize_type_name_valid,
- * decode_type_identifier_valid). Literals keep their exact rational type.
+ * A function whose body, modifiers or header fall outside the subset is kept
+ * with the reasons (fn_unsupported, one line per unsupported node), and with
+ * placeholders for the nodes the importer could not represent: dropping it
+ * would let a lookup or a super call fall through to a function it overrides,
+ * and its selector to the fallback. Calls of unsupported functions resolve
+ * to nothing (function_table), and elaboration skips them.
  *
- * valid_src_unit then establishes, for an imported unit:
- *  - all node ids are distinct;
- *  - every parameter, return, local and state variable has a normalized
- *    elementary, array or mapping type, the default data location, and a
- *    type identifier agreeing with that type, and the enclosing function,
- *    block, for statement or one of the contract's bases as its scope; event
- *    parameters are elementary, scoped by their event;
- *  - the contract's bases are distinct and start with the contract itself;
- *  - the contract's storage layout lists its state variables in
- *    linearization order, bases first, each with its own typeIdentifier and
- *    a slot below 2 ** 256;
- *  - every identifier resolves, within its lexical scope, to a variable of the
- *    annotated type, or, as the callee of a call, to a function of the same
- *    contract, the most derived override of the one it names (call_table);
- *    calls have matching arity and are annotated with the callee's
- *    return types; conversions are annotated with their normalized target type;
- *    environment reads with their member's type; emits name an event of the
- *    contract with as many arguments as it has parameters;
- *  - declaration statements list exactly their declarations' ids as
- *    assignments, returns name the enclosing function's return list, break and
- *    continue occur in loop bodies, conditions are boolean;
- *  - functions, receive and fallback are pure, view, nonpayable or payable,
- *    and only non-pure ones refer to state variables; functions a more
- *    derived one overrides are not checked, since nothing reaches them;
- *    contracts are scoped by the unit, functions by a base of their contract;
- *  - operators belong to the admitted set and every other expression
- *    annotation decodes to an elementary, rational literal or tuple type.
- *
- * Left to elaboration: implicit conversions (operand and argument types
- * against commonType and parameter types, literal ranges), return value
- * arity and types, assignment target shapes and their types, and evaluation
- * order, which the AST does not record. Left to the compiler: storage layout
- * calculation, that view functions write no state variable, and the
- * override metadata: which declarations each function overrides, and that
- * functions come most derived first.
+ * valid_src_unit checks what holds for the unit as a whole: distinct ids,
+ * declarations, function and modifier headers, storage layout, state
+ * variables, constants, immutables (each non-transient, declared in a base
+ * of the contract, of a stored scalar or function type: immutable_variable),
+ * getters and bases. Function bodies, and the
+ * expressions of initializers, base-constructor arguments and constant
+ * values, are checked where solidityElaborate elaborates them.
+ * unit_rejections lists the checks a unit fails, with the node each is about.
  *)
 Theory solidityImport
 Ancestors
@@ -62,6 +39,8 @@ Ancestors
   (* for the scalar layer's cv encodings of the AST types, so that every
    * descendant sees one encoding *)
   solidityScalar
+  (* an inline assembly block's code *)
+  yulAST
 Libs
   cv_transLib
 
@@ -75,13 +54,45 @@ Datatype:
   node_info = <| node_id : num; node_location : src_location |>
 End
 
+(* The compiler's kinds and operators, decoded once by the importer. *)
+Datatype:
+  src_function_kind = FunctionKind | ConstructorKind | ReceiveKind | FallbackKind
+End
+
+Datatype:
+  src_visibility
+  = PublicVisibility | ExternalVisibility | InternalVisibility | PrivateVisibility
+End
+
+Datatype:
+  literal_kind
+  = NumberLiteral | BoolLiteral | StringLiteral | UnicodeStringLiteral
+  | HexStringLiteral
+End
+
+Datatype:
+  src_unary_operator
+  = SrcIncrement | SrcDecrement | SrcNegate | SrcNot | SrcBitNot | SrcDelete
+End
+
+Datatype:
+  src_binary_operator
+  = SrcAdd | SrcSub | SrcMul | SrcDiv | SrcMod | SrcExp | SrcShl | SrcShr
+  | SrcBitAnd | SrcBitOr | SrcBitXor | SrcEq | SrcNe | SrcLt | SrcLe | SrcGt
+  | SrcGe | SrcAnd | SrcOr
+End
+
 (* ElementaryTypeName: name and, for addresses, stateMutability. *)
 Datatype:
-  src_type_name = SrcElementaryTypeName node_info string (string option)
+  src_type_name = SrcElementaryTypeName node_info string (address_payability option)
                 | SrcArrayTypeName node_info src_type_name num
                 | SrcDynamicArrayTypeName node_info src_type_name
   | SrcMappingTypeName node_info src_type_name src_type_name
   | SrcStructTypeName node_info num string
+  | SrcEnumTypeName node_info num
+  (* an internal function type, by its type identifier *)
+  | SrcFunctionTypeName node_info string
+  | SrcUnsupportedTypeName node_info string
 End
 
 Datatype:
@@ -91,7 +102,8 @@ Datatype:
     var_scope : num;
     var_type_name : src_type_name;
     var_type_id : string;
-    var_location : string
+    var_transient : bool;
+    var_location : data_location option
   |>
 End
 
@@ -100,29 +112,83 @@ End
  * Literal: kind, value.
  * UnaryOperation: operator, prefix, operand.
  * BinaryOperation: operator, operands, commonType.
- * Assignment: operator, left and right hand sides.
+ * Assignment: the operator of a compound assignment, left and right hand
+ * sides.
  * TupleExpression: components, NONE for a hole.
  * FunctionCall (kind functionCall): callee, positional arguments.
+ * SuperCall (super.f(args)): the declaration of f the compiler resolved
+ * from the caller's contract, positional arguments.
  * FunctionCall (kind typeConversion): target type name, argument.
- * Environment: a member of msg, tx or block, or address(this).
- * ExternalCall (I(target).f{value: v}(args)): the declaration of f, whether
+ * Environment: a member of msg, tx or block, or this.
+ * New (new T(n)): the type name of T, the length.
+ * EnumValue (E.A): the enum's type name and the member's index.
+ * ExternalCall (c.f{value: v}(args), c of a contract type): the declaration of f, whether
  * a value is given, and the operands in evaluation order: the target, the
  * value if given, the positional arguments.
+ * Unsupported (and its type name and statement counterparts): a node the
+ * importer can't represent, with the importer's line saying why and the
+ * children it could import, so that elaboration rejects it and still reports
+ * the blockers under and beside it.
  *)
 Datatype:
   src_builtin = RequireBuiltin | AssertBuiltin | RevertBuiltin
 End
 
-(* The declaration a high-level call refers to: an external or public
- * function of an interface or contract.
- *)
+(* An external signature comes from a function's parameters and returns,
+ * or from a public state variable's getter. *)
+Datatype:
+  src_external_signature
+  = FunctionSignature (src_variable list) (src_variable list)
+  | GetterSignature src_variable
+End
+
+(* The declaration a high-level call refers to. *)
 Datatype:
   src_external = <|
     ext_selector : byte list;
-    ext_mutability : string;
-    ext_parameters : src_variable list;
-    ext_returns : src_variable list
+    ext_mutability : state_mutability;
+    ext_kind : external_kind;
+    ext_bound : bool;
+    ext_signature : src_external_signature
   |>
+End
+
+(* The error a revert statement names: its selector and parameters. *)
+Datatype:
+  src_error = <|
+    error_selector : byte list;
+    error_parameters : src_variable list
+  |>
+End
+
+(* abi.encode, abi.encodePacked, abi.encodeWithSelector (the selector is the
+ * first argument) and abi.encodeWithSignature (of the bytes of a literal
+ * signature, which is not among the arguments). bytes.concat is
+ * abi.encodePacked, and string.concat (AbiStringConcat) is too, as a string.
+ *)
+Datatype:
+  abi_form = AbiPlain | AbiPacked | AbiWithSelector | AbiWithSignature (byte list)
+           | AbiCall (string list)
+           | AbiStringConcat
+End
+
+(* A creation target's compiler bytecode and constructor signature. *)
+Datatype:
+  src_create = <|
+    create_bytecode : byte list;
+    create_mutability : state_mutability;
+    create_parameters : src_variable list
+  |>
+End
+
+(* A call option in source order. Salt is restricted to creation. *)
+Datatype:
+  call_option = ValueOption | GasOption | SaltOption
+End
+
+(* a.call, a.staticcall and a.delegatecall of an address. *)
+Datatype:
+  low_level_kind = LowLevelCall | LowLevelStaticCall | LowLevelDelegateCall
 End
 
 Datatype:
@@ -131,25 +197,65 @@ Datatype:
   | SrcArrayLength node_info src_expr string
   | SrcMemberAccess node_info src_expr num string
   | SrcArrayMember node_info string src_expr string
-  | SrcLiteral node_info string string string
-  | SrcUnaryOperation node_info string bool src_expr string
-  | SrcBinaryOperation node_info string src_expr src_expr string string
-  | SrcAssignment node_info string src_expr src_expr string
+  | SrcLiteral node_info literal_kind string string
+  | SrcUnaryOperation node_info src_unary_operator bool src_expr string
+  | SrcBinaryOperation node_info src_binary_operator src_expr src_expr string string
+  | SrcConditional node_info src_expr src_expr src_expr string
+  | SrcAssignment node_info (src_binary_operator option) src_expr src_expr string
   | SrcIndexAccess node_info src_expr src_expr string
+  | SrcIndexRangeAccess node_info src_expr (src_expr option) (src_expr option) string
   | SrcTupleExpression node_info (src_expr option list) string
-  | SrcFunctionCall node_info src_expr (src_expr list) string
+  (* [e0, ..., ek-1], a fixed-size memory array *)
+  | SrcInlineArray node_info (src_expr list) string
+  | SrcFunctionCall node_info src_expr (src_expr list) (num list) string
+  | SrcSuperCall node_info num (src_expr list) (num list) string
+  | SrcBaseCall node_info num (src_expr list) (num list) string
   | SrcBuiltinCall node_info node_info src_builtin (src_expr option)
       (src_expr option) string
+  | SrcRequireError node_info node_info src_expr src_error (src_expr list)
+      (num list) string
   | SrcTypeConversion node_info src_type_name src_expr string
   | SrcEnvironment node_info environment_field string
-  | SrcExternalCall node_info src_external bool (src_expr list) string
+  | SrcExternalCall node_info src_external (call_option list) (src_expr list)
+      (num list) string
+  | SrcTypeMember node_info string src_type_name string
+  | SrcNew node_info src_type_name src_expr string
+  | SrcCreate node_info src_create (call_option list) (src_expr list)
+      (num list) string
+  (* S(args), the struct S's constructor: the arguments in the call's order,
+   * then for each member the index of its argument when they are named *)
+  | SrcStructConstructor node_info num (src_expr list) (num list) string
+  | SrcEnumValue node_info src_type_name num string
+  (* keccak256(a), ecrecover(h, v, r, s), a.code.length, a.balance, a.code:
+   * the builtin's own node (the callee, or the code member), if it has one *)
+  | SrcBuiltinOperation node_info (node_info option) builtin_op (src_expr list)
+      string
+  | SrcModular node_info node_info core_operator (src_expr list) string
+  | SrcSelector node_info (byte list) (src_expr option) string
+  | SrcAbiEncode node_info node_info abi_form (src_expr list) string
+  | SrcAbiDecode node_info node_info src_expr (src_type_name list) string
+  | SrcLowLevelCall node_info node_info low_level_kind (call_option list)
+      (src_expr list) string
+  | SrcTransfer node_info node_info src_expr src_expr string
+  | SrcUnsupportedExpr node_info string (src_expr list)
 End
 
 (* VariableDeclarationStatement: assignments, declarations (NONE for a hole),
  * initial value. ForStatement: initialization, condition, loop expression,
  * body. Return: functionReturnParameters, expression. Emit: the event's id,
- * positional arguments.
+ * positional arguments. RevertError: revert E(args), the error and the
+ * positional arguments. InlineAssembly: the block's code, and each Solidity
+ * variable it names, keyed by the name the code uses (x, or x.slot and
+ * x.offset for a state variable's location or a storage pointer's, x.offset
+ * and x.length for a calldata reference).
  *)
+Datatype:
+  src_assembly_reference = SrcAssemblyValue num
+                         | SrcAssemblySlot num
+                         | SrcAssemblyOffset num
+                         | SrcAssemblyLength num
+End
+
 Datatype:
   src_stmt
   = SrcBlock node_info (src_stmt list)
@@ -158,6 +264,8 @@ Datatype:
   | SrcVariableDeclarationStatement node_info (num option list)
       (src_variable option list) (src_expr option)
   | SrcIfStatement node_info src_expr src_stmt (src_stmt option)
+  | SrcTryStatement node_info src_expr
+      node_info (src_variable list) src_stmt (src_catch list)
   | SrcWhileStatement node_info src_expr src_stmt
   | SrcDoWhileStatement node_info src_stmt src_expr
   | SrcForStatement node_info (src_stmt option) (src_expr option)
@@ -165,30 +273,60 @@ Datatype:
   | SrcBreak node_info
   | SrcContinue node_info
   | SrcReturn node_info num (src_expr option)
-  | SrcEmit node_info num (src_expr list)
+  | SrcEmit node_info num (src_expr list) (num list)
+  | SrcRevertError node_info src_error (src_expr list) (num list)
+  | SrcInlineAssembly node_info (yul_stmt list)
+      ((string # src_assembly_reference) list)
+  | SrcPlaceholder node_info
+  | SrcUnsupportedStmt node_info string (src_expr list) (src_stmt list)
+; src_catch = SrcCatchClause node_info catch_kind (src_variable list) src_stmt
+End
+
+(* A modifier: its parameters and its body, where SrcPlaceholder runs the
+ * rest of the function it modifies. *)
+Datatype:
+  src_modifier = <|
+    modifier_info : node_info;
+    modifier_parameters_id : num;
+    modifier_parameters : src_variable list;
+    modifier_body : src_stmt
+  |>
 End
 
 (* Parameter lists are represented by their ids and declarations. The kind is
  * function, receive or fallback; the selector is that of an external or
  * public function. The base functions are the declarations it overrides,
  * directly or through other overridden declarations (the closure of the
- * compiler's baseFunctions).
+ * compiler's baseFunctions). The modifiers are the modifier invocations, in
+ * order: the modifier's id and the arguments. The super calls are the
+ * declarations the body's super calls name. An unsupported function is one
+ * the frontend could not model, with the reason: it keeps its place, so that
+ * overrides and super calls resolve as the compiler resolves them, but it is
+ * neither checked nor elaborated, and nothing may call it; the reason has a
+ * line for each node the importer could not represent, which may be left in
+ * the body, modifiers and header as placeholders.
  *)
 Datatype:
   src_function = <|
     fn_info : node_info;
     fn_name : string;
     fn_scope : num;
-    fn_kind : string;
-    fn_visibility : string;
-    fn_mutability : string;
+    fn_kind : src_function_kind;
+    fn_visibility : src_visibility;
+    fn_mutability : state_mutability;
     fn_selector : byte list option;
     fn_base_functions : num list;
     fn_parameters_id : num;
     fn_parameters : src_variable list;
+    (* Nominal compiler types, before runtime erasure, for super lookup. *)
+    fn_nominal_parameters : string list;
     fn_returns_id : num;
     fn_returns : src_variable list;
-    fn_body : src_stmt
+    fn_modifiers : (num # src_expr list) list;
+    fn_super_calls : num list;
+    fn_static_calls : num list;
+    fn_body : src_stmt;
+    fn_unsupported : string option
   |>
 End
 
@@ -198,6 +336,7 @@ End
 Datatype:
   src_storage_entry = <|
     storage_id : num;
+    storage_backend : storage_backend;
     storage_slot : num;
     storage_offset : num;
     storage_type_id : string
@@ -228,8 +367,10 @@ End
 (* A contract flattened along its linearization (the compiler's
  * linearizedBaseContracts, most derived first, which bases lists): the
  * members of all its bases, functions most derived first, state variables in
- * storage order. Declarations without a body are left out. Initializers
- * give state variables (by id) their declared values; base arguments are
+ * storage order; contract_immutables are the immutables, which have no
+ * storage slot. Declarations without a body are left out. Initializers
+ * give state variables and immutables (by id) their declared values; constants come with
+ * their values; base arguments are
  * the base constructor arguments: the base giving them, the base whose
  * constructor takes them, and the arguments, in evaluation order.
  *)
@@ -240,12 +381,30 @@ Datatype:
     contract_scope : num;
     contract_bases : num list;
     contract_state_variables : src_variable list;
+    contract_immutables : src_variable list;
     contract_initializers : (num # src_expr) list;
+    (* the libraries whose functions or constants it uses *)
+    contract_libraries : num list;
+    contract_constants : (src_variable # src_expr) list;
     contract_base_arguments : (num # num # src_expr list) list;
+    (* Static calls in initializers and inheritance specifiers. *)
+    contract_static_calls : num list;
     contract_storage : src_storage_entry list;
     contract_structs : src_struct list;
+    (* the enums of the compilation, by id, with their member counts *)
+    contract_enums : (num # num) list;
     contract_events : src_event list;
-    contract_functions : src_function list
+    contract_modifiers : src_modifier list;
+    contract_functions : src_function list;
+    (* the internal library functions it calls, also through each other *)
+    contract_library_functions : src_function list;
+    (* the public state variables, immutables and constants, each with its
+     * getter's selector *)
+    contract_getters : (num # byte list) list;
+    (* the compiler's internal dispatch numbers (internalFunctionIDs): each
+     * function an internal function value can name, by id, with the number
+     * the value is held as *)
+    contract_function_ids : (num # num) list
   |>
 End
 
@@ -253,6 +412,7 @@ Datatype:
   src_unit = <|
     unit_info : node_info;
     unit_path : string;
+    unit_sources : num list;
     unit_contracts : src_contract list
   |>
 End
@@ -262,7 +422,9 @@ End
 (* Elementary type names, with the widths valid_type_shape requires. *)
 Definition elementary_type_def:
   elementary_type name =
-    if name = "bool" then SOME BoolT
+    if name = "bytes" then SOME BytesT
+    else if name = "string" then SOME StringT
+    else if name = "bool" then SOME BoolT
     else if name = "address" then SOME (AddressT NonpayableAddress)
     else if name = "uint" then SOME (UintT 256)
     else if name = "int" then SOME (IntT 256)
@@ -282,51 +444,6 @@ Definition elementary_type_def:
     else NONE
 End
 
-Definition normalize_type_name_def:
-  (normalize_type_name (SrcElementaryTypeName _ name mutability) =
-    case elementary_type name of
-      SOME (AddressT _) =>
-        if mutability = SOME "nonpayable" then SOME (AddressT NonpayableAddress)
-        else if mutability = SOME "payable" then SOME (AddressT PayableAddress)
-        else NONE
-    | SOME ty => if mutability = NONE then SOME ty else NONE
-    | NONE => NONE) ∧
-  (normalize_type_name (SrcArrayTypeName _ element n) =
-    case normalize_type_name element of
-      SOME ty => if 0 < n ∧ n < 2 ** 256 then SOME (ArrayT ty (SOME n))
-                 else NONE
-    | NONE => NONE) ∧
-  (normalize_type_name (SrcStructTypeName _ id tid) =
-    if isPREFIX "t_struct$_" tid ∧
-       isPREFIX (REVERSE ("_$" ++ toString id ++ "_storage_ptr")) (REVERSE tid)
-    then SOME (StructT (AstId id)) else NONE) ∧
-  (normalize_type_name (SrcDynamicArrayTypeName _ element) =
-    OPTION_MAP (λty. ArrayT ty NONE) (normalize_type_name element)) ∧
-  (normalize_type_name (SrcMappingTypeName _ key value) =
-    case (normalize_type_name key, normalize_type_name value) of
-      (SOME k, SOME v) =>
-        if is_elementary_type k then SOME (MappingT k v) else NONE
-    | _ => NONE)
-End
-
-(* Decoded typeIdentifiers: elementary types, rational literal types (a
- * reduced numerator and positive denominator) and tuples of elementary types.
- *)
-Datatype:
-  src_value_type
-  = SrcType sol_type
-  | SrcRational int num
-  | SrcTupleType (sol_type list)
-End
-
-Definition decode_elementary_identifier_def:
-  decode_elementary_identifier s =
-    if s = "t_address_payable" then SOME (AddressT PayableAddress)
-    else if isPREFIX "t_" s ∧ s ≠ "t_uint" ∧ s ≠ "t_int" then
-      elementary_type (DROP 2 s)
-    else NONE
-End
-
 (* The fields of a string between occurrences of a separator: FIELDS for a
  * single separator character, by structural recursion so that it has a cv
  * translation (FIELDS' does not terminate under cv_auto_trans).
@@ -337,6 +454,190 @@ Definition separated_fields_def:
     if c = sep then REVERSE acc :: separated_fields sep "" cs
     else separated_fields sep (c :: acc) cs)
 End
+
+(* A type a slot holds, by its type identifier: an elementary value type or
+ * an enum. *)
+Definition scalar_type_identifier_def:
+  scalar_type_identifier s =
+    if s = "t_address_payable" then SOME (AddressT PayableAddress)
+    else if isPREFIX "t_enum_" s then
+      OPTION_MAP (λid. EnumT (AstId id)) (fromDecString (DROP 7 s))
+    else if isPREFIX "t_" s ∧ s ≠ "t_uint" ∧ s ≠ "t_int" then
+      case elementary_type (DROP 2 s) of
+        SOME ty => if is_elementary_type ty then SOME ty else NONE
+      | NONE => NONE
+    else NONE
+End
+
+(* Decoded typeIdentifiers: elementary types, rational literal types (a
+ * reduced numerator and positive denominator) and tuples of elementary types.
+ *)
+Datatype:
+  src_value_type
+  = SrcType sol_type
+  | SrcByteLiteral
+  | SrcRational int num
+  | SrcTupleType (sol_type list)
+End
+
+(* A memory array "t_array$_" ^ k, its base, then each dimension innermost
+ * first: "_$dyn_memory_ptr" or "_$N_memory_ptr". Split at "$", the k + 1
+ * prefixes are "t_array" and then "_t_array", the base is "_" b "_", and
+ * each dimension but the last ends with "_". *)
+Definition array_prefix_fields_def:
+  (array_prefix_fields [] = 0n) ∧
+  (array_prefix_fields (f :: fs) =
+    if f = "_t_array" then array_prefix_fields fs + 1 else 0)
+End
+
+(* The pointer suffix of a memory or calldata type identifier. *)
+Definition location_suffix_def:
+  location_suffix loc =
+    if loc = CalldataLoc then "_calldata_ptr"
+    else if loc = StorageLoc then "_storage"
+    else "_memory_ptr"
+End
+
+Definition array_dimensions_def:
+  (array_dimensions loc ty [] = SOME ty) ∧
+  (array_dimensions loc ty (l :: ls) =
+    let suffix = if ls = [] then location_suffix loc
+                 else location_suffix loc ++ "_" in
+    if ¬isPREFIX (REVERSE suffix) (REVERSE l) then NONE else
+    let digits = TAKE (LENGTH l - LENGTH suffix) l in
+    let length =
+      if digits = "dyn" then SOME NONE
+      else case fromDecString digits of
+             SOME n => if 0 < n then SOME (SOME n) else NONE
+           | NONE => NONE in
+    case length of
+      SOME length => array_dimensions loc (ArrayT ty length) ls
+    | NONE => NONE)
+End
+
+(* Struct names are display metadata; declaration IDs determine identity.
+ * Keep every other character, including location/pointer suffixes. *)
+Definition canonical_storage_identifier_def:
+  (canonical_storage_identifier (mode : num) (skip : num) [] = []) ∧
+  (canonical_storage_identifier mode skip (c :: cs) =
+    if skip ≠ 0 then canonical_storage_identifier mode (skip - 1) cs
+    else if mode = 1 then
+      if c = #"_" ∧ isPREFIX "$" cs ∧ ¬isPREFIX "$$" cs then
+        "_$" ++ canonical_storage_identifier 0 1 cs
+      else canonical_storage_identifier 1 0 cs
+    else if mode = 2 then
+      if c = #")" then ")" ++ canonical_storage_identifier 0 0 cs
+      else canonical_storage_identifier 2 0 cs
+    else if isPREFIX "t_struct$_" (c :: cs) then
+      "t_struct$_" ++ canonical_storage_identifier 1 9 cs
+    else if isPREFIX "t_struct(" (c :: cs) then
+      "t_struct(" ++ canonical_storage_identifier 2 8 cs
+    else c :: canonical_storage_identifier 0 0 cs)
+End
+
+(* The struct of a canonical typeIdentifier c "t_struct$__$<id>" ++ sfx. *)
+Definition struct_with_suffix_def:
+  struct_with_suffix sfx c =
+    if isPREFIX "t_struct$__$" c ∧ isPREFIX (REVERSE sfx) (REVERSE c) ∧
+       12 + LENGTH sfx < LENGTH c
+    then OPTION_MAP (λid. StructT (AstId id))
+           (fromDecString (TAKE (LENGTH c - (12 + LENGTH sfx)) (DROP 12 c)))
+    else NONE
+End
+
+(* A struct's typeIdentifier: unlocated in storage, as storage arrays are, or
+ * a pointer to one in a location. *)
+Definition decode_struct_identifier_def:
+  decode_struct_identifier s =
+    let c = canonical_storage_identifier 0 0 s in
+    case struct_with_suffix "_storage_ptr" c of
+      SOME ty => SOME (LocatedT StorageLoc ty)
+    | NONE =>
+    case struct_with_suffix "_memory_ptr" c of
+      SOME ty => SOME (LocatedT MemoryLoc ty)
+    | NONE =>
+    case struct_with_suffix "_calldata_ptr" c of
+      SOME ty => SOME (LocatedT CalldataLoc ty)
+    | NONE => struct_with_suffix "_storage" c
+End
+
+(* An array identifier's base and the dimension fields after it. A struct
+ * base spans fields, from "_t_struct" to its id and location: the first
+ * field without a leading "_". *)
+Definition array_base_split_def:
+  (array_base_split acc [] = NONE) ∧
+  (array_base_split acc (f :: fs) =
+    let b = if acc = "" then f else acc ++ "$" ++ f in
+    if b ≠ "_t_struct" ∧ (acc = "" ∨ ¬isPREFIX "_" f) then SOME (b, fs)
+    else array_base_split b fs)
+End
+
+(* A non-array identifier's type, shared by direct and array decoding. *)
+Definition decode_base_identifier_def:
+  decode_base_identifier s =
+    if s = "t_bytes_storage" then SOME BytesT
+    else if s = "t_string_storage" then SOME StringT
+    else if s = "t_bytes_memory_ptr" then SOME (LocatedT MemoryLoc BytesT)
+    else if s = "t_string_memory_ptr" then SOME (LocatedT MemoryLoc StringT)
+    else if s = "t_bytes_calldata_ptr" then SOME (LocatedT CalldataLoc BytesT)
+    else if s = "t_string_calldata_ptr" then SOME (LocatedT CalldataLoc StringT)
+    else if s = "t_bytes_storage_ptr" then SOME (LocatedT StorageLoc BytesT)
+    else if s = "t_string_storage_ptr" then SOME (LocatedT StorageLoc StringT)
+    else if isPREFIX "t_struct$_" s then decode_struct_identifier s
+    else scalar_type_identifier s
+End
+
+(* Array bases carry their location only for reference types. Storage uses
+ * unlocated bases, whereas memory and calldata use matching pointers. *)
+Definition array_element_def:
+  array_element loc name =
+    case decode_base_identifier name of
+      SOME (LocatedT loc' ty) =>
+        if loc' = loc ∧ loc ≠ StorageLoc then SOME ty else NONE
+    | SOME ty =>
+        if is_stored_scalar_type ty ∨ loc = StorageLoc then SOME ty else NONE
+    | NONE => NONE
+End
+
+(* A memory, calldata or storage array type identifier, nested to any depth. *)
+Definition decode_located_array_def:
+  decode_located_array loc s =
+    case separated_fields #"$" "" s of
+      f :: fs =>
+        if f ≠ "t_array" then NONE else
+        let k = array_prefix_fields fs in
+        (case array_base_split "" (DROP k fs) of
+           SOME (b, dimensions) =>
+             if LENGTH dimensions ≠ k + 1 ∨ LENGTH b < 2 ∨ ¬isPREFIX "_" b ∨
+                ¬isPREFIX "_" (REVERSE b) then NONE else
+             (case array_element loc (TAKE (LENGTH b - 2) (DROP 1 b)) of
+                SOME element =>
+                  (case array_dimensions loc element dimensions of
+                     SOME ty =>
+                       if located_object_shape loc ty ∧
+                          valid_type_shape (LocatedT loc ty)
+                       then SOME (LocatedT loc ty) else NONE
+                   | NONE => NONE)
+              | NONE => NONE)
+         | NONE => NONE)
+    | [] => NONE
+End
+
+Definition decode_elementary_identifier_def:
+  decode_elementary_identifier s =
+    if isPREFIX "t_array$_" s then
+      (* The outer dimension's suffix names the location. A storage array
+       * value is unlocated, as t_bytes_storage is. *)
+      (if isPREFIX (REVERSE (location_suffix StorageLoc)) (REVERSE s) then
+         case decode_located_array StorageLoc s of
+           SOME (LocatedT _ ty) => SOME ty
+         | _ => NONE
+       else if isPREFIX (REVERSE (location_suffix CalldataLoc)) (REVERSE s) then
+         decode_located_array CalldataLoc s
+       else decode_located_array MemoryLoc s)
+    else decode_base_identifier s
+End
+
 
 Definition rational_type_def:
   rational_type negative a b =
@@ -373,24 +674,155 @@ Proof
   Cases_on ‘OPT_MMAP I xs’ >> simp[]
 QED
 
-(* A tuple component "_c_", from "t_tuple$_c1_$_c2_$...$". *)
+(* The components of a tuple identifier from its `$`-separated fields,
+ * rejoining an array's or a struct's fields: "_t_array" or "_t_struct"
+ * opens one, and the field without a leading "_" (a dimension, or a struct's
+ * id and location) closes it. A function type's fields are rejoined
+ * likewise: "_t_function_internal_..." opens it, its "returns" field stays
+ * inside, and the field "_" (its closing "$" then "_") closes it. *)
+Definition tuple_identifier_components_def:
+  (tuple_identifier_components (depth : num) acc [] =
+    if depth = 0 ∧ acc = "" then SOME [] else NONE) ∧
+  (tuple_identifier_components depth acc (f :: fs) =
+    let component = if acc = "" then f else acc ++ "$" ++ f in
+    let depth' = if f = "_t_array" ∨ f = "_t_struct" ∨
+                    isPREFIX "_t_function_internal_" f
+                 then depth + 1
+                 else if f = "_" then depth - 1
+                 else if isPREFIX "_" f ∨ f = "returns" then depth
+                 else depth - 1 in
+    if depth' = 0 then
+      case tuple_identifier_components 0 "" fs of
+        SOME cs => SOME (component :: cs)
+      | NONE => NONE
+    else tuple_identifier_components depth' component fs)
+End
+
+(* A function type's parameter or return type, from its field "_tid_". A
+ * storage pointer "..._storage_ptr" is the type "..._storage" located in
+ * storage. *)
+Definition function_type_component_def:
+  function_type_component p =
+    if 2 < LENGTH p ∧ isPREFIX "_" p ∧ isPREFIX "_" (REVERSE p) then
+      let tid = TAKE (LENGTH p - 2) (DROP 1 p) in
+      if isPREFIX (REVERSE "_storage_ptr") (REVERSE tid) then
+        case decode_elementary_identifier (TAKE (LENGTH tid - 4) tid) of
+          SOME ty =>
+            if valid_type_shape (LocatedT StorageLoc ty)
+            then SOME (LocatedT StorageLoc ty) else NONE
+        | NONE => NONE
+      else decode_elementary_identifier tid
+    else NONE
+End
+
+(* A function type's parameter or return list, "$_t1_$_t2_$", from its fields
+ * between the "$"s, rejoined as a tuple's are: "__" alone for the empty
+ * list. *)
+Definition function_type_components_def:
+  function_type_components fs =
+    if fs = ["__"] then SOME [] else
+    case tuple_identifier_components 0 "" fs of
+      SOME (c :: cs) => all_some (MAP function_type_component (c :: cs))
+    | _ => NONE
+End
+
+(* The fields before the first "returns" field and those after it. *)
+Definition split_at_returns_def:
+  (split_at_returns acc [] = NONE) ∧
+  (split_at_returns acc (f :: fs) =
+    if f = "returns" then SOME (REVERSE acc, fs)
+    else split_at_returns (f :: acc) fs)
+End
+
+(* An internal function type's identifier,
+ * "t_function_internal_" m "$_p1_$_p2_$returns$_r1_$", whose parameters and
+ * returns are values or references. An internal function is never payable. *)
+Definition function_type_identifier_def:
+  function_type_identifier s =
+    case separated_fields #"$" "" s of
+      head :: fs =>
+        let mutability =
+          if head = "t_function_internal_pure" then SOME PureMut
+          else if head = "t_function_internal_view" then SOME ViewMut
+          else if head = "t_function_internal_nonpayable" then SOME NonpayableMut
+          else NONE in
+        (case (mutability, split_at_returns [] fs) of
+           (SOME m, SOME (ps, rs)) =>
+             (case REVERSE rs of
+                [] :: rrs =>
+                  (case (function_type_components ps,
+                         function_type_components (REVERSE rrs)) of
+                     (SOME params, SOME rets) =>
+                       SOME (FunctionT InternalFn m params rets)
+                   | _ => NONE)
+              | _ => NONE)
+         | _ => NONE)
+    | [] => NONE
+End
+
+Definition normalize_type_name_def:
+  (normalize_type_name (SrcElementaryTypeName _ name mutability) =
+    case elementary_type name of
+      SOME (AddressT _) => OPTION_MAP AddressT mutability
+    | SOME ty => if mutability = NONE then SOME ty else NONE
+    | NONE => NONE) ∧
+  (normalize_type_name (SrcArrayTypeName _ element n) =
+    case normalize_type_name element of
+      SOME ty => if 0 < n ∧ n < 2 ** 256 ∧ ¬is_function_type ty
+                 then SOME (ArrayT ty (SOME n)) else NONE
+    | NONE => NONE) ∧
+  (normalize_type_name (SrcStructTypeName _ id tid) =
+    if isPREFIX "t_struct$_" tid ∧
+       isPREFIX (REVERSE ("_$" ++ toString id ++ "_storage_ptr")) (REVERSE tid)
+    then SOME (StructT (AstId id)) else NONE) ∧
+  (normalize_type_name (SrcEnumTypeName _ id) = SOME (EnumT (AstId id))) ∧
+  (normalize_type_name (SrcFunctionTypeName _ tid) = function_type_identifier tid) ∧
+  (normalize_type_name (SrcUnsupportedTypeName _ _) = NONE) ∧
+  (normalize_type_name (SrcDynamicArrayTypeName _ element) =
+    case normalize_type_name element of
+      SOME ty => if is_function_type ty then NONE else SOME (ArrayT ty NONE)
+    | NONE => NONE) ∧
+  (normalize_type_name (SrcMappingTypeName _ key value) =
+    case (normalize_type_name key, normalize_type_name value) of
+      (SOME k, SOME v) =>
+        if (is_stored_scalar_type k ∨ byte_sequence_type k) ∧ ¬is_function_type v
+        then SOME (MappingT k v) else NONE
+    | _ => NONE)
+End
+
+(* A tuple component "_c_", from "t_tuple$_c1_$_c2_$...$". Literal
+ * byte sequences retain their source string kind here, and integer literals
+ * stand as uint256 (int256 when negative); elaboration coerces the literal
+ * itself to its destination's type. *)
 Definition tuple_component_def:
   tuple_component p =
     if 2 ≤ LENGTH p ∧ isPREFIX "_" p ∧ isPREFIX "_" (REVERSE p) then
-      decode_elementary_identifier (TAKE (LENGTH p - 2) (DROP 1 p))
+      let tid = TAKE (LENGTH p - 2) (DROP 1 p) in
+      if isPREFIX "t_stringliteral_" tid then SOME StringT
+      else if isPREFIX "t_rational_" tid then
+        case decode_rational (DROP 11 tid) of
+          SOME (SrcRational i d) =>
+            if d = 1 then SOME (if i < 0 then IntT 256 else UintT 256) else NONE
+        | _ => NONE
+      else if isPREFIX "t_function_internal_" tid then function_type_identifier tid
+      else decode_elementary_identifier tid
     else NONE
 End
 
 Definition decode_type_identifier_def:
   decode_type_identifier s =
     if isPREFIX "t_rational_" s then decode_rational (DROP 11 s)
+    else if isPREFIX "t_stringliteral_" s then SOME SrcByteLiteral
     else if s = "t_tuple$__$" then SOME (SrcTupleType [])
     else if isPREFIX "t_tuple$" s then
       case REVERSE (separated_fields #"$" "" (DROP 8 s)) of
         [] :: pieces =>
-          OPTION_MAP SrcTupleType
-            (all_some (MAP tuple_component (REVERSE pieces)))
+          (case tuple_identifier_components 0 "" (REVERSE pieces) of
+             SOME cs => OPTION_MAP SrcTupleType (all_some (MAP tuple_component cs))
+           | NONE => NONE)
       | _ => NONE
+    else if isPREFIX "t_function_internal_" s then
+      OPTION_MAP SrcType (function_type_identifier s)
     else OPTION_MAP SrcType (decode_elementary_identifier s)
 End
 
@@ -410,10 +842,48 @@ Proof
 QED
 
 Theorem elementary_mapping_key[local]:
-  is_elementary_type ty ∧ valid_type_shape ty ⇒ valid_mapping_key ty
+  is_stored_scalar_type ty ∧ valid_type_shape ty ⇒ valid_mapping_key ty
 Proof
   Cases_on ‘ty’ >> simp[solidityCoreWfTheory.is_elementary_type_def, valid_type_shape_def,
                        valid_mapping_key_def]
+QED
+
+Theorem decode_struct_identifier_valid[local]:
+  decode_struct_identifier s = SOME ty ⇒ valid_type_shape ty
+Proof
+  ‘∀sfx c ty. struct_with_suffix sfx c = SOME ty ⇒ ∃id. ty = StructT id’
+    by rw[struct_with_suffix_def, optionTheory.OPTION_MAP_EQ_SOME] >>
+  rw[decode_struct_identifier_def, AllCaseEqs()] >> res_tac >>
+  gvs[valid_type_shape_def, outer_location_free_def, location_shape_ok_def,
+      is_reference_type_def, contains_mapping_def]
+QED
+
+Theorem decode_elementary_identifier_valid:
+  decode_elementary_identifier s = SOME ty ⇒ valid_type_shape ty
+Proof
+  rw[decode_elementary_identifier_def, decode_base_identifier_def,
+     scalar_type_identifier_def, decode_located_array_def, AllCaseEqs()] >>
+  imp_res_tac elementary_type_valid >>
+  imp_res_tac decode_struct_identifier_valid >>
+  gvs[valid_type_shape_def, outer_location_free_def, location_shape_ok_def,
+      is_reference_type_def, contains_mapping_def]
+QED
+
+Theorem function_type_identifier_valid[local]:
+  function_type_identifier s = SOME ty ⇒
+  valid_type_shape ty ∧ outer_location_free ty
+Proof
+  ‘∀p ty. function_type_component p = SOME ty ⇒ valid_type_shape ty’
+    by (rw[function_type_component_def, LET_THM, AllCaseEqs()] >>
+        metis_tac[decode_elementary_identifier_valid]) >>
+  ‘∀ps tys. all_some (MAP function_type_component ps) = SOME tys ⇒
+            EVERY valid_type_shape tys’
+    by (Induct >> rw[all_some_def, AllCaseEqs()] >> gvs[] >> metis_tac[]) >>
+  ‘∀fs tys. function_type_components fs = SOME tys ⇒ EVERY valid_type_shape tys’
+    by (rw[function_type_components_def, AllCaseEqs()] >> gvs[] >>
+        qpat_x_assum ‘∀ps tys. all_some _ = _ ⇒ _’ (qspec_then ‘c::cs’ mp_tac) >> gvs[]) >>
+  rw[function_type_identifier_def, AllCaseEqs()] >>
+  simp[valid_type_shape_def, outer_location_free_def] >> metis_tac[]
 QED
 
 Theorem normalize_type_name_shape[local]:
@@ -423,8 +893,9 @@ Proof
   Induct_on ‘tn’ >> rw[normalize_type_name_def, AllCaseEqs()] >>
   imp_res_tac elementary_type_valid >>
   imp_res_tac elementary_type_outer_free >>
-  gvs[valid_type_shape_def, outer_location_free_def, valid_array_length_def] >>
-  metis_tac[elementary_mapping_key]
+  gvs[valid_type_shape_def, outer_location_free_def, valid_array_length_def,
+      solidityCoreWfTheory.byte_sequence_type_def, valid_mapping_key_def] >>
+  metis_tac[elementary_mapping_key, function_type_identifier_valid]
 QED
 
 Theorem normalize_type_name_valid:
@@ -433,11 +904,12 @@ Proof
   metis_tac[normalize_type_name_shape]
 QED
 
-Theorem decode_elementary_identifier_valid:
-  decode_elementary_identifier s = SOME ty ⇒ valid_type_shape ty
+Theorem tuple_component_valid[local]:
+  tuple_component p = SOME ty ⇒ valid_type_shape ty
 Proof
-  rw[decode_elementary_identifier_def] >>
-  imp_res_tac elementary_type_valid >> gvs[valid_type_shape_def]
+  rw[tuple_component_def, AllCaseEqs()] >>
+  gvs[valid_type_shape_def, solidityASTTheory.valid_int_width_def] >>
+  metis_tac[decode_elementary_identifier_valid, function_type_identifier_valid]
 QED
 
 Theorem decode_type_identifier_valid:
@@ -448,11 +920,11 @@ Proof
   ‘∀ps tys. all_some (MAP tuple_component ps) = SOME tys ⇒
             EVERY valid_type_shape tys’
     by (Induct >> rw[all_some_def, AllCaseEqs()] >>
-        gvs[tuple_component_def] >>
-        metis_tac[decode_elementary_identifier_valid]) >>
+        gvs[] >> metis_tac[tuple_component_valid]) >>
   rw[decode_type_identifier_def, decode_rational_def, rational_type_def,
      AllCaseEqs()] >>
-  gvs[] >> metis_tac[decode_elementary_identifier_valid]
+  gvs[] >> metis_tac[decode_elementary_identifier_valid,
+                     function_type_identifier_valid]
 QED
 
 (* The elementary type, or the integer value of an integer literal type, of a
@@ -476,6 +948,20 @@ End
  * children are checked against their AST types, including nested mappings.
  *)
 Definition storage_type_identifier_def:
+  (storage_type_identifier (LocatedT loc ty) =
+    if byte_sequence_type ty then
+      (if ty = BytesT then "t_bytes" else "t_string") ++
+      (case loc of MemoryLoc => "_memory_ptr" | CalldataLoc => "_calldata_ptr"
+                 | StorageLoc => "_storage_ptr")
+    else if loc = StorageLoc then
+      (* A storage pointer: the storage type's identifier with "_ptr", except
+       * that a mapping's identifier names no location. *)
+      (case ty of
+         MappingT _ _ => storage_type_identifier ty
+       | _ => storage_type_identifier ty ++ "_ptr")
+    else "") ∧
+  (storage_type_identifier BytesT = "t_bytes_storage") ∧
+  (storage_type_identifier StringT = "t_string_storage") ∧
   (storage_type_identifier BoolT = "t_bool") ∧
   (storage_type_identifier (UintT n) = "t_uint" ++ toString n) ∧
   (storage_type_identifier (IntT n) = "t_int" ++ toString n) ∧
@@ -487,10 +973,14 @@ Definition storage_type_identifier_def:
     "_storage") ∧
   (storage_type_identifier (StructT (AstId id)) =
     "t_struct$__$" ++ toString id ++ "_storage") ∧
+  (storage_type_identifier (EnumT (AstId id)) = "t_enum_" ++ toString id) ∧
   (storage_type_identifier (ArrayT element NONE) =
     "t_array$_" ++ storage_type_identifier element ++ "_$dyn_storage") ∧
   (storage_type_identifier (MappingT key value) =
-    "t_mapping$_" ++ storage_type_identifier key ++ "_$_" ++
+    "t_mapping$_" ++
+    (if key = BytesT then "t_bytes_memory_ptr"
+     else if key = StringT then "t_string_memory_ptr"
+     else storage_type_identifier key) ++ "_$_" ++
     storage_type_identifier value ++ "_$") ∧
   (storage_type_identifier _ = "")
 End
@@ -503,48 +993,85 @@ Definition storage_layout_identifier_def:
   (storage_layout_identifier (ArrayT element NONE) =
     "t_array(" ++ storage_layout_identifier element ++ ")dyn_storage") ∧
   (storage_layout_identifier (MappingT key value) =
-    "t_mapping(" ++ storage_layout_identifier key ++ "," ++
+    "t_mapping(" ++
+    (if key = BytesT then "t_bytes_memory_ptr"
+     else if key = StringT then "t_string_memory_ptr"
+     else storage_layout_identifier key) ++ "," ++
     storage_layout_identifier value ++ ")") ∧
   (storage_layout_identifier (StructT (AstId id)) =
     "t_struct()" ++ toString id ++ "_storage") ∧
   (storage_layout_identifier ty = storage_type_identifier ty)
 End
 
-(* Struct names are display metadata; declaration IDs determine identity.
- * Keep every other character, including location/pointer suffixes. *)
-Definition canonical_storage_identifier_def:
-  (canonical_storage_identifier (mode : num) (skip : num) [] = []) ∧
-  (canonical_storage_identifier mode skip (c :: cs) =
-    if skip ≠ 0 then canonical_storage_identifier mode (skip - 1) cs
-    else if mode = 1 then
-      if c = #"_" ∧ isPREFIX "$" cs ∧ ¬isPREFIX "$$" cs then
-        "_$" ++ canonical_storage_identifier 0 1 cs
-      else canonical_storage_identifier 1 0 cs
-    else if mode = 2 then
-      if c = #")" then ")" ++ canonical_storage_identifier 0 0 cs
-      else canonical_storage_identifier 2 0 cs
-    else if isPREFIX "t_struct$_" (c :: cs) then
-      "t_struct$_" ++ canonical_storage_identifier 1 9 cs
-    else if isPREFIX "t_struct(" (c :: cs) then
-      "t_struct(" ++ canonical_storage_identifier 2 8 cs
-    else c :: canonical_storage_identifier 0 0 cs)
+(* Memory and calldata types: an array's elements are values or pointers in
+ * the same location. *)
+Definition located_type_identifier_def:
+  (located_type_identifier loc (ArrayT element length) =
+    "t_array$_" ++ located_type_identifier loc element ++ "_$" ++
+    (case length of SOME n => toString n | NONE => "dyn") ++ location_suffix loc) ∧
+  (located_type_identifier loc BytesT = "t_bytes" ++ location_suffix loc) ∧
+  (located_type_identifier loc StringT = "t_string" ++ location_suffix loc) ∧
+  (located_type_identifier loc (StructT (AstId id)) =
+    "t_struct$__$" ++ toString id ++ location_suffix loc) ∧
+  (located_type_identifier loc ty = storage_type_identifier ty)
 End
 
 Definition source_type_matches_def:
   source_type_matches ty tid ⇔
-    canonical_storage_identifier 0 0 tid = storage_type_identifier ty
+    if is_function_type ty then function_type_identifier tid = SOME ty else
+    canonical_storage_identifier 0 0 tid =
+      case ty of
+        LocatedT MemoryLoc element => located_type_identifier MemoryLoc element
+      | LocatedT CalldataLoc element => located_type_identifier CalldataLoc element
+      | _ => storage_type_identifier ty
 End
 
 (* A parameter, return or local variable: an elementary value type in the
- * default location, agreeing with its typeIdentifier.
+ * default location, a byte sequence in any location, an array or struct
+ * in a location (memory, calldata or a storage pointer), or a storage
+ * pointer to a mapping, agreeing with its typeIdentifier.
  *)
 Definition variable_type_def:
   variable_type (v : src_variable) =
+    if v.var_transient then NONE else
     case normalize_type_name v.var_type_name of
       SOME ty =>
-        if v.var_location = "default" ∧
-           source_type_matches ty v.var_type_id
+        if byte_sequence_type ty ∨
+           (IS_SOME v.var_location ∧
+            case ty of ArrayT _ _ => T | StructT _ => T | _ => F) ∨
+           (v.var_location = SOME StorageLoc ∧
+            case ty of MappingT _ _ => T | _ => F) then
+          case v.var_location of
+            SOME loc =>
+              if located_object_shape loc ty ∧
+                 source_type_matches (LocatedT loc ty) v.var_type_id then
+                SOME (LocatedT loc ty) else NONE
+          | NONE => NONE
+        else if v.var_location = NONE ∧ source_type_matches ty v.var_type_id
         then SOME ty else NONE
+    | NONE => NONE
+End
+
+(* Canonical ABI types for encoded arguments and decoded returns. Actual
+ * encoded byte references can retain their source location. *)
+Definition call_variable_type_def:
+  call_variable_type v =
+    OPTION_MAP (λty. case ty of
+      LocatedT CalldataLoc element => LocatedT MemoryLoc element
+    | _ => ty) (variable_type v)
+End
+
+(* Event declarations omit an explicit location; analyzed reference parameters
+ * carry memory identifiers. *)
+Definition event_variable_type_def:
+  event_variable_type (v : src_variable) =
+    case normalize_type_name v.var_type_name of
+      SOME ty =>
+        if located_object_shape MemoryLoc ty then
+          if v.var_location = NONE ∧
+             source_type_matches (LocatedT MemoryLoc ty) v.var_type_id then
+            SOME (LocatedT MemoryLoc ty) else NONE
+        else variable_type v
     | NONE => NONE
 End
 
@@ -552,10 +1079,12 @@ End
  * unlike state declarations. Mappings retain their ordinary identifier. *)
 Definition field_variable_type_def:
   field_variable_type (v : src_variable) =
+    if v.var_transient then NONE else
     case normalize_type_name v.var_type_name of
       SOME ty =>
-        let suffix = case ty of ArrayT _ _ => "_ptr" | StructT _ => "_ptr" | _ => "" in
-        if v.var_location = "default" ∧
+        let suffix = case ty of ArrayT _ _ => "_ptr" | StructT _ => "_ptr"
+                            | BytesT => "_ptr" | StringT => "_ptr" | _ => "" in
+        if v.var_location = NONE ∧
            canonical_storage_identifier 0 0 v.var_type_id =
              storage_type_identifier ty ++ suffix
         then SOME ty else NONE
@@ -568,6 +1097,16 @@ Definition call_value_type_def:
   (call_value_type tys = SrcTupleType tys)
 End
 
+(* The type abi.decode gives a value it decodes as this type: the compiler
+ * types a decoded address as address payable, and an object as one in
+ * memory. *)
+Definition decoded_type_def:
+  decoded_type ty =
+    case ty of
+      AddressT _ => AddressT PayableAddress
+    | _ => if located_object_shape MemoryLoc ty then LocatedT MemoryLoc ty else ty
+End
+
 (* Ids *)
 
 Definition type_name_ids_def:
@@ -575,6 +1114,9 @@ Definition type_name_ids_def:
   (type_name_ids (SrcArrayTypeName info element _) =
     info.node_id :: type_name_ids element) ∧
   (type_name_ids (SrcStructTypeName info _ _) = [info.node_id]) ∧
+  (type_name_ids (SrcEnumTypeName info _) = [info.node_id]) ∧
+  (type_name_ids (SrcUnsupportedTypeName info _) = [info.node_id]) ∧
+  (type_name_ids (SrcFunctionTypeName info _) = [info.node_id]) ∧
   (type_name_ids (SrcDynamicArrayTypeName info element) =
     info.node_id :: type_name_ids element) ∧
   (type_name_ids (SrcMappingTypeName info key value) =
@@ -598,23 +1140,57 @@ Definition expr_ids_def:
   (expr_ids (SrcUnaryOperation info _ _ e _) = info.node_id :: expr_ids e) ∧
   (expr_ids (SrcBinaryOperation info _ l r _ _) =
     info.node_id :: expr_ids l ++ expr_ids r) ∧
+  (expr_ids (SrcConditional info c t f _) =
+    info.node_id :: expr_ids c ++ expr_ids t ++ expr_ids f) ∧
   (expr_ids (SrcIndexAccess info b i _) =
     info.node_id :: expr_ids b ++ expr_ids i) ∧
+  (expr_ids (SrcIndexRangeAccess info base start end_bound _) =
+    info.node_id :: expr_ids base ++
+    (case start of NONE => [] | SOME e => expr_ids e) ++
+    (case end_bound of NONE => [] | SOME e => expr_ids e)) ∧
   (expr_ids (SrcAssignment info _ l r _) =
     info.node_id :: expr_ids l ++ expr_ids r) ∧
   (expr_ids (SrcTupleExpression info cs _) =
     info.node_id :: component_ids cs) ∧
-  (expr_ids (SrcFunctionCall info f args _) =
+  (expr_ids (SrcInlineArray info es _) = info.node_id :: exprs_ids es) ∧
+  (expr_ids (SrcFunctionCall info f args _ _) =
     info.node_id :: expr_ids f ++ exprs_ids args) ∧
+  (expr_ids (SrcSuperCall info _ args _ _) = info.node_id :: exprs_ids args) ∧
+  (expr_ids (SrcBaseCall info _ args _ _) = info.node_id :: exprs_ids args) ∧
   (expr_ids (SrcBuiltinCall info callee _ condition message _) =
     [info.node_id; callee.node_id] ++
     (case condition of NONE => [] | SOME c => expr_ids c) ++
     (case message of NONE => [] | SOME m => expr_ids m)) ∧
+  (expr_ids (SrcRequireError info callee condition _ args _ _) =
+    [info.node_id; callee.node_id] ++ expr_ids condition ++ exprs_ids args) ∧
   (expr_ids (SrcTypeConversion info tn e _) =
     info.node_id :: type_name_ids tn ++ expr_ids e) ∧
   (expr_ids (SrcEnvironment info _ _) = [info.node_id]) ∧
-  (expr_ids (SrcExternalCall info _ _ operands _) =
+  (expr_ids (SrcTypeMember info _ tn _) = info.node_id :: type_name_ids tn) ∧
+  (expr_ids (SrcEnumValue info tn _ _) = info.node_id :: type_name_ids tn) ∧
+  (expr_ids (SrcBuiltinOperation info callee _ args _) =
+    info.node_id :: (case callee of NONE => [] | SOME c => [c.node_id]) ++
+    exprs_ids args) ∧
+  (expr_ids (SrcModular info callee _ args _) =
+    info.node_id :: callee.node_id :: exprs_ids args) ∧
+  (expr_ids (SrcSelector info _ receiver _) =
+    info.node_id :: (case receiver of NONE => [] | SOME e => expr_ids e)) ∧
+  (expr_ids (SrcAbiEncode info callee _ args _) =
+    info.node_id :: callee.node_id :: exprs_ids args) ∧
+  (expr_ids (SrcLowLevelCall info callee _ _ operands _) =
+    info.node_id :: callee.node_id :: exprs_ids operands) ∧
+  (expr_ids (SrcTransfer info callee target value _) =
+    info.node_id :: callee.node_id :: expr_ids target ++ expr_ids value) ∧
+  (expr_ids (SrcAbiDecode info callee e tns _) =
+    info.node_id :: callee.node_id :: expr_ids e ++ FLAT (MAP type_name_ids tns)) ∧
+  (expr_ids (SrcExternalCall info _ _ operands _ _) =
     info.node_id :: exprs_ids operands) ∧
+  (expr_ids (SrcNew info tn e _) =
+    info.node_id :: type_name_ids tn ++ expr_ids e) ∧
+  (expr_ids (SrcCreate info _ _ operands _ _) =
+    info.node_id :: exprs_ids operands) ∧
+  (expr_ids (SrcStructConstructor info _ args _ _) = info.node_id :: exprs_ids args) ∧
+  (expr_ids (SrcUnsupportedExpr info _ es) = info.node_id :: exprs_ids es) ∧
   (component_ids [] = []) ∧
   (component_ids (NONE :: cs) = component_ids cs) ∧
   (component_ids (SOME e :: cs) = expr_ids e ++ component_ids cs) ∧
@@ -641,6 +1217,9 @@ Definition stmt_ids_def:
     info.node_id :: declarations_ids decls ++ option_expr_ids init) ∧
   (stmt_ids (SrcIfStatement info c t e) =
     info.node_id :: expr_ids c ++ stmt_ids t ++ option_stmt_ids e) ∧
+  (stmt_ids (SrcTryStatement info call ok ps body handlers) =
+    [info.node_id; ok.node_id] ++ expr_ids call ++
+    FLAT (MAP variable_ids ps) ++ stmt_ids body ++ catches_ids handlers) ∧
   (stmt_ids (SrcWhileStatement info c body) =
     info.node_id :: expr_ids c ++ stmt_ids body) ∧
   (stmt_ids (SrcDoWhileStatement info body c) =
@@ -651,18 +1230,35 @@ Definition stmt_ids_def:
   (stmt_ids (SrcBreak info) = [info.node_id]) ∧
   (stmt_ids (SrcContinue info) = [info.node_id]) ∧
   (stmt_ids (SrcReturn info _ e) = info.node_id :: option_expr_ids e) ∧
-  (stmt_ids (SrcEmit info _ args) = info.node_id :: exprs_ids args) ∧
+  (stmt_ids (SrcEmit info _ args _) = info.node_id :: exprs_ids args) ∧
+  (stmt_ids (SrcRevertError info _ args _) = info.node_id :: exprs_ids args) ∧
+  (stmt_ids (SrcInlineAssembly info _ _) = [info.node_id]) ∧
+  (stmt_ids (SrcPlaceholder info) = [info.node_id]) ∧
+  (stmt_ids (SrcUnsupportedStmt info _ es ss) =
+    info.node_id :: exprs_ids es ++ stmts_ids ss) ∧
   (option_stmt_ids NONE = []) ∧
   (option_stmt_ids (SOME s) = stmt_ids s) ∧
   (stmts_ids [] = []) ∧
-  (stmts_ids (s :: ss) = stmt_ids s ++ stmts_ids ss)
+  (stmts_ids (s :: ss) = stmt_ids s ++ stmts_ids ss) ∧
+  (catch_ids (SrcCatchClause info _ ps body) =
+    info.node_id :: FLAT (MAP variable_ids ps) ++ stmt_ids body) ∧
+  (catches_ids [] = []) ∧
+  (catches_ids (c :: cs) = catch_ids c ++ catches_ids cs)
+Termination
+  WF_REL_TAC ‘measure (λx. case x of
+    INL s => src_stmt_size s
+  | INR (INL s) => option_size src_stmt_size s
+  | INR (INR (INL ss)) => list_size src_stmt_size ss
+  | INR (INR (INR (INL c))) => src_catch_size c
+  | INR (INR (INR (INR cs))) => list_size src_catch_size cs)’ >>
+  rw[fetch "-" "src_stmt_size_def", listTheory.list_size_def, basicSizeTheory.option_size_def]
 End
 
 Definition function_ids_def:
   function_ids (f : src_function) =
     f.fn_info.node_id :: f.fn_parameters_id :: f.fn_returns_id ::
     FLAT (MAP variable_ids (f.fn_parameters ++ f.fn_returns)) ++
-    stmt_ids f.fn_body
+    FLAT (MAP (exprs_ids o SND) f.fn_modifiers) ++ stmt_ids f.fn_body
 End
 
 Definition contract_ids_def:
@@ -670,12 +1266,19 @@ Definition contract_ids_def:
     c.contract_info.node_id ::
     FLAT (MAP (λs. s.struct_info.node_id ::
       FLAT (MAP variable_ids s.struct_members)) c.contract_structs) ++
+    MAP FST c.contract_enums ++
     FLAT (MAP variable_ids c.contract_state_variables) ++
+    FLAT (MAP variable_ids c.contract_immutables) ++
     FLAT (MAP (λ(_, e). expr_ids e) c.contract_initializers) ++
+    FLAT (MAP (λ(v, e). variable_ids v ++ expr_ids e) c.contract_constants) ++
     FLAT (MAP (λ(_, _, es). exprs_ids es) c.contract_base_arguments) ++
     FLAT (MAP (λe. e.event_info.node_id ::
       FLAT (MAP (variable_ids o FST) e.event_parameters)) c.contract_events) ++
-    FLAT (MAP function_ids c.contract_functions)
+    FLAT (MAP (λm. m.modifier_info.node_id :: m.modifier_parameters_id ::
+      FLAT (MAP variable_ids m.modifier_parameters) ++ stmt_ids m.modifier_body)
+      c.contract_modifiers) ++
+    FLAT (MAP function_ids c.contract_functions) ++
+    FLAT (MAP function_ids c.contract_library_functions)
 End
 
 Definition unit_ids_def:
@@ -685,45 +1288,15 @@ End
 
 (* Checking *)
 
-Definition unary_operator_ok_def:
-  unary_operator_ok op ⇔
-    op = "++" ∨ op = "--" ∨ op = "-" ∨ op = "!" ∨ op = "~"
-End
-
-Definition binary_operator_ok_def:
-  binary_operator_ok op ⇔
-    op = "+" ∨ op = "-" ∨ op = "*" ∨ op = "/" ∨ op = "%" ∨ op = "**" ∨
-    op = "<<" ∨ op = ">>" ∨ op = "&" ∨ op = "|" ∨ op = "^" ∨ op = "==" ∨
-    op = "!=" ∨ op = "<" ∨ op = "<=" ∨ op = ">" ∨ op = ">=" ∨ op = "&&" ∨
-    op = "||"
-End
-
-Definition assignment_operator_ok_def:
-  assignment_operator_ok op ⇔
-    op = "=" ∨ op = "+=" ∨ op = "-=" ∨ op = "*=" ∨ op = "/=" ∨ op = "%=" ∨
-    op = "<<=" ∨ op = ">>=" ∨ op = "&=" ∨ op = "|=" ∨ op = "^="
-End
-
-(* Functions callable by id; variables in lexical scope; the contract's state
- * variables, if the function may read them; the innermost scope node; the
- * enclosing function's return list; whether in a loop body.
- *)
-Datatype:
-  import_env = <|
-    functions : (num # src_function) list;
-    structs : src_struct list;
-    events : (num # src_event) list;
-    variables : (num # sol_type) list;
-    state : (num # sol_type) list;
-    scope : num;
-    returns_id : num;
-    in_loop : bool
-  |>
+(* The members of the struct with node id id. *)
+Definition source_struct_members_def:
+  source_struct_members structs id =
+    ALOOKUP (MAP (λs. (s.struct_info.node_id, s.struct_members)) structs) id
 End
 
 Definition source_struct_field_def:
   source_struct_field structs id field =
-    case ALOOKUP (MAP (λs. (s.struct_info.node_id, s.struct_members)) structs) id of
+    case source_struct_members structs id of
       SOME fields =>
         (case ALOOKUP (MAP (λv. (v.var_info.node_id, v)) fields) field of
            SOME v => field_variable_type v
@@ -731,262 +1304,64 @@ Definition source_struct_field_def:
     | NONE => NONE
 End
 
-(* Literal bytes are imported from solc's hexValue, including UTF-8 and NULs.
- * Dynamic strings are a later runtime increment. *)
+(* Literal bytes are imported from solc's hexValue, including UTF-8 and NULs. *)
 Definition literal_message_def:
   (literal_message (SrcLiteral _ kind value tid) =
-    if (kind = "string" ∨ kind = "unicodeString" ∨ kind = "hexString") ∧
+    if kind ≠ NumberLiteral ∧ kind ≠ BoolLiteral ∧
        isPREFIX "t_stringliteral_" tid
     then SOME value else NONE) ∧
   (literal_message _ = NONE)
 End
 
 Definition builtin_shape_def:
-  (builtin_shape AssertBuiltin condition message ⇔
+  (builtin_shape AssertBuiltin (condition : src_expr option) (message : src_expr option) ⇔
     IS_SOME condition ∧ message = NONE) ∧
   (builtin_shape RequireBuiltin condition message ⇔
-    IS_SOME condition ∧
-    (case message of NONE => T | SOME m => IS_SOME (literal_message m))) ∧
+    IS_SOME condition) ∧
   (builtin_shape RevertBuiltin condition message ⇔
-    condition = NONE ∧
-    (case message of NONE => T | SOME m => IS_SOME (literal_message m)))
+    condition = NONE)
 End
 
-(* The decoded type of a checked expression. *)
-Definition check_expr_def:
-  (check_expr (env : import_env) (SrcIdentifier _ _ x tid) =
-    case ALOOKUP (env.variables ++ env.state) x of
-      SOME ty =>
-        if source_type_matches ty tid then SOME (SrcType ty)
-        else NONE
-    | NONE => NONE) ∧
-  (check_expr env (SrcMemberAccess _ root_expr field tid) =
-    case check_expr env root_expr of
-      SOME (SrcType (StructT (AstId id))) =>
-        (case source_struct_field env.structs id field of
-           SOME ty => if source_type_matches ty tid then SOME (SrcType ty) else NONE
-         | NONE => NONE)
-    | _ => NONE) ∧
-  (check_expr env (SrcIndexAccess _ root_expr index tid) =
-    case (check_expr env root_expr, check_expr env index) of
-      (SOME (SrcType (MappingT key value)), SOME _) =>
-        if source_type_matches value tid then SOME (SrcType value) else NONE
-    | (SOME (SrcType (ArrayT element _)), SOME index_type) =>
-        if source_type_matches element tid ∧
-           (case index_type of
-              SrcType (UintT _) => T
-            | SrcRational i d => 0 ≤ i ∧ d = 1
-            | _ => F)
-        then SOME (SrcType element) else NONE
-    | _ => NONE) ∧
-  (check_expr env (SrcArrayLength _ root_expr tid) =
-    case check_expr env root_expr of
-      SOME (SrcType (ArrayT _ _)) =>
-        if tid = "t_uint256" then SOME (SrcType (UintT 256)) else NONE
-    | _ => NONE) ∧
-  (check_expr env (SrcArrayMember _ _ _ _) = NONE) ∧
-  (check_expr env (SrcLiteral _ kind value tid) =
-    if kind = "number" then
-      case decode_type_identifier tid of
-        SOME (SrcRational n d) => SOME (SrcRational n d)
-      | _ => NONE
-    else if kind = "bool" ∧ (value = "true" ∨ value = "false") ∧
-            tid = "t_bool"
-    then SOME (SrcType BoolT)
-    else NONE) ∧
-  (check_expr env (SrcUnaryOperation _ op _ e tid) =
-    if unary_operator_ok op ∧ IS_SOME (check_expr env e) then
-      case decode_type_identifier tid of
-        SOME (SrcType ty) => SOME (SrcType ty)
-      | _ => NONE
-    else NONE) ∧
-  (check_expr env (SrcBinaryOperation _ op l r common tid) =
-    if binary_operator_ok op ∧ IS_SOME (check_expr env l) ∧
-       IS_SOME (check_expr env r)
-    then
-      case (decode_type_identifier common, decode_type_identifier tid) of
-        (SOME (SrcType _), SOME (SrcType ty)) => SOME (SrcType ty)
-      | _ => NONE
-    else NONE) ∧
-  (check_expr env (SrcAssignment _ op l r tid) =
-    if assignment_operator_ok op ∧ IS_SOME (check_expr env l) ∧
-       IS_SOME (check_expr env r)
-    then decode_type_identifier tid
-    else NONE) ∧
-  (check_expr env (SrcTupleExpression _ cs tid) =
-    if check_components env cs then decode_type_identifier tid else NONE) ∧
-  (check_expr env (SrcFunctionCall _ (SrcArrayMember _ member root_expr _) args tid) =
-    case check_expr env root_expr of
-      SOME (SrcType (ArrayT element NONE)) =>
-        if ¬elementary_storage_type_ok element then NONE else
-        if member = "push" ∧ args = [] ∧ source_type_matches element tid then
-          SOME (SrcType element)
-        else if tid = "t_tuple$__$" ∧ check_exprs env args ∧
-                ((member = "push" ∧ LENGTH args = 1) ∨
-                 (member = "pop" ∧ args = []))
-        then SOME (SrcTupleType []) else NONE
-    | _ => NONE) ∧
-  (check_expr env (SrcFunctionCall _ (SrcIdentifier _ _ f _) args tid) =
-    case ALOOKUP env.functions f of
-      SOME callee =>
-        (case (all_some (MAP variable_type callee.fn_returns),
-               decode_type_identifier tid) of
-           (SOME tys, SOME vt) =>
-             if LENGTH args = LENGTH callee.fn_parameters ∧
-                callee.fn_visibility ≠ "external" ∧ check_exprs env args ∧
-                vt = call_value_type tys
-             then SOME vt else NONE
+(* type(T).max and type(T).min of an integer type T. *)
+Definition type_bound_def:
+  type_bound member ty =
+    case ty of
+      UintT n =>
+        if member = "max" then SOME (&(2 ** n) - 1 : int)
+        else if member = "min" then SOME 0 else NONE
+    | IntT n =>
+        if member = "max" then SOME (&(2 ** (n - 1)) - 1)
+        else if member = "min" then SOME (-&(2 ** (n - 1))) else NONE
+    | _ => NONE
+End
+
+(* A call's parameter order, for named arguments: none, or a permutation of
+ * the positions of its n arguments. The elaborator passes the arguments in
+ * that order. *)
+Definition argument_order_ok_def:
+  argument_order_ok (order : num list) n ⇔
+    order = [] ∨
+    (LENGTH order = n ∧ ALL_DISTINCT order ∧ EVERY (λi. i < n) order)
+End
+
+(* The ABI type of a parameter of the function abi.encodeCall names: scalars
+ * keep their type, and objects use the same memory shape as ABI arguments.
+ * Their references retain their original location until encoding. *)
+Definition abi_call_parameter_def:
+  abi_call_parameter tid =
+    case decode_type_identifier tid of
+      SOME (SrcType ty) =>
+        if is_stored_scalar_type ty then SOME ty else
+        (case ty of
+           LocatedT _ element =>
+             if located_object_shape MemoryLoc element
+             then SOME (LocatedT MemoryLoc element) else NONE
          | _ => NONE)
-    | NONE => NONE) ∧
-  (check_expr env (SrcFunctionCall _ _ _ _) = NONE) ∧
-  (check_expr env (SrcBuiltinCall _ _ builtin condition message tid) =
-    if builtin_shape builtin condition message ∧ tid = "t_tuple$__$" ∧
-       (case condition of NONE => T
-        | SOME c => check_expr env c = SOME (SrcType BoolT))
-    then SOME (SrcTupleType []) else NONE) ∧
-  (check_expr env (SrcTypeConversion _ tn e tid) =
-    case normalize_type_name tn of
-      SOME ty =>
-        if IS_SOME (check_expr env e) ∧
-           decode_type_identifier tid = SOME (SrcType ty)
-        then SOME (SrcType ty) else NONE
-    | NONE => NONE) ∧
-  (check_expr env (SrcEnvironment _ f tid) =
-    if source_type_matches (environment_type f) tid
-    then SOME (SrcType (environment_type f)) else NONE) ∧
-  (* Value only for a payable callee, as the compiler requires; elaboration
-     converts the target to an address. *)
-  (check_expr env (SrcExternalCall _ callee with_value operands tid) =
-    case (all_some (MAP variable_type callee.ext_parameters),
-          all_some (MAP variable_type callee.ext_returns),
-          decode_type_identifier tid) of
-      (SOME params, SOME rets, SOME vt) =>
-        if MEM callee.ext_mutability ["pure"; "view"; "nonpayable"; "payable"] ∧
-           (with_value ⇒ callee.ext_mutability = "payable") ∧
-           LENGTH operands = LENGTH params + (if with_value then 2 else 1) ∧
-           check_exprs env operands ∧ vt = call_value_type rets
-        then SOME vt else NONE
-    | _ => NONE) ∧
-  (check_components env [] ⇔ T) ∧
-  (check_components env (NONE :: cs) ⇔ check_components env cs) ∧
-  (check_components env (SOME e :: cs) ⇔
-    IS_SOME (check_expr env e) ∧ check_components env cs) ∧
-  (check_exprs env [] ⇔ T) ∧
-  (check_exprs env (e :: es) ⇔
-    IS_SOME (check_expr env e) ∧ check_exprs env es)
+    | _ => NONE
 End
 
-Definition check_condition_def:
-  check_condition env c ⇔ check_expr env c = SOME (SrcType BoolT)
-End
-
-(* The local, if any, declared by one entry of a declaration statement, in
- * the current scope and with its normalized type.
- *)
-Definition declare_local_def:
-  (declare_local env NONE = SOME []) ∧
-  (declare_local env (SOME (v : src_variable)) =
-    case variable_type v of
-      SOME ty =>
-        if v.var_scope = env.scope then SOME [(v.var_info.node_id, ty)]
-        else NONE
-    | NONE => NONE)
-End
-
-(* A declaration statement: its assignments list its declarations' ids, a
- * declaration without initial value declares a single variable, and the
- * locals are visible after the statement only.
- *)
-Definition declaration_id_def:
-  (declaration_id NONE = NONE) ∧
-  (declaration_id (SOME (v : src_variable)) = SOME v.var_info.node_id)
-End
-
-Definition check_declaration_def:
-  check_declaration env assigned decls init =
-    case all_some (MAP (declare_local env) decls) of
-      NONE => NONE
-    | SOME locals =>
-        if decls ≠ [] ∧ assigned = MAP declaration_id decls ∧
-           (case init of
-              NONE => (case decls of [SOME _] => T | _ => F)
-            | SOME e => IS_SOME (check_expr env e))
-        then SOME (env with variables := FLAT locals ++ env.variables)
-        else NONE
-End
-
-(* A for initialization: a declaration or an expression statement. *)
-Definition check_for_init_def:
-  (check_for_init env NONE = SOME env) ∧
-  (check_for_init env (SOME (SrcVariableDeclarationStatement _ assigned decls
-                               init)) =
-    check_declaration env assigned decls init) ∧
-  (check_for_init env (SOME (SrcExpressionStatement _ e)) =
-    if IS_SOME (check_expr env e) then SOME env else NONE) ∧
-  (check_for_init env (SOME _) = NONE)
-End
-
-(* The environment after a statement in a list: extended by a declaration,
- * unchanged by any other statement, which check_stmt checks.
- *)
-Definition declaration_env_def:
-  (declaration_env env (SrcVariableDeclarationStatement _ assigned decls init) =
-    SOME (check_declaration env assigned decls init)) ∧
-  (declaration_env env _ = NONE)
-End
-
-(* Statement lists return the environment after their declarations. *)
-Definition check_stmts_def:
-  (check_stmts env [] = SOME env) ∧
-  (check_stmts env (s :: ss) =
-    case declaration_env env s of
-      SOME (SOME env') => check_stmts env' ss
-    | SOME NONE => NONE
-    | NONE => if check_stmt env s then check_stmts env ss else NONE) ∧
-  (check_stmt env (SrcBlock info ss) ⇔
-    IS_SOME (check_stmts (env with scope := info.node_id) ss)) ∧
-  (check_stmt env (SrcUncheckedBlock info ss) ⇔
-    IS_SOME (check_stmts (env with scope := info.node_id) ss)) ∧
-  (check_stmt env (SrcExpressionStatement _ e) ⇔
-    IS_SOME (check_expr env e)) ∧
-  (check_stmt env (SrcVariableDeclarationStatement _ _ _ _) ⇔ F) ∧
-  (check_stmt env (SrcIfStatement _ c t NONE) ⇔
-    check_condition env c ∧ check_stmt env t) ∧
-  (check_stmt env (SrcIfStatement _ c t (SOME e)) ⇔
-    check_condition env c ∧ check_stmt env t ∧ check_stmt env e) ∧
-  (check_stmt env (SrcWhileStatement _ c body) ⇔
-    check_condition env c ∧ check_stmt (env with in_loop := T) body) ∧
-  (check_stmt env (SrcDoWhileStatement _ body c) ⇔
-    check_stmt (env with in_loop := T) body ∧ check_condition env c) ∧
-  (check_stmt env (SrcForStatement info init c next body) ⇔
-    case check_for_init (env with scope := info.node_id) init of
-      NONE => F
-    | SOME env' =>
-        (case c of NONE => T | SOME c => check_condition env' c) ∧
-        (case next of
-           NONE => T
-         | SOME (SrcExpressionStatement _ e) => IS_SOME (check_expr env' e)
-         | SOME _ => F) ∧
-        check_stmt (env' with in_loop := T) body) ∧
-  (check_stmt env (SrcBreak _) ⇔ env.in_loop) ∧
-  (check_stmt env (SrcContinue _) ⇔ env.in_loop) ∧
-  (check_stmt env (SrcReturn _ returns_id e) ⇔
-    returns_id = env.returns_id ∧
-    case e of NONE => T | SOME e => IS_SOME (check_expr env e)) ∧
-  (check_stmt env (SrcEmit _ ev args) ⇔
-    case ALOOKUP env.events ev of
-      SOME e => LENGTH args = LENGTH e.event_parameters ∧ check_exprs env args
-    | NONE => F)
-Termination
-  WF_REL_TAC ‘measure (λx. case x of
-                 INL (env, ss) => list_size src_stmt_size ss
-               | INR (env, s) => src_stmt_size s)’ >>
-  rw[fetch "-" "src_stmt_size_def", listTheory.list_size_def]
-End
-
-(* A variable declared by the node scope: a parameter or return variable of a
- * function, or a state variable of a contract.
- *)
+(* A parameter, return variable, state variable, or catch binding declared by
+ * the node scope. *)
 Definition scoped_variable_def:
   scoped_variable scope (v : src_variable) =
     if v.var_scope = scope then
@@ -999,7 +1374,56 @@ End
 (* A state variable, declared by one of the contract's bases. *)
 Definition state_variable_def:
   state_variable bases (v : src_variable) =
-    if MEM v.var_scope bases then scoped_variable v.var_scope v else NONE
+    if ¬MEM v.var_scope bases then NONE else
+    case normalize_type_name v.var_type_name of
+      SOME ty =>
+        if v.var_transient then
+          if v.var_location = NONE ∧ is_stored_scalar_type ty ∧
+             source_type_matches ty v.var_type_id
+          then SOME (v.var_info.node_id, ty) else NONE
+        else if byte_sequence_type ty then
+          if v.var_location = NONE ∧ source_type_matches ty v.var_type_id then
+            SOME (v.var_info.node_id, ty) else NONE
+        else if is_function_type ty then NONE
+        else scoped_variable v.var_scope v
+    | NONE => NONE
+End
+
+(* A constant, declared by one of the given contracts or libraries, at the
+ * type its references have: byte sequences are in memory. *)
+Definition constant_variable_def:
+  constant_variable bases (v : src_variable) =
+    if ¬MEM v.var_scope bases ∨ IS_SOME v.var_location ∨ v.var_transient then NONE else
+    case normalize_type_name v.var_type_name of
+      SOME ty =>
+        let ty' = if byte_sequence_type ty then LocatedT MemoryLoc ty else ty in
+        if (is_stored_scalar_type ty ∨ byte_sequence_type ty) ∧
+           source_type_matches ty' v.var_type_id
+        then SOME (v.var_info.node_id, ty') else NONE
+    | NONE => NONE
+End
+
+Definition constant_table_def:
+  constant_table (c : src_contract) =
+    all_some (MAP (constant_variable (c.contract_bases ++ c.contract_libraries) o FST)
+                c.contract_constants)
+End
+
+(* An immutable, declared by one of the contract's bases, of elementary, enum
+ * or internal function type. *)
+Definition immutable_variable_def:
+  immutable_variable bases (v : src_variable) =
+    if v.var_transient ∨ ¬MEM v.var_scope bases then NONE else
+    case scoped_variable v.var_scope v of
+      SOME (x, ty) =>
+        if is_stored_scalar_type ty ∨ is_function_type ty then SOME (x, ty)
+        else NONE
+    | NONE => NONE
+End
+
+Definition immutable_table_def:
+  immutable_table (c : src_contract) =
+    all_some (MAP (immutable_variable c.contract_bases) c.contract_immutables)
 End
 
 (* The function a call to each declaration runs: the most derived function
@@ -1014,6 +1438,17 @@ Definition call_table_def:
       (call_table fs))
 End
 
+(* The call table of what may be called: without the entries of a key whose
+ * function is unsupported, all of them, so that a lookup never falls through
+ * to a function that one overrides. *)
+Definition function_table_def:
+  function_table fs =
+    let table = call_table fs in
+    FILTER (λ(x, _). case ALOOKUP table x of
+                       SOME (g : src_function) => g.fn_unsupported = NONE
+                     | NONE => F) table
+End
+
 (* The functions no other function overrides: those calls and the dispatch
  * table can reach. *)
 Definition live_functions_def:
@@ -1024,12 +1459,171 @@ Definition live_functions_def:
                 (ALOOKUP table f.fn_info.node_id) = SOME f.fn_info.node_id) fs
 End
 
+(* The bases after x in the linearization, where a super call from a
+ * function of x looks. *)
+Definition later_bases_def:
+  (later_bases (x : num) [] = []) ∧
+  (later_bases x (y :: ys) = if x = y then ys else later_bases x ys)
+End
+
+(* The function a super call naming d runs: the first function, along the
+ * bases given, with d's name and parameter types (the compiler's lookup,
+ * from the deployed contract's linearization). *)
+Definition super_target_def:
+  (super_target fs (d : src_function) [] = NONE) ∧
+  (super_target fs d (x :: xs) =
+    case FILTER (λ(g : src_function).
+                   g.fn_scope = x ∧ g.fn_kind = FunctionKind ∧
+                   g.fn_name = d.fn_name ∧
+                   g.fn_nominal_parameters = d.fn_nominal_parameters ∧
+                   MAP variable_type g.fn_parameters =
+                   MAP variable_type d.fn_parameters) fs of
+      g :: _ => SOME g
+    | [] => super_target fs d xs)
+End
+
+(* The functions the super calls of f run, by the declaration each names. *)
+Definition super_table_def:
+  super_table fs bases (f : src_function) =
+    all_some (MAP (λr.
+      case FILTER (λ(d : src_function). d.fn_info.node_id = r) fs of
+        d :: _ => OPTION_MAP (λg. (r, g))
+                    (super_target fs d (later_bases f.fn_scope bases))
+      | [] => NONE) f.fn_super_calls)
+End
+
+(* The functions super calls reach from rs; an unsupported function never
+ * runs, so its super calls reach nothing. *)
+Definition super_targets_def:
+  (super_targets fs bases [] = []) ∧
+  (super_targets fs bases (f :: rs) =
+    (if f.fn_unsupported ≠ NONE then [] else
+     case super_table fs bases f of SOME t => MAP SND t | NONE => []) ++
+    super_targets fs bases rs)
+End
+
+Definition add_functions_def:
+  (add_functions rs [] = rs) ∧
+  (add_functions rs ((g : src_function) :: gs) =
+    add_functions
+      (if MEM g.fn_info.node_id (MAP (λ(f : src_function). f.fn_info.node_id) rs)
+       then rs else rs ++ [g]) gs)
+End
+
+(* Statically named base implementations, without virtual redirection. *)
+Definition static_targets_def:
+  (static_targets fs [] = []) ∧
+  (static_targets fs ((f : src_function) :: rs) =
+    (if f.fn_unsupported ≠ NONE then [] else
+     FILTER (λ(g : src_function). MEM g.fn_info.node_id f.fn_static_calls) fs) ++
+    static_targets fs rs)
+End
+
+(* The functions calls reach: the live ones and those super calls reach from
+ * them. Each round adds a function or ends, so as many rounds as there are
+ * functions suffice. *)
+Definition reached_functions_def:
+  (reached_functions fs bases 0 rs = rs) ∧
+  (reached_functions fs bases (SUC k) rs =
+    let rs' = add_functions rs
+                (super_targets fs bases rs ++ static_targets fs rs) in
+    if LENGTH rs' = LENGTH rs then rs else reached_functions fs bases k rs')
+End
+
+(* The live functions and implementations reached by super or static calls. *)
+Definition checked_functions_def:
+  checked_functions fs bases =
+    reached_functions fs bases (LENGTH fs) (live_functions fs)
+End
+
+(* Initializers also reach static implementations, even without a constructor. *)
+Definition checked_contract_functions_def:
+  checked_contract_functions (c : src_contract) =
+    reached_functions c.contract_functions c.contract_bases
+      (LENGTH c.contract_functions)
+      (add_functions (live_functions c.contract_functions)
+         (FILTER (λf. MEM f.fn_info.node_id c.contract_static_calls)
+            c.contract_functions))
+End
+
 (* The constructor a base declares, if any. *)
 Definition contract_constructor_def:
   (contract_constructor x [] = NONE) ∧
   (contract_constructor x ((f : src_function) :: fs) =
-    if f.fn_kind = "constructor" ∧ f.fn_scope = x then SOME f
+    if f.fn_kind = ConstructorKind ∧ f.fn_scope = x then SOME f
     else contract_constructor x fs)
+End
+
+(* What a getter returns of a struct member: nothing for a mapping or an
+ * array other than a byte sequence, as the compiler's getters skip them, or
+ * the member, which must be a value, a byte sequence or a struct.
+ *)
+Definition getter_member_def:
+  getter_member (v : src_variable) =
+    case field_variable_type v of
+      SOME (MappingT _ _) => SOME []
+    | SOME (ArrayT _ _) => SOME []
+    | SOME (StructT s) => SOME [(SOME v.var_info.node_id, StructT s)]
+    | SOME ty =>
+        if is_stored_scalar_type ty ∨ byte_sequence_type ty
+        then SOME [(SOME v.var_info.node_id, ty)] else NONE
+    | NONE => NONE
+End
+
+(* What a getter returns of the value of type ty it reaches: the value, or a
+ * struct's returned members in order, each with its member id. *)
+Definition getter_results_def:
+  getter_results structs ty =
+    case ty of
+      StructT (AstId id) =>
+        (case source_struct_members structs id of
+           SOME fields =>
+             (case all_some (MAP getter_member fields) of
+                SOME ms => if FLAT ms = [] then NONE else SOME (FLAT ms)
+              | NONE => NONE)
+         | NONE => NONE)
+    | _ => if is_stored_scalar_type ty ∨ byte_sequence_type ty then SOME [(NONE, ty)]
+           else NONE
+End
+
+(* The parameter types and the results of the getter of a public state
+ * variable of type ty: a key for each mapping and an index for each array
+ * along its type, down to a value, a byte sequence or a struct.
+ *)
+Definition getter_shape_def:
+  getter_shape structs ty =
+    case ty of
+      MappingT key value =>
+        if is_stored_scalar_type key ∨ byte_sequence_type key then
+          OPTION_MAP (λ(ps, r). (mapping_key_type key :: ps, r)) (getter_shape structs value)
+        else NONE
+    | ArrayT element _ =>
+        OPTION_MAP (λ(ps, r). (UintT 256 :: ps, r)) (getter_shape structs element)
+    | _ => OPTION_MAP (λrs. ([], rs)) (getter_results structs ty)
+End
+
+(* A getter returns objects (byte sequences and a struct member's structs)
+ * as copies in memory. *)
+Definition getter_result_def:
+  getter_result ty =
+    if located_object_shape MemoryLoc ty then LocatedT MemoryLoc ty else ty
+End
+
+(* Both kinds of external declaration use the same normalized ABI types. *)
+Definition external_types_def:
+  external_types structs signature =
+    case signature of
+      FunctionSignature ps rs =>
+        (case (all_some (MAP call_variable_type ps),
+               all_some (MAP call_variable_type rs)) of
+           (SOME params, SOME rets) => SOME (params, rets)
+         | _ => NONE)
+    | GetterSignature v =>
+        case state_variable [v.var_scope] v of
+          NONE => NONE
+        | SOME (_, ty) =>
+            OPTION_MAP (λ(ps, rs). (ps, MAP (getter_result o SND) rs))
+              (getter_shape structs ty)
 End
 
 (* The variables the base constructor arguments a base gives see: the
@@ -1041,26 +1635,22 @@ Definition constructor_parameters_def:
     | SOME f => all_some (MAP (scoped_variable f.fn_info.node_id) f.fn_parameters)
 End
 
-(* A pure function sees no state variables. Whether a view function writes
- * one is the compiler's check.
- *)
-Definition check_function_def:
-  check_function structs events functions state bases (f : src_function) ⇔
+(* What a function's header must satisfy, whether or not its body is
+ * supported: its declaring base, its kind and mutability, and the types of
+ * its parameters and results. A failing header rejects the unit, since only
+ * a body is confined to its function. *)
+Definition function_header_ok_def:
+  function_header_ok bases (f : src_function) ⇔
     MEM f.fn_scope bases ∧
-    (f.fn_kind = "function" ∨ f.fn_kind = "receive" ∨ f.fn_kind = "fallback" ∨
-     f.fn_kind = "constructor") ∧
-    (f.fn_mutability = "pure" ∨ f.fn_mutability = "view" ∨
-     f.fn_mutability = "nonpayable" ∨ f.fn_mutability = "payable") ∧
-    case (all_some (MAP (scoped_variable f.fn_info.node_id)
-                     (f.fn_parameters ++ f.fn_returns)), f.fn_body) of
-      (SOME variables, SrcBlock info ss) =>
-        IS_SOME (check_stmts
-          <| functions := functions; structs := structs; events := events;
-             variables := variables;
-             state := if f.fn_mutability = "pure" then [] else state;
-             scope := info.node_id; returns_id := f.fn_returns_id;
-             in_loop := F |> ss)
-    | _ => F
+    IS_SOME (all_some (MAP (scoped_variable f.fn_info.node_id) f.fn_parameters)) ∧
+    IS_SOME (all_some (MAP (scoped_variable f.fn_info.node_id) f.fn_returns))
+End
+
+(* Likewise the types of a modifier's parameters. *)
+Definition modifier_header_ok_def:
+  modifier_header_ok (m : src_modifier) ⇔
+    IS_SOME (all_some (MAP (scoped_variable m.modifier_info.node_id)
+                         m.modifier_parameters))
 End
 
 (* The layout has an entry for each state variable, in order. *)
@@ -1068,7 +1658,10 @@ Definition storage_layout_ok_def:
   (storage_layout_ok fields [] [] ⇔ T) ∧
   (storage_layout_ok fields ((v : src_variable) :: vs) (e :: es) ⇔
      e.storage_id = v.var_info.node_id ∧
-     (case (if fields then field_variable_type v else variable_type v) of
+     e.storage_backend = (if ¬fields ∧ v.var_transient
+                          then TransientStorage else PersistentStorage) ∧
+     (case (if fields then field_variable_type v
+            else OPTION_MAP SND (state_variable [v.var_scope] v)) of
         SOME ty => canonical_storage_identifier 0 0 e.storage_type_id = storage_layout_identifier ty
       | NONE => F) ∧
      e.storage_slot < 2 ** 256 ∧ storage_layout_ok fields vs es) ∧
@@ -1076,8 +1669,8 @@ Definition storage_layout_ok_def:
 End
 
 Definition check_struct_def:
-  check_struct unit_id bases (s : src_struct) ⇔
-    (MEM s.struct_scope bases ∨ s.struct_scope = unit_id) ∧
+  check_struct sources bases (s : src_struct) ⇔
+    (MEM s.struct_scope bases ∨ MEM s.struct_scope sources) ∧
     s.struct_members ≠ [] ∧
     EVERY (λv. v.var_scope = s.struct_info.node_id ∧ IS_SOME (field_variable_type v))
       s.struct_members ∧
@@ -1088,57 +1681,218 @@ Definition check_struct_def:
         storage_layout_ok T s.struct_members fields
 End
 
-(* Event parameters are elementary value types declared by the event. *)
+(* Event parameters belong to their declaration; emit sites check their types. *)
 Definition check_event_def:
   check_event (e : src_event) ⇔
-    EVERY (λp. IS_SOME (scoped_variable e.event_info.node_id (FST p)))
+    EVERY (λp. (FST p).var_scope = e.event_info.node_id)
       e.event_parameters
 End
 
-(* Initializers and base constructor arguments see the state variables and
- * call functions; base constructor arguments also see the parameters of the
- * constructor of the base giving them. *)
-Definition initializer_env_def:
-  initializer_env (c : src_contract) state =
-    <| functions := call_table c.contract_functions;
-       structs := c.contract_structs;
-       events := MAP (λe. (e.event_info.node_id, e)) c.contract_events;
-       variables := []; state := state; scope := c.contract_info.node_id;
-       returns_id := c.contract_info.node_id; in_loop := F |>
+(* The super calls of f reach supported functions. *)
+Definition supported_supers_def:
+  supported_supers (c : src_contract) (f : src_function) ⇔
+    case super_table c.contract_functions c.contract_bases f of
+      SOME supers => EVERY (λ(_, g). g.fn_unsupported = NONE) supers
+    | NONE => T
 End
 
 Definition check_contract_def:
-  check_contract unit_id (c : src_contract) ⇔
+  check_contract unit_id sources (c : src_contract) ⇔
     c.contract_scope = unit_id ∧
     (case c.contract_bases of x :: _ => x = c.contract_info.node_id | [] => F) ∧
-    ALL_DISTINCT c.contract_bases ∧
-    EVERY (check_struct unit_id c.contract_bases) c.contract_structs ∧
+    ALL_DISTINCT (c.contract_bases ++ c.contract_libraries) ∧
+    EVERY (check_struct sources (c.contract_bases ++ c.contract_libraries))
+      c.contract_structs ∧
+    EVERY (λ(_, members). 0 < members ∧ members ≤ 256) c.contract_enums ∧
     EVERY check_event c.contract_events ∧
     storage_layout_ok F c.contract_state_variables c.contract_storage ∧
-    case all_some (MAP (state_variable c.contract_bases)
-                     c.contract_state_variables) of
-      SOME state =>
-        EVERY (check_function c.contract_structs
-                 (MAP (λe. (e.event_info.node_id, e)) c.contract_events)
-                 (call_table c.contract_functions)
-                 state c.contract_bases)
-          (live_functions c.contract_functions) ∧
-        EVERY (λ(x, e). IS_SOME (ALOOKUP state x) ∧
-                        IS_SOME (check_expr (initializer_env c state) e))
+    EVERY (function_header_ok c.contract_bases)
+      (checked_contract_functions c) ∧
+    EVERY (λf. f.fn_kind = FunctionKind ∧
+               f.fn_visibility ≠ ExternalVisibility ∧
+               function_header_ok c.contract_libraries f)
+      c.contract_library_functions ∧
+    EVERY modifier_header_ok c.contract_modifiers ∧
+    case (all_some (MAP (state_variable c.contract_bases)
+                      c.contract_state_variables), constant_table c,
+          immutable_table c) of
+      (SOME state, SOME constants, SOME immutables) =>
+        EVERY (λ(x, _). IS_SOME (ALOOKUP (state ++ immutables) x))
           c.contract_initializers ∧
-        EVERY (λ(x, b, args).
-                 case constructor_parameters x c.contract_functions of
-                   SOME ps => check_exprs (initializer_env c state with
-                                             variables := ps) args
-                 | NONE => F)
+        ALL_DISTINCT (MAP FST c.contract_getters) ∧
+        EVERY (λ(x, selector).
+                 LENGTH selector = 4 ∧
+                 case ALOOKUP (state ++ immutables) x of
+                   SOME ty => IS_SOME (getter_shape c.contract_structs ty)
+                 | NONE => IS_SOME (ALOOKUP constants x))
+          c.contract_getters ∧
+        EVERY (λ(x, _, _).
+                 IS_SOME (constructor_parameters x c.contract_functions))
           c.contract_base_arguments
-    | NONE => F
+    | _ => F
+End
+
+(* Why a unit fails the source check: each failing conjunct of
+ * check_contract and of the checks it is made of, with the id of the node it
+ * is about (a contract, struct, enum, event, function, modifier, state
+ * variable or base) and a tag naming the check. *)
+Definition rejected_unless_def:
+  rejected_unless b (id : num) (tag : string) = if b then [] else [(id, tag)]
+End
+
+Definition function_header_rejections_def:
+  function_header_rejections bases (f : src_function) =
+    rejected_unless (MEM f.fn_scope bases) f.fn_info.node_id "function scope" ++
+    rejected_unless
+      (IS_SOME (all_some (MAP (scoped_variable f.fn_info.node_id) f.fn_parameters)))
+      f.fn_info.node_id "parameter type" ++
+    rejected_unless
+      (IS_SOME (all_some (MAP (scoped_variable f.fn_info.node_id) f.fn_returns)))
+      f.fn_info.node_id "return type"
+End
+
+Definition struct_rejections_def:
+  struct_rejections sources bases (s : src_struct) =
+    rejected_unless (MEM s.struct_scope bases ∨ MEM s.struct_scope sources)
+      s.struct_info.node_id "struct scope" ++
+    rejected_unless (s.struct_members ≠ []) s.struct_info.node_id "empty struct" ++
+    rejected_unless
+      (EVERY (λv. v.var_scope = s.struct_info.node_id ∧ IS_SOME (field_variable_type v))
+         s.struct_members) s.struct_info.node_id "struct member" ++
+    case s.struct_layout of
+      NONE => []
+    | SOME (bytes, fields) =>
+        rejected_unless (0 < bytes ∧ bytes MOD 32 = 0 ∧ bytes DIV 32 < 2 ** 256)
+          s.struct_info.node_id "struct layout size" ++
+        rejected_unless (storage_layout_ok T s.struct_members fields)
+          s.struct_info.node_id "struct layout"
+End
+
+Definition contract_rejections_def:
+  contract_rejections unit_id sources (c : src_contract) =
+    rejected_unless (c.contract_scope = unit_id) c.contract_info.node_id
+      "contract scope" ++
+    rejected_unless
+      (case c.contract_bases of x :: _ => x = c.contract_info.node_id | [] => F)
+      c.contract_info.node_id "linearization" ++
+    rejected_unless (ALL_DISTINCT (c.contract_bases ++ c.contract_libraries))
+      c.contract_info.node_id "duplicate bases" ++
+    FLAT (MAP (struct_rejections sources (c.contract_bases ++ c.contract_libraries))
+            c.contract_structs) ++
+    FLAT (MAP (λ(x, members). rejected_unless (0 < members ∧ members ≤ 256) x "enum size")
+            c.contract_enums) ++
+    FLAT (MAP (λe. rejected_unless (check_event e) e.event_info.node_id
+                     "event parameter") c.contract_events) ++
+    rejected_unless
+      (storage_layout_ok F c.contract_state_variables c.contract_storage)
+      c.contract_info.node_id "storage layout" ++
+    FLAT (MAP (function_header_rejections c.contract_bases)
+            (checked_contract_functions c)) ++
+    FLAT (MAP (λf. rejected_unless (f.fn_kind = FunctionKind) f.fn_info.node_id
+                     "library function kind" ++
+                   rejected_unless (f.fn_visibility ≠ ExternalVisibility)
+                     f.fn_info.node_id "library function visibility" ++
+                   function_header_rejections c.contract_libraries f)
+            c.contract_library_functions) ++
+    FLAT (MAP (λm. rejected_unless (modifier_header_ok m) m.modifier_info.node_id
+                     "modifier parameter type") c.contract_modifiers) ++
+    rejected_unless
+      (IS_SOME (all_some (MAP (state_variable c.contract_bases)
+                            c.contract_state_variables)))
+      c.contract_info.node_id "state variable type" ++
+    rejected_unless (IS_SOME (constant_table c)) c.contract_info.node_id "constant" ++
+    rejected_unless (IS_SOME (immutable_table c)) c.contract_info.node_id "immutable" ++
+    case (all_some (MAP (state_variable c.contract_bases)
+                      c.contract_state_variables), constant_table c,
+          immutable_table c) of
+      (SOME state, SOME constants, SOME immutables) =>
+        FLAT (MAP (λ(x, _). rejected_unless (IS_SOME (ALOOKUP (state ++ immutables) x))
+                              x "initializer") c.contract_initializers) ++
+        rejected_unless (ALL_DISTINCT (MAP FST c.contract_getters))
+          c.contract_info.node_id "duplicate getters" ++
+        FLAT (MAP (λ(x, selector).
+                     rejected_unless (LENGTH selector = 4) x "getter selector" ++
+                     rejected_unless
+                       (case ALOOKUP (state ++ immutables) x of
+                          SOME ty => IS_SOME (getter_shape c.contract_structs ty)
+                        | NONE => IS_SOME (ALOOKUP constants x)) x "getter type")
+                c.contract_getters) ++
+        FLAT (MAP (λ(x, _, _).
+                     rejected_unless (IS_SOME (constructor_parameters x c.contract_functions))
+                       x "base constructor parameters") c.contract_base_arguments)
+    | _ => []
+End
+
+Definition unit_rejections_def:
+  unit_rejections (u : src_unit) =
+    FLAT (MAP (λc. rejected_unless (ALL_DISTINCT (u.unit_info.node_id :: contract_ids c))
+                     c.contract_info.node_id "duplicate node ids") u.unit_contracts) ++
+    rejected_unless (MEM u.unit_info.node_id u.unit_sources) u.unit_info.node_id
+      "unit not among its sources" ++
+    FLAT (MAP (contract_rejections u.unit_info.node_id u.unit_sources) u.unit_contracts)
 End
 
 Definition valid_src_unit_def:
-  valid_src_unit (u : src_unit) ⇔
-    ALL_DISTINCT (unit_ids u) ∧
-    EVERY (check_contract u.unit_info.node_id) u.unit_contracts
+  valid_src_unit (u : src_unit) ⇔ NULL (unit_rejections u)
+End
+
+Theorem rejected_unless_nil[local,simp]:
+  rejected_unless b x t = [] ⇔ b
+Proof
+  rw[rejected_unless_def]
+QED
+
+Theorem FLAT_MAP_nil[local]:
+  FLAT (MAP f l) = [] ⇔ EVERY (λx. f x = []) l
+Proof
+  Induct_on ‘l’ >> simp[]
+QED
+
+Theorem function_header_rejections_nil[local]:
+  function_header_rejections bases f = [] ⇔ function_header_ok bases f
+Proof
+  simp[function_header_rejections_def, function_header_ok_def, CONJ_ASSOC]
+QED
+
+Theorem struct_rejections_nil[local]:
+  struct_rejections sources bases s = [] ⇔ check_struct sources bases s
+Proof
+  simp[struct_rejections_def, check_struct_def] >>
+  Cases_on ‘s.struct_layout’ >> simp[CONJ_ASSOC] >>
+  rename1 ‘SOME p’ >> Cases_on ‘p’ >> simp[CONJ_ASSOC]
+QED
+
+Theorem contract_rejections_nil[local]:
+  contract_rejections unit_id sources c = [] ⇔ check_contract unit_id sources c
+Proof
+  simp[contract_rejections_def, check_contract_def, FLAT_MAP_nil,
+       struct_rejections_nil, function_header_rejections_nil] >>
+  Cases_on ‘all_some (MAP (state_variable c.contract_bases)
+                        c.contract_state_variables)’ >>
+  Cases_on ‘constant_table c’ >> Cases_on ‘immutable_table c’ >>
+  simp[FLAT_MAP_nil, listTheory.EVERY_MEM, pairTheory.FORALL_PROD, CONJ_ASSOC]
+QED
+
+(* The conjuncts unit_rejections lists. *)
+Theorem valid_src_unit_checks:
+  valid_src_unit u ⇔
+    EVERY (λc. ALL_DISTINCT (u.unit_info.node_id :: contract_ids c))
+      u.unit_contracts ∧
+    MEM u.unit_info.node_id u.unit_sources ∧
+    EVERY (check_contract u.unit_info.node_id u.unit_sources) u.unit_contracts
+Proof
+  simp[valid_src_unit_def, unit_rejections_def, listTheory.NULL_EQ, FLAT_MAP_nil,
+       contract_rejections_nil, CONJ_ASSOC, listTheory.EVERY_MEM]
+QED
+
+(* The functions of a unit's contracts that calls reach, then their library
+ * functions: each one's id, name, and reason if unsupported. *)
+Definition unit_functions_def:
+  unit_functions (u : src_unit) =
+    FLAT (MAP (λc.
+      MAP (λ(f : src_function). (f.fn_info.node_id, f.fn_name, f.fn_unsupported))
+        (checked_contract_functions c ++
+         c.contract_library_functions)) u.unit_contracts)
 End
 
 (* cv translation, so that imported units are checked by cv_eval. The
@@ -1161,14 +1915,20 @@ Proof
 QED
 
 val () = cv_auto_trans normalize_type_name_def;
+(* canonical_storage_identifier is translated above, as a dependency of
+ * decode_type_identifier. *)
 val () = cv_auto_trans storage_type_identifier_def;
-val () = cv_auto_trans canonical_storage_identifier_def;
+val () = cv_auto_trans located_type_identifier_def;
 val () = cv_auto_trans source_type_matches_def;
 val () = cv_auto_trans storage_layout_identifier_def;
 val () = cv_auto_trans variable_type_def;
+val () = cv_auto_trans call_variable_type_def;
+val () = cv_auto_trans event_variable_type_def;
 val () = cv_auto_trans field_variable_type_def;
 val () = cv_auto_trans call_value_type_def;
-val () = cv_auto_trans_rec expr_ids_def (
+val () = cv_auto_trans decoded_type_def;
+val expr_ids_pre_def = cv_auto_trans_pre_rec
+  "expr_ids_pre component_ids_pre exprs_ids_pre" expr_ids_def (
   WF_REL_TAC ‘measure (λx. case x of
                  INL e => cv_size e
                | INR (INL cs) => cv_size cs
@@ -1176,82 +1936,78 @@ val () = cv_auto_trans_rec expr_ids_def (
   cv_termination_tac
 );
 
+Theorem expr_ids_pre[cv_pre,local]:
+  (∀v. expr_ids_pre v) ∧ (∀v. component_ids_pre v) ∧ (∀v. exprs_ids_pre v)
+Proof
+  ho_match_mp_tac expr_ids_ind >> rpt strip_tac >>
+  simp[Once expr_ids_pre_def] >> rw[AllCaseEqs()] >> fs[]
+QED
+
 val stmt_ids_pre_def = cv_auto_trans_pre_rec
-  "stmt_ids_pre option_stmt_ids_pre stmts_ids_pre" stmt_ids_def (
+  "stmt_ids_pre option_stmt_ids_pre stmts_ids_pre catch_ids_pre catches_ids_pre" stmt_ids_def (
   WF_REL_TAC ‘measure (λx. case x of
                  INL s => cv_size s
                | INR (INL s) => cv_size s
-               | INR (INR ss) => cv_size ss)’ >>
+               | INR (INR (INL ss)) => cv_size ss
+               | INR (INR (INR (INL c))) => cv_size c
+               | INR (INR (INR (INR cs))) => cv_size cs)’ >>
   cv_termination_tac
 );
 
 Theorem stmt_ids_pre[cv_pre,local]:
-  (∀v. stmt_ids_pre v) ∧ (∀v. stmts_ids_pre v) ∧ (∀v. option_stmt_ids_pre v)
+  (∀v. stmt_ids_pre v) ∧ (∀v. option_stmt_ids_pre v) ∧
+  (∀v. stmts_ids_pre v) ∧ (∀v. catch_ids_pre v) ∧ (∀v. catches_ids_pre v)
 Proof
-  CONV_TAC (RAND_CONV (REWR_CONV CONJ_COMM)) >>
   ho_match_mp_tac stmt_ids_ind >> rpt strip_tac >>
   simp[Once stmt_ids_pre_def] >> rw[] >> fs[]
 QED
 
 val () = cv_auto_trans unit_ids_def;
 
+val () = cv_auto_trans source_struct_members_def;
 val () = cv_auto_trans source_struct_field_def;
+val () = cv_auto_trans argument_order_ok_def;
 val () = cv_auto_trans literal_message_def;
 val () = cv_auto_trans builtin_shape_def;
-
-val check_expr_pre_def = cv_auto_trans_pre_rec
-  "check_expr_pre check_components_pre check_exprs_pre" check_expr_def (
-  WF_REL_TAC ‘measure (λx. case x of
-                 INL (env, e) => cv_size e
-               | INR (INL (env, cs)) => cv_size cs
-               | INR (INR (env, es)) => cv_size es)’ >>
-  cv_termination_tac
-);
-
-Theorem check_expr_pre[cv_pre,local]:
-  (∀env e. check_expr_pre env e) ∧ (∀env cs. check_components_pre env cs) ∧
-  (∀env es. check_exprs_pre env es)
-Proof
-  ho_match_mp_tac check_expr_ind >> rpt strip_tac >>
-  simp[Once check_expr_pre_def] >> rw[] >> fs[]
-QED
-
-val () = cv_auto_trans declaration_id_def;
-val () = cv_auto_trans declare_local_def;
-val () = cv_auto_trans check_declaration_def;
-val () = cv_auto_trans check_for_init_def;
-val () = cv_auto_trans declaration_env_def;
-val () = cv_auto_trans check_condition_def;
-
-val check_stmts_pre_def = cv_auto_trans_pre_rec
-  "check_stmts_pre check_stmt_pre" check_stmts_def (
-  WF_REL_TAC ‘measure (λx. case x of
-                 INL (env, ss) => cv_size ss
-               | INR (env, s) => cv_size s)’ >>
-  cv_termination_tac
-);
-
-Theorem check_stmts_pre[cv_pre,local]:
-  (∀env ss. check_stmts_pre env ss) ∧ (∀env s. check_stmt_pre env s)
-Proof
-  ho_match_mp_tac check_stmts_ind >> rpt strip_tac >>
-  simp[Once check_stmts_pre_def] >> rw[] >> fs[] >>
-  (* record updates appear as cases on the environment *)
-  Cases_on ‘env’ >> gvs[fetch "-" "import_env_fn_updates"] >>
-  rename1 ‘check_for_init _ _ = SOME env'’ >>
-  Cases_on ‘env'’ >> gvs[fetch "-" "import_env_fn_updates"]
-QED
+val () = cv_auto_trans type_bound_def;
 
 val () = cv_auto_trans scoped_variable_def;
+
 val () = cv_auto_trans state_variable_def;
+val () = cv_auto_trans constant_variable_def;
+val () = cv_auto_trans constant_table_def;
+val () = cv_auto_trans immutable_variable_def;
+val () = cv_auto_trans immutable_table_def;
+val () = cv_auto_trans getter_member_def;
+val () = cv_auto_trans getter_results_def;
+val () = cv_auto_trans getter_shape_def;
+val () = cv_auto_trans getter_result_def;
+val () = cv_auto_trans external_types_def;
 val () = cv_auto_trans call_table_def;
+val () = cv_auto_trans function_table_def;
 val () = cv_auto_trans contract_constructor_def;
 val () = cv_auto_trans constructor_parameters_def;
 val () = cv_auto_trans live_functions_def;
+val () = cv_auto_trans later_bases_def;
+val () = cv_auto_trans super_target_def;
+val () = cv_auto_trans super_table_def;
+val () = cv_auto_trans super_targets_def;
+val () = cv_auto_trans add_functions_def;
+val () = cv_auto_trans static_targets_def;
+val () = cv_auto_trans reached_functions_def;
+val () = cv_auto_trans checked_functions_def;
+val () = cv_auto_trans checked_contract_functions_def;
 val () = cv_auto_trans storage_layout_ok_def;
-val () = cv_auto_trans check_function_def;
+val () = cv_auto_trans function_header_ok_def;
+val () = cv_auto_trans modifier_header_ok_def;
 val () = cv_auto_trans check_struct_def;
 val () = cv_auto_trans check_event_def;
-val () = cv_auto_trans initializer_env_def;
+val () = cv_auto_trans supported_supers_def;
 val () = cv_auto_trans check_contract_def;
+val () = cv_auto_trans rejected_unless_def;
+val () = cv_auto_trans function_header_rejections_def;
+val () = cv_auto_trans struct_rejections_def;
+val () = cv_auto_trans contract_rejections_def;
+val () = cv_auto_trans unit_rejections_def;
 val () = cv_auto_trans valid_src_unit_def;
+val () = cv_auto_trans unit_functions_def;

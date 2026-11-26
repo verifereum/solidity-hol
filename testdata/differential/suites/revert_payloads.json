@@ -1,0 +1,167 @@
+{
+  "name": "revert_payloads",
+  "source": "testdata/differential/revert_payloads.sol",
+  "contract": "RevertPayloads",
+  "artifact": "testdata/differential/expected/revert_payloads.json",
+  "cases": [
+    {
+      "name": "none_at_scratch",
+      "function": "none",
+      "args": [],
+      "expect": {
+        "revert": "0x31234354"
+      },
+      "memory_size": 96,
+      "memory_image": true
+    },
+    {
+      "name": "three_at_scratch",
+      "function": "three",
+      "args": [
+        7
+      ],
+      "expect": {
+        "revert": "0xd3d2405d000000000000000000000000000000000000000000000000000000000000000700000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000003"
+      },
+      "memory_size": 128,
+      "memory_image": true
+    },
+    {
+      "name": "values_at_scratch",
+      "function": "values",
+      "args": [],
+      "expect": {
+        "revert": "0x5319298300000000000000000000000000000000000000000000000000000000000000ab0000000000000000000000000000000000000000000000000000000000000001ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      },
+      "memory_size": 128,
+      "memory_image": true
+    },
+    {
+      "name": "four_at_free_pointer",
+      "function": "four",
+      "args": [
+        7
+      ],
+      "expect": {
+        "revert": "0xc976bb900000000000000000000000000000000000000000000000000000000000000007000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000030000000000000000000000000000000000000000000000000000000000000004"
+      },
+      "memory_size": 288,
+      "memory_image": true
+    },
+    {
+      "name": "text_at_free_pointer",
+      "function": "text",
+      "args": [
+        "0x6869"
+      ],
+      "expect": {
+        "revert": "0x5ac0919f000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000026869000000000000000000000000000000000000000000000000000000000000"
+      },
+      "memory_size": 320,
+      "memory_image": true
+    },
+    {
+      "name": "pair_at_free_pointer",
+      "function": "pair",
+      "args": [],
+      "expect": {
+        "revert": "0x470c049900000000000000000000000000000000000000000000000000000000000000050000000000000000000000000000000000000000000000000000000000000006"
+      },
+      "memory_size": 288,
+      "memory_image": true
+    },
+    {
+      "name": "message_at_free_pointer",
+      "function": "message",
+      "args": [],
+      "expect": {
+        "revert": "0x08c379a00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000568656c6c6f000000000000000000000000000000000000000000000000000000"
+      },
+      "memory_size": 256,
+      "memory_image": true
+    },
+    {
+      "name": "require_message_at_free_pointer",
+      "function": "requireMessage",
+      "args": [
+        false
+      ],
+      "expect": {
+        "revert": "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000046e6f706500000000000000000000000000000000000000000000000000000000"
+      },
+      "memory_size": 256,
+      "memory_image": true
+    },
+    {
+      "name": "require_three_at_scratch",
+      "function": "requireThree",
+      "args": [
+        false
+      ],
+      "expect": {
+        "revert": "0xd3d2405d000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000003"
+      },
+      "memory_size": 128,
+      "memory_image": true
+    },
+    {
+      "name": "require_four_at_free_pointer",
+      "function": "requireFour",
+      "args": [
+        false
+      ],
+      "expect": {
+        "revert": "0xc976bb900000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000030000000000000000000000000000000000000000000000000000000000000004"
+      },
+      "memory_size": 288,
+      "memory_image": true
+    },
+    {
+      "name": "require_text_at_free_pointer",
+      "function": "requireText",
+      "args": [
+        false,
+        "0x61206c6f6e6765722074657874207468616e206f6e6520776f72642c20746f207370696c6c"
+      ],
+      "expect": {
+        "revert": "0x5ac0919f0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002561206c6f6e6765722074657874207468616e206f6e6520776f72642c20746f207370696c6c000000000000000000000000000000000000000000000000000000"
+      },
+      "memory_size": 384,
+      "memory_image": true
+    },
+    {
+      "name": "empty_writes_nothing",
+      "function": "empty",
+      "args": [],
+      "expect": {
+        "revert": "0x"
+      },
+      "memory_size": 96,
+      "memory_image": true
+    },
+    {
+      "name": "assert_panic_at_scratch",
+      "function": "asserted",
+      "args": [
+        1
+      ],
+      "expect": {
+        "revert": "0x4e487b710000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "memory_size": 96,
+      "memory_image": true
+    },
+    {
+      "name": "overflow_panic_at_scratch",
+      "function": "overflow",
+      "args": [
+        115792089237316195423570985008687907853269984665640564039457584007913129639935
+      ],
+      "expect": {
+        "revert": "0x4e487b710000000000000000000000000000000000000000000000000000000000000011"
+      },
+      "memory_size": 192,
+      "memory_image": true
+    }
+  ]
+}

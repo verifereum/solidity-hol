@@ -1,0 +1,18 @@
+{
+  "name": "rejected_assembly_library_forms",
+  "source": "testdata/differential/assembly_library_forms.sol",
+  "contract": "AssemblyLibraryForms",
+  "artifact": "testdata/differential/expected/assembly_library_forms.json",
+  "cases": [
+    {
+      "name": "enum_past_last_member",
+      "function": "nextState",
+      "args": [
+        2
+      ],
+      "expect": {
+        "panic": 33
+      }
+    }
+  ]
+}

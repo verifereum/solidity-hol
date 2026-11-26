@@ -5,11 +5,19 @@ Theory solidityState
 Ancestors
   solidityCore finite_map
 
+(* original and to_delete are the transaction's EVM bookkeeping that
+ * SELFDESTRUCT needs (EIP-6780): the original accounts are the world at the
+ * transaction's start, with the accounts created since marked empty, and
+ * to_delete lists the accounts the transaction's calls left pending deletion,
+ * deleted when it settles (settle_source_world). The source never reads them;
+ * it threads them through the message calls it hands to Verifereum. *)
 Datatype:
   source_world = <|
     accounts : evm_accounts;
     transient : transient_storage;
-    logs : event list
+    logs : event list;
+    original : evm_accounts;
+    to_delete : address list
   |>
 End
 
@@ -20,17 +28,6 @@ Datatype:
   source_binding = <|
     binding_type : core_value_type;
     binding_value : runtime_value
-  |>
-End
-
-(* Addressable sparse objects: references carry identity and a captured offset.
- * Allocation, array length metadata, and typed validity remain future rules.
- *)
-Datatype:
-  heap_object = <|
-    object_type : sol_type;
-    object_length : num;
-    object_cells : num |-> runtime_value
   |>
 End
 
@@ -46,18 +43,29 @@ Datatype:
   |>
 End
 
-(* Scopes, heap and targets are num-keyed finite maps (scopes and targets keyed
- * by the ast_id's number), which cv encodes as sptrees. Scopes are innermost
- * first.
+(* Scopes and targets are num-keyed finite maps (keyed by the ast_id's
+ * number), which cv encodes as sptrees. Memory is the frame's EVM memory, a
+ * byte per address (absent bytes are zero) with its active size, as the
+ * compiled code sees it: the free memory pointer is the word at 0x40, and
+ * memory references are addresses in it. Scopes are innermost
+ * first. The immutables are the values of the contract's immutables the
+ * deployed code holds, keyed by their declarations (one not there is zero);
+ * NONE during creation, where they are words in the frame's reserved memory
+ * instead, as the compiled constructor keeps them. The return
+ * data is the frame's return data buffer, the last message call's return or
+ * revert bytes, where the source knows it: NONE after a call whose return data
+ * the source computes no bytes for (the ecrecover precompile).
  *)
 Datatype:
   source_state = <|
     world : source_world;
     frame : source_frame;
+    immutables : (num |-> scalar) option;
     scopes : (num |-> source_binding) list;
-    heap : num |-> heap_object;
-    next_heap_id : num;
-    targets : num |-> captured_target
+    memory : num |-> word8;
+    memory_size : num;
+    targets : num |-> captured_target;
+    return_data : byte list option
   |>
 End
 
@@ -96,7 +104,9 @@ Definition project_evm_world_def:
     | (ctxt, checkpoint)::rest => SOME <|
         accounts := es.rollback.accounts;
         transient := es.rollback.tStorage;
-        logs := ctxt.logs
+        logs := ctxt.logs;
+        original := es.originalAccounts;
+        to_delete := es.rollback.toDelete
       |>
 End
 
@@ -107,6 +117,8 @@ Datatype:
   frame_observation
   = FrameSuccess (runtime_value list) source_world
   | FrameRevert (byte list) source_world
+  | FrameAbort source_world
+  | FrameHalt (byte list) source_world
   | FramePanic num source_world
   | FrameInvalid string
   | FrameResourceLimit
@@ -118,6 +130,8 @@ Definition finish_source_frame_def:
       NormalCompletion => FrameSuccess [] final
     | ReturnCompletion values => FrameSuccess values final
     | RevertCompletion data => FrameRevert data initial
+    | AbortCompletion => FrameAbort initial
+    | HaltCompletion data => FrameHalt data final
     | PanicCompletion code => FramePanic code initial
     | FuelExhausted => FrameResourceLimit
     | InvalidCompletion reason => FrameInvalid reason

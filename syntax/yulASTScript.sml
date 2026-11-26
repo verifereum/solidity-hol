@@ -21,43 +21,46 @@
  * the unittest tests/test_yul_reconnaissance.py checks the dialect's names
  * against it), plus the ones contracts beyond the corpus need: the executing
  * account, a three-topic log, a memory-to-memory copy and an immutable value
- * the constructor patched in.  The four object-level ones (codesize,
- * codecopy, datasize, dataoffset) read the running code or the object's
- * layout, which the evaluator does not model; the compiler emits them in
- * creation objects, and inline assembly can use codesize and codecopy
- * anywhere. They are here so the set is complete and the evaluator can
- * reject them rather than misread them.
+ * the constructor patched in. Object-level builtins read the running code,
+ * named object layout and immutable patch offsets supplied by the frame.
+ * Unsupported layouts and names fail closed.
  *)
 Theory yulAST
 Ancestors
   vfmTypes
+Libs
+  cv_typeLib
 
 Datatype:
   yul_builtin
   = (* arithmetic *)
-    YAdd | YSub | YMul | YDiv | YSDiv | YMod | YSMod | YExp | YSignExtend
+    YAdd | YSub | YMul | YDiv | YSDiv | YMod | YSMod | YAddMod | YMulMod | YExp
+  | YSignExtend
     (* comparison and bitwise *)
   | YLt | YGt | YSLt | YSGt | YEq | YIsZero | YAnd | YOr | YXor | YNot
-  | YShl | YShr | YSar
-    (* hashing, memory, storage *)
-  | YKeccak256 | YMLoad | YMStore | YMCopy | YSLoad | YSStore
+  | YShl | YShr | YSar | YByte
+    (* hashing, memory, storage, transient storage *)
+  | YKeccak256 | YMLoad | YMStore | YMStore8 | YMCopy | YSLoad | YSStore | YTLoad | YTStore
     (* frame and call data *)
   | YCallDataLoad | YCallDataSize | YCallDataCopy | YCallValue | YMemoryGuard | YCaller
-  | YLoadImmutable | YAddress
+  | YLoadImmutable | YAddress | YSelfBalance
     (* the transaction and block *)
   | YOrigin | YGasPrice | YChainId | YNumber | YTimestamp | YCoinbase | YBaseFee
-  | YGasLimit
+  | YGasLimit | YBlockHash | YPrevRandao
     (* message calls, other accounts and the frame's gas *)
-  | YCall | YStaticCall | YExtCodeSize | YReturnDataSize | YReturnDataCopy
-  | YGas
+  | YCall | YStaticCall | YDelegateCall | YBalance | YExtCodeSize | YExtCodeCopy | YExtCodeHash
+  | YReturnDataSize | YReturnDataCopy
+  | YGas | YCreate | YCreate2
     (* events *)
   | YLog0 | YLog1 | YLog2 | YLog3 | YLog4
     (* discards a value *)
   | YPop
     (* halting *)
-  | YStop | YReturn | YRevert
+  | YStop | YReturn | YRevert | YInvalid | YSelfDestruct
     (* object level: the creation object only *)
-  | YCodeSize | YCodeCopy | YDataSize | YDataOffset
+  | YCodeSize | YCodeCopy | YDataCopy | YDataSize | YDataOffset | YSetImmutable
+    (* linking *)
+  | YLinkerSymbol
 End
 
 Datatype:
@@ -133,3 +136,8 @@ Theorem yul_expr_size_pos:
 Proof
   Cases_on `e` >> simp[fetch "-" "yul_expr_size_def"]
 QED
+
+(* The cv encoding of the tree, here so that every descendant shares one:
+ * the Yul evaluator runs it, and the Solidity core embeds inline assembly
+ * in its statements. *)
+val _ = cv_typeLib.from_to_thm_for “:yul_stmt”;

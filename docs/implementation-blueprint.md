@@ -8,11 +8,16 @@ validation and execution rules as existing consumers.
 ## Preparation and declarations
 
 `solidityPrepareLib.prepare_artifact` checks the pinned compiler, artifact format,
-profile and Standard JSON settings, imports and validates the normalized source,
+profile and Standard JSON settings (including the restricted
+[stack-depth fallback](profiles.md#stack-depth-fallback)), imports and validates the normalized source,
 elaborates it, and cv-evaluates the full `wf_core_program`. Differential tests
 and the semanticTests acceptance scanner share this API. Metadata validation is
 an SML check; source validation, elaboration and core checking return HOL
 certificates. Metadata is not proof that the recorded compiler output is genuine.
+
+When creation cannot be lowered, preparation retains the checked runtime
+procedures and marks creation unsupported. Deployment then fails closed with
+`ContractInvalid "unknown procedure"`; unsupported helpers remain excluded.
 
 Malformed artifacts, unsupported import/lowering, source rejection and invalid
 generated core are separate failures. Invalid generated core is an implementation
@@ -23,16 +28,25 @@ A `core_program` owns procedures, state variables, semantic declarations and key
 storage layouts. `core_program_environment` derives both checker and runtime
 environments from it. `StructDeclaration` records field identities and types even
 without storage metadata. Layouts give relative slots, offsets and extents and
-must agree with those declarations. Enum and user-defined value declarations
-have the same semantic home; their import coverage remains deferred.
+must agree with those declarations. Enums retain their semantic declarations. User-defined value types are
+erased to their underlying elementary types by the importer; `wrap` and
+`unwrap` use scalar conversions, and overloaded operators use internal calls.
+
+Public state variables, constants and immutables may override external
+functions. The importer removes the replaced function implementations along
+`baseFunctions`, including transitive overrides, so the existing getter is the
+only dispatch entry for that selector. Replaced implementations do not pull in
+unused library dependencies. Custom error arguments go through the shared ABI
+encoder; enums keep their declaration identity and encode as `uint8`.
 
 ## Destinations and storage
 
 Elaboration represents an assignment destination as a local binding or an
 already evaluated reference. `elab_destination`, `read_destination` and
-`write_destination` are shared by assignment, compound assignment and increment.
-Tuple writes use the same helpers, retaining identifier-only target coverage and
-right-to-left writes. The pinned profile evaluates the assignment RHS before
+`write_destination` are shared by assignment, compound assignment, increment
+and scalar `delete`. Deletion writes the type's default without reading its
+old value, so it preserves neighboring packed storage.
+Tuple writes use the same helpers and write right to left. The pinned profile evaluates the assignment RHS before
 capturing a computed LHS. Snapshots keep earlier values stable while later
 operands run. Postfix increment preserves its old value; compound assignment
 reads and writes the captured location once.
@@ -41,14 +55,24 @@ Scalar state variables use `StateReferenceOperation`, `ReadOperation` and
 `CaptureValueStmt`, like navigated storage. There is no second scalar-state
 read/capture operation. `WriteScalarStmt`, `BindReferenceStmt` and
 `CopyContentsStmt` remain distinct: changing an alias is not copying an aggregate.
-The latter operations are extension points, not aggregate execution coverage.
 
 `solidityStorage` owns concrete storage encoding, packed scalar access, mapping
-hashing, array navigation, state references and struct-field navigation. These
+hashing, array navigation, state references and struct-field navigation. Scalar
+word extraction and replacement are shared by persistent and transient state;
+state descriptors select the backend. Byte-sequence mapping keys use their
+unpadded contents, read through the existing memory/calldata/storage byte path.
+These
 helpers take evaluated values/references and accounts; they do not evaluate core
 atoms or change scopes. `solidityEvaluator` owns atom evaluation, bindings,
 captured targets, frame checks and control flow. Its static-frame write rejection
 is deliberate and remains `InvalidCompletion`.
+
+Fixed bytes, dynamic bytes and arrays use `ArrayIndexOperation` with one
+indexed-element typing rule. The elaborator evaluates the base before the
+index and retains that value: fixed bytes are captured scalars, while byte
+sequences and arrays keep their reference identity. Storage uses its packed
+layout; memory and calldata use their existing element readers. All report
+panic `0x32` for an index outside the current bounds.
 
 ## Evaluator interfaces and validation
 
@@ -84,11 +108,16 @@ source and invalid generated core distinguishable. The acceptance census tracks
 which upstream tests prepare; executing upstream semanticTests expectations is
 separate work.
 
-Memory/calldata execution, a memory model compatible with inline assembly, and
-aggregate aliasing/copying remain unresolved. Concrete CALL/CREATE experiments
-below do not settle the source external-call context, transaction bookkeeping or
-gas contract. Deployment and exact gas/refund correspondence also remain open.
-Full type safety and whole-language coverage are later obligations.
+Memory executes on one byte-addressed memory per frame, shared with inline
+assembly; calldata is read from the frame's call data. Reference rebinding and aggregate copies execute
+(`BindReferenceStmt`, `CopyContentsStmt`). Deployment runs through
+`deploy_contract`; creation and external calls run on Verifereum through the
+provisional adapter (`run_create_call`, `run_external_call`). The concrete
+CALL/CREATE experiments below do not settle that adapter's obligations for the
+source external-call context, transaction bookkeeping or gas
+([source-evm-adapter-contract.md](source-evm-adapter-contract.md)); exact
+gas/refund correspondence remains open. Full type safety and whole-language
+coverage are later obligations.
 
 ## Concrete EVM boundary experiment
 
