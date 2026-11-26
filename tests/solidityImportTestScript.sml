@@ -279,8 +279,8 @@ val () = function_error "modifier invocation of unknown kind"
 val () = function_error "a named argument naming no parameter"
   (edit_first "FunctionCall"
      (set_field "names" (JSON.ARRAY [JSON.STRING "noSuchParameter"])) ast)
-(* (fact)({n: ...}): the callee names no declaration to take the parameter
- * names from, so the call fails import as unsupported, naming the cause. *)
+(* (fact)({n: ...}) takes the parameter name from the same declaration as
+ * fact({n: ...}). *)
 val () =
   let
     fun parenthesize (callee as JSON.OBJECT kvs) =
@@ -299,11 +299,9 @@ val () =
       | NONE => raise Fail "a call without a callee"
   in
     case import_rejection [] (edit_first "FunctionCall" edit ast) contracts of
-      NONE => raise Fail "named arguments of a parenthesized callee: imported"
-    | SOME (k, msg) =>
-        if k = UnsupportedFunction andalso
-           String.isSubstring "named arguments are not supported" msg then ()
-        else raise Fail ("named arguments of a parenthesized callee: " ^ msg)
+      NONE => ()
+    | SOME (_, msg) =>
+        raise Fail ("named arguments of a parenthesized callee: " ^ msg)
   end
 val () = import_error "base outside the compilation"
   (edit_first "ContractDefinition"
