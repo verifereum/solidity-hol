@@ -884,6 +884,15 @@ Definition tuple_partial_writes_def:
       (PartialParts NONE done T q)
 End
 
+(* Only a panic or revert during a read keeps the encoder's effects. *)
+Definition abi_read_failure_def:
+  abi_read_failure c ⇔
+    case c of
+      PanicCompletion _ => T
+    | RevertCompletion _ => T
+    | _ => F
+End
+
 (* An encoder writes at the free memory pointer, and the compiled one reads
  * each input only when it reaches it, after writing what comes before it.
  * The encoders here read their inputs first, from memory as it was, which
@@ -910,7 +919,9 @@ Definition encoded_runtime_values_def:
         case r of
           INL (parts, spill) =>
             (INL (encoded_abi_tuple parts, (case spill of SOME sp => sp | NONE => [])), st2)
-        | INR (c, done, q) => (INR (c, tuple_partial_writes env tys done q), st2)
+        | INR (c, done, q) =>
+            if abi_read_failure c then (INR (c, tuple_partial_writes env tys done q), st2)
+            else (INR (c, []), st)
 End
 
 (* abi.encodePacked: a value in its own width, a bytesN left-aligned and the
@@ -986,7 +997,11 @@ Definition packed_encoding_def:
     let (r, reach, st1) = packed_values env 0 st tys vs in
     case encoder_state st reach st1 of
       INR c => (INR (c, []), st)
-    | INL st2 => (r, st2)
+    | INL st2 =>
+        case r of
+          INL _ => (r, st2)
+        | INR (c, _) =>
+            if abi_read_failure c then (r, st2) else (INR (c, []), st)
 End
 
 Definition abi_runtime_values_def:
@@ -1503,7 +1518,8 @@ Definition event_log_def:
       INR (c, ws) =>
         (case event_state st temps reach st1 of
            INR c1 => (INR (c1, []), st)
-         | INL st2 => (INR (c, ws), st2))
+         | INL st2 =>
+             if abi_read_failure c then (INR (c, ws), st2) else (INR (c, []), st))
     | INL topics =>
         let (r2, reach2, st2) =
           runtime_abi_values env reach st1 tys (MAP (SND o SND) data_args) in
@@ -1516,7 +1532,9 @@ Definition event_log_def:
                          topics := (case topic0 of SOME t => t :: topics | NONE => topics);
                          data := encoded_abi_tuple parts |>,
                       (case spill of SOME sp => sp | NONE => [])), st3)
-            | INR (c, done, q) => (INR (c, tuple_partial_writes env tys done q), st3)
+            | INR (c, done, q) =>
+                if abi_read_failure c then (INR (c, tuple_partial_writes env tys done q), st3)
+                else (INR (c, []), st)
 End
 
 val abi_type_pre_def = cv_auto_trans_pre_rec "abi_type_pre abi_types_pre" abi_type_def (
@@ -1751,6 +1769,7 @@ Proof
 QED
 val () = cv_auto_trans tuple_partial_writes_def;
 
+val () = cv_auto_trans abi_read_failure_def;
 val () = cv_auto_trans encoder_state_def;
 val () = cv_auto_trans encoded_runtime_values_def;
 val () = cv_auto_trans packed_value_def;
