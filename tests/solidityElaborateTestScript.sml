@@ -673,6 +673,21 @@ Proof
   EVAL_TAC
 QED
 
+(* A recursive memory object is unsupported even when referenced only by a
+ * function signature in a struct field. A signature pointing back to its
+ * own struct does not make the struct's memory layout recursive. *)
+Theorem struct_function_signatures_checked:
+  contract_type_blockers
+    [(AstId 40, StructDeclaration [(AstId 41, ArrayT (StructT (AstId 40)) NONE)]);
+     (AstId 42, StructDeclaration [(AstId 43,
+       FunctionT InternalFn PureMut [LocatedT MemoryLoc (StructT (AstId 40))] [])]);
+     (AstId 44, StructDeclaration [(AstId 45,
+       FunctionT InternalFn PureMut [LocatedT MemoryLoc (StructT (AstId 44))] [])])]
+    [] [] [] = [(42, "unsupported type declaration")]
+Proof
+  EVAL_TAC
+QED
+
 Theorem binary_operands_all_report:
   ^(reports “elab_expr ^ctx0 10
                (SrcBinaryOperation ^(at 30) SrcAdd ^(string_at 32) ^(string_at 33)

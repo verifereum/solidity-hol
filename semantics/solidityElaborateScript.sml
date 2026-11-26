@@ -3997,6 +3997,23 @@ Definition creation_dispatch_def:
                  (reached_procedures (LENGTH ps + 2) ps [x])))
 End
 
+(* Check declarations together in their nominal environment. A function
+ * signature may refer to its enclosing struct through a located parameter,
+ * so each declaration is checked once, with other declarations in scope. *)
+Definition contract_type_blockers_def:
+  contract_type_blockers decls layouts cvs immutables =
+    let env = <| procedures := []; state_variables := []; immutables := [];
+                 struct_layouts := MAP (λs. (s.struct_id, s)) layouts;
+                 function_ids := []; creation_function_ids := [];
+                 type_declarations := decls |> in
+    MAP (λ(x, _). case x of AstId id => (id, "unsupported type declaration"))
+      (FILTER (λ(_, decl). ¬wf_type_declaration env decl) decls) ++
+    MAP (λv. case v.state_id of AstId id => (id, "unsupported state variable type"))
+      (FILTER (λv. ¬wf_core_state_variable env v) cvs) ++
+    MAP (λ(x, _). (x, "unsupported immutable type"))
+      (FILTER (λ(_, ty). ¬reference_scalar_type env ty) immutables)
+End
+
 Definition elaborate_contract_def:
   elaborate_contract ctx (c0 : src_contract) (c : src_contract) state immutables n =
     let fs = live_functions c.contract_functions in
@@ -4005,6 +4022,7 @@ Definition elaborate_contract_def:
           core_state_variables state c.contract_storage,
           elab_functions ctx c T F n (elaborated_functions c)) of
       (SOME decls, SOME layouts, SOME cvs, INL (cfps, n00)) =>
+        if ¬NULL (contract_type_blockers decls layouts cvs immutables) then NONE else
         (case elab_functions ctx c T T n00 (elaborated_library_functions c) of
           INR _ => NONE
         | INL (lfps, n0) =>
@@ -4089,6 +4107,12 @@ Definition contract_blockers_def:
      then [(c.contract_info.node_id, "struct layout mismatch")] else []) ++
     (if IS_SOME (core_state_variables state c.contract_storage) then []
      else [(c.contract_info.node_id, "storage layout mismatch")]) ++
+    (case (elab_type_declarations c.contract_enums c.contract_structs,
+           elab_struct_layouts c.contract_structs,
+           core_state_variables state c.contract_storage) of
+       (SOME decls, SOME layouts, SOME cvs) =>
+         contract_type_blockers decls layouts cvs immutables
+     | _ => []) ++
     blockers (elab_functions ctx c T F n (elaborated_functions c)) ++
     blockers (elab_functions ctx c T T n (elaborated_library_functions c)) ++
     MAP (λx. (x, "unsupported getter"))
@@ -4667,6 +4691,7 @@ val () = cv_auto_trans reference_values_def;
 val () = cv_auto_trans procedure_references_def;
 val () = cv_auto_trans reached_procedures_def;
 val () = cv_auto_trans creation_dispatch_def;
+val () = cv_auto_trans contract_type_blockers_def;
 val () = cv_auto_trans elaborate_contract_def;
 val () = cv_auto_trans table_blockers_def;
 val () = cv_auto_trans contract_blockers_def;
