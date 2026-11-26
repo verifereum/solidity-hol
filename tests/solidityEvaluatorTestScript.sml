@@ -2495,8 +2495,10 @@ val () = cv_auto_trans encoder_operand_rejections_def;
 
 Theorem encoder_operand_rejections_discard_scratch_and_partial_writes:
   encoder_operand_rejections =
-    let bad = (InvalidCompletion "bad memory array reference", []) in
-    (INR bad, INR bad, INR bad, [T; T; T])
+    (INR (InvalidCompletion "bad memory array reference", []),
+     INR (InvalidCompletion "bad memory array reference", []),
+     INR (InvalidCompletion "bad memory array reference", []),
+     [T; T; T])
 Proof
   CONV_TAC cv_eval
 QED
