@@ -1153,36 +1153,20 @@ Definition elab_struct_layouts_def:
         (computed_struct_layouts (LENGTH structs) structs)) structs
 End
 
-(* Whether a binding of type ty is one the core accepts: a memory or calldata
- * type's structs are declared, not recursive and hold no mapping; a storage
- * type's structs have layouts. *)
-Definition located_binding_ok_def:
-  located_binding_ok enums structs ty ⇔
-    case ty of
-      LocatedT StorageLoc element =>
-        (case (elab_type_declarations enums structs, elab_struct_layouts structs) of
-           (SOME decls, SOME layouts) =>
-             storage_type_ok <| procedures := []; state_variables := []; immutables := [];
-                                struct_layouts := MAP (λs. (s.struct_id, s)) layouts;
-                                function_ids := []; creation_function_ids := []; type_declarations := decls |> element
-         | _ => F)
-    | LocatedT _ element =>
-        (case elab_type_declarations enums structs of
-           SOME decls =>
-             memory_type_ok <| procedures := []; state_variables := []; immutables := [];
-                               struct_layouts := []; function_ids := []; creation_function_ids := []; type_declarations := decls |>
-               (LENGTH decls) element
-         | NONE => F)
-    | _ => T
-End
-
-(* located_binding_ok of a binding, or of each parameter and return of an
- * internal function type. *)
+(* Check located objects and function signatures against the same declarations
+ * and layouts used to check the generated core. *)
 Definition memory_binding_ok_def:
   memory_binding_ok enums structs ty ⇔
-    case ty of
-      FunctionT InternalFn _ ps rs => EVERY (located_binding_ok enums structs) (ps ++ rs)
-    | _ => located_binding_ok enums structs ty
+    if located_value_type ty ∨ is_function_type ty then
+      case (elab_type_declarations enums structs, elab_struct_layouts structs) of
+        (SOME decls, SOME layouts) =>
+          core_binding_type
+            <| procedures := []; state_variables := []; immutables := [];
+               struct_layouts := MAP (λs. (s.struct_id, s)) layouts;
+               function_ids := []; creation_function_ids := [];
+               type_declarations := decls |> ty
+      | _ => F
+    else case ty of LocatedT _ _ => F | _ => T
 End
 
 (* Whether values of type ty cross an ABI boundary (abi_type_ok), against the
@@ -1194,6 +1178,18 @@ Definition abi_binding_ok_def:
         abi_type_ok <| procedures := []; state_variables := []; immutables := [];
                        struct_layouts := []; function_ids := []; creation_function_ids := []; type_declarations := decls |> ty
     | NONE => F
+End
+
+(* AbiEncode operands can name aggregates through their source location.
+ * Validate the encoded types after resolving their declarations. *)
+Definition checked_abi_encoding_def:
+  checked_abi_encoding enums structs n id ids form os =
+    case abi_encoding n id ids form os of
+      INL ((ss, AbiEncodeOperation sel tys args), n1) =>
+        if EVERY (abi_binding_ok enums structs) tys then
+          INL ((ss, AbiEncodeOperation sel tys args), n1)
+        else INR [(id, "abi encoding of this type")]
+    | result => result
 End
 
 (* Slices retain their elements' offsets, so each element's ABI head must
@@ -2237,7 +2233,8 @@ Definition elab_expr_def:
                     (if form = AbiStringConcat then StringT else BytesT) in
          ensure (source_type_matches ty tid) (info.node_id, "type annotation mismatch")
          (let ((ss, os), n1) = elab_arg_values ctx n args in
-          case abi_encoding n1 info.node_id (expr_ids args) form os of
+          case checked_abi_encoding ctx.enums ctx.structs n1 info.node_id
+                 (expr_ids args) form os of
             INL ((cs, op), n2) =>
               let (es, r) = bind_value n2 ty op in
               INL ((ss ++ cs ++ es, r, ElabType ty), n2 + 1)
@@ -4320,6 +4317,7 @@ val () = cv_auto_trans elab_struct_layouts_with_def;
 val () = cv_auto_trans elab_struct_layouts_def;
 val () = cv_auto_trans memory_binding_ok_def;
 val () = cv_auto_trans abi_binding_ok_def;
+val () = cv_auto_trans checked_abi_encoding_def;
 val () = cv_auto_trans static_binding_ok_def;
 val () = cv_auto_trans copy_target_ok_def;
 val () = cv_auto_trans struct_root_def;

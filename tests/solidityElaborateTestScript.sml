@@ -660,6 +660,19 @@ Proof
   EVAL_TAC
 QED
 
+Theorem abi_encode_function_array_refused:
+  elab_expr (^ctx0 with variables :=
+      [(40, LocatedT MemoryLoc (ArrayT
+             (FunctionT InternalFn PureMut [UintT 256] [UintT 256]) NONE))]) 10
+    (SrcAbiEncode ^(at 30) ^(at 31) AbiPlain
+      [SrcIdentifier ^(at 32) "fns" 40
+         "t_array$_t_function_internal_pure$_t_uint256_$returns$_t_uint256_$_$dyn_memory_ptr"]
+      "t_bytes_memory_ptr") =
+  INR [(30, "abi encoding of this type")]
+Proof
+  EVAL_TAC
+QED
+
 Theorem binary_operands_all_report:
   ^(reports “elab_expr ^ctx0 10
                (SrcBinaryOperation ^(at 30) SrcAdd ^(string_at 32) ^(string_at 33)

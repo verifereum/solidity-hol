@@ -775,7 +775,7 @@ End
 Definition decode_elementary_identifier_def:
   decode_elementary_identifier s =
     case decode_identifier_fuel (LENGTH s) s of
-      SOME ty => if valid_type_shape ty then SOME ty else NONE
+      SOME ty => if valid_type_shape ty ∧ function_type_ok ty then SOME ty else NONE
     | NONE => NONE
 End
 
@@ -1365,7 +1365,7 @@ Definition abi_call_parameter_def:
   abi_call_parameter tid =
     case decode_type_identifier tid of
       SOME (SrcType ty) =>
-        if is_stored_scalar_type ty then SOME ty else
+        if abi_scalar_type ty then SOME ty else
         (case ty of
            LocatedT _ element =>
              if located_object_shape MemoryLoc element

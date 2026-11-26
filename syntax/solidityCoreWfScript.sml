@@ -248,6 +248,34 @@ Definition located_object_shape_def:
   (located_object_shape loc ty ⇔ byte_sequence_type ty)
 End
 
+(* Located values: references to an object in a data location. *)
+Definition located_value_type_def:
+  (located_value_type (LocatedT loc ty) ⇔ located_object_shape loc ty) ∧
+  (located_value_type _ ⇔ F)
+End
+
+(* Check signatures throughout the type syntax. Struct declarations are
+ * checked separately, so a function signature can refer back to its struct. *)
+Definition function_type_ok_def:
+  (function_type_ok (FunctionT kind m ps rs) ⇔
+    kind = InternalFn ∧ m ≠ PayableMut ∧
+    function_parameters_ok ps ∧ function_parameters_ok rs) ∧
+  (function_type_ok (ArrayT ty _) ⇔ function_type_ok ty) ∧
+  (function_type_ok (MappingT key value) ⇔
+    function_type_ok key ∧ function_type_ok value) ∧
+  (function_type_ok (LocatedT _ ty) ⇔ function_type_ok ty) ∧
+  (function_type_ok _ ⇔ T) ∧
+  (function_parameters_ok [] ⇔ T) ∧
+  (function_parameters_ok (ty :: tys) ⇔
+    (is_value_type ty ∨ located_value_type ty) ∧
+    function_type_ok ty ∧ function_parameters_ok tys)
+Termination
+  WF_REL_TAC ‘measure (λx. case x of
+    INL ty => sol_type_size ty
+  | INR tys => list_size sol_type_size tys)’ >>
+  rw[solidityASTTheory.sol_type_size_def, list_size_def]
+End
+
 (* The structs a memory or calldata object type reaches are declared, and each
  * field is a stored scalar or, as a pointer, an object in the same location
  * (memory and calldata objects share a shape): no mapping.
@@ -260,6 +288,9 @@ Definition memory_type_ok_def:
       SOME fields => memory_fields_ok env (n - 1) (MAP SND fields)
     | NONE => F) ∧
   (memory_type_ok env n (EnumT id) ⇔ IS_SOME (lookup_enum env id)) ∧
+  (memory_type_ok env n (FunctionT k m ps rs) ⇔
+    function_type_ok (FunctionT k m ps rs) ∧
+    valid_type_shape (FunctionT k m ps rs)) ∧
   (memory_type_ok env n _ ⇔ T) ∧
   (memory_fields_ok env n [] ⇔ T) ∧
   (memory_fields_ok env n (ty :: tys) ⇔
@@ -271,21 +302,6 @@ Termination
     INL (env, n, ty) => (n, sol_type_size ty)
   | INR (env, n, tys) => (n, list_size sol_type_size tys))’ >>
   rw[list_size_def]
-End
-
-(* Located values: references to an object in a data location. *)
-Definition located_value_type_def:
-  (located_value_type (LocatedT loc ty) ⇔ located_object_shape loc ty) ∧
-  (located_value_type _ ⇔ F)
-End
-
-(* An internal function is never payable. Its parameters and returns
- * may themselves be values or located references. Other types pass. *)
-Definition function_type_ok_def:
-  (function_type_ok (FunctionT kind m ps rs) ⇔
-    kind = InternalFn ∧ m ≠ PayableMut ∧
-    EVERY (λty. is_value_type ty ∨ located_value_type ty) (ps ++ rs)) ∧
-  (function_type_ok _ ⇔ T)
 End
 
 Definition storage_type_ok_def:
@@ -307,10 +323,10 @@ Definition storage_type_ok_def:
   (storage_type_ok env ty ⇔ elementary_storage_type_ok ty)
 End
 
-(* A located type that is well formed in env: its object shape, in storage
- * its layout, and in memory and calldata its structs' fields. *)
-Definition located_type_ok_def:
-  located_type_ok env loc ty ⇔
+(* The layout of a located type, independent of the declarations named
+ * inside its function signatures. *)
+Definition located_layout_ok_def:
+  located_layout_ok env loc ty ⇔
     located_object_shape loc ty ∧ (loc = StorageLoc ⇒ storage_type_ok env ty) ∧
     (loc ≠ StorageLoc ⇒ memory_type_ok env (LENGTH env.type_declarations) ty)
 End
@@ -327,11 +343,12 @@ Definition declared_type_ok_def:
   (declared_type_ok env (EnumT id) ⇔ IS_SOME (lookup_enum env id)) ∧
   (declared_type_ok env (UserValueT id) ⇔ IS_SOME (lookup_user_value env id)) ∧
   (declared_type_ok env (ContractT _) ⇔ F) ∧
-  (declared_type_ok env (FunctionT _ _ parameters returns) ⇔
+  (declared_type_ok env (FunctionT k m parameters returns) ⇔
+    function_type_ok (FunctionT k m parameters returns) ∧
     declared_types_ok env parameters ∧
     declared_types_ok env returns ∧
     EVERY (λty. case ty of
-                  LocatedT loc element => located_type_ok env loc element
+                  LocatedT loc element => located_layout_ok env loc element
                 | _ => T) (parameters ++ returns)) ∧
   (declared_type_ok env (LocatedT loc ty) ⇔
     declared_type_ok env ty ∧
@@ -346,6 +363,12 @@ Termination
     INL (env, ty) => sol_type_size ty
   | INR (env, tys) => list_size sol_type_size tys)’ >>
   rw[solidityASTTheory.sol_type_size_def, list_size_def]
+End
+
+(* Check both the object's layout and the types named in it. *)
+Definition located_type_ok_def:
+  located_type_ok env loc ty ⇔
+    located_layout_ok env loc ty ∧ declared_type_ok env (LocatedT loc ty)
 End
 
 (* Stage 2 bindings, parameters and returns are value types: an internal
@@ -1592,7 +1615,7 @@ End
  *)
 Definition wf_core_state_variable_def:
   wf_core_state_variable env (v : core_state_variable) ⇔
-    storage_type_ok env v.state_type ∧
+    storage_type_ok env v.state_type ∧ declared_type_ok env v.state_type ∧
     (v.state_backend = TransientStorage ⇒ IS_SOME (storage_bytes v.state_type)) ∧
     case storage_bytes v.state_type of
       SOME b => v.state_offset + b ≤ 32
@@ -1775,6 +1798,12 @@ val () = cv_auto_trans_rec mapping_reachable_def (
   WF_REL_TAC ‘inv_image ($< LEX $<) (λx. case x of
     INL (env, n, ty) => (cv$c2n n, cv_size ty)
   | INR (env, n, tys) => (cv$c2n n, cv_size tys))’ >>
+  cv_termination_tac
+);
+val () = cv_auto_trans_rec function_type_ok_def (
+  WF_REL_TAC ‘measure (λx. case x of
+    INL ty => cv_size ty
+  | INR tys => cv_size tys)’ >>
   cv_termination_tac
 );
 val () = cv_auto_trans_rec memory_type_ok_def (

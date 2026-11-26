@@ -31,8 +31,7 @@ val prepared = #prepared (solidityPrepareLib.prepare_artifact
  * functions calls reach. The constant DIGITS and digits, which reads it,
  * elaborate through the shared fixed-byte indexed access;
  * pointer's assembly assigns a bytes local, which elaborates.
- * hookCount's struct has a function-typed member, so the struct is left out
- * and hookCount's local does not elaborate, while the unit still imports.
+ * hookCount's local struct holds an internal function value.
  * nodeValue's local and nodeCount's new array hold a recursive struct in
  * memory, which the core does not hold, and copyTree copies one in storage.
  * encodePair, emitPair and putPair take a memory struct across an ABI
@@ -76,8 +75,7 @@ val () =
      reasons "twice" = [calls_unsupported] andalso
      reasons "digits" = [NONE] andalso
      reasons "pointer" = [NONE] andalso
-     List.all elaboration_failure (reasons "hookCount") andalso
-     length (reasons "hookCount") = 1 andalso
+     reasons "hookCount" = [NONE] andalso
      List.all elaboration_failure (reasons "nodeValue") andalso
      length (reasons "nodeValue") = 1 andalso
      List.all elaboration_failure (reasons "nodeCount") andalso
@@ -299,10 +297,8 @@ Proof
   CONV_TAC (QUANT_CONV (LAND_CONV cv_eval)) >> simp[]
 QED
 
-(* Function types the core does not model
- * (testdata/frontend/function_type_limits.sol): a comparison of function
- * values and a function value in inline assembly leave their functions
- * unsupported, while a local internal function value runs. *)
+(* Internal function values support local calls, equality and inline
+ * assembly references. *)
 val limits_prepared = #prepared (solidityPrepareLib.prepare_artifact
   {root = "..", path = "../testdata/frontend/expected/function_type_limits.json",
    source = "testdata/frontend/function_type_limits.sol"});
@@ -314,8 +310,8 @@ fun limits_reasons name =
 val () =
   if limits_reasons "local" = [NONE] andalso
      limits_reasons "inc" = [NONE] andalso
-     List.all elaboration_failure (limits_reasons "compares") andalso
-     List.all elaboration_failure (limits_reasons "inAssembly") andalso
+     limits_reasons "compares" = [NONE] andalso
+     limits_reasons "inAssembly" = [NONE] andalso
      length limits_outcomes = 4
   then ()
   else raise Fail ("unexpected function_type_limits outcomes: " ^
@@ -345,16 +341,15 @@ Proof
   CONV_TAC (QUANT_CONV (LAND_CONV cv_eval)) >> simp[] >> EVAL_TAC
 QED
 
-Theorem limits_compares_refused:
-  limits_call ^(listSyntax.mk_list (selector "df6b2ec9", “:word8”)) =
-  ContractInvalid "unknown procedure"
+Theorem limits_compares_runs:
+  ∃w. limits_call ^(listSyntax.mk_list (selector "df6b2ec9", “:word8”)) =
+      ContractReturned (word_to_bytes (1w : bytes32) T) w
 Proof
-  CONV_TAC (LAND_CONV cv_eval) >> REFL_TAC
+  CONV_TAC (QUANT_CONV (LAND_CONV cv_eval)) >> simp[] >> EVAL_TAC
 QED
 
-(* A function value in storage and an external function type parameter
- * (testdata/frontend/function_type_refused.sol) each refuse the whole unit:
- * the core models neither the storage layout nor the function's header. *)
+(* An external function type parameter refuses the unit, which also stores
+ * a supported internal function value. *)
 val () =
   (ignore (solidityPrepareLib.prepare_artifact
      {root = "..", path = "../testdata/frontend/expected/function_type_refused.json",
@@ -362,7 +357,7 @@ val () =
    raise Fail "function_type_refused unexpectedly prepared")
   handle solidityPrepareLib.PreparationError
            (solidityPrepareLib.UnsupportedImport, msg) =>
-    if String.isSubstring "unsupported state variable" msg andalso
-       String.isSubstring "external function types are not supported" msg
+    if String.isSubstring "external function types are not supported" msg andalso
+       not (String.isSubstring "unsupported state variable" msg)
     then ()
     else raise Fail ("function_type_refused reason missing: " ^ msg);
