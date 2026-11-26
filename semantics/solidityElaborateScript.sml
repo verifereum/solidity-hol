@@ -79,6 +79,7 @@ Datatype:
   elab_ctx = <|
     functions : (num # src_function) list;
     static_functions : (num # src_function) list;
+    function_ids : (ast_id # num) list;
     supers : (num # src_function) list;
     structs : src_struct list;
     enums : (num # num) list;
@@ -388,7 +389,7 @@ Definition read_location_def:
   read_location (id : num) result =
     case result of
       INL ((ss, ref, ty), n) =>
-        if is_stored_scalar_type ty ∨ is_function_type ty ∨
+        if is_stored_scalar_type ty ∨
            located_object_shape StorageLoc ty then
           let (rs, a) = bind_value n (read_value_type ty) (ReadOperation ty ref) in
           INL ((ss ++ rs, a, ElabType (read_value_type ty)), n + 1)
@@ -493,12 +494,10 @@ Definition negate_value_def:
     in ((ss ++ ss', a'), n + 1)
 End
 
-(* Comparisons of two operands of type ty, by equality and less-than. The
- * core does not compare function values. *)
+(* Comparisons of two operands of type ty, by equality and less-than. *)
 Definition comparison_def:
   comparison n ty op al ar =
-    if is_function_type ty then NONE
-    else if op = SrcEq then SOME (compare_value n ty EqualOp al ar, n + 1)
+    if op = SrcEq then SOME (compare_value n ty EqualOp al ar, n + 1)
     else if op = SrcNe then
       SOME (negate_value (n + 1) (compare_value n ty EqualOp al ar))
     else if op = SrcLt then SOME (compare_value n ty LessThanOp al ar, n + 1)
@@ -780,7 +779,8 @@ Definition abi_argument_def:
   abi_argument packed a vt =
     case vt of
       ElabType ty =>
-        if is_stored_scalar_type ty then INL (ty, a) else
+        if is_function_type ty then INR "abi encoding of a function type"
+        else if abi_scalar_type ty then INL (ty, a) else
         (case ty of
            LocatedT _ element =>
              if (if packed then packed_type (LocatedT MemoryLoc element)
@@ -1324,7 +1324,7 @@ Definition finish_delete_def:
         LocatedT MemoryLoc element => memory_binding_ok ctx.enums ctx.structs ty
       | LocatedT _ _ => F
       | MappingT _ _ => F
-      | _ => is_stored_scalar_type ty ∨ is_function_type ty ∨
+      | _ => is_stored_scalar_type ty ∨
              (located_object_shape StorageLoc ty ∧
               memory_binding_ok ctx.enums ctx.structs (LocatedT StorageLoc ty)) in
     if ¬allowed then INR [(id, "delete of this type or location")] else
@@ -1545,7 +1545,7 @@ Definition elab_expr_def:
         (case variable_destination ctx n x tid of
            SOME ((ls, target), n1) =>
              let ty = destination_type target in
-             if ¬(is_stored_scalar_type ty ∨ is_function_type ty ∨
+             if ¬(is_stored_scalar_type ty ∨
                   located_object_shape StorageLoc ty ∨ located_value_type ty)
              then INR [(info.node_id, "read of a value of this type")] else
              let (read, n2) = read_destination n1 target in
@@ -2174,8 +2174,7 @@ Definition elab_expr_def:
                 INL ((st, at, vt), n3) =>
                   (case OPTION_MAP read_value_type (identifier_type tid) of
                      SOME ty =>
-                       if ¬(located_value_type ty ∨ is_stored_scalar_type ty ∨
-                            is_function_type ty) ∨
+                       if ¬(located_value_type ty ∨ is_stored_scalar_type ty) ∨
                           ¬memory_binding_ok ctx.enums ctx.structs ty
                        then reject (info.node_id, "unsupported conditional type")
                               (elab_expr ctx n f) else
@@ -2931,14 +2930,14 @@ End
  * array, and the plain name of a calldata static array, name the calldata
  * the reference covers.
  *)
-(* The declarations assembly_value_type reads: the enums. The importer gives
- * a user-defined value type's values their underlying type. *)
+(* The declarations and dispatch ids in scope for assembly references. The
+ * importer gives a user-defined value type's values their underlying type. *)
 Definition elab_enum_environment_def:
   elab_enum_environment ctx =
     <| procedures := []; state_variables := []; immutables := [];
        struct_layouts := [];
-       function_ids := []; creation_function_ids := []; type_declarations :=
-         MAP (λ(id, members). (AstId id, EnumDeclaration members)) ctx.enums |>
+       function_ids := ctx.function_ids; creation_function_ids := [];
+       type_declarations := MAP (λ(id, members). (AstId id, EnumDeclaration members)) ctx.enums |>
 End
 
 Definition elab_assembly_reference_def:
@@ -3526,6 +3525,7 @@ End
 Definition contract_ctx_def:
   contract_ctx (c : src_contract) calls state immutables constants =
     <| functions := calls;
+       function_ids := MAP (λ(x, n). (AstId x, n)) c.contract_function_ids;
        static_functions := MAP (λf. (f.fn_info.node_id, f))
          (FILTER (λf. f.fn_unsupported = NONE) c.contract_functions);
        supers := []; structs := c.contract_structs;

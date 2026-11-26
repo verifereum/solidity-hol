@@ -356,14 +356,16 @@ QED
 Theorem asm_halt_rejected_in_constructor:
   ∀info.
     ISL (elab_stmt
-      <| functions := []; static_functions := []; supers := []; structs := []; enums := []; events := [];
+      <| functions := []; static_functions := []; function_ids := [];
+         supers := []; structs := []; enums := []; events := [];
          variables := []; state := []; locations := []; immutables := [];
          constants := []; returns := []; placeholder := NONE;
          mode := CheckedArithmetic; creation := F; scope := 0;
          returns_id := 0; in_loop := F; bad_ids := [] |> 0
       (SrcInlineAssembly info [YulExprStmt (YulBuiltin YStop [])] [])) ∧
     elab_stmt
-      <| functions := []; static_functions := []; supers := []; structs := []; enums := []; events := [];
+      <| functions := []; static_functions := []; function_ids := [];
+         supers := []; structs := []; enums := []; events := [];
          variables := []; state := []; locations := []; immutables := [];
          constants := []; returns := []; placeholder := NONE;
          mode := CheckedArithmetic; creation := T; scope := 0;
@@ -394,7 +396,8 @@ Theorem declaration_body_and_tuple_fraction_rejected:
       d = SrcVariableDeclarationStatement info [SOME 1] [SOME x] NONE;
       c = SrcLiteral info BoolLiteral "true" "t_bool";
       half = SrcLiteral info NumberLiteral "" "t_rational_1_by_2";
-      ctx = <| functions := []; static_functions := []; supers := []; structs := []; enums := [];
+      ctx = <| functions := []; static_functions := []; function_ids := [];
+               supers := []; structs := []; enums := [];
                events := []; variables := []; state := []; locations := [];
                immutables := []; constants := []; returns := [];
                placeholder := NONE; mode := CheckedArithmetic; creation := F;
@@ -415,7 +418,8 @@ Theorem bytes_to_fixed_bytes_admitted:
                                     loc_source := 0 |> |>;
       to16 e = SrcTypeConversion info
                  (SrcElementaryTypeName info "bytes16" NONE) e "t_bytes16";
-      ctx = <| functions := []; static_functions := []; supers := []; structs := []; enums := [];
+      ctx = <| functions := []; static_functions := []; function_ids := [];
+               supers := []; structs := []; enums := [];
                events := [];
                variables := [(1, LocatedT MemoryLoc BytesT); (2, FixedBytesT 32)];
                state := []; locations := [];
@@ -436,7 +440,8 @@ val info0 = “<| node_id := 0;
                 node_location := <| loc_start := 0; loc_length := 0;
                                     loc_source := 0 |> |>”;
 fun at id = “^info0 with node_id := ^(numSyntax.term_of_int id)”;
-val ctx0 = “<| functions := []; static_functions := []; supers := []; structs := []; enums := [];
+val ctx0 = “<| functions := []; static_functions := []; function_ids := [];
+               supers := []; structs := []; enums := [];
                events := []; variables := []; state := []; locations := [];
                immutables := []; constants := []; returns := [];
                placeholder := NONE; mode := CheckedArithmetic; creation := F;

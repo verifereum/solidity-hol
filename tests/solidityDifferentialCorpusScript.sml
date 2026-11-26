@@ -67,6 +67,7 @@ Ancestors
   solidityDifferentialCorpus_fallback
   solidityDifferentialCorpus_function_references
   solidityDifferentialCorpus_function_types
+  solidityDifferentialCorpus_function_values
   solidityDifferentialCorpus_gas_invalid
   solidityDifferentialCorpus_hashes
   solidityDifferentialCorpus_immutable_kinds

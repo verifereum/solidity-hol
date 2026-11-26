@@ -353,7 +353,8 @@ Definition convert_scalar_def:
          | NONE => ScalarInvalid)
     | (UserValueT _, _) => ScalarOk s
     | (BoolT, BoolValue _) => ScalarOk s
-    | (FunctionT _ _ _ _, InternalFunctionValue _) => ScalarOk s
+    | (FunctionT InternalFn _ _ _, InternalFunctionValue _) => ScalarOk s
+    | (FunctionT ExternalFn _ _ _, ExternalFunctionValue _ _) => ScalarOk s
     | _ => ScalarInvalid
 End
 

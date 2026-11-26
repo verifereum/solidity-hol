@@ -124,11 +124,10 @@ Definition memory_word_def:
   memory_word env ty v =
     case v of
       ScalarValue (InternalFunctionValue f) =>
-        (case f of INL x => ALOOKUP env.function_ids x | INR w => SOME w)
+        scalar_number env 32 (InternalFunctionValue f)
     | ScalarValue (ExternalFunctionValue a selector) =>
-        if LENGTH selector = 4 then
-          SOME (w2n a * 2 ** 96 + num_of_be_bytes selector * 2 ** 64)
-        else NONE
+        OPTION_MAP (λn. n * 2 ** 64)
+          (scalar_number env 24 (ExternalFunctionValue a selector))
     | ScalarValue s => scalar_word env ty s
     | ReferenceValue (MemoryReference p _) => SOME p
     | _ => NONE
@@ -164,16 +163,16 @@ Definition word_value_def:
              else INR (PanicCompletion 33)
          | NONE => INR (InvalidCompletion "unknown enum"))
     | FunctionT InternalFn _ _ _ =>
-        (case FILTER (λ(x, n). n = w) env.function_ids of
-           [] => INL (ScalarValue (InternalFunctionValue (INR w)))
-         | (x, _) :: _ =>
-             if scalar_has_type env ty (InternalFunctionValue (INL x))
-             then INL (ScalarValue (InternalFunctionValue (INL x)))
+        (case scalar_of_number env ty w of
+           SOME s =>
+             if scalar_has_type env ty s then INL (ScalarValue s)
              else INR (InvalidCompletion
-                    "unsupported: an internal function word of a function of another type"))
+                    "unsupported: an internal function word of a function of another type")
+         | NONE => INR (InvalidCompletion "bad memory word type"))
     | FunctionT ExternalFn _ _ _ =>
-        INL (ScalarValue (ExternalFunctionValue (n2w (w DIV 2 ** 96))
-               (num_to_bytes 4 (w DIV 2 ** 64))))
+        (case scalar_of_number env ty (w DIV 2 ** 64) of
+           SOME s => INL (ScalarValue s)
+         | NONE => INR (InvalidCompletion "bad memory word type"))
     | _ =>
       case word_type env ty of
         SOME BoolT => INL (ScalarValue (BoolValue (w ≠ 0)))
@@ -575,8 +574,8 @@ Definition source_part_def:
 End
 
 Definition store_storage_word_def:
-  store_storage_word addr slot offset ty x (st : source_state) =
-    case write_storage st.world.accounts addr slot offset ty x of
+  store_storage_word env addr slot offset ty x (st : source_state) =
+    case write_storage env st.world.accounts addr slot offset ty x of
       SOME accounts => (INL (), st with world := st.world with accounts := accounts)
     | NONE => (INR (InvalidCompletion "bad storage write"), st)
 End
@@ -651,7 +650,7 @@ Definition store_storage_value_def:
                     (case x of
                        ScalarValue y =>
                          (case eval_conversion env src dst y of
-                            ScalarOk z => store_storage_word addr s offset dst z st1
+                            ScalarOk z => store_storage_word env addr s offset dst z st1
                           | _ => (INR (InvalidCompletion "bad element conversion"), st1))
                      | _ => (INR (InvalidCompletion "bad stored element"), st1))
                   else store_storage_value env fuel addr s src dst x st1) of
@@ -669,7 +668,7 @@ Definition store_storage_value_def:
             let s = slot + l.state_slot in
             case (if is_stored_scalar_type ty then
                     (case x of
-                       ScalarValue y => store_storage_word addr s l.state_offset ty y st1
+                       ScalarValue y => store_storage_word env addr s l.state_offset ty y st1
                      | _ => (INR (InvalidCompletion "bad stored field"), st1))
                   else case ty of
                     MappingT _ _ => (INL (), st1)

@@ -771,13 +771,12 @@ fun check_using d = within d (fn d =>
               | NONE => false))
     "using directive has no library or nonempty function list")
 
-(* A type-valued expression without its parentheses: (T) is a one-component
- * tuple around T, and denotes T. *)
-fun unparenthesized_type v =
+(* A parenthesized expression is a one-component tuple around its operand. *)
+fun unparenthesized v =
   if node_type v = "TupleExpression" andalso not (bool_field v "isInlineArray") then
     case JSONUtil.arrayMap I (field v "components") of
       [JSON.NULL] => v
-    | [c] => unparenthesized_type c
+    | [c] => unparenthesized c
     | _ => v
   else v
 
@@ -971,7 +970,7 @@ fun expr v = guarded (fn e => [ExprChild e]) unsupported_expr (fn v => within v 
                    string_field (field base "expression") "name" = "type" andalso
                    int_field (field base "expression") "referencedDeclaration" < 0
            then
-             (case map unparenthesized_type (JSONUtil.arrayMap I (field base "arguments")) of
+             (case map unparenthesized (JSONUtil.arrayMap I (field base "arguments")) of
                 [arg] =>
                   if String.isPrefix "t_type$_t_contract$_" (raw_type_id arg) then
                     contract_type_member v base arg
@@ -1130,7 +1129,7 @@ fun expr v = guarded (fn e => [ExprChild e]) unsupported_expr (fn v => within v 
       end
   | "FunctionCall" =>
       let
-        val callee = field v "expression"
+        val callee = unparenthesized (field v "expression")
         val abi_member =
           node_type callee = "MemberAccess" andalso
           node_type (field callee "expression") = "Identifier" andalso
@@ -1304,7 +1303,7 @@ fun expr v = guarded (fn e => [ExprChild e]) unsupported_expr (fn v => within v 
                | NONE => (positional (); listSyntax.mk_nil numSyntax.num),
                type_id v]
         | "typeConversion" =>
-            let val callee = unparenthesized_type callee in
+            let val callee = unparenthesized callee in
             (positional ();
              require v (length args = 1) "a conversion takes one argument";
              if String.isPrefix "t_type$_t_contract$_" (raw_type_id callee) then
@@ -1324,7 +1323,7 @@ fun expr v = guarded (fn e => [ExprChild e]) unsupported_expr (fn v => within v 
                    type_id v]))
             end
         | "structConstructorCall" =>
-            let val s = int_field (unparenthesized_type callee) "referencedDeclaration" in
+            let val s = int_field (unparenthesized callee) "referencedDeclaration" in
               con "SrcStructConstructor"
                 [info v, mk_num s, listSyntax.mk_list (args, expr_ty),
                  argument_order v s 0, type_id v]
@@ -1339,7 +1338,7 @@ fun expr v = guarded (fn e => [ExprChild e]) unsupported_expr (fn v => within v 
 and wrap_call v callee args =
   let
     val (nominal, ty) =
-      case value_type_expression (unparenthesized_type (field callee "expression")) of
+      case value_type_expression (unparenthesized (field callee "expression")) of
         SOME pair => pair
       | NONE => fail (describe v ^ ": wrap/unwrap requires a user-defined value type")
     val member = string_field callee "memberName"
@@ -1405,7 +1404,7 @@ and abi_decode_call v callee args =
       case c of
         JSON.NULL => NONE
       | _ =>
-        let val c = unparenthesized_type c in
+        let val c = unparenthesized c in
         case node_type c of
           "ElementaryTypeNameExpression" => SOME (type_name (field c "typeName"))
         | "IndexAccess" =>

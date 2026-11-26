@@ -38,6 +38,33 @@ Definition stored_value_def:
     | _ => NONE
 End
 
+(* Internal function words are dispatch ids. The 24-byte external form is
+ * the address followed by the selector, before memory's left alignment. *)
+Definition scalar_number_def:
+  scalar_number env b s =
+    case s of
+      InternalFunctionValue (INL x) => ALOOKUP env.function_ids x
+    | InternalFunctionValue (INR w) => SOME w
+    | ExternalFunctionValue a selector =>
+        if LENGTH selector = 4 then
+          SOME (w2n a * 2 ** 32 + num_of_be_bytes selector)
+        else NONE
+    | _ => stored_number b s
+End
+
+Definition scalar_of_number_def:
+  scalar_of_number env ty (n : num) =
+    case ty of
+      FunctionT InternalFn _ _ _ =>
+        SOME (InternalFunctionValue
+          (case FILTER (λ(_, id). id = n) env.function_ids of
+             [] => INR n
+           | (x, _) :: _ => INL x))
+    | FunctionT ExternalFn _ _ _ =>
+        SOME (ExternalFunctionValue (n2w (n DIV 2 ** 32)) (num_to_bytes 4 n))
+    | _ => stored_value ty n
+End
+
 (* The bytes of a value of type ty at a byte offset from the low-order end of
  * a slot of an account. Reading keeps only those bytes, as the compiler's
  * storage cleanup does; writing replaces only them.
@@ -46,7 +73,7 @@ Definition read_storage_word_def:
   read_storage_word env (word : bytes32) offset ty =
     case storage_bytes ty of
       SOME b =>
-        (case stored_value ty
+        (case scalar_of_number env ty
           ((w2n word DIV 2 ** (8 * offset)) MOD 2 ** (8 * b)) of
            SOME v => if scalar_has_type env ty v then SOME v else NONE
          | NONE => NONE)
@@ -60,11 +87,11 @@ Definition read_storage_def:
 End
 
 Definition write_storage_word_def:
-  write_storage_word (word : bytes32) offset ty s =
+  write_storage_word env (word : bytes32) offset ty s =
     case storage_bytes ty of
       NONE => NONE
     | SOME b =>
-        case stored_number b s of
+        case scalar_number env b s of
           NONE => NONE
         | SOME v =>
             let w = w2n word in
@@ -75,11 +102,11 @@ Definition write_storage_word_def:
 End
 
 Definition write_storage_def:
-  write_storage accounts addr slot offset ty s =
+  write_storage env accounts addr slot offset ty s =
     let account = lookup_account addr accounts in
     OPTION_MAP (λword. update_account addr
       (account with storage := update_storage slot word account.storage) accounts)
-      (write_storage_word (lookup_storage slot account.storage) offset ty s)
+      (write_storage_word env (lookup_storage slot account.storage) offset ty s)
 End
 
 (* A declaration's concrete location in the executing account. *)
@@ -98,7 +125,7 @@ End
 Definition mapping_key_bytes_def:
   mapping_key_bytes env key s =
     if byte_sequence_type key then (case s of BytesValue bs => SOME bs | _ => NONE)
-    else if ¬(is_stored_scalar_type key ∧ storage_type_ok env key ∧
+    else if ¬(is_stored_scalar_type key ∧ ¬is_function_type key ∧ storage_type_ok env key ∧
               scalar_has_type env key s) then NONE
     else case s of
       BytesValue bs => SOME (bs ++ REPLICATE (32 - LENGTH bs) 0w)
@@ -467,7 +494,7 @@ End
 Definition clear_storage_value_def:
   (clear_storage_value env (fuel : num) accounts addr slot offset ty =
     if is_stored_scalar_type ty then
-      (case write_storage accounts addr slot offset ty (IntegerValue 0) of
+      (case write_storage env accounts addr slot offset ty (IntegerValue 0) of
          SOME accounts' => INL (accounts', NONE)
        | NONE => INR (InvalidCompletion "bad storage clear"))
     else if offset ≠ 0 then INR (InvalidCompletion "unaligned storage clear")
@@ -750,6 +777,8 @@ Definition navigate_storage_field_def:
     | _ => ValueAbrupt (InvalidCompletion "bad struct reference")
 End
 
+val () = cv_auto_trans scalar_number_def;
+val () = cv_auto_trans scalar_of_number_def;
 val () = cv_auto_trans read_storage_word_def;
 val () = cv_auto_trans read_storage_def;
 val () = cv_auto_trans write_storage_word_def;

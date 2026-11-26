@@ -226,7 +226,9 @@ starts at `0x80`, past a creation frame's reserved immutable words, where the
 model's does; the `memory_images` suite compares it byte for byte. An internal function pointer's word
 is the function's number in the compiler's internal dispatch, which the
 importer reads from `ContractDefinition.internalFunctionIDs` in the analyzed
-AST, and 0 for the zero value. A word no function has reads as itself and
+AST, and 0 for the zero value. Persistent and transient storage pack
+this id into eight bytes, and memory and inline assembly use a full word.
+A word no function has reads as itself and
 panics with 0x51 when called, as the compiler's internal dispatch does; a word
 of a function of another type fails closed. The creation code's dispatch
 holds only the functions named as values in the creation code and in every

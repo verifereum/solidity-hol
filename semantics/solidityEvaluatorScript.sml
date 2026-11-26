@@ -662,7 +662,7 @@ Definition write_target_value_def:
     | (SOME (ValueTarget (StorageReference PersistentStorage addr slot offset
                             ty _)), ScalarValue s) =>
         if st.frame.static_context then NONE else
-        (case write_storage st.world.accounts addr slot offset ty s of
+        (case write_storage env st.world.accounts addr slot offset ty s of
            SOME accounts =>
              SOME (st with world := st.world with accounts := accounts)
          | NONE => NONE)
@@ -670,7 +670,7 @@ Definition write_target_value_def:
                             ty _)), ScalarValue s) =>
         if st.frame.static_context then NONE else
         let storage = lookup_transient_storage addr st.world.transient in
-        (case write_storage_word (lookup_storage slot storage) offset ty s of
+        (case write_storage_word env (lookup_storage slot storage) offset ty s of
            SOME word => SOME (st with world := st.world with transient :=
              update_transient_storage addr (update_storage slot word storage) st.world.transient)
          | NONE => NONE)
@@ -739,7 +739,7 @@ Definition push_storage_array_def:
                 (old_length + 1) layout (&old_length) of
            ValueOk (ReferenceValue
              (StorageReference PersistentStorage _ data_slot offset _ _)) =>
-             (case write_storage st.world.accounts addr slot 0 (UintT 256)
+             (case write_storage env st.world.accounts addr slot 0 (UintT 256)
                      (IntegerValue (&(old_length + 1))) of
                 SOME accounts =>
                   normal_result
@@ -784,7 +784,7 @@ Definition pop_storage_array_def:
              (case clear_storage_value env (n + LENGTH env.type_declarations)
                      st.world.accounts addr data_slot offset element of
                 INL (accounts, scratch) =>
-                  (case write_storage accounts addr slot 0 (UintT 256)
+                  (case write_storage env accounts addr slot 0 (UintT 256)
                           (IntegerValue (&(old_length - 1))) of
                      SOME accounts' =>
                        normal_result
@@ -1561,7 +1561,7 @@ Definition assembly_reference_word_def:
         (case lookup_binding x st.scopes of
            SOME b =>
              (case b.binding_value of
-                ScalarValue s => scalar_word env ty s
+                ScalarValue s => memory_word env ty (ScalarValue s)
               | _ => NONE)
          | NONE => NONE)
     | AssemblySlot x =>
@@ -1600,7 +1600,7 @@ Definition assembly_reference_word_def:
          | NONE => NONE)
     | AssemblyConstant a ty =>
         (case eval_atom st.scopes a of
-           SOME (ScalarValue s) => scalar_word env ty s
+           SOME (ScalarValue s) => memory_word env ty (ScalarValue s)
          | _ => NONE)
     | AssemblyMemory x _ =>
         (case lookup_binding x st.scopes of
@@ -1731,7 +1731,7 @@ Definition assembly_write_one_def:
              case assembly_value env ty (w2n w) of
                NONE => NONE
              | SOME s =>
-                 if scalar_word env ty s = SOME (w2n w) then
+                 if memory_word env ty (ScalarValue s) = SOME (w2n w) then
                    update_binding x (ScalarValue s) scopes
                  else NONE)
     | AssemblyMemory x ty =>

@@ -86,9 +86,10 @@ Definition is_elementary_type_def[simp]:
   (is_elementary_type _ ⇔ F)
 End
 
-(* A value read or stored as a whole: an elementary type or an enum. *)
+(* A value read or stored as a whole: an elementary type, enum or function type. *)
 Definition is_stored_scalar_type_def[simp]:
   (is_stored_scalar_type (EnumT _) ⇔ T) ∧
+  (is_stored_scalar_type (FunctionT _ _ _ _) ⇔ T) ∧
   (is_stored_scalar_type ty ⇔ is_elementary_type ty)
 End
 
@@ -128,6 +129,8 @@ Definition storage_bytes_def:
     | IntT n => SOME (n DIV 8)
     | AddressT _ => SOME 20
     | FixedBytesT n => SOME n
+    | FunctionT InternalFn _ _ _ => SOME 8
+    | FunctionT ExternalFn _ _ _ => SOME 24
     | _ => NONE
 End
 
@@ -167,44 +170,40 @@ Termination
   WF_REL_TAC ‘measure (sol_type_size o SND)’
 End
 
+Definition is_function_type_def[simp]:
+  (is_function_type (FunctionT _ _ _ _) ⇔ T) ∧
+  (is_function_type _ ⇔ F)
+End
+
 Definition byte_sequence_type_def:
   byte_sequence_type ty ⇔ ty = BytesT ∨ ty = StringT
 End
 
-(* Byte-sequence keys accept ABI byte operands in their original location,
- * including literals, without allocating a memory object. *)
+(* The ABI has no encoding for internal dispatch ids. External function
+ * values are admitted separately with their ABI codec. *)
+Definition abi_scalar_type_def:
+  abi_scalar_type ty ⇔ is_stored_scalar_type ty ∧ ¬is_function_type ty
+End
+
 (* Packed ABI arrays contain one full ABI word per scalar element. Nested
  * arrays and structs have no packed encoding. *)
 Definition packed_type_def:
   packed_type ty ⇔
-    is_stored_scalar_type ty ∨
+    abi_scalar_type ty ∨
     case ty of
       LocatedT MemoryLoc element =>
         byte_sequence_type element ∨
         (case element of ArrayT item length =>
-           valid_array_length length ∧ is_stored_scalar_type item
+           valid_array_length length ∧ abi_scalar_type item
          | _ => F)
     | _ => F
 End
 
+(* Byte-sequence keys accept ABI byte operands in their original location,
+ * including literals, without allocating a memory object. *)
 Definition mapping_key_type_def:
   mapping_key_type key =
     if byte_sequence_type key then LocatedT MemoryLoc key else key
-End
-
-Definition storage_type_ok_def:
-  (storage_type_ok env (ArrayT element (SOME n)) ⇔
-    0 < n ∧ n < 2 ** 256 ∧ storage_type_ok env element ∧
-    IS_SOME (fixed_storage_slots env (ArrayT element (SOME n)))) ∧
-  (storage_type_ok env (MappingT key value) ⇔
-    ((is_stored_scalar_type key ∧ storage_type_ok env key) ∨ byte_sequence_type key) ∧
-    storage_type_ok env value) ∧
-  (storage_type_ok env (ArrayT element NONE) ⇔ storage_type_ok env element) ∧
-  (storage_type_ok env (StructT id) ⇔ IS_SOME (lookup_struct_layout env id)) ∧
-  (storage_type_ok env (EnumT id) ⇔ IS_SOME (lookup_enum env id)) ∧
-  (storage_type_ok env BytesT ⇔ T) ∧
-  (storage_type_ok env StringT ⇔ T) ∧
-  (storage_type_ok env ty ⇔ elementary_storage_type_ok ty)
 End
 
 (* Whether an encoding of the type has a fixed size, with no offsets. *)
@@ -231,7 +230,7 @@ End
 (* The objects a reference in each data location may denote. Storage holds
  * byte sequences, arrays, mappings and structs; their shape against the
  * environment is storage_type_ok's. Memory and calldata hold byte sequences,
- * structs, and arrays whose elements are elementary values or, as pointers,
+ * structs, and arrays whose elements are stored scalars or, as pointers,
  * other objects in the same location; memory_type_ok checks struct fields.
  * Array elements are unlocated: element_type adds the location on access. *)
 Definition located_object_shape_def:
@@ -251,7 +250,7 @@ End
 
 (* The structs a memory or calldata object type reaches are declared, and each
  * field is a stored scalar or, as a pointer, an object in the same location
- * (memory and calldata objects share a shape): no mapping or function type.
+ * (memory and calldata objects share a shape): no mapping.
  * The fuel bounds the struct nesting, so a recursive struct fails. *)
 Definition memory_type_ok_def:
   (memory_type_ok env (n : num) (ArrayT element _) ⇔ memory_type_ok env n element) ∧
@@ -274,18 +273,46 @@ Termination
   rw[list_size_def]
 End
 
+(* Located values: references to an object in a data location. *)
+Definition located_value_type_def:
+  (located_value_type (LocatedT loc ty) ⇔ located_object_shape loc ty) ∧
+  (located_value_type _ ⇔ F)
+End
+
+(* An internal function is never payable. Its parameters and returns
+ * may themselves be values or located references. Other types pass. *)
+Definition function_type_ok_def:
+  (function_type_ok (FunctionT kind m ps rs) ⇔
+    kind = InternalFn ∧ m ≠ PayableMut ∧
+    EVERY (λty. is_value_type ty ∨ located_value_type ty) (ps ++ rs)) ∧
+  (function_type_ok _ ⇔ T)
+End
+
+Definition storage_type_ok_def:
+  (storage_type_ok env (ArrayT element (SOME n)) ⇔
+    0 < n ∧ n < 2 ** 256 ∧ storage_type_ok env element ∧
+    IS_SOME (fixed_storage_slots env (ArrayT element (SOME n)))) ∧
+  (storage_type_ok env (MappingT key value) ⇔
+    ((is_stored_scalar_type key ∧ ¬is_function_type key ∧
+      storage_type_ok env key) ∨ byte_sequence_type key) ∧
+    storage_type_ok env value) ∧
+  (storage_type_ok env (ArrayT element NONE) ⇔ storage_type_ok env element) ∧
+  (storage_type_ok env (StructT id) ⇔ IS_SOME (lookup_struct_layout env id)) ∧
+  (storage_type_ok env (EnumT id) ⇔ IS_SOME (lookup_enum env id)) ∧
+  (storage_type_ok env (FunctionT k m ps rs) ⇔
+    function_type_ok (FunctionT k m ps rs) ∧
+    valid_type_shape (FunctionT k m ps rs)) ∧
+  (storage_type_ok env BytesT ⇔ T) ∧
+  (storage_type_ok env StringT ⇔ T) ∧
+  (storage_type_ok env ty ⇔ elementary_storage_type_ok ty)
+End
+
 (* A located type that is well formed in env: its object shape, in storage
  * its layout, and in memory and calldata its structs' fields. *)
 Definition located_type_ok_def:
   located_type_ok env loc ty ⇔
     located_object_shape loc ty ∧ (loc = StorageLoc ⇒ storage_type_ok env ty) ∧
     (loc ≠ StorageLoc ⇒ memory_type_ok env (LENGTH env.type_declarations) ty)
-End
-
-(* Located values: references to an object in a data location. *)
-Definition located_value_type_def:
-  (located_value_type (LocatedT loc ty) ⇔ located_object_shape loc ty) ∧
-  (located_value_type _ ⇔ F)
 End
 
 (* Environment-aware type validation: declared ids resolve, and memory and
@@ -321,23 +348,6 @@ Termination
   rw[solidityASTTheory.sol_type_size_def, list_size_def]
 End
 
-Definition is_function_type_def[simp]:
-  (is_function_type (FunctionT _ _ _ _) ⇔ T) ∧
-  (is_function_type _ ⇔ F)
-End
-
-(* A function type's admitted shape: an internal function, not payable,
- * whose parameters and returns are non-function value types or located
- * references. Other types pass.
- *)
-Definition function_type_ok_def:
-  (function_type_ok (FunctionT kind m ps rs) ⇔
-    kind = InternalFn ∧ m ≠ PayableMut ∧
-    EVERY (λty. (is_value_type ty ∧ ¬is_function_type ty) ∨ located_value_type ty)
-      (ps ++ rs)) ∧
-  (function_type_ok _ ⇔ T)
-End
-
 (* Stage 2 bindings, parameters and returns are value types: an internal
  * function type only as function_type_ok admits it. *)
 Definition core_scalar_type_def:
@@ -346,11 +356,10 @@ Definition core_scalar_type_def:
     declared_type_ok env ty
 End
 
-(* A scalar held behind a reference: a stored scalar, or an internal function,
- * which only an immutable holds. *)
+(* A scalar held behind a reference. *)
 Definition reference_scalar_type_def:
   reference_scalar_type env ty ⇔
-    core_scalar_type env ty ∧ (IS_SOME (storage_bytes ty) ∨ is_function_type ty)
+    core_scalar_type env ty ∧ IS_SOME (storage_bytes ty)
 End
 
 (* The type of an element of a memory or calldata array, or of a field of a
@@ -372,14 +381,34 @@ Definition indexed_element_type_def:
     | _ => NONE
 End
 
-(* The types that cross an ABI boundary: stored scalars (an enum as a uint8)
- * and memory or calldata objects; storage pointers never do. *)
+(* Every leaf of an ABI object must have an ABI representation. *)
+Definition abi_object_leaves_ok_def:
+  (abi_object_leaves_ok env (n : num) (ArrayT element _) ⇔
+    abi_object_leaves_ok env n element) ∧
+  (abi_object_leaves_ok env n (StructT id) ⇔
+    if n = 0 then F else
+    case lookup_struct env id of
+      SOME fields => abi_object_fields_ok env (n - 1) (MAP SND fields)
+    | NONE => F) ∧
+  (abi_object_leaves_ok env n ty ⇔ byte_sequence_type ty ∨ abi_scalar_type ty) ∧
+  (abi_object_fields_ok env n [] ⇔ T) ∧
+  (abi_object_fields_ok env n (ty :: tys) ⇔
+    abi_object_leaves_ok env n ty ∧ abi_object_fields_ok env n tys)
+Termination
+  WF_REL_TAC ‘inv_image ($< LEX $<) (λx. case x of
+    INL (env, n, ty) => (n, sol_type_size ty)
+  | INR (env, n, tys) => (n, list_size sol_type_size tys))’ >>
+  rw[list_size_def]
+End
+
+(* Scalars and memory or calldata objects with an ABI representation. *)
 Definition abi_type_ok_def:
   abi_type_ok env ty ⇔
-    (is_stored_scalar_type ty ∧ valid_type_shape ty ∧ declared_type_ok env ty) ∨
+    (abi_scalar_type ty ∧ valid_type_shape ty ∧ declared_type_ok env ty) ∨
     case ty of
-      LocatedT MemoryLoc element => located_type_ok env MemoryLoc element
-    | LocatedT CalldataLoc element => located_type_ok env CalldataLoc element
+      LocatedT loc element =>
+        loc ≠ StorageLoc ∧ located_type_ok env loc element ∧
+        abi_object_leaves_ok env (LENGTH env.type_declarations) element
     | _ => F
 End
 
@@ -485,6 +514,9 @@ Definition scalar_has_type_def:
                   MAP SND p.parameters = ps ∧ MAP SND p.return_bindings = rs
               | NONE => F)
          | _ => F)
+    | FunctionT ExternalFn _ _ _ =>
+        (case s of ExternalFunctionValue _ selector => LENGTH selector = 4
+                 | _ => F)
     | EnumT id =>
         (case (lookup_enum env id, s) of
            (SOME members, IntegerValue i) => 0 ≤ i ∧ i < &members
@@ -644,6 +676,7 @@ End
 
 Definition is_equality_type_def[simp]:
   (is_equality_type BoolT ⇔ T) ∧
+  (is_equality_type (FunctionT _ _ _ _) ⇔ T) ∧
   (is_equality_type ty ⇔ is_ordered_type ty)
 End
 
@@ -1176,12 +1209,13 @@ End
 (* The value types a block reads and writes back as one word: the elementary
  * ones, a declared enum, and a user-defined value type of an elementary one.
  * solc does not clean a word written to an enum, so the evaluator fails an
- * out-of-range one closed (assembly_value). Function types stay out: their
- * word is a code location the source does not have. *)
+ * out-of-range one closed (assembly_value). Internal functions use their
+ * dispatch ids as IR words. *)
 Definition assembly_value_type_def:
   assembly_value_type env ty ⇔
     case ty of
-      EnumT id => IS_SOME (lookup_enum env id)
+      FunctionT InternalFn _ _ _ => T
+    | EnumT id => IS_SOME (lookup_enum env id)
     | UserValueT id =>
         (case lookup_user_value env id of
            SOME u => assembly_elementary_type u
@@ -1744,6 +1778,12 @@ val () = cv_auto_trans_rec mapping_reachable_def (
   cv_termination_tac
 );
 val () = cv_auto_trans_rec memory_type_ok_def (
+  WF_REL_TAC ‘inv_image ($< LEX $<) (λx. case x of
+    INL (env, n, ty) => (cv$c2n n, cv_size ty)
+  | INR (env, n, tys) => (cv$c2n n, cv_size tys))’ >>
+  cv_termination_tac
+);
+val () = cv_auto_trans_rec abi_object_leaves_ok_def (
   WF_REL_TAC ‘inv_image ($< LEX $<) (λx. case x of
     INL (env, n, ty) => (cv$c2n n, cv_size ty)
   | INR (env, n, tys) => (cv$c2n n, cv_size tys))’ >>
