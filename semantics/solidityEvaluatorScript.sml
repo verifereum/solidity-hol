@@ -1452,28 +1452,10 @@ Definition simple_stmt_def:
                     | LocatedT _ (StructT s) => SOME (StructT s)
                     | _ => NONE) of
                 SOME cty =>
-                  (* The compiler's storage-to-storage copy returns at once
-                   * when the source is the destination. *)
-                  if (case (src, dst) of
-                        (StorageReference PersistentStorage src_addr src_slot 0 _ _,
-                         StorageReference PersistentStorage dst_addr dst_slot 0 _ _) =>
-                          src_addr = dst_addr ∧ src_slot = dst_slot
-                      | _ => F)
-                  then normal_result st gas else
-                  if st.frame.static_context then
-                    abrupt_result (InvalidCompletion "array copy in static frame") st gas
-                  else
-                  (* A memory source is read as the copy reaches it. *)
-                  (case (case src of
-                           MemoryReference _ _ => (INL (ReferenceValue src), st)
-                         | _ =>
-                             (case array_copy_value env 0 st cty src of
-                                (INL v, _, st1) => (INL v, st1)
-                              | (INR (c, _), _, st1) => (INR c, st1))) of
-                     (INL v, st1) =>
-                       (case copy_to_storage env cty v dst st.frame.static_context st1 of
-                          (INL _, st2) => normal_result st2 gas
-                        | (INR c, st2) => abrupt_result c st2 gas)
+                  (* The source is read as the copy reaches it. *)
+                  (case copy_to_storage env cty (ReferenceValue src) dst
+                          st.frame.static_context st of
+                     (INL _, st1) => normal_result st1 gas
                    | (INR c, st1) => abrupt_result c st1 gas)
               | NONE =>
                 case copy_byte_contents src dst st of

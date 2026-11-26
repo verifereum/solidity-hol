@@ -122,6 +122,7 @@ Ancestors
   solidityDifferentialCorpus_storage_bytes
   solidityDifferentialCorpus_storage_bytes_aliases
   solidityDifferentialCorpus_storage_call_data
+  solidityDifferentialCorpus_storage_copy_order
   solidityDifferentialCorpus_storage_enum_arrays
   solidityDifferentialCorpus_storage_memory_padding
   solidityDifferentialCorpus_storage_pointer_base
