@@ -359,21 +359,8 @@ val ctx0 = “<| functions := []; static_functions := [];
                supers := []; structs := []; enums := [];
                events := []; variables := []; state := []; locations := [];
                immutables := []; constants := []; returns := [];
-               placeholder := NONE; mode := CheckedArithmetic; creation := F;
+               placeholder := NONE; mode := CheckedArithmetic;
                scope := 0; returns_id := 0; in_loop := F; bad_ids := [] |>”;
-
-(* A block a constructor runs may not halt, since the source installs no
- * runtime code from the returned bytes; elsewhere it may. *)
-Theorem asm_halt_rejected_in_constructor:
-  ∀info.
-    ISL (elab_stmt ^ctx0 0
-      (SrcInlineAssembly info [YulExprStmt (YulBuiltin YStop [])] [])) ∧
-    elab_stmt (^ctx0 with creation := T) 0
-      (SrcInlineAssembly info [YulExprStmt (YulBuiltin YStop [])] []) =
-    INR [(info.node_id, "assembly halt in a constructor")]
-Proof
-  gen_tac >> EVAL_TAC
-QED
 
 Theorem no_exponent_assignment:
   compound_operator (SOME SrcExp) = NONE ∧
