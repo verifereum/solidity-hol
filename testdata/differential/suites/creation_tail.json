@@ -107,6 +107,17 @@
           true
         ]
       }
+    },
+    {
+      "name": "runtime_code_copy_leaves_padding",
+      "function": "runtimePadding",
+      "args": [],
+      "expect": {
+        "return": [
+          202,
+          "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        ]
+      }
     }
   ]
 }

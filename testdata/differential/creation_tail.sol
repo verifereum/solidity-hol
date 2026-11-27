@@ -38,6 +38,21 @@ contract CreationTail {
         } catch {}
     }
 
+    // the word after the copy, over memory dirtied first: the copy writes
+    // the code's bytes only, so the dirty bytes after them stay
+    function runtimePadding() external pure returns (uint256 size, bytes32 tail) {
+        assembly {
+            let p := mload(0x40)
+            mstore(add(p, 224), not(0))
+            mstore(add(p, 256), not(0))
+        }
+        bytes memory code = type(TailChild).runtimeCode;
+        assembly {
+            tail := mload(add(add(code, 32), mload(code)))
+        }
+        size = code.length;
+    }
+
     function runtime() external returns (uint256 size, bool deployed) {
         bytes memory code = type(TailChild).runtimeCode;
         TailChild c = new TailChild(1);
