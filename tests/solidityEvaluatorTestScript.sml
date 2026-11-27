@@ -2481,6 +2481,31 @@ Proof
   CONV_TAC cv_eval
 QED
 
+(* The free-pointer read before copying the signature would grow memory to
+ * 96 bytes. A rejected copy must discard that change. *)
+Definition abi_signature_copy_rejection_def:
+  abi_signature_copy_rejection =
+    let st = initial_state with <|
+          memory := FEMPTY; memory_size := 0;
+          world := initial_state.world with accounts := long_bytes_accounts;
+          scopes := [FEMPTY |+ (1, <|
+            binding_type := SingleType (LocatedT StorageLoc StringT);
+            binding_value := ReferenceValue (static_copy_dst 0w StringT) |>)] |> in
+    let r = simple_stmt 10 test_env
+          (DefineStmt (AstId 2) (SingleType (LocatedT MemoryLoc BytesT))
+            (AbiEncodeOperation (SOME (BoundAtom (AstId 1))) [] []))
+          st [] in
+    (r.completion, r.state = st)
+End
+
+val () = cv_auto_trans abi_signature_copy_rejection_def;
+
+Theorem abi_signature_copy_rejection_preserves_state:
+  abi_signature_copy_rejection = (long_storage_unsupported, T)
+Proof
+  CONV_TAC cv_eval
+QED
+
 Definition encoder_prefix_panics_def:
   encoder_prefix_panics =
     let st = memory_store 0 2 initial_state in
