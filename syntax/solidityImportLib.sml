@@ -896,9 +896,9 @@ val expression_kinds =
 fun is_expression v =
   List.exists (fn k => k = node_type v) expression_kinds handle _ => false
 
-(* type(C).interfaceId, a selector; type(C).name, type(C).creationCode and
- * type(C).runtimeCode, a string or bytes literal converted to memory, as solc
- * copies them there. *)
+(* type(C).interfaceId, a selector; type(C).name, a string literal converted
+ * to memory, as solc copies it there; type(C).creationCode and runtimeCode,
+ * the code. *)
 fun contract_type_member v base arg =
   let
     val id = int_field arg "referencedDeclaration"
@@ -919,12 +919,10 @@ fun contract_type_member v base arg =
         con "SrcSelector" [info v, interface_id v id, mk_opt expr_ty NONE, type_id v]
     | "name" => literal "string" (string_field (contract_declaration v id) "name") "string"
     | "creationCode" =>
-        literal "hexString"
-          (String.implode (map Char.chr (hex_bytes v (creation_code v id)))) "bytes"
+        con "SrcContractCode" [info v, mk_bytes v (creation_code v id), type_id v]
     | "runtimeCode" =>
-        literal "hexString"
-          (String.implode (map Char.chr
-             (hex_bytes v (contract_code "deployedBytecode" v id)))) "bytes"
+        con "SrcContractCode"
+          [info v, mk_bytes v (contract_code "deployedBytecode" v id), type_id v]
     | member => fail (describe v ^ ": unsupported contract type member " ^ member)
   end
 

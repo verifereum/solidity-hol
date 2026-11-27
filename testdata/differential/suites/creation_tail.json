@@ -118,6 +118,17 @@
           "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
         ]
       }
+    },
+    {
+      "name": "creation_code_copy_leaves_padding",
+      "function": "creationPadding",
+      "args": [],
+      "expect": {
+        "return": [
+          852,
+          "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        ]
+      }
     }
   ]
 }

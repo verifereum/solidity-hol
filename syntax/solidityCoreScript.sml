@@ -177,6 +177,9 @@ Datatype:
   | DefaultMemoryOperation sol_type
   | DefaultReferenceOperation data_location sol_type
   | BytesLiteralOperation sol_type (byte list)
+  (* a contract's code (type(C).creationCode, runtimeCode), copied to new
+   * memory bytes as the code's bytes only *)
+  | CodeCopyOperation (byte list)
   | AllocateMemoryOperation sol_type core_atom
   | BytesToFixedOperation num core_atom
   | ArrayIndexOperation core_atom core_atom

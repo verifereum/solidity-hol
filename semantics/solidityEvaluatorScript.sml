@@ -1316,6 +1316,15 @@ Definition simple_stmt_def:
                   (bs ++ REPLICATE ((LENGTH bs + 31) DIV 32 * 32 - LENGTH bs) 0w)
                   st1)) gas
          | INR c => abrupt_result c st gas)
+    (* A contract's code is copied as its bytes only (datacopy), the rest of
+     * its last word left as it was. *)
+    | DefineStmt x ty (CodeCopyOperation bs) =>
+        (case allocate_byte_array (LENGTH bs) st of
+           INL (p, st1) =>
+             normal_result (define_binding x ty
+               (ReferenceValue (MemoryReference p BytesT))
+               (memory_write (p + 32) bs st1)) gas
+         | INR c => abrupt_result c st gas)
     | DefineStmt x ty (DefaultMemoryOperation element) =>
         (case zero_value env (LENGTH env.type_declarations) element st of
            INL (p, st1) =>

@@ -53,6 +53,19 @@ contract CreationTail {
         size = code.length;
     }
 
+    // as runtimePadding, for the creation code
+    function creationPadding() external pure returns (uint256 size, bytes32 tail) {
+        assembly {
+            let p := mload(0x40)
+            for { let i := 0 } lt(i, 0x400) { i := add(i, 32) } { mstore(add(p, i), not(0)) }
+        }
+        bytes memory code = type(TailChild).creationCode;
+        assembly {
+            tail := mload(add(add(code, 32), mload(code)))
+        }
+        size = code.length;
+    }
+
     function runtime() external returns (uint256 size, bool deployed) {
         bytes memory code = type(TailChild).runtimeCode;
         TailChild c = new TailChild(1);

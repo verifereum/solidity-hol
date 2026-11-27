@@ -426,10 +426,12 @@ run time, stored and ABI encoded as one: in type names, in the type
 identifiers of expressions and in storage layouts. `I(a)` is a conversion to
 `address`, `this` is the contract's own address, and an external call
 `c.f{value: v, gas: g}(args)` may name any contract-typed `c`; a gas option
-caps the callee's gas as it does for `a.call`, below. `type(C).name`,
-`type(C).creationCode` and `type(C).runtimeCode` are memory literals of the
-contract's name and of its creation and runtime bytecode from the compiler's
-output; `type(I).interfaceId` is below. External calls to getters and the
+caps the callee's gas as it does for `a.call`, below. `type(C).name` is a
+memory literal of the contract's name. `type(C).creationCode` and
+`type(C).runtimeCode` are new memory `bytes` holding C's creation and runtime
+bytecode from the compiler's output, copied as solc's `datacopy` does: the
+code's bytes only, the rest of the last word left as memory held it.
+`type(I).interfaceId` is below. External calls to getters and the
 members of external functions other than `selector` (below) are rejected.
 Nominal parameter type identifiers keep overloads distinct for `super`
 lookup even when their runtime representations agree.

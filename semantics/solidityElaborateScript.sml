@@ -172,6 +172,7 @@ Definition expr_id_def:
   (expr_id (SrcBuiltinOperation info _ _ _ _) = info.node_id) ∧
   (expr_id (SrcModular info _ _ _ _) = info.node_id) ∧
   (expr_id (SrcSelector info _ _ _) = info.node_id) ∧
+  (expr_id (SrcContractCode info _ _) = info.node_id) ∧
   (expr_id (SrcAbiEncode info _ _ _ _) = info.node_id) ∧
   (expr_id (SrcAbiDecode info _ _ _ _) = info.node_id) ∧
   (expr_id (SrcTransfer info _ _ _ _) = info.node_id) ∧
@@ -2354,6 +2355,12 @@ Definition elab_expr_def:
              case elab_expr ctx n e of
                INL ((ss, _, _), n1) => finish_selector n1 ty ss bs
              | INR bs => INR bs)
+    | SrcContractCode info code tid =>
+        let ty = LocatedT MemoryLoc BytesT in
+        if ¬source_type_matches ty tid
+        then INR [(info.node_id, "unsupported contract code")] else
+        let (ss, a) = bind_value n ty (CodeCopyOperation code) in
+        INL ((ss, a, ElabType ty), n + 1)
     | SrcTypeMember info member tn tid =>
         (case normalize_type_name tn of
            SOME ty =>

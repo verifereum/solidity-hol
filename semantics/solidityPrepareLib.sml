@@ -439,8 +439,9 @@ fun function_outcomes unit =
     (#1 (listSyntax.dest_list
       (cv_value (mk_comb (import_const "unit_functions", unit)))))
 
-(* The creation code byte lists of a unit and its byte-sequence literals of
- * at least long_literal bytes (type(C).creationCode) as constants, so that
+(* The code byte lists of a unit (creations, type(C).creationCode and
+ * runtimeCode) and its byte-sequence literals of at least long_literal bytes
+ * as constants, so that
  * the certificates keep them folded: input abbreviates the unit, whose
  * elaboration has the literals' byte lists, which output folds back. *)
 val long_literal = 1024
@@ -451,6 +452,7 @@ fun creation_code_definitions unit =
         head ~~ import_const name andalso length args = arity
       end
     fun code tm = record_field (List.nth (#2 (strip_comb tm), 1)) "create_bytecode"
+    fun contract_code tm = List.nth (#2 (strip_comb tm), 1)
     val literals = List.filter (fn s => size (stringSyntax.fromHOLstring s) >= long_literal)
       (map (fn tm => List.nth (#2 (strip_comb tm), 2))
          (find_terms (applications "SrcLiteral" 4) unit))
@@ -463,6 +465,7 @@ fun creation_code_definitions unit =
         if List.exists (aconv tm) seen then seen else tm :: seen) [] tms
     val byte_defs = map (embed "embedded_creation_code" computeLib.EVAL_CONV)
       (distinct (map code (find_terms (applications "SrcCreate" 6) unit) @
+                 map contract_code (find_terms (applications "SrcContractCode" 3) unit) @
                  map bytes literals))
     val literal_defs = map (embed "embedded_literal" computeLib.EVAL_CONV)
       (distinct literals)

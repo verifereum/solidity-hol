@@ -955,6 +955,8 @@ Definition wf_core_operation_def:
     located_type_ok env loc ty ∧ annotation = SingleType (LocatedT loc ty)) ∧
   (wf_core_operation env ctx annotation (BytesLiteralOperation ty _) ⇔
     annotation = SingleType (LocatedT MemoryLoc ty) ∧ byte_sequence_type ty) ∧
+  (wf_core_operation env ctx annotation (CodeCopyOperation _) ⇔
+    annotation = SingleType (LocatedT MemoryLoc BytesT)) ∧
   (wf_core_operation env ctx annotation (AllocateMemoryOperation ty length) ⇔
     annotation = SingleType (LocatedT MemoryLoc ty) ∧
     located_type_ok env MemoryLoc ty ∧
