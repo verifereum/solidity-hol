@@ -1584,14 +1584,14 @@ Definition simple_stmt_def:
          | NONE => abrupt_result (InvalidCompletion "bad reference binding") st gas)
     | CopyContentsStmt src_ty _ a b =>
         (case (eval_atom st.scopes a, eval_atom st.scopes b) of
-           (SOME (ReferenceValue src), SOME (ReferenceValue dst)) =>
+           (SOME src, SOME (ReferenceValue dst)) =>
              (case (case src_ty of
                       LocatedT _ (ArrayT element length) => SOME (ArrayT element length)
                     | LocatedT _ (StructT s) => SOME (StructT s)
                     | _ => NONE) of
                 SOME cty =>
                   (* The source is read as the copy reaches it. *)
-                  (case copy_to_storage env cty (ReferenceValue src) dst
+                  (case copy_to_storage env cty src dst
                           st.frame.static_context st of
                      (INL _, st1) => normal_result st1 gas
                    | (INR c, st1) => abrupt_result c st1 gas)
