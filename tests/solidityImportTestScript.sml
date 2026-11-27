@@ -44,7 +44,8 @@ val () = holbuild_extra_deps [
   "../testdata/differential/expected/contract_creation.json",
   "../testdata/differential/expected/abstract_child_unit.json",
   "../testdata/differential/expected/contract_selection.json",
-  "../testdata/differential/expected/type_members.json"
+  "../testdata/differential/expected/type_members.json",
+  "../testdata/differential/expected/immutable_kinds.json"
 ]
 
 val fixture = "../testdata/frontend/expected/pure_core.json"
@@ -636,6 +637,27 @@ val () =
               (names (field "contract_state_variables" c)))
     then () else raise Fail "immutable state variable: not imported apart"
   end
+
+(* An immutable of external function type is rejected, as the compiler
+ * rejects it; one of internal function type is not. *)
+local
+  val path = "../testdata/differential/expected/immutable_kinds.json"
+  val source = "testdata/differential/immutable_kinds.sol"
+  val ast = artifact_part path ["sources", source, "ast"]
+  val contracts = artifact_part path ["contracts", source]
+in
+  val () = edited_unit_with contracts "internal_function_immutable" ast
+  val () = edited_unit_with contracts "external_function_immutable"
+    (edit_first "FunctionTypeName"
+       (type_identifier "t_function_external_pure$_t_uint256_$returns$_t_uint256_$") ast)
+end
+
+Theorem external_function_immutable_rejected:
+  unit_rejections internal_function_immutable = [] ∧
+  MEM "immutable" (MAP SND (unit_rejections external_function_immutable))
+Proof
+  CONV_TAC cv_eval
+QED
 val () = import_error_with Malformed (JSON.OBJECT []) "missing storage layout" storage_ast
 
 (* The contracts output with an edit to the layout entries; the first is
@@ -1596,6 +1618,18 @@ val () =
     ((check "contract_selection" (SOME "Missing") [];
       raise Fail "contract_selection: a missing contract selected")
      handle ImportError _ => ())
+  end
+
+(* An abstract contract selected by name is rejected: it has no bytecode. *)
+val () =
+  let
+    val artifact = JSONParser.parseFile
+      "../testdata/differential/expected/abstract_child_unit.json"
+    val (_, blockers) = import_contract_artifact_unit_blockers artifact
+      "testdata/differential/abstract_child_unit.sol" (SOME "AbstractChildLogic")
+  in
+    if List.exists (String.isSubstring "abstract contract has no bytecode") blockers
+    then () else raise Fail "abstract contract selected: not rejected"
   end
 
 (* abi.encodeWithSignature keeps its signature as its first argument, a

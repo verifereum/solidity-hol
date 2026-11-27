@@ -27,7 +27,7 @@
  * valid_src_unit checks what holds for the unit as a whole: distinct ids,
  * declarations, function and modifier headers, storage layout, state
  * variables, constants, immutables (each non-transient, declared in a base
- * of the contract, of a stored scalar or function type: immutable_variable),
+ * of the contract, of an elementary, enum or internal function type: immutable_variable),
  * getters and bases. Function bodies, and the
  * expressions of initializers, base-constructor arguments and constant
  * values, are checked where solidityElaborate elaborates them.
@@ -1465,7 +1465,9 @@ Definition immutable_variable_def:
     if v.var_transient ∨ ¬MEM v.var_scope bases then NONE else
     case scoped_variable v.var_scope v of
       SOME (x, ty) =>
-        if is_stored_scalar_type ty then SOME (x, ty)
+        if is_stored_scalar_type ty ∧
+           (case ty of FunctionT ExternalFn _ _ _ => F | _ => T)
+        then SOME (x, ty)
         else NONE
     | NONE => NONE
 End

@@ -868,7 +868,7 @@ Definition convert_operands_def:
   (convert_operands n id (_ :: ids) (_ :: ts) (INR bs :: os) =
     INR (bs ++ blockers (convert_operands n id ids ts os))) ∧
   (convert_operands n id _ _ os =
-    INR ((id, "value count mismatch") :: FLAT (MAP blockers os)))
+    INR ((id, "call with this argument count") :: FLAT (MAP blockers os)))
 End
 
 (* The operands' values when every outcome is one, else the blockers of
@@ -1444,8 +1444,8 @@ Definition finish_array_location_length_def:
     | INL ((ss, ref, ArrayT _ NONE), n) =>
         let (rs, a) = bind_value n (UintT 256) (ArrayLengthOperation ref) in
         INL ((ss ++ rs, a, ElabType (UintT 256)), n + 1)
-    | INL _ => INR [(id, "length of a non-array")]
-    | INR _ => reject (id, "length of a non-array") value_result
+    | INL _ => INR [(id, ".length of this storage location")]
+    | INR _ => reject (id, ".length of this expression") value_result
 End
 
 Definition finish_selector_def:
@@ -1461,7 +1461,7 @@ Definition checked_callee_def:
       SOME (params, rets) =>
         if internal_call_ok callee rets args order tid
         then INL (callee, params, rets)
-        else INR (id, "call does not match the function")
+        else INR (id, "unsupported internal call signature")
     | NONE => INR (id, "unsupported parameter type")
 End
 
@@ -1522,7 +1522,7 @@ Definition call_location_def:
   call_location id r =
     case r of
       INL ((ss, a, ElabType (LocatedT StorageLoc ty)), n1) => INL ((ss, a, ty), n1)
-    | INL _ => INR [(id, "not a storage location")]
+    | INL _ => INR [(id, "call result used as a storage location")]
     | INR bs => INR bs
 End
 
@@ -1778,7 +1778,7 @@ Definition elab_expr_def:
                    INL ((ss ++ DefineStmt (AstId n1) (ReferenceType ety)
                                  (NavigateOperation ety ref (FieldNavigation (AstId member_id))) ::
                                rs, a, ElabType ety), n1 + 2))
-              | NONE => INR [(info.node_id, "unknown struct member")])
+              | NONE => INR [(info.node_id, "unsupported struct member")])
          | NONE => read_location info.node_id (elab_location ctx n expression))
     | SrcIndexAccess info root_expr index tid =>
         (case indexed_root (elab_expr ctx n root_expr) of
@@ -1968,7 +1968,7 @@ Definition elab_expr_def:
         if tuple_destination lhs then
         (case lhs of
            SrcTupleExpression linfo cs ltid =>
-             ensure (IS_SOME (decode_type_identifier tid)) (info.node_id, "type annotation mismatch")
+             ensure (IS_SOME (decode_type_identifier tid)) (info.node_id, "unsupported tuple type")
              (case elab_values ctx n rhs of
                 INL ((sr, vs), n1) =>
                   (* Each destination checks its own annotation; holes have
@@ -2048,7 +2048,7 @@ Definition elab_expr_def:
                                (TupleOperation atoms)], BoundAtom (AstId n2), ElabTuple tys), n2 + 1)
                   | INR bs => INR bs)
          | (_, INR bs) => INR bs
-         | _ => INR [(info.node_id, "type annotation mismatch")])
+         | _ => INR [(info.node_id, "unsupported tuple type")])
     | SrcArrayMember info _ _ _ => INR [(info.node_id, "array member as a value")]
     | SrcFunctionCall info through_value callee args order tid =>
         (* the other callees are not matched as patterns, which would copy
@@ -2124,7 +2124,7 @@ Definition elab_expr_def:
                          SOME (gty, ps, rs) =>
                            if order ≠ [] ∨ LENGTH args ≠ LENGTH ps ∨
                               decode_type_identifier tid ≠ SOME (call_value_type rs)
-                           then reject (info.node_id, "call does not match the function type")
+                           then reject (info.node_id, "unsupported call of a function value")
                                   (operand_values (elab_arg_values ctx n args)) else
                            let (gs, g') = bind_value n1 gty (ConvertOperation gty g) in
                            (case elab_args ctx (n1 + 1) info.node_id 0 [] (values_of ps) args of
@@ -2137,8 +2137,8 @@ Definition elab_expr_def:
                        | NONE =>
                            INR (callee_failure info.node_id callee ::
                                 blockers (operand_values (elab_arg_values ctx n args))))
-                  | INR _ =>
-                      INR (callee_failure info.node_id callee ::
+                  | INR cbs =>
+                      INR (callee_failure info.node_id callee :: cbs ++
                            blockers (operand_values (elab_arg_values ctx n args))))
     | SrcSuperCall info through_value _ args order _ =>
         (case call_target ctx expression of
@@ -2278,7 +2278,7 @@ Definition elab_expr_def:
               case elab_inline_elements ctx (n + 1) a element 0 es of
                 INL (ss, n1) => INL ((cs ++ ss, a, ElabType ty), n1)
               | INR bs => INR bs)
-         | NONE => INR ((info.node_id, "type annotation mismatch") ::
+         | NONE => INR ((info.node_id, "unsupported inline array type") ::
                         blockers (operand_values (elab_arg_values ctx n es))))
     (* new T(n) of a byte sequence or dynamic memory array type *)
     | SrcNew info tn e tid =>
@@ -2613,7 +2613,7 @@ Definition elab_expr_def:
                      INL ((ss ++ cs, v, ElabType ty), n1 + 1))
               | (NONE, _) =>
                   INR (type_name_blockers (info.node_id, "unsupported type name") tn)
-              | _ => INR [(info.node_id, "type annotation mismatch")])
+              | _ => INR [(info.node_id, "unsupported conversion result type")])
          | INR bs =>
              INR (bs ++ type_name_blockers (info.node_id, "unsupported type name") tn))
     | SrcUnsupportedExpr info msg es =>
@@ -2638,11 +2638,11 @@ Definition elab_expr_def:
       | _ => INR ((id, "argument order") :: FLAT (MAP blockers os))
     else
       case es of
-        [] => INR [(id, "value count mismatch")]
+        [] => INR [(id, "call with too few arguments")]
       | e :: rest =>
         case tys of
           [] =>
-            reject (id, "value count mismatch") (operand_values (elab_arg_values ctx n es))
+            reject (id, "call with too many arguments") (operand_values (elab_arg_values ctx n es))
         | ty :: ts =>
           case call_argument_suffix_order order of
             NONE =>
@@ -2679,7 +2679,7 @@ Definition elab_expr_def:
   (elab_values ctx n e =
     case e of
       SrcTupleExpression info cs tid =>
-        ensure (IS_SOME (decode_type_identifier tid)) (info.node_id, "type annotation mismatch")
+        ensure (IS_SOME (decode_type_identifier tid)) (info.node_id, "unsupported tuple type")
         (case cs of
            [SOME e'] => elab_values ctx n e'
          | _ =>
@@ -2731,7 +2731,7 @@ Definition elab_expr_def:
                                   (ElabType (LocatedT StorageLoc ty)) in
              let (ss, a) = copied in
              INL ((ss, a, ty), n1)
-         | SOME _ => INR [(info.node_id, "not a storage location")]
+         | SOME _ => INR [(info.node_id, "local variable used as a storage location")]
          | NONE =>
            case ALOOKUP ctx.state x of
              SOME ty =>
@@ -2740,7 +2740,7 @@ Definition elab_expr_def:
                INL (([DefineStmt (AstId n) (ReferenceType ty)
                         (StateReferenceOperation (AstId x))],
                      BoundAtom (AstId n), ty), n + 1)
-           | NONE => unknown_reference ctx info.node_id "not a storage location" x)
+           | NONE => unknown_reference ctx info.node_id "identifier is not a state variable" x)
     | SrcMemberAccess info root_expr member_id tid =>
         (case elab_location ctx n root_expr of
            INL ((ss, ref, StructT (AstId id)), n1) =>
@@ -2752,7 +2752,7 @@ Definition elab_expr_def:
                     [DefineStmt (AstId n1) (ReferenceType ty)
                       (NavigateOperation ty ref (FieldNavigation (AstId member_id)))],
                     BoundAtom (AstId n1), ty), n1 + 1)
-              | NONE => INR [(info.node_id, "unknown struct member")])
+              | NONE => INR [(info.node_id, "unsupported struct member")])
          | INL _ => INR [(info.node_id, "member access on a non-struct")]
          | INR bs => INR bs)
     | SrcIndexAccess info root_expr index tid =>
@@ -2866,13 +2866,13 @@ Definition elab_expr_def:
                                           (sf ++ assign_local n2 n1 lty af)],
                              res, ty), n3)
                    | INR bs => INR bs)
-              | INL _ => INR [(expr_id t, "not a storage location")]
+              | INL _ => INR [(expr_id t, "conditional of non-storage references")]
               | INR bs => INR bs)
          | INL _ => INR [(expr_id c, "condition not a bool")]
          | INR bs => INR bs)
     | SrcUnsupportedExpr info msg es =>
         INR ((info.node_id, msg) :: blockers (operand_values (elab_arg_values ctx n es)))
-    | _ => INR [(expr_id e, "not a storage location")]) ∧
+    | _ => INR [(expr_id e, "unsupported expression as a storage location")]) ∧
   (elab_destination ctx n e =
     case e of
       SrcTupleExpression info [SOME e'] tid =>
@@ -2924,7 +2924,7 @@ Definition elab_expr_def:
                     let ety = element_type MemoryLoc fty in
                     ensure (source_type_matches ety tid) (info.node_id, "type annotation mismatch")
                     (INL ((ss ++ saved, FieldDestination ref' (AstId member_id) ety), n2))
-                | NONE => INR [(info.node_id, "unknown struct member")])
+                | NONE => INR [(info.node_id, "unsupported struct member")])
            | NONE =>
              case elab_location ctx n e of
                INL ((ss, ref, ty), n1) =>
@@ -3056,7 +3056,7 @@ Definition declare_values_def:
     | NONE =>
         INR (variable_blockers "unsupported variable type" v ++
              blockers (declare_values ctx n id ds vs))) ∧
-  (declare_values ctx n id _ _ = INR [(id, "value count mismatch")])
+  (declare_values ctx n id _ _ = INR [(id, "declaration count differs from values")])
 End
 
 Definition return_atoms_def:
@@ -3801,7 +3801,7 @@ Definition elab_function_def:
            (f.fn_info.node_id, "unsupported ABI parameter or return type")
         (ensure (EVERY (λ(_, ty). memory_binding_ok c.contract_enums c.contract_structs ty)
                    (ps ++ rs))
-           (f.fn_info.node_id, "unsupported memory struct type")
+           (f.fn_info.node_id, "unsupported parameter or return type")
         (function_levels (function_ctx ctx library f supers (ps ++ rs) rs info.node_id)
           modifiers ps rs f.fn_info.node_id n f.fn_modifiers ss))))
     | (SOME _, SOME _, SrcBlock _ _, NONE) =>
