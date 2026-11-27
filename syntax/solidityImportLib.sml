@@ -2078,9 +2078,11 @@ fun super_members (v as JSON.OBJECT fields) =
 (* Only a call executes a static member; f.selector does not. *)
 fun static_references (v as JSON.OBJECT fields) =
       (if JSONUtil.testField "nodeType"
-            (fn JSON.STRING s => s = "FunctionCall" | _ => false) v andalso
-          is_base_member (field v "expression")
-       then [int_field (field v "expression") "referencedDeclaration"] else []) @
+            (fn JSON.STRING s => s = "FunctionCall" | _ => false) v then
+         let val callee = unparenthesized (field v "expression") in
+           if is_base_member callee then [int_field callee "referencedDeclaration"] else []
+         end
+       else []) @
       List.concat (map (static_references o #2) fields)
   | static_references (JSON.ARRAY vs) = List.concat (map static_references vs)
   | static_references _ = []

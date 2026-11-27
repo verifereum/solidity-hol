@@ -323,12 +323,33 @@ Definition storage_type_ok_def:
   (storage_type_ok env ty ⇔ elementary_storage_type_ok ty)
 End
 
-(* The layout of a located type, independent of the declarations named
- * inside its function signatures. *)
+(* Every leaf of an ABI object must have an ABI representation. *)
+Definition abi_object_leaves_ok_def:
+  (abi_object_leaves_ok env (n : num) (ArrayT element _) ⇔
+    abi_object_leaves_ok env n element) ∧
+  (abi_object_leaves_ok env n (StructT id) ⇔
+    if n = 0 then F else
+    case lookup_struct env id of
+      SOME fields => abi_object_fields_ok env (n - 1) (MAP SND fields)
+    | NONE => F) ∧
+  (abi_object_leaves_ok env n ty ⇔ byte_sequence_type ty ∨ abi_scalar_type ty) ∧
+  (abi_object_fields_ok env n [] ⇔ T) ∧
+  (abi_object_fields_ok env n (ty :: tys) ⇔
+    abi_object_leaves_ok env n ty ∧ abi_object_fields_ok env n tys)
+Termination
+  WF_REL_TAC ‘inv_image ($< LEX $<) (λx. case x of
+    INL (env, n, ty) => (n, sol_type_size ty)
+  | INR (env, n, tys) => (n, list_size sol_type_size tys))’ >>
+  rw[list_size_def]
+End
+
+(* Calldata is read through the ABI codec. Check its leaves at every
+ * binding, including local references that never cross an ABI boundary. *)
 Definition located_layout_ok_def:
   located_layout_ok env loc ty ⇔
     located_object_shape loc ty ∧ (loc = StorageLoc ⇒ storage_type_ok env ty) ∧
-    (loc ≠ StorageLoc ⇒ memory_type_ok env (LENGTH env.type_declarations) ty)
+    (loc ≠ StorageLoc ⇒ memory_type_ok env (LENGTH env.type_declarations) ty) ∧
+    (loc = CalldataLoc ⇒ abi_object_leaves_ok env (LENGTH env.type_declarations) ty)
 End
 
 (* Environment-aware type validation: declared ids resolve, and memory and
@@ -404,26 +425,6 @@ Definition indexed_element_type_def:
     | _ => NONE
 End
 
-(* Every leaf of an ABI object must have an ABI representation. *)
-Definition abi_object_leaves_ok_def:
-  (abi_object_leaves_ok env (n : num) (ArrayT element _) ⇔
-    abi_object_leaves_ok env n element) ∧
-  (abi_object_leaves_ok env n (StructT id) ⇔
-    if n = 0 then F else
-    case lookup_struct env id of
-      SOME fields => abi_object_fields_ok env (n - 1) (MAP SND fields)
-    | NONE => F) ∧
-  (abi_object_leaves_ok env n ty ⇔ byte_sequence_type ty ∨ abi_scalar_type ty) ∧
-  (abi_object_fields_ok env n [] ⇔ T) ∧
-  (abi_object_fields_ok env n (ty :: tys) ⇔
-    abi_object_leaves_ok env n ty ∧ abi_object_fields_ok env n tys)
-Termination
-  WF_REL_TAC ‘inv_image ($< LEX $<) (λx. case x of
-    INL (env, n, ty) => (n, sol_type_size ty)
-  | INR (env, n, tys) => (n, list_size sol_type_size tys))’ >>
-  rw[list_size_def]
-End
-
 (* Scalars and memory or calldata objects with an ABI representation. *)
 Definition abi_type_ok_def:
   abi_type_ok env ty ⇔
@@ -431,7 +432,7 @@ Definition abi_type_ok_def:
     case ty of
       LocatedT loc element =>
         loc ≠ StorageLoc ∧ located_type_ok env loc element ∧
-        abi_object_leaves_ok env (LENGTH env.type_declarations) element
+        (loc = MemoryLoc ⇒ abi_object_leaves_ok env (LENGTH env.type_declarations) element)
     | _ => F
 End
 

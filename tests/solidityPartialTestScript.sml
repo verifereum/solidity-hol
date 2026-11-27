@@ -298,7 +298,7 @@ Proof
 QED
 
 (* Internal function values support local calls, equality and inline
- * assembly references. *)
+ * assembly references. Calldata structs still require ABI-encodable fields. *)
 val limits_prepared = #prepared (solidityPrepareLib.prepare_artifact
   {root = "..", path = "../testdata/frontend/expected/function_type_limits.json",
    source = "testdata/frontend/function_type_limits.sol"});
@@ -312,7 +312,10 @@ val () =
      limits_reasons "inc" = [NONE] andalso
      limits_reasons "compares" = [NONE] andalso
      limits_reasons "inAssembly" = [NONE] andalso
-     length limits_outcomes = 4
+     (case limits_reasons "fromCalldata" of
+        [SOME why] => String.isSubstring "unsupported declaration" why
+      | _ => false) andalso
+     length limits_outcomes = 5
   then ()
   else raise Fail ("unexpected function_type_limits outcomes: " ^
     String.concatWith "; " (map (fn (n, r) => n ^ " " ^

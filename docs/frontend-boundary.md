@@ -492,7 +492,9 @@ value and any other unassigned word panic with 0x51 after the arguments.
 Internal function values can be parameters, returns, state variables, struct
 fields, array elements and mapping values. They support `delete`, `==` and
 `!=`. Import rejects source external function types. Mapping keys and ABI
-encodings exclude internal function types.
+encodings exclude internal function types. Calldata objects require an ABI
+representation for every field and array element, including when a local
+calldata reference is set in assembly.
 
 `abi.encode`, `abi.encodePacked`, `abi.encodeWithSelector` and
 `abi.encodeWithSignature` give a new memory `bytes`, allocated as the

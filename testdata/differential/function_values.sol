@@ -7,7 +7,13 @@ library FunctionValueLibrary {
     }
 }
 
-contract FunctionValues {
+abstract contract FunctionValueBase {
+    function adjust(uint256 value) internal pure virtual returns (uint256) {
+        return value + 8;
+    }
+}
+
+contract FunctionValues is FunctionValueBase {
     using FunctionValueLibrary for uint256;
 
     struct Entry {
@@ -118,6 +124,14 @@ contract FunctionValues {
         assembly { raw := operation }
         current = operation;
         return (raw, low, current(value), high);
+    }
+
+    function adjust(uint256 value) internal pure override returns (uint256) {
+        return value + 80;
+    }
+
+    function qualified(uint256 value) external pure returns (uint256, uint256) {
+        return ((FunctionValueBase.adjust)(value), adjust(value));
     }
 
     function attached(uint256 value) external pure returns (uint256) {
