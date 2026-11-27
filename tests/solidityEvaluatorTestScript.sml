@@ -395,7 +395,7 @@ QED
 Definition static_byte_copy_def:
   static_byte_copy bad_src bad_dst =
     FST (copy_byte_contents
-      (StorageReference PersistentStorage 0w 0w 0 BytesT (LayoutId 1))
+      (ReferenceValue (StorageReference PersistentStorage 0w 0w 0 BytesT (LayoutId 1)))
       (StorageReference PersistentStorage 0w 1w 0 BytesT (LayoutId 2))
       (static_state with world := static_state.world with accounts :=
         set_storage_word (set_storage_word empty_accounts 0w 0w bad_src) 0w 1w bad_dst))

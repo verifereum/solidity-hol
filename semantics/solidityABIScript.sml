@@ -864,10 +864,7 @@ Definition store_storage_value_def:
              | _ => T)
     then (INR (InvalidCompletion "bad copy source"), st)
     else if byte_sequence_type dst then
-      (case v of
-         ReferenceValue r =>
-           copy_byte_contents r (StorageReference PersistentStorage addr slot 0 dst layout) st
-       | _ => (INR (InvalidCompletion "bad copy source"), st))
+      copy_byte_contents v (StorageReference PersistentStorage addr slot 0 dst layout) st
     else case (src, dst) of
       (ArrayT e _, ArrayT e' l) =>
         (case source_length src v st of

@@ -414,8 +414,10 @@ Definition write_destination_def:
 End
 
 (* Assigning a storage byte sequence or array copies contents, converting an
- * array's elements as copy_convertible allows; binding a local storage
- * pointer continues to use the ordinary alias-preserving local assignment. *)
+ * array's elements as copy_convertible allows; a literal is copied from its
+ * bytes, with no copy in memory first, as the compiler does. Binding a local
+ * storage pointer continues to use the ordinary alias-preserving local
+ * assignment. *)
 Definition plain_assignment_def:
   plain_assignment n target a vt =
     case target of
@@ -423,7 +425,9 @@ Definition plain_assignment_def:
         if copy_convertible (StorageLoc, ty) (StorageLoc, ty) then
           let source =
             case vt of
-              ElabBytesLiteral => coerce n (LocatedT MemoryLoc ty) a vt
+              ElabBytesLiteral =>
+                if byte_sequence_type ty then INL (([], a), n)
+                else INR "string literal conversion"
             | ElabType (LocatedT loc element) =>
                 if copy_convertible (loc, element) (StorageLoc, ty) then INL (([], a), n)
                 else INR "storage copy between these types"

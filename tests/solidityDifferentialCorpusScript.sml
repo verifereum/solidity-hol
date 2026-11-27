@@ -70,6 +70,7 @@ Ancestors
   solidityDifferentialCorpus_external
   solidityDifferentialCorpus_external_function_values
   solidityDifferentialCorpus_fallback
+  solidityDifferentialCorpus_free_pointer_moves
   solidityDifferentialCorpus_function_references
   solidityDifferentialCorpus_function_types
   solidityDifferentialCorpus_function_values
@@ -91,6 +92,7 @@ Ancestors
   solidityDifferentialCorpus_library_calls
   solidityDifferentialCorpus_library_structs
   solidityDifferentialCorpus_literal_bytes
+  solidityDifferentialCorpus_literal_storage
   solidityDifferentialCorpus_literals
   solidityDifferentialCorpus_low_level_calls
   solidityDifferentialCorpus_mappings
