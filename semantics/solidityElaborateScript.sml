@@ -1612,6 +1612,35 @@ Definition conditional_tuple_types_def:
     | _ => NONE
 End
 
+(* A storage component is a reference, as a read gives it. *)
+Definition read_memory_types_def:
+  read_memory_types enums structs tys =
+    let ts = MAP read_value_type tys in
+    if EVERY (memory_binding_ok enums structs) ts then SOME ts else NONE
+End
+
+Definition error_argument_types_def:
+  error_argument_types (err : src_error) =
+    case all_some (MAP event_variable_type err.error_parameters) of
+      SOME params => INL params
+    | NONE => INR (variables_blockers (MAP SOME err.error_parameters))
+End
+
+Definition normalize_type_names_def:
+  normalize_type_names fallback tns =
+    case all_some (MAP normalize_type_name tns) of
+      SOME tys => INL tys
+    | NONE => INR (FLAT (MAP (type_name_blockers fallback) tns))
+End
+
+(* Remove the first argument and shift the remaining indices. *)
+Definition call_argument_suffix_order_def:
+  call_argument_suffix_order order =
+    case order of
+      [] => SOME []
+    | i :: is => if i = 0 ∧ ¬MEM 0 is then SOME (MAP PRE is) else NONE
+End
+
 (* Index the size equations once for the recursive calls and preconditions. *)
 val elab_size_ss = boss_ss () &&
   [prim_recTheory.measure_thm, solidityImportTheory.src_expr_size_def,
@@ -1737,7 +1766,7 @@ Definition elab_expr_def:
                 INL ((bs, vs), n3) =>
                   if ¬EVERY (λ(a, vt). index_value_ok a vt) vs
                   then INR [(info.node_id, "slice bound of this type")] else
-                  (case convert_operands n3 info.node_id (MAP expr_id es)
+                  (case convert_operands n3 info.node_id (expr_ids es)
                           (REPLICATE (LENGTH es) (ValueOf (UintT 256))) (MAP INL vs) of
                      INL (cs, _, atoms, n4) =>
                        (case (case (start, end_bound, atoms) of
@@ -1954,18 +1983,17 @@ Definition elab_expr_def:
     | SrcTupleExpression info cs tid =>
         (case (decode_type_identifier tid, elab_components ctx n cs) of
            (SOME (SrcTupleType tys0), INL ((ss, vs), n1)) =>
-             (* a storage component is a reference, as a read gives it *)
-             let tys = MAP read_value_type tys0 in
-             if MEM NONE cs then INR [(info.node_id, "tuple with an empty component")]
-             else if ¬EVERY (memory_binding_ok ctx.enums ctx.structs) tys then
-               INR [(info.node_id, "unsupported tuple type")] else
-             (case convert_operands n1 info.node_id
-                     (MAP (λc. case c of NONE => info.node_id | SOME e => expr_id e) cs)
-                     (values_of tys) (MAP INL vs) of
-                INL (cs', _, atoms, n2) =>
-                  INL ((ss ++ cs' ++ [DefineStmt (AstId n2) (ProductType (MAP SingleType tys))
-                           (TupleOperation atoms)], BoundAtom (AstId n2), ElabTuple tys), n2 + 1)
-              | INR bs => INR bs)
+             if MEM NONE cs then INR [(info.node_id, "tuple with an empty component")] else
+             (case read_memory_types ctx.enums ctx.structs tys0 of
+                NONE => INR [(info.node_id, "unsupported tuple type")]
+              | SOME tys =>
+                  case convert_operands n1 info.node_id
+                         (MAP (λc. case c of NONE => info.node_id | SOME e => expr_id e) cs)
+                         (values_of tys) (MAP INL vs) of
+                    INL (cs', _, atoms, n2) =>
+                      INL ((ss ++ cs' ++ [DefineStmt (AstId n2) (ProductType (MAP SingleType tys))
+                               (TupleOperation atoms)], BoundAtom (AstId n2), ElabTuple tys), n2 + 1)
+                  | INR bs => INR bs)
          | (_, INR bs) => INR bs
          | _ => INR [(info.node_id, "type annotation mismatch")])
     | SrcArrayMember info _ _ _ => INR [(info.node_id, "array member as a value")]
@@ -2103,10 +2131,9 @@ Definition elab_expr_def:
                      | INL _ => INR [(expr_id c, "condition not a bool")]
                      | INR bs => INR bs)))
     | SrcRequireError info _ condition err args order tid =>
-        (case all_some (MAP event_variable_type err.error_parameters) of
-           NONE => INR (variables_blockers (MAP SOME err.error_parameters) ++
-                        blockers (operand_values (elab_arg_values ctx n (condition :: args))))
-         | SOME params =>
+        (case error_argument_types err of
+           INR bs => INR (bs ++ blockers (operand_values (elab_arg_values ctx n (condition :: args))))
+         | INL params =>
              if tid ≠ "t_tuple$__$" ∨
                 ¬revert_shape ctx.enums ctx.structs err.error_selector params order (LENGTH args) then
                reject (info.node_id, "require does not match the error")
@@ -2212,11 +2239,9 @@ Definition elab_expr_def:
     | SrcConditional info c t f tid =>
         (case conditional_tuple_types tid of
            SOME tys0 =>
-             (* a storage component is a reference, as a read gives it *)
-             let tys = MAP read_value_type tys0 in
-             if ¬EVERY (memory_binding_ok ctx.enums ctx.structs) tys
-             then INR [(info.node_id, "unsupported conditional type")] else
-             (case elab_expr ctx n c of
+             (case read_memory_types ctx.enums ctx.structs tys0 of
+                NONE => INR [(info.node_id, "unsupported conditional type")]
+              | SOME tys => (case elab_expr ctx n c of
                 INL ((sc, cond, ElabType BoolT), n1) =>
                   (case elab_values ctx n1 t of
                      INL ((st, vt), n2) =>
@@ -2241,7 +2266,7 @@ Definition elab_expr_def:
                         | INR bs => INR bs)
                    | INR bs => INR (bs ++ blockers (elab_values ctx n f)))
               | INL _ => INR [(expr_id c, "condition not a bool")]
-              | INR bs => INR bs)
+              | INR bs => INR bs))
          | NONE =>
         (* the result is declared first, and each branch writes it: a value
            or a memory reference, which the result local can hold *)
@@ -2364,8 +2389,8 @@ Definition elab_expr_def:
                     | INR why => INR [(expr_id e, why)])
                | r => r) of
            INL ((ss, a, ElabType (LocatedT loc BytesT)), n1) =>
-             (case all_some (MAP normalize_type_name tns) of
-                SOME tys =>
+             (case normalize_type_names (info.node_id, "unsupported type name") tns of
+                INL tys =>
                   let out_tys =
                     (case decode_type_identifier tid of
                        SOME (SrcType ty) => [ty]
@@ -2378,9 +2403,7 @@ Definition elab_expr_def:
                   INL ((ss ++ [DefineStmt (AstId n1) (call_result_type out_tys)
                                  (AbiDecodeOperation out_tys a)],
                         BoundAtom (AstId n1), call_value out_tys), n1 + 1)
-              | NONE =>
-                  INR (FLAT (MAP (λtn. type_name_blockers
-                                         (info.node_id, "unsupported type name") tn) tns)))
+              | INR bs => INR bs)
          | INL _ => INR [(expr_id e, "abi decoding of data not of type bytes")]
          | INR bs => INR bs)
     | SrcTransfer info _ target value tid =>
@@ -2509,17 +2532,11 @@ Definition elab_expr_def:
       | e :: rest =>
         case tys of
           [] =>
-            let ((_, os), _) = elab_arg_values ctx n es in
-            INR ((id, "value count mismatch") :: FLAT (MAP blockers os))
+            reject (id, "value count mismatch") (operand_values (elab_arg_values ctx n es))
         | ty :: ts =>
-          let suffix_order =
-            case order of
-              [] => SOME []
-            | i :: is => if i = 0 ∧ ¬MEM 0 is then SOME (MAP PRE is) else NONE in
-          case suffix_order of
+          case call_argument_suffix_order order of
             NONE =>
-              let ((_, os), _) = elab_arg_values ctx n es in
-              INR ((id, "argument order") :: FLAT (MAP blockers os))
+              reject (id, "argument order") (operand_values (elab_arg_values ctx n es))
           | SOME remaining =>
           (case elab_expr ctx n e of
              INL ((ss, a, vt), n1) =>
@@ -3379,10 +3396,9 @@ Definition elab_stmts_def:
              | INR bs => INR bs)
         | _ => INR [(info.node_id, "argument order")]) ∧
   (elab_stmt ctx n (SrcRevertError info err args order) =
-    case all_some (MAP event_variable_type err.error_parameters) of
-      NONE => INR (variables_blockers (MAP SOME err.error_parameters) ++
-                   blockers (operand_values (elab_arg_values ctx n args)))
-    | SOME params =>
+    case error_argument_types err of
+      INR bs => INR (bs ++ blockers (operand_values (elab_arg_values ctx n args)))
+    | INL params =>
         if ¬revert_shape ctx.enums ctx.structs err.error_selector params order (LENGTH args)
         then reject (info.node_id, "revert does not match the error")
                (operand_values (elab_arg_values ctx n args))
@@ -4454,6 +4470,25 @@ val () = cv_auto_trans finish_array_location_length_def;
 val () = cv_auto_trans finish_selector_def;
 val () = cv_auto_trans inline_array_type_def;
 val () = cv_auto_trans conditional_tuple_types_def;
+
+(* A missing dependency restarts the expression mutual translation. *)
+val () = cv_auto_trans function_value_type_def;
+val () = cv_auto_trans index_value_ok_def;
+val () = cv_auto_trans is_array_member_def;
+val () = cv_auto_trans direct_callee_def;
+val () = cv_auto_trans function_signature_def;
+val () = cv_auto_trans callee_failure_def;
+val () = cv_auto_trans external_call_def;
+val () = cv_auto_trans low_level_data_def;
+val () = cv_auto_trans low_level_external_kind_def;
+val () = cv_auto_trans (DB.fetch "-" "recordtype_elab_ctx_seldef_constants_def");
+val () = cv_auto_trans (DB.fetch "-" "recordtype_elab_ctx_seldef_mode_def");
+val () = cv_auto_trans (DB.fetch "solidityImport" "recordtype_src_error_seldef_error_parameters_def");
+val () = cv_auto_trans (DB.fetch "solidityImport" "recordtype_src_error_seldef_error_selector_def");
+val () = cv_auto_trans read_memory_types_def;
+val () = cv_auto_trans error_argument_types_def;
+val () = cv_auto_trans normalize_type_names_def;
+val () = cv_auto_trans call_argument_suffix_order_def;
 
 (* A remaining size comparison sums projections from disjoint fields.
  * Expose the tuple spine from the projections in the goal. *)
