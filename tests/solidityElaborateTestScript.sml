@@ -355,7 +355,7 @@ val info0 = “<| node_id := 0;
                 node_location := <| loc_start := 0; loc_length := 0;
                                     loc_source := 0 |> |>”;
 fun at id = “^info0 with node_id := ^(numSyntax.term_of_int id)”;
-val ctx0 = “<| functions := []; static_functions := []; function_ids := [];
+val ctx0 = “<| functions := []; static_functions := [];
                supers := []; structs := []; enums := [];
                events := []; variables := []; state := []; locations := [];
                immutables := []; constants := []; returns := [];

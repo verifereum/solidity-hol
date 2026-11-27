@@ -289,6 +289,21 @@ Proof
   EVAL_TAC
 QED
 
+val function_word_env = “programs_env with function_ids := [(AstId 8, 1)]”;
+val nullary_function = “FunctionT InternalFn PureMut [] [u256]”;
+
+(* Dispatch id 1 names fact, which takes an argument. *)
+Theorem wrong_signature_function_word_rejected:
+  scalar_of_number ^function_word_env ^nullary_function 1 =
+    SOME (InternalFunctionValue (INL (AstId 8))) ∧
+  read_storage_word ^function_word_env 1w 0 ^nullary_function = NONE ∧
+  word_value ^function_word_env ^nullary_function 1 =
+    INR (InvalidCompletion
+      "unsupported: an internal function word of a function of another type")
+Proof
+  EVAL_TAC
+QED
+
 Definition programs_state_def:
   programs_state = <|
     world := <| accounts := empty_accounts;

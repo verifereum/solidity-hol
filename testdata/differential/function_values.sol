@@ -101,13 +101,19 @@ contract FunctionValues is FunctionValueBase {
         return operation(value);
     }
 
-    function higherOrder(uint256 value) external pure returns (bool, bool, uint256) {
+    function higherOrder(uint256 value) external pure returns (bool, bool, bool, bool, uint256) {
         function(bool) internal pure returns (
             function(uint256) internal pure returns (uint256)
         ) choose = select;
         function(function(uint256) internal pure returns (uint256), uint256)
             internal pure returns (uint256) execute = invoke;
-        return (choose(true) == increment, choose(true) != choose(false), execute(choose(false), value));
+        return (
+            choose(true) == increment,
+            choose(true) != choose(false),
+            choose(true) == choose(false),
+            choose(true) != increment,
+            execute(choose(false), value)
+        );
     }
 
     function assemblyValue(uint256 value, bool invalidate) external pure returns (uint256) {

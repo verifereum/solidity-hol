@@ -79,7 +79,6 @@ Datatype:
   elab_ctx = <|
     functions : (num # src_function) list;
     static_functions : (num # src_function) list;
-    function_ids : (ast_id # num) list;
     supers : (num # src_function) list;
     structs : src_struct list;
     enums : (num # num) list;
@@ -2950,14 +2949,14 @@ End
  * array, and the plain name of a calldata static array, name the calldata
  * the reference covers.
  *)
-(* The declarations and dispatch ids in scope for assembly references. The
- * importer gives a user-defined value type's values their underlying type. *)
+(* The declarations assembly_value_type reads: the enums. The importer gives
+ * a user-defined value type's values their underlying type. *)
 Definition elab_enum_environment_def:
   elab_enum_environment ctx =
     <| procedures := []; state_variables := []; immutables := [];
        struct_layouts := [];
-       function_ids := ctx.function_ids; creation_function_ids := [];
-       type_declarations := MAP (λ(id, members). (AstId id, EnumDeclaration members)) ctx.enums |>
+       function_ids := []; creation_function_ids := []; type_declarations :=
+         MAP (λ(id, members). (AstId id, EnumDeclaration members)) ctx.enums |>
 End
 
 Definition elab_assembly_reference_def:
@@ -3545,7 +3544,6 @@ End
 Definition contract_ctx_def:
   contract_ctx (c : src_contract) calls state immutables constants =
     <| functions := calls;
-       function_ids := MAP (λ(x, n). (AstId x, n)) c.contract_function_ids;
        static_functions := MAP (λf. (f.fn_info.node_id, f))
          (FILTER (λf. f.fn_unsupported = NONE) c.contract_functions);
        supers := []; structs := c.contract_structs;
