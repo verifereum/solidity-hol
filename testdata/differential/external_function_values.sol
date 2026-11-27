@@ -86,6 +86,13 @@ contract ExternalFunctionValues {
         return (abi.encode(operation), abi.encodePacked(operation, bytes1(0xab)));
     }
 
+    function encodePackedArray(address target) external view returns (bytes memory) {
+        function(uint256) external view returns (uint256)[2][2] memory values;
+        values[0][0] = this.quote;
+        values[1][1] = ExternalFunctionTarget(target).quote;
+        return abi.encodePacked(values);
+    }
+
     function assemble(address target, uint32 selector)
         external view returns (uint256, uint256, address, bytes4)
     {
