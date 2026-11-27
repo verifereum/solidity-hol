@@ -169,6 +169,19 @@ Proof
        EVAL “word_to_bytes (128w : bytes32) T = []”]
 QED
 
+(* Elementary decoded arguments are already scalar values, so the source
+ * prologue can pass them through without allocating or changing its state. *)
+Theorem materialize_arguments_elementary:
+  EVERY (λ(ty,s). is_elementary_type ty) args ⇒
+  materialize_arguments env (MAP FST args)
+    (MAP (λ(ty,s). ScalarValue s) args) st =
+    INL (MAP (λ(ty,s). ScalarValue s) args, st)
+Proof
+  Induct_on ‘args’ >> simp[materialize_arguments_def] >>
+  gen_tac >> PairCases_on ‘h’ >> Cases_on ‘h0’ >>
+  simp[materialize_arguments_def, is_elementary_type_def]
+QED
+
 Theorem elementary_abi_layout:
   is_elementary_type ty ⇒
   abi_type env fuel ty = abi_type env 0 ty ∧
