@@ -747,23 +747,24 @@ Definition source_part_def:
     | ReferenceValue (StorageReference PersistentStorage addr slot 0 rty layout) =>
         (case (case rty of
                  StructT s =>
-                   (case (lookup_struct env s, lookup_struct_layout env s) of
-                      (SOME fields, SOME l) =>
-                        (case DROP i fields of
-                           (f, _) :: _ =>
-                             OPTION_MAP (λm. (slot + m.state_slot, m.state_offset))
-                               (ALOOKUP (MAP (λm. (m.state_id, m)) l.struct_fields) f)
-                         | [] => NONE)
-                    | _ => NONE)
+                   (case OPTION_MAP (DROP i) (lookup_struct env s) of
+                      SOME ((f, _) :: _) =>
+                        navigate_storage_field env
+                          (StorageReference PersistentStorage addr slot 0 rty layout) f
+                    | _ => ValueAbrupt (InvalidCompletion "bad stored part"))
                | _ =>
-                   storage_element_location env
-                     (SND (storage_array_data st.world.accounts addr slot rty)) ty i) of
-           NONE => (INR (InvalidCompletion "bad stored part"), st)
-         | SOME (s, offset) =>
-             (case read_storage_reference env st.world ty
-                     (StorageReference PersistentStorage addr s offset ty layout) of
+                   (case storage_element_location env
+                           (SND (storage_array_data st.world.accounts addr slot rty)) ty i of
+                      SOME (s, offset) =>
+                        ValueOk (ReferenceValue
+                          (StorageReference PersistentStorage addr s offset ty layout))
+                    | NONE => ValueAbrupt (InvalidCompletion "bad stored part"))) of
+           ValueOk (ReferenceValue r) =>
+             (case read_storage_reference env st.world ty r of
                 ValueOk x => (INL x, st)
-              | ValueAbrupt c => (INR c, st)))
+              | ValueAbrupt c => (INR c, st))
+         | ValueOk _ => (INR (InvalidCompletion "bad stored part"), st)
+         | ValueAbrupt c => (INR c, st))
     | _ => (INR (InvalidCompletion "bad copy source"), st)
 End
 
@@ -778,43 +779,6 @@ Definition source_slot_word_def:
            SOME (s, _) => lookup_storage s (lookup_account addr st.world.accounts).storage
          | NONE => 0w)
     | _ => (0w : bytes32)
-End
-
-(* The storage array of element type element at data, shrunk from old to new
- * elements, its end cleared as the compiler's cleanup_storage_array_end
- * does, with its arithmetic. Scalar elements count slots, rounded up modulo
- * 2^256; the last kept slot keeps only its bytes below the new end, then
- * the old slots past it are cleared. Other elements count slots as a checked
- * product of the length (Panic 0x11 past 2^256), and are cleared one by one.
- * Clearing 2^64 slots or elements or more cannot finish within any gas
- * limit. Also gives the slot it hashed last (clear_storage_elements). *)
-Definition shrink_storage_array_def:
-  shrink_storage_array env accounts addr (data : bytes32) element old new =
-    if old ≤ new then INL (accounts, NONE) else
-    case storage_bytes element of
-      SOME b =>
-        if b = 0 ∨ 32 < b then INR (InvalidCompletion "bad array element type") else
-        let per_slot = 32 DIV b in
-        let old_slots = ((old + per_slot - 1) MOD 2 ** 256) DIV per_slot in
-        let new_slots = (new + per_slot - 1) DIV per_slot in
-        let keep = b * (new MOD per_slot) in
-        let last = data + n2w (new_slots - 1) in
-        let accounts1 =
-          if keep = 0 then accounts
-          else set_storage_word accounts addr last
-                 (n2w (w2n (lookup_storage last (lookup_account addr accounts).storage)
-                       MOD 2 ** (8 * keep))) in
-        let count = (old_slots + 2 ** 256 - new_slots) MOD 2 ** 256 in
-        if 2 ** 64 ≤ count then INR FuelExhausted
-        else INL (clear_byte_slots count accounts1 addr (data + n2w new_slots), NONE)
-    | NONE =>
-        case fixed_storage_slots env element of
-          NONE => INR (InvalidCompletion "bad array element type")
-        | SOME slots =>
-            if 2 ** 256 ≤ old * slots then INR (PanicCompletion 17)
-            else if 2 ** 64 ≤ old - new then INR FuelExhausted
-            else clear_storage_elements env (LENGTH env.type_declarations) accounts addr
-                   data element new (old - new)
 End
 
 (* Elements i to i + n - 1 of a source v of scalar element type src, copied
@@ -910,8 +874,9 @@ Definition store_storage_value_def:
                  let accounts1 = if l = NONE then
                                    set_storage_word st1.world.accounts addr slot (n2w length)
                                  else st1.world.accounts in
-                 case shrink_storage_array env accounts1 addr data e' old_length length of
-                   INR c => (INR c, st1)
+                 case shrink_storage_array env (LENGTH env.type_declarations) accounts1 addr
+                        data e' old_length length of
+                   INR c => (INR c, st1 with world := st1.world with accounts := accounts1)
                  | INL (accounts2, cleared) =>
                      let st2 = scratch_write (if l = NONE then SOME slot else cleared)
                                  (st1 with world := st1.world with accounts := accounts2) in
@@ -1980,7 +1945,6 @@ val () = cv_auto_trans same_storage_def;
 val () = cv_auto_trans source_length_def;
 val () = cv_auto_trans source_part_def;
 val () = cv_auto_trans source_slot_word_def;
-val () = cv_auto_trans shrink_storage_array_def;
 val store_scalar_elements_pre_def =
   cv_auto_trans_pre "store_scalar_elements_pre" store_scalar_elements_def;
 
