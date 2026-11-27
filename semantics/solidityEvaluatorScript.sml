@@ -2035,6 +2035,15 @@ Definition assembly_result_def:
           st gas
 End
 
+(* Why a block naming a builtin it may not run is rejected: a state write
+ * in a static frame, or a builtin the block may never run here. *)
+Definition assembly_rejection_def:
+  assembly_rejection static code_bad code =
+    if static ∧ assembly_stmts_ok (assembly_unsupported ++ code_bad) code
+    then "assembly state write in static frame"
+    else "unsupported assembly builtin"
+End
+
 Definition eval_assembly_def:
   eval_assembly n env code refs (st : source_state) gas =
     let code_bad =
@@ -2045,10 +2054,7 @@ Definition eval_assembly_def:
               else assembly_unsupported ++ code_bad in
     if ¬assembly_stmts_ok bad code then
       abrupt_result (InvalidCompletion
-        (if st.frame.static_context ∧
-            assembly_stmts_ok (assembly_unsupported ++ code_bad) code
-         then "assembly state write in static frame"
-         else "unsupported assembly builtin")) st gas
+        (assembly_rejection st.frame.static_context code_bad code)) st gas
     else if st.return_data = NONE ∧ ¬assembly_calls_ok code then
       abrupt_result (InvalidCompletion "assembly reads return data the source does not know") st gas
     else
@@ -2256,6 +2262,7 @@ val () = cv_auto_trans calldata_in_bounds_def;
 val () = cv_auto_trans assembly_calldata_ok_def;
 val () = cv_auto_trans assembly_write_back_def;
 val () = cv_auto_trans assembly_result_def;
+val () = cv_auto_trans assembly_rejection_def;
 val () = cv_auto_trans eval_assembly_def;
 val () = cv_auto_trans bind_call_result_def;
 val () = cv_auto_trans procedure_completion_def;
