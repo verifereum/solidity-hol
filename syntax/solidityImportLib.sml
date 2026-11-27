@@ -542,6 +542,9 @@ fun is_external_member callee =
   has_external_function_type callee andalso
   String.isPrefix "t_contract$_" (raw_type_id (field callee "expression"))
 
+fun has_dynamic_selector base =
+  has_external_function_type base andalso not (is_external_member base)
+
 (* a.call, a.staticcall or a.delegatecall, as a callee: the address member,
  * not a function attached to addresses by using for. Its low_level_kind. *)
 fun low_level_kind callee =
@@ -1022,10 +1025,9 @@ fun expr v = guarded (fn e => [ExprChild e]) unsupported_expr (fn v => within v 
            else if String.isPrefix "t_struct$_"
                  (string_field (field (field v "expression") "typeDescriptions") "typeIdentifier")
             then raise MalformedInput (describe v ^ ": missing struct field declaration")
-            else if has_external_function_type base andalso
-                    (string_field v "memberName" = "address" orelse
-                     (string_field v "memberName" = "selector" andalso
-                      not (is_external_member base))) then
+            else if (string_field v "memberName" = "address" andalso
+                     has_external_function_type base) orelse
+                    (is_selector v andalso has_dynamic_selector base) then
               con "SrcFunctionMember"
                 [info v, prim_mk_const {Thy = "solidityCore", Name =
                    if string_field v "memberName" = "address"
@@ -1610,12 +1612,13 @@ and low_level_call v callee args =
 and external_call v callee args =
   let
     val member = unparenthesized (options_target callee)
-    val () = require member (is_external_member member)
+    val direct = is_external_member member
+    val target = expr (if direct then field member "expression" else member)
+    val options = call_options false callee
+    val () = require member direct
                (if has_external_function_type member andalso bool_field v "tryCall"
                 then "try/catch through an external function value"
                 else "unsupported call options")
-    val target = expr (field member "expression")
-    val options = call_options false callee
   in
     con "SrcExternalCall"
       [info v,
@@ -2139,12 +2142,15 @@ fun is_delegate_call_reference v =
 (* The declarations the nodes of v refer to; when internal, without the
  * callee of a delegate call, which runs as the linked library's code. *)
 fun declaration_references internal (v as JSON.OBJECT fields) =
-      (* Only a selector's computed receiver executes, not the function it
-       * names. Include that receiver's helper and constant dependencies. *)
+      (* A function value is evaluated to read its selector. A declared
+       * selector comes from the declaration and only evaluates its receiver. *)
       if is_selector v then
-        (case selector_receiver (field v "expression") of
-           SOME receiver => declaration_references internal receiver
-         | NONE => [])
+        let val base = field v "expression" in
+          if has_dynamic_selector base then declaration_references internal base
+          else case selector_receiver base of
+                 SOME receiver => declaration_references internal receiver
+               | NONE => []
+        end
       else if JSONUtil.testField "nodeType"
            (fn JSON.STRING s => s = "UsingForDirective" | _ => false) v
       then [] else

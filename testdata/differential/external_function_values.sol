@@ -7,6 +7,14 @@ interface ExternalFunctionTarget {
     function ping() external;
 }
 
+library ExternalFunctionLibrary {
+    function identity(function(uint256) external view returns (uint256) operation)
+        internal pure returns (function(uint256) external view returns (uint256))
+    {
+        return operation;
+    }
+}
+
 contract ExternalFunctionValues {
     struct Entry {
         function(uint256) external view returns (uint256) operation;
@@ -71,6 +79,10 @@ contract ExternalFunctionValues {
         entry = item;
         operations.push(entry.operation);
         return (operations[0](x), operations[0].address, operations[0].selector);
+    }
+
+    function selectorViaLibrary() external view returns (bytes4) {
+        return ExternalFunctionLibrary.identity(this.quote).selector;
     }
 
     function echo(function(uint256) external view returns (uint256) operation)

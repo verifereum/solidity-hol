@@ -115,6 +115,14 @@
       }
     },
     {
+      "name": "selector_evaluates_library_result",
+      "function": "selectorViaLibrary",
+      "args": [],
+      "expect": {
+        "return": ["0xed1bd76c"]
+      }
+    },
+    {
       "name": "parameter_return_and_event_use_bytes24",
       "calldata": "0x90898ee4112233445566778899aabbccddeeff0011223344ed1bd76c0000000000000000",
       "expect": {
