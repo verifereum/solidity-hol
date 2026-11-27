@@ -10,7 +10,7 @@ on:
   pull_request:
   merge_group:
   push:
-    branches: [main, bot/opus/solidity-e2e]
+    branches: [main]
 
 concurrency:
   # Only PR runs share a group; branch runs never cancel each other.
@@ -102,7 +102,13 @@ jobs:
       - name: Configure remote cache
         uses: ./.github/actions/setup-remote-cache
         with:
-          curl-config: ${{ (((github.ref == 'refs/heads/main' || github.ref == 'refs/heads/bot/opus/solidity-e2e') && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')) || (github.event_name == 'merge_group' && (github.event.merge_group.base_ref == 'refs/heads/main' || github.event.merge_group.base_ref == 'refs/heads/bot/opus/solidity-e2e')) || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)) && secrets.HOLBUILD_REMOTE_CACHE_CURL_CONFIG || '' }}
+          curl-config: >-
+            ${{ (
+              (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+              (github.event_name == 'workflow_dispatch' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/bot/opus/solidity-e2e')) ||
+              (github.event_name == 'merge_group' && github.event.merge_group.base_ref == 'refs/heads/main') ||
+              (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+            ) && secrets.HOLBUILD_REMOTE_CACHE_CURL_CONFIG || '' }}
 
       - name: Build HOL toolchain
         run: |

@@ -923,7 +923,10 @@ Definition call_create_def:
         if 2 ** 64 ≤ p + LENGTH code then abrupt_result (PanicCompletion 65) st gas else
         (case encoded_runtime_values env st0 params vs of
            (INR (c, ws), st1) =>
-             abrupt_result c (apply_writes (p + LENGTH code) ws (memory_write p code st1)) gas
+             abrupt_result c
+               (if abi_read_failure c then
+                  apply_writes (p + LENGTH code) ws (memory_write p code st1)
+                else st) gas
          | (INL (data, spill), st1) =>
              let st2 = memory_write (p + LENGTH code + LENGTH data) spill
                          (memory_write p (code ++ data) st1) in
@@ -974,7 +977,9 @@ Definition call_external_mode_def:
         (case encoded_runtime_values env st0 params vs of
            (INR (c, ws), st1) =>
              abrupt_result c
-               (apply_writes (p + LENGTH selector) ws (write_call_data p selector [] st1)) gas
+               (if abi_read_failure c then
+                  apply_writes (p + LENGTH selector) ws (write_call_data p selector [] st1)
+                else st) gas
          | (INL (data, spill), st1) =>
            let st2 = memory_write (p + LENGTH selector + LENGTH data) spill
                        (write_call_data p selector data st1) in
@@ -1217,8 +1222,10 @@ Definition abi_encode_def:
          | (INR (c, ws), st1) =>
              let p = FST (memory_load 64 st1) in
              abrupt_result c
-               (apply_writes (p + 32 + LENGTH prefix) ws
-                  (write_call_data (p + 32) prefix [] st1)) gas)
+               (if abi_read_failure c then
+                  apply_writes (p + 32 + LENGTH prefix) ws
+                    (write_call_data (p + 32) prefix [] st1)
+                else st) gas)
     | _ => abrupt_result (InvalidCompletion "bad abi.encode operands") st gas
 End
 
@@ -1502,8 +1509,10 @@ Definition simple_stmt_def:
                           (write_call_data p selector data st2)) gas
                   | INR (c, ws) =>
                       abrupt_result c
-                        (apply_writes (p + LENGTH selector) ws
-                          (write_call_data p selector [] st2)) gas)
+                        (if abi_read_failure c then
+                           apply_writes (p + LENGTH selector) ws
+                             (write_call_data p selector [] st2)
+                         else st) gas)
          | NONE =>
              abrupt_result
                (InvalidCompletion "unbound atom") st gas)

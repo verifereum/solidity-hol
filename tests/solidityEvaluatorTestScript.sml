@@ -2412,6 +2412,97 @@ Proof
   CONV_TAC cv_eval
 QED
 
+(* The same failing enum read reaches all four prefix-writing callers.
+ * The external call expects a return value, so a target without code
+ * does not short-circuit argument encoding. *)
+Definition encoder_prefix_calls_def:
+  encoder_prefix_calls st =
+    let arr = ArrayT (EnumT (AstId 500)) (SOME 1);
+        prefix = [0x11w; 0x22w; 0x33w; 0x44w] in
+    let arg_ty = LocatedT MemoryLoc arr in
+    let params = [u256; arg_ty];
+        args = [k 42; BoundAtom (AstId 1)];
+        st1 = st with scopes := [FEMPTY
+          |+ (1, <| binding_type := SingleType arg_ty;
+                    binding_value := ReferenceValue (MemoryReference 0 arr) |>)] in
+    MAP (λstmt. simple_stmt 10 static_copy_env stmt st1 [])
+      [DefineStmt (AstId 2) (SingleType (ContractT (AstId 3)))
+         (CreateContractOperation prefix params (k 0) NONE args);
+       DefineStmt (AstId 2) (ProductType [SingleType u256])
+         (ExternalCallOperation ExternalCall prefix params [u256]
+            (ConstantAtom (AddressValue 0x5000w)) (k 0) NONE args);
+       DefineStmt (AstId 2) (SingleType (LocatedT MemoryLoc BytesT))
+         (AbiEncodeOperation (SOME (ConstantAtom (BytesValue prefix))) params args);
+       RevertErrorStmt prefix params args]
+End
+
+Definition encoder_prefix_rejections_def:
+  encoder_prefix_rejections =
+    let st = memory_store 0 2
+          (initial_state with <| memory := FEMPTY; memory_size := 0 |>) in
+    MAP (λr. (r.completion, memory_image r.state = memory_image st))
+      (encoder_prefix_calls st)
+End
+
+val () = cv_auto_trans encoder_prefix_rejections_def;
+
+Theorem encoder_prefix_rejections_preserve_memory:
+  encoder_prefix_rejections =
+    REPLICATE 4
+      (InvalidCompletion "unsupported: encoder input at or above the free memory pointer", T)
+Proof
+  CONV_TAC cv_eval
+QED
+
+Definition encoder_prefix_panics_def:
+  encoder_prefix_panics =
+    let st = memory_store 0 2 initial_state in
+    MAP (λ(r, p). (r.completion, FST (memory_read p 4 r.state),
+                                 FST (memory_load (p + 4) r.state)))
+      (ZIP (encoder_prefix_calls st, [0x80; 0x80; 0xa0; 0x80]))
+End
+
+val () = cv_auto_trans encoder_prefix_panics_def;
+
+Theorem encoder_prefix_panics_keep_prefix_and_completed_argument:
+  encoder_prefix_panics = REPLICATE 4 (PanicCompletion 33, [0x11w; 0x22w; 0x33w; 0x44w], 42)
+Proof
+  CONV_TAC cv_eval
+QED
+
+(* A stored array read writes its slot to scratch before the next operand
+ * is rejected. Emit has also prepared an indexed hash preimage. *)
+Definition encoder_operand_rejections_def:
+  encoder_operand_rejections =
+    let arr = ArrayT u256 NONE in
+    let stored_ty = LocatedT StorageLoc arr;
+        memory_ty = LocatedT MemoryLoc arr;
+        stored = ReferenceValue (static_copy_dst 6w arr);
+        bad = ReferenceValue (MemoryReference 0 BytesT) in
+    let tys = [stored_ty; memory_ty];
+        vs = [stored; bad];
+        st = initial_state with frame := initial_state.frame with call_data := [0x55w] in
+    let (encoded, st1) = encoded_runtime_values static_copy_env st tys vs;
+        (packed, st2) = packed_encoding static_copy_env st tys vs;
+        (event, st3) = event_log static_copy_env st 0w NONE
+          [(LocatedT CalldataLoc BytesT, T, ReferenceValue (CalldataReference 0 1 BytesT));
+           (stored_ty, F, stored); (memory_ty, F, bad)] in
+    (encoded, packed, event,
+     MAP (λs. memory_image s = memory_image st) [st1; st2; st3])
+End
+
+val () = cv_auto_trans encoder_operand_rejections_def;
+
+Theorem encoder_operand_rejections_discard_scratch_and_partial_writes:
+  encoder_operand_rejections =
+    (INR (InvalidCompletion "bad memory array reference", []),
+     INR (InvalidCompletion "bad memory array reference", []),
+     INR (InvalidCompletion "bad memory array reference", []),
+     [T; T; T])
+Proof
+  CONV_TAC cv_eval
+QED
+
 (* With no argument in memory, an indexed calldata preimage that moves the free
  * memory pointer below a stored array's slot hash fails closed: the compiled
  * encoder would write the log's data where that hash later overwrites it. *)

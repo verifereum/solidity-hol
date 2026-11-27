@@ -3,10 +3,10 @@
     "agree": 4448,
     "not-runnable": 389
   },
-  "core_revision": "1fd55d236a2f8b38ee7ea094eb822c376ee4e6fe",
+  "core_revision": "04d504f55cd20fdb287545ddfb008ff281d25e61",
   "format": "solidity-hol-semantic-expectations-v1",
   "solidity_pin": "f401782df49be312ea4ef52a2d467cf5183b5906",
-  "source_hash": "5e3b6f811e958bc9e8db4eb603ca9047e77d82b2dc644bf50aa6f517cdd60ef6",
+  "source_hash": "c132d0ec5194b6514b631f54dda78afa9528920d273131ac5c38cfd9a5b1f403",
   "test_counts": {
     "agree": 1262,
     "not-runnable": 92
