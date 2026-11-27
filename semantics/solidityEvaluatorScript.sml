@@ -1239,14 +1239,58 @@ Definition call_low_level_def:
 End
 
 (* The selector an ABI encoding starts with: none, or four bytes. *)
-Definition selector_bytes_def:
-  selector_bytes scopes selector =
+(* A new memory copy of a calldata or storage object, as
+ * CopyToMemoryOperation makes it, with the state it leaves on failure. *)
+Definition copy_to_memory_def:
+  copy_to_memory env v st =
+    case v of
+      ReferenceValue (CalldataReference data n rty) =>
+        (case copy_calldata_array env st.frame.call_data rty data n
+                (FST (memory_load 64 st)) of
+           INL v' =>
+             (case materialize_value env rty v' st of
+                INL r => INL r
+              | INR c => INR (c, st))
+         | INR c => INR (c, st))
+    | ReferenceValue (StorageReference PersistentStorage addr slot 0 rty _) =>
+        materialize_storage env (LENGTH env.type_declarations)
+          st.world.accounts addr slot rty st
+    | _ => INR (InvalidCompletion "bad object copy", st)
+End
+
+(* abi.encodeWithSignature's selector for a signature string r, as the
+ * compiler computes it after the arguments: the free memory pointer p is
+ * read, a calldata or storage string is copied to memory, the first four
+ * bytes of the Keccak-256 hash of the string's bytes are the selector, and
+ * the pointer is set back to p, freeing the copy, whose bytes stay. *)
+Definition signature_selector_def:
+  signature_selector env r st =
+    let (p, st1) = memory_load 64 st in
+    case (case r of
+            MemoryReference _ _ => INL (ReferenceValue r, st1)
+          | _ => copy_to_memory env (ReferenceValue r) st1) of
+      INR (c, st2) => INR (c, st2)
+    | INL (ReferenceValue (MemoryReference q _), st2) =>
+        let (bs, st3) = memory_bytes q st2 in
+        (case finalize_allocation p 0 st3 of
+           INL st4 => INL (TAKE 4 (Keccak_256_w64 bs), st4)
+         | INR c => INR (c, st3))
+    | INL (_, st2) => INR (InvalidCompletion "bad signature", st2)
+End
+
+(* The bytes an encoding starts with: none, a bytes4 selector, or the
+ * selector of a signature string. *)
+Definition encoding_selector_def:
+  encoding_selector env selector st =
     case selector of
-      NONE => SOME []
+      NONE => INL ([], st)
     | SOME s =>
-        case eval_atom scopes s of
-          SOME (ScalarValue (BytesValue bs)) => if LENGTH bs = 4 then SOME bs else NONE
-        | _ => NONE
+        case eval_atom st.scopes s of
+          SOME (ScalarValue (BytesValue bs)) =>
+            if LENGTH bs = 4 then INL (bs, st)
+            else INR (InvalidCompletion "bad abi.encode selector", st)
+        | SOME (ReferenceValue r) => signature_selector env r st
+        | _ => INR (InvalidCompletion "bad abi.encode selector", st)
 End
 
 (* An ABI encoding as a new memory bytes, or string (string.concat), as the
@@ -1270,18 +1314,21 @@ End
 
 Definition abi_encode_def:
   abi_encode env x ty selector tys args st gas =
-    case (selector_bytes st.scopes selector, eval_atoms st.scopes args) of
-      (SOME prefix, SOME vs) =>
-        (case encoded_runtime_values env st tys vs of
-           (INL (bs, spill), st1) => allocate_encoding x ty prefix bs spill st1 gas
-         | (INR (c, ws), st1) =>
-             let p = FST (memory_load 64 st1) in
-             abrupt_result c
-               (if abi_read_failure c then
-                  apply_writes (p + 32 + LENGTH prefix) ws
-                    (write_call_data (p + 32) prefix [] st1)
-                else st) gas)
-    | _ => abrupt_result (InvalidCompletion "bad abi.encode operands") st gas
+    case eval_atoms st.scopes args of
+      NONE => abrupt_result (InvalidCompletion "bad abi.encode operands") st gas
+    | SOME vs =>
+      case encoding_selector env selector st of
+        INR (c, st0) => abrupt_result c st0 gas
+      | INL (prefix, st0) =>
+        case encoded_runtime_values env st0 tys vs of
+          (INL (bs, spill), st1) => allocate_encoding x ty prefix bs spill st1 gas
+        | (INR (c, ws), st1) =>
+            let p = FST (memory_load 64 st1) in
+            abrupt_result c
+              (if abi_read_failure c then
+                 apply_writes (p + 32 + LENGTH prefix) ws
+                   (write_call_data (p + 32) prefix [] st1)
+               else st) gas
 End
 
 Definition abi_encode_packed_def:
@@ -1357,20 +1404,11 @@ Definition simple_stmt_def:
          | _ => abrupt_result (InvalidCompletion "bad allocation length") st gas)
     | DefineStmt x ty (CopyToMemoryOperation a) =>
         (case eval_atom st.scopes a of
-           SOME (ReferenceValue (CalldataReference data n rty)) =>
-             (case copy_calldata_array env st.frame.call_data rty data n
-                     (FST (memory_load 64 st)) of
-                INL v =>
-                  (case materialize_value env rty v st of
-                     INL (v', st') => normal_result (define_binding x ty v' st') gas
-                   | INR c => abrupt_result c st gas)
-              | INR c => abrupt_result c st gas)
-         | SOME (ReferenceValue (StorageReference PersistentStorage addr slot 0 rty _)) =>
-             (case materialize_storage env (LENGTH env.type_declarations)
-                     st.world.accounts addr slot rty st of
+           SOME v =>
+             (case copy_to_memory env v st of
                 INL (v', st') => normal_result (define_binding x ty v' st') gas
               | INR (c, st') => abrupt_result c st' gas)
-         | _ => abrupt_result (InvalidCompletion "bad object copy") st gas)
+         | NONE => abrupt_result (InvalidCompletion "bad object copy") st gas)
     (* Decoded memory values are allocated, as external call results are. A
      * memory input is decoded in place: only its bytes below the memory size
      * are read, the rest being zeros, as the compiler's decoder reads only

@@ -6,6 +6,7 @@ Ancestors
   solidityDifferentialCorpus_abi_decodes
   solidityDifferentialCorpus_abi_encoding
   solidityDifferentialCorpus_abi_parenthesized_types
+  solidityDifferentialCorpus_abi_signatures
   solidityDifferentialCorpus_abi_values
   solidityDifferentialCorpus_abstract_child_unit
   solidityDifferentialCorpus_array_events

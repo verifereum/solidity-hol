@@ -28,6 +28,7 @@ val () = holbuild_extra_deps [
   "../testdata/differential/expected/hashes.json",
   "../testdata/differential/expected/conditionals.json",
   "../testdata/differential/expected/encode_calls.json",
+  "../testdata/differential/expected/abi_signatures.json",
   "../testdata/differential/expected/bytes_constants.json",
   "../testdata/differential/expected/try_calls.json",
   "../testdata/differential/expected/inline_assembly.json",
@@ -1590,3 +1591,31 @@ val () =
      handle ImportError _ => ())
   end
 
+(* abi.encodeWithSignature keeps its signature as its first argument, a
+ * literal or not (a parameter, a state variable, a struct field), as
+ * abi.encodeWithSelector keeps its selector. *)
+local
+  val fixture = "../testdata/differential/expected/abi_signatures.json"
+  val source = "testdata/differential/abi_signatures.sol"
+  val unit_tm =
+    import_source_unit []
+      (artifact_part fixture ["sources", source, "ast"])
+      (artifact_part fixture ["contracts", source])
+  fun const_name tm = if is_const tm then fst (dest_const tm) else ""
+  fun signature_call tm =
+    case strip_comb tm of
+      (c, [_, _, form, _, _]) =>
+        const_name c = "SrcAbiEncode" andalso const_name form = "AbiWithSignature"
+    | _ => false
+  val firsts =
+    List.map (fn tm => case fst (listSyntax.dest_list (el 4 (snd (strip_comb tm)))) of
+                         first :: _ => const_name (fst (strip_comb first))
+                       | [] => raise Fail "abi_signatures: a signature call without arguments")
+      (find_terms signature_call unit_tm)
+in
+  val () =
+    List.app (fn kind =>
+      if List.exists (fn k => k = kind) firsts then ()
+      else raise Fail ("abi_signatures: no signature given as " ^ kind))
+    ["SrcLiteral", "SrcIdentifier", "SrcMemberAccess"]
+end

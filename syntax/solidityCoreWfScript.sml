@@ -185,8 +185,16 @@ Definition abi_scalar_type_def:
   abi_scalar_type ty ⇔ is_stored_scalar_type ty ∧ ¬is_function_type ty
 End
 
-(* Packed ABI arrays contain one full ABI word per scalar element. Nested
- * arrays and structs have no packed encoding. *)
+(* An element of a packed array: a scalar, or a fixed-length array of
+ * packed elements, which is laid out in place. Structs and dynamic arrays
+ * have no packed encoding. *)
+Definition packed_element_type_def:
+  (packed_element_type (ArrayT item (SOME k)) ⇔
+    valid_array_length (SOME k) ∧ packed_element_type item) ∧
+  (packed_element_type ty ⇔ is_stored_scalar_type ty)
+End
+
+(* Packed ABI arrays contain one full ABI word per scalar leaf. *)
 Definition packed_type_def:
   packed_type ty ⇔
     abi_scalar_type ty ∨
@@ -194,7 +202,7 @@ Definition packed_type_def:
       LocatedT MemoryLoc element =>
         byte_sequence_type element ∨
         (case element of ArrayT item length =>
-           valid_array_length length ∧ abi_scalar_type item
+           valid_array_length length ∧ packed_element_type item
          | _ => F)
     | _ => F
 End
@@ -1068,11 +1076,16 @@ Definition wf_core_operation_def:
     let (operands, result) = builtin_signature op in
     LIST_REL (wf_builtin_operand env ctx) operands args ∧
     annotation = SingleType result) ∧
+  (* The selector is a bytes4, or a signature string in any location, which
+     the encoding hashes. *)
   (wf_core_operation env ctx annotation (AbiEncodeOperation selector tys args) ⇔
     annotation = SingleType (LocatedT MemoryLoc BytesT) ∧
     (case selector of
        NONE => T
-     | SOME s => wf_core_atom env ctx (SingleType (FixedBytesT 4)) s) ∧
+     | SOME s => wf_core_atom env ctx (SingleType (FixedBytesT 4)) s ∨
+                 wf_core_atom env ctx (SingleType (LocatedT MemoryLoc StringT)) s ∨
+                 wf_core_atom env ctx (SingleType (LocatedT CalldataLoc StringT)) s ∨
+                 wf_core_atom env ctx (SingleType (LocatedT StorageLoc StringT)) s) ∧
     EVERY (abi_type_ok env) tys ∧
     LIST_REL (wf_abi_atom env ctx) tys args) ∧
   (* A byte sequence argument is encoded where it is, in any location. *)
