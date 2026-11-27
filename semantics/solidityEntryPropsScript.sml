@@ -76,6 +76,50 @@ Proof
   strip_tac >> simp[run_entry_frame_def]
 QED
 
+(* A successful call-entry prologue followed by source evaluation has the
+ * same result as the source completion/frame model. *)
+Theorem run_entry_invoke_source:
+  entry_memory 0 NONE
+    <| world := w; frame := fr; immutables := SOME imm; scopes := [];
+       memory := FEMPTY; memory_size := 0;
+       targets := FEMPTY; return_data := SOME [] |> = INL st0 ∧
+  materialize_arguments env (MAP SND p.parameters) args st0 =
+    INL (values, st1) ∧
+  invoke_source fuel env p.procedure_id values st1 [] = r ∧
+  r.unused_gas_evidence = [] ⇒
+  run_entry fuel env p args fr w (SOME imm) 0 NONE CallEntry =
+    (case finish_source_frame w r.state.world r.completion of
+       FrameSuccess vs w' =>
+         (case FST (entry_output env p CallEntry r.state vs) of
+            INL data => ContractReturned data (settle_source_world w')
+          | INR (PanicCompletion code) => ContractReverted (panic_data code) w
+          | INR (RevertCompletion data) => ContractReverted data w
+          | INR (InvalidCompletion reason) => ContractInvalid reason
+          | INR _ => ContractInvalid "unencodable return values")
+     | FrameRevert data w' => ContractReverted data w'
+     | FrameAbort w' => ContractAborted w'
+     | FrameHalt data w' => ContractReturned data (settle_source_world w')
+     | FramePanic code w' => ContractReverted (panic_data code) w'
+     | FrameInvalid reason => ContractInvalid reason
+     | FrameResourceLimit => ContractOutOfFuel)
+Proof
+  rpt gen_tac >> strip_tac >>
+  simp_tac (srw_ss()) [run_entry_def, run_entry_with_gas_def,
+    run_entry_frame_def, LET_THM] >>
+  qpat_x_assum ‘entry_memory 0 NONE _ = INL st0’
+    (fn h => simp_tac (srw_ss()) [h]) >>
+  qpat_x_assum ‘materialize_arguments env (MAP SND p.parameters) args st0 =
+                   INL (values,st1)’
+    (fn h => simp_tac (srw_ss()) [h]) >>
+  qpat_x_assum ‘invoke_source fuel env p.procedure_id values st1 [] = r’
+    (fn h => simp_tac (srw_ss()) [h]) >>
+  qpat_x_assum ‘r.unused_gas_evidence = []’
+    (fn h => simp_tac (srw_ss()) [h]) >>
+  Cases_on ‘r.completion’ >>
+  simp_tac (srw_ss()) [solidityStateTheory.finish_source_frame_def,
+    pairTheory.UNCURRY]
+QED
+
 Theorem call_contract_nonpayable:
   4 ≤ LENGTH fr.call_data ∧
   lookup_external (TAKE 4 fr.call_data) prog.external_functions = SOME e ∧
