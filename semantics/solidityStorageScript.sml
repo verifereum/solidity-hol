@@ -655,7 +655,9 @@ Proof
     rpt strip_tac >> spose_not_then strip_assume_tac >>
     rpt (first_x_assum (qspec_then ‘m'’ mp_tac)) >> gvs[])
   >~ [‘shrink_storage_array env m accounts addr data element old new = _’] >-
-   (once_rewrite_tac[clear_storage_value_def] >> simp[] >>
+   (once_rewrite_tac[clear_storage_value_def] >>
+    Cases_on ‘old ≤ new’ >> asm_simp_tac bool_ss [] >>
+    Cases_on ‘storage_bytes element’ >> asm_simp_tac bool_ss [] >>
     BasicProvers.EVERY_CASE_TAC >> gvs[] >>
     rpt strip_tac >> spose_not_then strip_assume_tac >>
     first_x_assum (qspec_then ‘m'’ mp_tac) >> gvs[]) >>
