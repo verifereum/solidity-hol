@@ -177,6 +177,9 @@ Datatype:
   | DefaultMemoryOperation sol_type
   | DefaultReferenceOperation data_location sol_type
   | BytesLiteralOperation sol_type (byte list)
+  (* a contract's code (type(C).creationCode, runtimeCode), copied to new
+   * memory bytes as the code's bytes only *)
+  | CodeCopyOperation (byte list)
   | AllocateMemoryOperation sol_type core_atom
   | BytesToFixedOperation num core_atom
   | ArrayIndexOperation core_atom core_atom
@@ -202,6 +205,10 @@ Datatype:
   | LowLevelCallOperation external_kind core_atom core_atom (core_atom option)
       core_atom
   | CreateContractOperation (byte list) (sol_type list) core_atom
+      (core_atom option) (core_atom list)
+  (* success flag, the new address, RevertDataType; only a failed creation
+   * is caught. Operand failures still propagate. *)
+  | TryCreateContractOperation (byte list) (sol_type list) core_atom
       (core_atom option) (core_atom list)
   (* target.transfer(value): exact stipend, failure bytes forwarded, no
    * return-data allocation. *)

@@ -946,9 +946,12 @@ End
 (* Constructor arguments use the same live-location ABI codec as calls. The
  * compiler copies the creation code to the free memory pointer, Panic(0x41)
  * when its end passes 2^64 - 1, encodes the arguments after it, and does not
- * move the pointer. *)
+ * move the pointer. A catching creation, as in try, binds the success flag,
+ * the new address (zero on failure) and the revert data instead of
+ * forwarding a failed creation's revert. *)
 Definition call_create_def:
-  call_create env x ty code params value salt args (st : source_state) gas =
+  call_create catching env x ty code params value salt args (st : source_state)
+    gas =
     if st.frame.static_context then
       abrupt_result (InvalidCompletion "creation in static frame") st gas else
     case (eval_atom st.scopes value, eval_atoms st.scopes args,
@@ -983,10 +986,23 @@ Definition call_create_def:
                                original := r.create_original;
                                to_delete := st2.world.to_delete ++ r.create_to_delete |> |> in
                  case r.create_address of
-                   NONE => abrupt_result (RevertCompletion r.create_return)
-                             (forward_revert r.create_return st3) gas
+                   NONE =>
+                     if catching then
+                       normal_result (define_binding x ty
+                         (TupleValue [ScalarValue (BoolValue F);
+                                      ScalarValue (AddressValue 0w);
+                                      ScalarValue (BytesValue r.create_return)])
+                         st3) gas
+                     else
+                       abrupt_result (RevertCompletion r.create_return)
+                         (forward_revert r.create_return st3) gas
                  | SOME addr => normal_result
-                     (define_binding x ty (ScalarValue (AddressValue addr)) st3) gas)
+                     (define_binding x ty
+                       (if catching then
+                          TupleValue [ScalarValue (BoolValue T);
+                                      ScalarValue (AddressValue addr);
+                                      ScalarValue (BytesValue [])]
+                        else ScalarValue (AddressValue addr)) st3) gas)
     | _ => abrupt_result (InvalidCompletion "bad creation operands") st gas
 End
 
@@ -1300,6 +1316,15 @@ Definition simple_stmt_def:
                   (bs ++ REPLICATE ((LENGTH bs + 31) DIV 32 * 32 - LENGTH bs) 0w)
                   st1)) gas
          | INR c => abrupt_result c st gas)
+    (* A contract's code is copied as its bytes only (datacopy), the rest of
+     * its last word left as it was. *)
+    | DefineStmt x ty (CodeCopyOperation bs) =>
+        (case allocate_byte_array (LENGTH bs) st of
+           INL (p, st1) =>
+             normal_result (define_binding x ty
+               (ReferenceValue (MemoryReference p BytesT))
+               (memory_write (p + 32) bs st1)) gas
+         | INR c => abrupt_result c st gas)
     | DefineStmt x ty (DefaultMemoryOperation element) =>
         (case zero_value env (LENGTH env.type_declarations) element st of
            INL (p, st1) =>
@@ -1407,7 +1432,9 @@ Definition simple_stmt_def:
     | DefineStmt x ty (LowLevelCallOperation kind target value g data) =>
         call_low_level x ty kind target value g data st gas
     | DefineStmt x ty (CreateContractOperation code params value salt args) =>
-        call_create env x ty code params value salt args st gas
+        call_create F env x ty code params value salt args st gas
+    | DefineStmt x ty (TryCreateContractOperation code params value salt args) =>
+        call_create T env x ty code params value salt args st gas
     | DefineStmt x ty (TryDecodeErrorOperation kind a) =>
         (case eval_atom st.scopes a of
            SOME (ScalarValue (BytesValue data)) =>

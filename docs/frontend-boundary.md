@@ -407,7 +407,10 @@ constructor may read it and assign it, as the compiler allows. Creation
 reserves 32 bytes of memory per immutable above the free-memory pointer, as
 the compiler's creation code does, and `deploy_contract` returns the final
 table; `call_contract` takes the table, which with the program stands for the
-deployed code. The differential harness compares a creation's table with the
+deployed code. A constructor whose inline assembly halts (`return`, `stop`)
+instead returns the halt's bytes, which are the deployed code, as the EVM
+installs a creation's output; bytes the EVM refuses (a first byte `0xEF`, or
+more than its code size limit) abort the creation. The differential harness compares a creation's table with the
 words the compiler's created code holds at its `immutableReferences` offsets,
 and patches a call case's immutables into the runtime bytecode there. The
 harness encodes no internal function values, so a fixture's function
@@ -419,8 +422,12 @@ run time, stored and ABI encoded as one: in type names, in the type
 identifiers of expressions and in storage layouts. `I(a)` is a conversion to
 `address`, `this` is the contract's own address, and an external call
 `c.f{value: v, gas: g}(args)` may name any contract-typed `c`; a gas option
-caps the callee's gas as it does for `a.call`, below. `new C`, `type(C)`
-other than `type(I).interfaceId` (below), external calls to getters and the
+caps the callee's gas as it does for `a.call`, below. `type(C).name` is a
+memory literal of the contract's name. `type(C).creationCode` and
+`type(C).runtimeCode` are new memory `bytes` holding C's creation and runtime
+bytecode from the compiler's output, copied as solc's `datacopy` does: the
+code's bytes only, the rest of the last word left as memory held it.
+`type(I).interfaceId` is below. External calls to getters and the
 members of external functions other than `selector` (below) are rejected.
 Nominal parameter type identifiers keep overloads distinct for `super`
 lookup even when their runtime representations agree.
@@ -600,8 +607,9 @@ cannot be used as a source value without materialization.
 Only failure of the external call selects a catch body; argument evaluation,
 missing-code checks, return decoding and the success/catch bodies keep their
 ordinary failure behavior. Returns are decoded as a high-level call's are,
-arrays and structs included. Contract creation in a try statement remains
-unsupported.
+arrays and structs included. `try new C(...)` catches only a failed
+creation, which yields no address: the success clause binds the new contract,
+and the catch clauses read the creation's return data as a call's.
 
 Internal and private library functions, their modifiers, and library
 constants come with the contracts that use them, also through each other,

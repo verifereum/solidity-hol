@@ -613,22 +613,25 @@ fun contract_declaration v id =
     SOME (_, c) => c
   | NONE => fail (describe v ^ ": unknown contract " ^ IntInf.toString id)
 
-(* The creation bytecode of contract id, fully linked and nonempty, as hex. *)
-fun creation_code v id =
+(* The creation ("bytecode") or runtime ("deployedBytecode") code of contract
+ * id, fully linked and nonempty, as hex. *)
+fun contract_code kind v id =
   let
+    val name = if kind = "bytecode" then "creation bytecode" else "runtime bytecode"
     val output = case List.find (fn (i, _) => i = id) (!creation_outputs) of
                    SOME (_, c) => c
-                 | NONE => fail (describe v ^ ": no creation bytecode")
-    val bytecode = field (field output "evm") "bytecode"
+                 | NONE => fail (describe v ^ ": no " ^ name)
+    val bytecode = field (field output "evm") kind
     val () = require v
       (case optional_field bytecode "linkReferences" of
          NONE => true | SOME refs => null (object refs))
-      "creation bytecode has unresolved links"
+      (name ^ " has unresolved links")
     val code = string_field bytecode "object"
-    val () = require v (code <> "") "empty creation bytecode"
+    val () = require v (code <> "") ("empty " ^ name)
   in
     code
   end
+val creation_code = contract_code "bytecode"
 
 (* type(I).interfaceId, which solc has only for an interface or an abstract
  * contract: the XOR of the selectors of the external functions and public
@@ -892,8 +895,9 @@ val expression_kinds =
 fun is_expression v =
   List.exists (fn k => k = node_type v) expression_kinds handle _ => false
 
-(* type(C).interfaceId, a selector; type(C).name and type(C).creationCode, a
- * string or bytes literal converted to memory, as solc copies them there. *)
+(* type(C).interfaceId, a selector; type(C).name, a string literal converted
+ * to memory, as solc copies it there; type(C).creationCode and runtimeCode,
+ * the code. *)
 fun contract_type_member v base arg =
   let
     val id = int_field arg "referencedDeclaration"
@@ -914,8 +918,10 @@ fun contract_type_member v base arg =
         con "SrcSelector" [info v, interface_id v id, mk_opt expr_ty NONE, type_id v]
     | "name" => literal "string" (string_field (contract_declaration v id) "name") "string"
     | "creationCode" =>
-        literal "hexString"
-          (String.implode (map Char.chr (hex_bytes v (creation_code v id)))) "bytes"
+        con "SrcContractCode" [info v, mk_bytes v (creation_code v id), type_id v]
+    | "runtimeCode" =>
+        con "SrcContractCode"
+          [info v, mk_bytes v (contract_code "deployedBytecode" v id), type_id v]
     | member => fail (describe v ^ ": unsupported contract type member " ^ member)
   end
 
@@ -1782,7 +1788,12 @@ fun stmt v = guarded (fn st => [StmtChild st]) unsupported_stmt (fn v => within 
             "try supports only external function calls")
         val (imported, call_failure) =
           if isSome try_call
-          then attempt (fn () => external_call call (field call "expression") args)
+          then attempt (fn () =>
+            let val callee = field call "expression" in
+              if node_type (options_target callee) = "NewExpression"
+              then creation_call call callee args
+              else external_call call callee args
+            end)
           else (NONE, [])
         fun clause_parameters c =
           case optional_field c "parameters" of

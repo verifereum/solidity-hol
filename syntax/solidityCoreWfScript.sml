@@ -1012,6 +1012,8 @@ Definition wf_core_operation_def:
     located_type_ok env loc ty ∧ annotation = SingleType (LocatedT loc ty)) ∧
   (wf_core_operation env ctx annotation (BytesLiteralOperation ty _) ⇔
     annotation = SingleType (LocatedT MemoryLoc ty) ∧ byte_sequence_type ty) ∧
+  (wf_core_operation env ctx annotation (CodeCopyOperation _) ⇔
+    annotation = SingleType (LocatedT MemoryLoc BytesT)) ∧
   (wf_core_operation env ctx annotation (AllocateMemoryOperation ty length) ⇔
     annotation = SingleType (LocatedT MemoryLoc ty) ∧
     located_type_ok env MemoryLoc ty ∧
@@ -1188,6 +1190,16 @@ Definition wf_core_operation_def:
   (wf_core_operation env ctx annotation
      (CreateContractOperation code params value salt args) ⇔
     annotation = SingleType (AddressT NonpayableAddress) ∧
+    EVERY (abi_type_ok env) params ∧
+    wf_core_atom env ctx (SingleType (UintT 256)) value ∧
+    (case salt of NONE => T | SOME a =>
+       wf_core_atom env ctx (SingleType (FixedBytesT 32)) a) ∧
+    LIST_REL (wf_abi_atom env ctx) params args) ∧
+  (wf_core_operation env ctx annotation
+     (TryCreateContractOperation code params value salt args) ⇔
+    annotation = ProductType [SingleType BoolT;
+                              SingleType (AddressT NonpayableAddress);
+                              RevertDataType] ∧
     EVERY (abi_type_ok env) params ∧
     wf_core_atom env ctx (SingleType (UintT 256)) value ∧
     (case salt of NONE => T | SOME a =>

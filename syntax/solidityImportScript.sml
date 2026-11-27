@@ -234,6 +234,8 @@ Datatype:
       string
   | SrcModular node_info node_info core_operator (src_expr list) string
   | SrcSelector node_info (byte list) (src_expr option) string
+  (* type(C).creationCode or type(C).runtimeCode: the code's bytes *)
+  | SrcContractCode node_info (byte list) string
   | SrcAbiEncode node_info node_info abi_form (src_expr list) string
   | SrcAbiDecode node_info node_info src_expr (src_type_name list) string
   | SrcLowLevelCall node_info node_info low_level_kind (call_option list)
@@ -1198,6 +1200,7 @@ Definition expr_ids_def:
     info.node_id :: callee.node_id :: exprs_ids args) ∧
   (expr_ids (SrcSelector info _ receiver _) =
     info.node_id :: (case receiver of NONE => [] | SOME e => expr_ids e)) ∧
+  (expr_ids (SrcContractCode info _ _) = [info.node_id]) ∧
   (expr_ids (SrcAbiEncode info callee _ args _) =
     info.node_id :: callee.node_id :: exprs_ids args) ∧
   (expr_ids (SrcLowLevelCall info callee _ _ operands _) =
