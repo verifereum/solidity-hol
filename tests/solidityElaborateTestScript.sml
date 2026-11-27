@@ -351,25 +351,24 @@ Proof
   CONV_TAC cv_eval
 QED
 
+val info0 = “<| node_id := 0;
+                node_location := <| loc_start := 0; loc_length := 0;
+                                    loc_source := 0 |> |>”;
+fun at id = “^info0 with node_id := ^(numSyntax.term_of_int id)”;
+val ctx0 = “<| functions := []; static_functions := []; function_ids := [];
+               supers := []; structs := []; enums := [];
+               events := []; variables := []; state := []; locations := [];
+               immutables := []; constants := []; returns := [];
+               placeholder := NONE; mode := CheckedArithmetic; creation := F;
+               scope := 0; returns_id := 0; in_loop := F; bad_ids := [] |>”;
+
 (* A block a constructor runs may not halt, since the source installs no
  * runtime code from the returned bytes; elsewhere it may. *)
 Theorem asm_halt_rejected_in_constructor:
   ∀info.
-    ISL (elab_stmt
-      <| functions := []; static_functions := []; function_ids := [];
-         supers := []; structs := []; enums := []; events := [];
-         variables := []; state := []; locations := []; immutables := [];
-         constants := []; returns := []; placeholder := NONE;
-         mode := CheckedArithmetic; creation := F; scope := 0;
-         returns_id := 0; in_loop := F; bad_ids := [] |> 0
+    ISL (elab_stmt ^ctx0 0
       (SrcInlineAssembly info [YulExprStmt (YulBuiltin YStop [])] [])) ∧
-    elab_stmt
-      <| functions := []; static_functions := []; function_ids := [];
-         supers := []; structs := []; enums := []; events := [];
-         variables := []; state := []; locations := []; immutables := [];
-         constants := []; returns := []; placeholder := NONE;
-         mode := CheckedArithmetic; creation := T; scope := 0;
-         returns_id := 0; in_loop := F; bad_ids := [] |> 0
+    elab_stmt (^ctx0 with creation := T) 0
       (SrcInlineAssembly info [YulExprStmt (YulBuiltin YStop [])] []) =
     INR [(info.node_id, "assembly halt in a constructor")]
 Proof
@@ -383,51 +382,41 @@ Proof
   EVAL_TAC
 QED
 
+val local_declaration =
+  “SrcVariableDeclarationStatement ^info0 [SOME 1]
+     [SOME <| var_info := ^(at 1); var_name := "x"; var_scope := 0;
+              var_type_name := SrcElementaryTypeName ^info0 "uint256" NONE;
+              var_type_id := "t_uint256"; var_transient := F; var_location := NONE |>]
+     NONE”;
+val true_condition = “SrcLiteral ^info0 BoolLiteral "true" "t_bool"”;
+
 (* Statements the compiler does not produce: a declaration as the body of an
  * if or a loop (it must be a statement of a block), and a fractional literal
  * in a tuple, even at a hole. *)
 Theorem declaration_body_and_tuple_fraction_rejected:
-  let info = <| node_id := 0;
-                node_location := <| loc_start := 0; loc_length := 0;
-                                    loc_source := 0 |> |>;
-      x = <| var_info := info with node_id := 1; var_name := "x"; var_scope := 0;
-             var_type_name := SrcElementaryTypeName info "uint256" NONE;
-             var_type_id := "t_uint256"; var_transient := F; var_location := NONE |>;
-      d = SrcVariableDeclarationStatement info [SOME 1] [SOME x] NONE;
-      c = SrcLiteral info BoolLiteral "true" "t_bool";
-      half = SrcLiteral info NumberLiteral "" "t_rational_1_by_2";
-      ctx = <| functions := []; static_functions := []; function_ids := [];
-               supers := []; structs := []; enums := [];
-               events := []; variables := []; state := []; locations := [];
-               immutables := []; constants := []; returns := [];
-               placeholder := NONE; mode := CheckedArithmetic; creation := F;
-               scope := 0; returns_id := 0; in_loop := F; bad_ids := [] |> in
-    ISL (elab_stmt ctx 2 d) ∧
-    elab_stmt ctx 2 (SrcIfStatement info c d NONE) = INR [(0, "declaration as a body")] ∧
-    elab_stmt ctx 2 (SrcWhileStatement info c d) = INR [(0, "declaration as a body")] ∧
-    elab_stmt ctx 2 (SrcVariableDeclarationStatement info [NONE] [NONE] (SOME half)) =
+  ISL (elab_stmt ^ctx0 2 ^local_declaration) ∧
+  elab_stmt ^ctx0 2 (SrcIfStatement ^info0 ^true_condition ^local_declaration NONE) =
+    INR [(0, "declaration as a body")] ∧
+  elab_stmt ^ctx0 2 (SrcWhileStatement ^info0 ^true_condition ^local_declaration) =
+    INR [(0, "declaration as a body")] ∧
+  elab_stmt ^ctx0 2 (SrcVariableDeclarationStatement ^info0 [NONE] [NONE]
+    (SOME (SrcLiteral ^info0 NumberLiteral "" "t_rational_1_by_2"))) =
     INR [(0, "rational number value")]
 Proof
   EVAL_TAC
 QED
 
+val bytes_context =
+  “^ctx0 with variables := [(1, LocatedT MemoryLoc BytesT); (2, FixedBytesT 32)]”;
+fun to_bytes16 e =
+  “SrcTypeConversion ^info0 (SrcElementaryTypeName ^info0 "bytes16" NONE) ^e "t_bytes16"”;
+
 (* Dynamic bytes and fixed bytes both convert to a fixed-size prefix. *)
 Theorem bytes_to_fixed_bytes_admitted:
-  let info = <| node_id := 0;
-                node_location := <| loc_start := 0; loc_length := 0;
-                                    loc_source := 0 |> |>;
-      to16 e = SrcTypeConversion info
-                 (SrcElementaryTypeName info "bytes16" NONE) e "t_bytes16";
-      ctx = <| functions := []; static_functions := []; function_ids := [];
-               supers := []; structs := []; enums := [];
-               events := [];
-               variables := [(1, LocatedT MemoryLoc BytesT); (2, FixedBytesT 32)];
-               state := []; locations := [];
-               immutables := []; constants := []; returns := [];
-               placeholder := NONE; mode := CheckedArithmetic; creation := F;
-               scope := 0; returns_id := 0; in_loop := F; bad_ids := [] |> in
-    ISL (elab_expr ctx 3 (to16 (SrcIdentifier info "b" 1 "t_bytes_memory_ptr"))) ∧
-    ISL (elab_expr ctx 3 (to16 (SrcIdentifier info "w" 2 "t_bytes32")))
+  ISL (elab_expr ^bytes_context 3
+    ^(to_bytes16 “SrcIdentifier ^info0 "b" 1 "t_bytes_memory_ptr"”)) ∧
+  ISL (elab_expr ^bytes_context 3
+    ^(to_bytes16 “SrcIdentifier ^info0 "w" 2 "t_bytes32"”))
 Proof
   EVAL_TAC
 QED
@@ -436,16 +425,6 @@ QED
  * fails, and a statement after a failed declaration only its own blockers.
  * The declared variable is bound if its type is supported, and otherwise
  * a reference to it adds no blocker, the declaration having reported it. *)
-val info0 = “<| node_id := 0;
-                node_location := <| loc_start := 0; loc_length := 0;
-                                    loc_source := 0 |> |>”;
-fun at id = “^info0 with node_id := ^(numSyntax.term_of_int id)”;
-val ctx0 = “<| functions := []; static_functions := []; function_ids := [];
-               supers := []; structs := []; enums := [];
-               events := []; variables := []; state := []; locations := [];
-               immutables := []; constants := []; returns := [];
-               placeholder := NONE; mode := CheckedArithmetic; creation := F;
-               scope := 0; returns_id := 0; in_loop := F; bad_ids := [] |>”;
 fun local_y tn = “<| var_info := ^(at 4); var_name := "y"; var_scope := 0;
                      var_type_name := ^tn; var_type_id := "t_uint256";
                      var_transient := F; var_location := NONE |>”;
