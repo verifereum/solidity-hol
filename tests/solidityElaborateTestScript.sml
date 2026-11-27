@@ -292,7 +292,15 @@ Theorem computed_struct_layouts_match_solc:
   elab_struct_layouts (REVERSE (HD missing_struct_layout_unit.unit_contracts).contract_structs) =
     OPTION_MAP REVERSE (elab_struct_layouts (HD struct_unit.unit_contracts).contract_structs)
 Proof
-  conj_tac >- CONV_TAC cv_eval >> EVAL_TAC
+  conj_tac >- CONV_TAC cv_eval >>
+  (* CV needs the fixture to have a head contract. *)
+  ‘missing_struct_layout_unit.unit_contracts ≠ []’ by
+    (REWRITE_TAC [GSYM listTheory.NULL_EQ] >> CONV_TAC cv_eval) >>
+  pop_assum (fn nonempty =>
+    CONV_TAC (LAND_CONV (fn tm => MP (cv_eval tm) nonempty))) >>
+  EVAL_TAC >>
+  simp[solidityCoreTheory.core_struct_layout_component_equality,
+       solidityCoreTheory.core_state_variable_component_equality]
 QED
 
 Definition unlayoutable_structs_def:
