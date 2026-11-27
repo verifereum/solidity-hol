@@ -65,11 +65,15 @@ contract FunctionValues is FunctionValueBase {
         return (low, current != increment, high);
     }
 
-    function writeAggregates(uint256 value) external returns (uint256, uint256, uint256) {
+    function writeAggregates(uint256 value) external returns (uint256, uint256, uint256, uint256) {
         entry = Entry(3, increment);
+        function(uint256) internal pure returns (uint256)[] memory items =
+            new function(uint256) internal pure returns (uint256)[](1);
+        items[0] = increment;
+        operations = items;
         operations.push(double);
         byKey[3] = increment;
-        return (entry.operation(value), operations[0](value), byKey[3](value));
+        return (entry.operation(value), operations[0](value), operations[1](value), byKey[3](value));
     }
 
     function memoryAggregates(uint256 value) external pure returns (uint256, uint256) {

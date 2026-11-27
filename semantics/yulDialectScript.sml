@@ -41,6 +41,7 @@ Definition builtin_name_def:
   builtin_name YShr = "shr" ∧
   builtin_name YSar = "sar" ∧
   builtin_name YByte = "byte" ∧
+  builtin_name YClz = "clz" ∧
   builtin_name YKeccak256 = "keccak256" ∧
   builtin_name YMLoad = "mload" ∧
   builtin_name YMStore = "mstore" ∧
@@ -71,8 +72,10 @@ Definition builtin_name_def:
   builtin_name YLog4 = "log4" ∧
   builtin_name YGasPrice = "gasprice" ∧
   builtin_name YBaseFee = "basefee" ∧
+  builtin_name YBlobBaseFee = "blobbasefee" ∧
   builtin_name YGasLimit = "gaslimit" ∧
   builtin_name YBlockHash = "blockhash" ∧
+  builtin_name YBlobHash = "blobhash" ∧
   builtin_name YPrevRandao = "prevrandao" ∧
   builtin_name YStop = "stop" ∧
   builtin_name YInvalid = "invalid" ∧
@@ -128,6 +131,7 @@ Definition builtin_of_name_def:
     else if name = "shr" then SOME YShr
     else if name = "sar" then SOME YSar
     else if name = "byte" then SOME YByte
+    else if name = "clz" then SOME YClz
     else if name = "keccak256" then SOME YKeccak256
     else if name = "mload" then SOME YMLoad
     else if name = "mstore" then SOME YMStore
@@ -158,8 +162,10 @@ Definition builtin_of_name_def:
     else if name = "log4" then SOME YLog4
     else if name = "gasprice" then SOME YGasPrice
     else if name = "basefee" then SOME YBaseFee
+    else if name = "blobbasefee" then SOME YBlobBaseFee
     else if name = "gaslimit" then SOME YGasLimit
     else if name = "blockhash" then SOME YBlockHash
+    else if name = "blobhash" then SOME YBlobHash
     else if name = "prevrandao" then SOME YPrevRandao
     else if name = "stop" then SOME YStop
     else if name = "invalid" then SOME YInvalid
@@ -243,6 +249,7 @@ Definition builtin_effect_def:
   builtin_effect YShr = EffectPure ∧
   builtin_effect YSar = EffectPure ∧
   builtin_effect YByte = EffectPure ∧
+  builtin_effect YClz = EffectPure ∧
   builtin_effect YKeccak256 = EffectMemory ∧
   builtin_effect YMLoad = EffectMemory ∧
   builtin_effect YMStore = EffectMemory ∧
@@ -273,8 +280,10 @@ Definition builtin_effect_def:
   builtin_effect YLog4 = EffectLog ∧
   builtin_effect YGasPrice = EffectFrame ∧
   builtin_effect YBaseFee = EffectFrame ∧
+  builtin_effect YBlobBaseFee = EffectFrame ∧
   builtin_effect YGasLimit = EffectFrame ∧
   builtin_effect YBlockHash = EffectFrame ∧
+  builtin_effect YBlobHash = EffectFrame ∧
   builtin_effect YPrevRandao = EffectFrame ∧
   builtin_effect YStop = EffectHalt ∧
   builtin_effect YInvalid = EffectHalt ∧

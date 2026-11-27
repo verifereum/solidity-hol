@@ -756,6 +756,12 @@ Definition builtin_signature_def:
     ([InPlaceOperand (LocatedT MemoryLoc BytesT)], FixedBytesT 32)) ∧
   (builtin_signature BlockhashBuiltin =
     ([ValueOperand (UintT 256)], FixedBytesT 32)) ∧
+  (builtin_signature BlobhashBuiltin =
+    ([ValueOperand (UintT 256)], FixedBytesT 32)) ∧
+  (builtin_signature Ripemd160Builtin =
+    ([InPlaceOperand (LocatedT MemoryLoc BytesT)], FixedBytesT 20)) ∧
+  (builtin_signature Erc7201Builtin =
+    ([ValueOperand (LocatedT MemoryLoc StringT)], UintT 256)) ∧
   (builtin_signature CodeBuiltin =
     ([ValueOperand (AddressT NonpayableAddress)], LocatedT MemoryLoc BytesT))
 End

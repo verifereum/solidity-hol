@@ -878,12 +878,16 @@ fun run_expectations {root, manifest} =
                    val prior_world = !world
                    val () = block := !block + 1
                    val bn = num_term (IntInf.fromInt (!block))
+                   (* The pinned solc test/EVMHost.cpp supplies both blob hashes. *)
                    val fr = eval “(differential_frame ^sender ^value ^data) with
                      <| self_address := ^address; code_address := ^address;
                         tx_params := (differential_frame ^sender ^value ^data).tx_params with
                           <| origin := 0x9292929292929292929292929292929292929292w;
                              gasPrice := 3000000000; blockNumber := ^bn;
                              prevHashes := test_block_hashes ^bn;
+                             blobHashes :=
+                               [0x0100000000000000000000000000000000000000000000000000000000000001w;
+                                0x0100000000000000000000000000000000000000000000000000000000000002w];
                              blockTimeStamp := 15 * ^bn; chainId := 1;
                              blockCoinBase := 0x7878787878787878787878787878787878787878w;
                              blockGasLimit := 20000000;

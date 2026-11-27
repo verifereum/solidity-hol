@@ -471,9 +471,14 @@ its effects and failures; the selector still comes from the declaration.
 the interface `I` declares itself, not those it inherits, nor its `fallback`
 or `receive`; `I` must name an interface directly, not through a module, and
 an abstract contract's `interfaceId` is rejected. A selector of any other
-function-typed value is rejected, and so is `ripemd160`. `sha256(b)` hashes
-bytes in memory, as the precompile at address 2 does, and `blockhash(n)` is
-the hash of one of the 256 blocks before the current one, or 0.
+function-typed value is rejected. `sha256(b)` and `ripemd160(b)` hash bytes
+as the precompiles at addresses 2 and 3 do. The RIPEMD-160 call returns a
+`bytes20` digest and leaves the padded return word in scratch memory and in
+returndata. `blockhash(n)` is the hash of one of the 256 blocks before the
+current one, or 0. `blobhash(i)` reads the transaction's versioned blob hash
+at index `i`, or 0 if the index is out of range. `block.blobbasefee` reads
+the blob base fee. `erc7201(s)` computes the ERC-7201 namespace slot as a
+`uint256`. The compiler folds a literal argument without touching memory.
 
 `c ? a : b` evaluates `c`, then only the operand it chooses, converted to the
 type the compiler gives the whole expression, which must be a value type,
@@ -676,21 +681,23 @@ read, so a dirty element reverts when it is indexed, copied or re-encoded.
 Storage arrays of the same element types are values too: they copy to memory
 (reading every element, panic `0x41` past the allocation limit), are assigned
 from memory, calldata or another storage array, and are ABI-encoded in place as
-return values and external call arguments. An assignment from memory walks
-the source as the compiled copy does: it resizes the destination, then reads
-each element as it writes it, so the slot hashes the copy leaves in the
-scratch word are what a later element at that address reads. An assignment
-from calldata or another storage array reads the source first, which reads no
-memory. Either clears the destination (shrinking it, nested
-data included) and writes the elements, converting them as the compiler's
-implicit conversions allow (`uint8[]` to `uint16[]`, `bytes8` to `bytes10`,
-static to dynamic, a static array into a longer static one, whose remaining
-elements are cleared); a self-assignment returns at once, as the compiler's
-copy does. Reading the whole source before clearing the destination differs from the
-compiler, which resizes the destination and then copies slot by slot, only
-under storage forged with inline assembly: two distinct arrays that alias
-through a wrapped-around length, or which failure comes first when a corrupt
-header meets malformed calldata. `T storage` locals of arrays are still
+return values and external call arguments. An assignment walks the source as
+the compiled copy does, whether it is in memory, calldata or storage: it
+resizes the destination (clearing a shrunk tail, nested data included, with
+the compiler's slot-count arithmetic, which wraps for packed elements and
+panics with `0x11` on overflow for multi-slot ones), then reads each element as it writes
+it, against storage as the earlier writes left it. A storage source of scalar
+elements is read a slot at a time, the next slot as soon as the last element
+of the one before is taken, and each destination slot is built from zero and
+stored whole. So a source that overlaps its destination (two arrays that
+alias through a forged length) reads what the copy already wrote, the slot
+hashes the copy leaves in the scratch word are what a later element at that
+address reads, and a corrupt destination header panics before a later
+malformed calldata element is reached. Elements are converted as the
+compiler's implicit conversions allow (`uint8[]` to `uint16[]`, `bytes8` to
+`bytes10`, static to dynamic, a static array into a longer static one, whose
+remaining elements are cleared); a self-assignment returns at once, as the
+compiler's copy does. `T storage` locals of arrays are still
 rejected.
 
 Struct declarations may be file-level or contract members. User-defined type

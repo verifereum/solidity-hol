@@ -68,8 +68,7 @@ and non-canonical words written back to locals by inline assembly, fail with
 storage array copies and ABI encoding too. `solidityStorage` owns packed access and
 navigation; the evaluator owns bindings, frame checks and control flow.
 Scalar writes, reference
-rebinding and content copying are distinct core operations; the latter two
-remain extension points rather than implemented aggregate semantics.
+rebinding and content copying are distinct core operations.
 
 An inline assembly block (`AssemblyStmt`) runs on the Yul evaluator over the
 frame's own memory. Solidity code and assembly share one byte-addressed
@@ -102,8 +101,9 @@ where the EVM runs out of gas. High-level external calls and
 the low-level `call`, `staticcall` and `delegatecall` run the callee on
 Verifereum through `externalCall`, a provisional adapter with a fixed gas
 budget (a `gas` option caps it) and a fresh callee frame; a delegate call's
-frame runs the callee's code in the caller's account. Creation is not
-connected yet. Core well-formedness alone does not rule out `InvalidCompletion`:
+frame runs the callee's code in the caller's account. Source `new C` runs the
+compiler's initcode, and Yul `create`/`create2` the initcode in memory, on
+Verifereum through `run_create_call`. Core well-formedness alone does not rule out `InvalidCompletion`:
 for example, a storage write in a static frame is deliberately invalid.
 
 ## Yul

@@ -23,10 +23,11 @@ val prepared = #prepared (solidityPrepareLib.prepare_artifact
   {root = "..", path = "../testdata/frontend/expected/partial.json",
    source = "testdata/frontend/partial.sol"});
 
-(* add is supported; digest and the fallback use ripemd160, as does Mid.twice,
- * which Partial.twice reaches by super, so Partial.twice, digestTwice and
- * callsTwice call unsupported functions; the constructor's halting assembly
- * does not elaborate. Once Partial.twice is unsupported its super calls
+(* add is supported; digest, the fallback and Mid.twice use abi.encodeCall
+ * through a computed receiver. Partial.twice reaches Mid.twice by super,
+ * so Partial.twice, digestTwice and callsTwice call unsupported functions.
+ * The constructor's halting assembly does not elaborate.
+ * Once Partial.twice is unsupported its super calls
  * reach nothing, so neither Mid.twice nor Base.twice is among the
  * functions calls reach. The constant DIGITS and digits, which reads it,
  * elaborate through the shared fixed-byte indexed access;
@@ -58,17 +59,17 @@ fun elaboration_failure r =
   | NONE => false;
 fun elaboration_failure_with tag r =
   elaboration_failure r andalso String.isSubstring tag (valOf r);
-fun imported_failure r =
+fun computed_receiver_failure r =
   case r of
-    SOME m => not (String.isPrefix "calls" m) andalso not (elaboration_failure r)
+    SOME m => String.isSubstring "abi.encodeCall through a computed receiver is not supported" m
   | NONE => false;
 val () =
   if reasons "add" = [NONE] andalso
      reasons "total" = [] andalso
-     List.all imported_failure (reasons "digest") andalso
+     List.all computed_receiver_failure (reasons "digest") andalso
      length (reasons "digest") = 1 andalso
      length (reasons "") = 2 andalso
-     List.exists imported_failure (reasons "") andalso
+     List.exists computed_receiver_failure (reasons "") andalso
      List.exists elaboration_failure (reasons "") andalso
      reasons "digestTwice" = [calls_unsupported] andalso
      reasons "callsTwice" = [calls_unsupported] andalso

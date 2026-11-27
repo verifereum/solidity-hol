@@ -809,6 +809,22 @@ Proof
   CONV_TAC cv_eval
 QED
 
+Definition yul_blob_machine_def:
+  yul_blob_machine = yul_test_machine with transaction_parameters :=
+    (yul_test_tx_params with blobHashes := [0x1234w; 0x5678w])
+End
+
+Theorem blobhash_reads_only_the_indexed_transaction_hash:
+  eval_yul_builtin YBlobHash [0w] yul_blob_machine =
+    EvalValues [0x1234w] yul_blob_machine ∧
+  eval_yul_builtin YBlobHash [1w] yul_blob_machine =
+    EvalValues [0x5678w] yul_blob_machine ∧
+  eval_yul_builtin YBlobHash [2w] yul_blob_machine =
+    EvalValues [0w] yul_blob_machine
+Proof
+  PURE_REWRITE_TAC [yul_blob_machine_def] >> CONV_TAC cv_eval
+QED
+
 Theorem environment_builtins_read_the_frame_transaction_and_block:
   (run_frame 20 environment_code).completion =
   YulReturn (word_to_bytes_be (0x1234w : bytes32) ++

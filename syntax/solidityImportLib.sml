@@ -178,7 +178,10 @@ val builtin_functions : (IntInf.int * string * int * string) list =
   [(~5, "BlockhashBuiltin", 1, "blockhash takes one argument"),
    (~6, "EcrecoverBuiltin", 4, "ecrecover takes four arguments"),
    (~8, "Keccak256Builtin", 1, "keccak256 takes one argument"),
-   (~22, "Sha256Builtin", 1, "sha256 takes one argument")]
+   (~20, "Ripemd160Builtin", 1, "ripemd160 takes one argument"),
+   (~22, "Sha256Builtin", 1, "sha256 takes one argument"),
+   (~29, "BlobhashBuiltin", 1, "blobhash takes one argument"),
+   (~30, "Erc7201Builtin", 1, "erc7201 takes one argument")]
 
 (* The bytes of a hex string without prefix. *)
 fun hex_bytes v hex =
@@ -209,6 +212,7 @@ fun environment_field v base member =
        ((tx_id, "gasprice"), "TxGasPrice"), ((block_id, "number"), "BlockNumber"),
        ((block_id, "timestamp"), "BlockTimestamp"), ((block_id, "chainid"), "BlockChainId"),
        ((block_id, "coinbase"), "BlockCoinbase"), ((block_id, "basefee"), "BlockBaseFee"),
+       ((block_id, "blobbasefee"), "BlockBlobBaseFee"),
        ((block_id, "gaslimit"), "BlockGasLimit"),
        ((block_id, "prevrandao"), "BlockPrevRandao"),
        ((block_id, "difficulty"), "BlockPrevRandao")]
