@@ -775,10 +775,10 @@ Definition expr_ids_def:
 End
 
 (* An argument of abi.encode*, with the ABI type it is encoded as: a scalar
- * as its type; an unpacked array without structs, byte sequence, or string
- * literal where it is, as the compiler encodes it in place; an integer
- * literal (unpacked only) as its mobile type, whose encoding is that of
- * int256 or uint256. *)
+ * as its type; an object, byte sequence or string literal where it is, as
+ * the compiler encodes it in place (packed, only what packed_type admits);
+ * an integer literal (unpacked only) as its mobile type, whose encoding is
+ * that of int256 or uint256. *)
 Definition abi_argument_def:
   abi_argument packed a vt =
     case vt of
@@ -931,9 +931,8 @@ End
 (* The operation of abi.encode* on the values of its arguments, after any
  * statements converting the arguments: a selector given as an argument
  * converts to a bytes4 (a hex literal binds its bytes), a signature as
- * AbiSignature converts it, and the other
- * arguments are scalars, arrays without structs or byte sequences (arrays and
- * integer literals only unpacked, as the compiler requires). *)
+ * AbiSignature converts it, and the other arguments convert as abi_argument
+ * does. *)
 Definition selector_encoding_def:
   selector_encoding target (i : num) so r =
     case (so, r) of
