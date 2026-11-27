@@ -1037,9 +1037,28 @@ fun run_expectations {root, manifest} =
                            else ();
                            (con "Returned" [bytes_term []], eval “^w.logs”)
                          end
+                     (* A creation that returned its own code deploys it;
+                      * later calls would run the source program against
+                      * other code, so the sequence stops there. *)
                      | ("ContractReturned", [bs, w]) =>
-                         (world := result_world;
-                          (con "Returned" [bs], eval “^result_world.logs”))
+                         if creating then
+                           let
+                             val destroyed = eval “(lookup_account ^address
+                               ^result_world.accounts).nonce = 0” ~~ T
+                           in
+                             world := (if destroyed then result_world
+                               else “^result_world with accounts :=
+                                 update_account ^address
+                                   ((lookup_account ^address ^result_world.accounts)
+                                      with code := ^bs) ^result_world.accounts”);
+                             stopped := SOME (if destroyed
+                               then "constructor destroyed the contract"
+                               else "constructor returned its own code");
+                             (con "Returned" [bytes_term []], eval “^result_world.logs”)
+                           end
+                         else
+                           (world := result_world;
+                            (con "Returned" [bs], eval “^result_world.logs”))
                      | ("ContractReverted", [bs, _]) => rolled_back "deployment reverted" bs
                      (* An abort fails with no return data, which the expectation
                       * format, like the bytecode run, shows as an empty revert. *)

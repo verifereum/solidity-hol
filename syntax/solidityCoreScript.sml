@@ -203,6 +203,10 @@ Datatype:
       core_atom
   | CreateContractOperation (byte list) (sol_type list) core_atom
       (core_atom option) (core_atom list)
+  (* success flag, the new address, RevertDataType; only a failed creation
+   * is caught. Operand failures still propagate. *)
+  | TryCreateContractOperation (byte list) (sol_type list) core_atom
+      (core_atom option) (core_atom list)
   (* target.transfer(value): exact stipend, failure bytes forwarded, no
    * return-data allocation. *)
   | TransferOperation core_atom core_atom

@@ -1,0 +1,47 @@
+{
+  "name": "constructor_halt",
+  "source": "testdata/differential/constructor_halt.sol",
+  "contract": "ConstructorHalt",
+  "artifact": "testdata/differential/expected/constructor_halt.json",
+  "cases": [
+    {
+      "name": "constructor_stop_keeps_writes",
+      "deploy": true,
+      "args": [
+        1
+      ],
+      "expect": {
+        "return": []
+      },
+      "final_storage": {
+        "0": 1
+      }
+    },
+    {
+      "name": "constructor_return_deploys_bytes",
+      "deploy": true,
+      "args": [
+        2
+      ],
+      "expect": {
+        "return": []
+      },
+      "final_storage": {
+        "0": 2
+      }
+    },
+    {
+      "name": "constructor_without_halt",
+      "deploy": true,
+      "args": [
+        3
+      ],
+      "expect": {
+        "return": []
+      },
+      "final_storage": {
+        "0": 103
+      }
+    }
+  ]
+}

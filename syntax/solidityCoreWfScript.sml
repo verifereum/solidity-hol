@@ -1136,6 +1136,16 @@ Definition wf_core_operation_def:
     (case salt of NONE => T | SOME a =>
        wf_core_atom env ctx (SingleType (FixedBytesT 32)) a) ∧
     LIST_REL (wf_abi_atom env ctx) params args) ∧
+  (wf_core_operation env ctx annotation
+     (TryCreateContractOperation code params value salt args) ⇔
+    annotation = ProductType [SingleType BoolT;
+                              SingleType (AddressT NonpayableAddress);
+                              RevertDataType] ∧
+    EVERY (abi_type_ok env) params ∧
+    wf_core_atom env ctx (SingleType (UintT 256)) value ∧
+    (case salt of NONE => T | SOME a =>
+       wf_core_atom env ctx (SingleType (FixedBytesT 32)) a) ∧
+    LIST_REL (wf_abi_atom env ctx) params args) ∧
   (wf_core_operation env ctx annotation _ ⇔ F)
 End
 

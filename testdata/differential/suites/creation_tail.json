@@ -1,0 +1,112 @@
+{
+  "name": "creation_tail",
+  "source": "testdata/differential/creation_tail.sol",
+  "contract": "CreationTail",
+  "artifact": "testdata/differential/expected/creation_tail.json",
+  "cases": [
+    {
+      "name": "try_create_success",
+      "function": "tryCreate",
+      "args": [
+        4
+      ],
+      "expect": {
+        "return": [
+          true,
+          25,
+          "0x"
+        ]
+      }
+    },
+    {
+      "name": "try_create_error",
+      "function": "tryCreate",
+      "args": [
+        13
+      ],
+      "expect": {
+        "return": [
+          false,
+          0,
+          "0x72656a6563746564"
+        ]
+      }
+    },
+    {
+      "name": "try_create_panic",
+      "function": "tryCreate",
+      "args": [
+        0
+      ],
+      "expect": {
+        "return": [
+          false,
+          18,
+          "0x"
+        ]
+      }
+    },
+    {
+      "name": "try_bare_success",
+      "function": "tryBare",
+      "args": [
+        5
+      ],
+      "expect": {
+        "return": [
+          true
+        ]
+      }
+    },
+    {
+      "name": "try_bare_failure",
+      "function": "tryBare",
+      "args": [
+        13
+      ],
+      "expect": {
+        "return": [
+          false
+        ]
+      }
+    },
+    {
+      "name": "try_value_without_balance",
+      "function": "tryValue",
+      "args": [
+        4
+      ],
+      "expect": {
+        "return": [
+          false,
+          0
+        ]
+      }
+    },
+    {
+      "name": "try_salted_collision",
+      "function": "trySalted",
+      "args": [
+        4,
+        "0x000000000000000000000000000000000000000000000000000000000000002a"
+      ],
+      "expect": {
+        "return": [
+          true,
+          false
+        ]
+      }
+    },
+    {
+      "name": "runtime_code_is_deployed_code",
+      "function": "runtime",
+      "args": [],
+      "expect": {
+        "return": [
+          202,
+          true
+        ]
+      }
+    }
+  ]
+}

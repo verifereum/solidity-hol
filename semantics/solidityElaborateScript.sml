@@ -69,7 +69,7 @@ val () = cv_rep_delete "solidityImport.cv_num_to_dec_string_thm";
  * immutables and constants (with the id of the constant's wrapping
  * procedure); the enclosing function's return variables and, in a modifier,
  * the procedure its placeholder calls and the variables it passes; the
- * arithmetic mode; whether in the creation; the innermost scope node, which
+ * arithmetic mode; the innermost scope node, which
  * declares the locals of a declaration statement; the id of the return
  * parameter list a return names; whether in a loop body; the declarations
  * that failed to elaborate, whose references fail with no blocker of their
@@ -91,7 +91,6 @@ Datatype:
     returns : (num # sol_type) list;
     placeholder : (num # (num # sol_type) list) option;
     mode : arithmetic_mode;
-    creation : bool;
     scope : num;
     returns_id : num;
     in_loop : bool;
@@ -1515,9 +1514,11 @@ Definition external_call_def:
     | _ => INR [(info.node_id, "unsupported external call")]
 End
 
-(* Creation shares external-call argument conversion and ABI admission. *)
+(* Creation shares external-call argument conversion and ABI admission. A
+ * caught creation binds its success flag, the new address and the raw revert
+ * data, as a caught call does. *)
 Definition create_contract_def:
-  create_contract ctx (info : node_info) callee opts operands order tid r =
+  create_contract catching ctx (info : node_info) callee opts operands order tid r =
     let shape =
       case all_some (MAP call_variable_type callee.create_parameters) of
         NONE => NONE
@@ -1540,11 +1541,20 @@ Definition create_contract_def:
                                       else UintT 256) opts) ++ params)) (MAP INL vs) of
                 INL (cs, _, atoms, n1) =>
                   let options = TAKE (LENGTH opts) atoms in
-                  let (rs, a) = bind_value n1 (AddressT NonpayableAddress)
-                    (CreateContractOperation callee.create_bytecode params
-                      (option_value opts options) (option_atom SaltOption opts options)
-                      (DROP (LENGTH opts) atoms)) in
-                  INL ((ss ++ cs ++ rs, a, ElabType (AddressT NonpayableAddress)), n1 + 1)
+                  let address = AddressT NonpayableAddress in
+                  let operation = if catching then TryCreateContractOperation
+                                  else CreateContractOperation in
+                  INL ((ss ++ cs ++
+                        [DefineStmt (AstId n1)
+                           (if catching then
+                              ProductType [SingleType BoolT; SingleType address;
+                                           RevertDataType]
+                            else SingleType address)
+                           (operation callee.create_bytecode params
+                              (option_value opts options)
+                              (option_atom SaltOption opts options)
+                              (DROP (LENGTH opts) atoms))],
+                        BoundAtom (AstId n1), ElabType address), n1 + 1)
               | INR bs => INR bs)
          | _ => INR [(info.node_id, "argument order")])
 End
@@ -2060,7 +2070,7 @@ Definition elab_expr_def:
              (external_operand_order opts order)
              (external_operand_targets ctx.structs callee opts) operands)
     | SrcCreate info callee opts operands order tid =>
-        create_contract ctx info callee opts operands order tid
+        create_contract F ctx info callee opts operands order tid
           (operand_values (elab_arg_values ctx n operands))
     (* S(args): the arguments in the call's order, then the struct is
        allocated, and each field converted and written in declaration order *)
@@ -3003,9 +3013,9 @@ Definition elab_assembly_references_def:
     | INR bs => INR (bs ++ blockers (elab_assembly_references ctx n id refs)))
 End
 
-(* The caught operation of a try statement: an external call. Kept out of
- * elab_stmt, whose termination proof the case split on the call's form
- * would multiply. *)
+(* The caught operation of a try statement: an external call or a creation.
+ * Kept out of elab_stmt, whose termination proof the case split on the
+ * call's form would multiply. *)
 Definition try_operation_def:
   try_operation ctx n id call =
     case call of
@@ -3013,7 +3023,21 @@ Definition try_operation_def:
         external_call T ctx info callee opts operands order tid
           (elab_args ctx n info.node_id 0 (external_operand_order opts order)
              (external_operand_targets ctx.structs callee opts) operands)
+    | SrcCreate info callee opts operands order tid =>
+        create_contract T ctx info callee opts operands order tid
+          (operand_values (elab_arg_values ctx n operands))
     | _ => INR [(id, "unsupported try statement")]
+End
+
+(* The results of a caught call: the callee's returns, or a creation's new
+ * address. *)
+Definition try_results_def:
+  try_results structs call =
+    case call of
+      SrcExternalCall _ callee _ _ _ _ =>
+        OPTION_MAP SND (external_types structs callee.ext_signature)
+    | SrcCreate _ _ _ _ _ _ => SOME [AddressT NonpayableAddress]
+    | _ => NONE
 End
 
 (* A caught call's success flag, results and raw revert data, projected from
@@ -3021,11 +3045,8 @@ End
  * when the success clause binds none of them. *)
 Definition try_call_def:
   try_call structs n call ok ps body ss r =
-    case (call, all_some (MAP (scoped_variable ok) ps)) of
-      (SrcExternalCall _ callee _ _ _ _, SOME locals) =>
-        (case external_types structs callee.ext_signature of
-         NONE => NONE
-       | SOME (_, rets) =>
+    case (try_results structs call, all_some (MAP (scoped_variable ok) ps)) of
+      (SOME rets, SOME locals) =>
         if ¬((ps = [] ∨ rets = MAP SND locals) ∧
              ¬is_declaration body)
         then NONE else
@@ -3038,7 +3059,7 @@ Definition try_call_def:
                   (TupleComponentOperation (LENGTH types) r)],
                condition, (if ps = [] then [] else rest),
                BoundAtom (AstId n1), n1 + 1)
-         | [] => NONE))
+         | [] => NONE)
     | _ => NONE
 End
 
@@ -3310,16 +3331,10 @@ Definition elab_stmts_def:
                        (expr_ids args) vs of
                   INL (cs, failure, n2) => INL ((ss ++ cs ++ [failure], ctx), n2)
                 | INR bs => INR bs))) ∧
-  (* A constructor, and the modifiers it runs, may not halt from assembly:
-   * the source installs no runtime code from the returned bytes. The
-   * instruction checks are separate: the constructor's forbids more. *)
   (elab_stmt ctx n (SrcInlineAssembly info code refs) =
     let own =
       (if ¬assembly_stmts_ok assembly_unsupported code
        then [(info.node_id, "unsupported assembly instruction")]
-       else if ctx.creation ∧
-               ¬assembly_stmts_ok (YReturn :: YStop :: assembly_unsupported) code
-       then [(info.node_id, "assembly halt in a constructor")]
        else []) ++
       (if assembly_gas_ok code then []
        else [(info.node_id, "unsupported assembly gas or return data use")]) ++
@@ -3519,7 +3534,7 @@ Definition function_ctx_def:
                          else ctx.state;
                 locations := if library then [] else ctx.locations;
                 immutables := if library then [] else ctx.immutables;
-                returns := rs; creation := (f.fn_kind = ConstructorKind);
+                returns := rs;
                 scope := scope; returns_id := f.fn_returns_id |>
 End
 
@@ -3544,7 +3559,7 @@ Definition contract_ctx_def:
        events := MAP (λe. (e.event_info.node_id, e)) c.contract_events;
        variables := []; state := state; locations := state;
        immutables := immutables; constants := constants; returns := [];
-       placeholder := NONE; mode := CheckedArithmetic; creation := F;
+       placeholder := NONE; mode := CheckedArithmetic;
        scope := 0; returns_id := 0; in_loop := F; bad_ids := [] |>
 End
 
@@ -4035,7 +4050,7 @@ Definition elaborate_contract_def:
         let ps = fps ++ gps ++ cps in
         let creation =
           if unsupported_creation c then INR (AstId n)
-          else case elab_creation (ctx with creation := T) c n of
+          else case elab_creation ctx c n of
                  INL (p, _) => INL p
                | INR _ => INR (AstId n) in
         let creation_id = (case creation of
@@ -4112,7 +4127,7 @@ Definition contract_blockers_def:
     blockers (elab_constants (contract_ctx c [] [] [] ctx.constants) n
                 c.contract_constants) ++
     (if unsupported_creation c then []
-     else blockers (elab_creation (ctx with creation := T) c n))
+     else blockers (elab_creation ctx c n))
 End
 
 (* Raw lowering of a unit of one contract, with fresh ids above its node ids;
@@ -4200,7 +4215,7 @@ Definition contract_elaboration_failures_def:
               table_blockers c0 ++
               FLAT (MAP (λx. if MEM (FST x).var_info.node_id live then []
                              else blockers (elab_constant typed_ctx 0 x)) typed) ++
-              blockers (elab_creation (ctx with creation := T) c n) in
+              blockers (elab_creation ctx c n) in
     (if own = [] then [] else [(c0.contract_info.node_id, own)]) ++
     FLAT (MAP (λf. case elab_function ctx c strict F n f of
                      INL _ => []
@@ -4530,6 +4545,7 @@ QED
 val () = cv_auto_trans flag_def;
 val () = cv_auto_trans set_flag_def;
 
+val () = cv_auto_trans try_results_def;
 val () = cv_auto_trans try_call_def;
 val () = cv_auto_trans catch_binding_def;
 val bind_failed_pre_def = cv_auto_trans_pre "bind_failed_pre" bind_failed_def;

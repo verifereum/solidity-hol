@@ -29,7 +29,9 @@ Libs
   cv_transLib
 
 (* A creation that succeeds yields the values of the contract's immutables:
- * the deployed code is the compiler's, with those values in it. *)
+ * the deployed code is the compiler's, with those values in it. A creation
+ * whose inline assembly halts returns the halt's bytes, which are the
+ * deployed code instead. *)
 Datatype:
   contract_result
   = ContractReturned (byte list) source_world
@@ -185,9 +187,11 @@ End
  * the immutables (NONE in a creation frame, which keeps them in its reserved
  * memory), and the frame's memory when it ends, which source code cannot
  * observe. An inline assembly halt returns its bytes as the frame's data; in
- * a creation frame those bytes would be the deployed code, which the source
- * does not model, so a halt there fails closed. A creation frame yields the
- * immutables' final values, the words of its reserved memory.
+ * a creation frame those bytes are the deployed code, as the EVM installs a
+ * creation's output, which it refuses when the code starts with 0xEF or is
+ * longer than max_code_size with an exceptional halt, an abort. A
+ * creation frame that ends normally yields the immutables' final values, the
+ * words of its reserved memory.
  *)
 Definition run_entry_frame_def:
   run_entry_frame fuel env p args (fr : source_frame) (w : source_world) imm reserved
@@ -227,7 +231,10 @@ Definition run_entry_frame_def:
     | FrameRevert data w' => ContractReverted data w'
     | FrameAbort w' => ContractAborted w'
     | FrameHalt data w' =>
-        if kind = CreationEntry then ContractInvalid "assembly halt in a creation frame"
+        if kind = CreationEntry ∧
+           ((case data of h :: _ => h = 0xEFw | [] => F) ∨
+            max_code_size < LENGTH data)
+        then ContractAborted w
         else ContractReturned data (settle_source_world w')
     | FramePanic code w' => ContractReverted (panic_data code) w'
     | FrameInvalid reason => ContractInvalid reason

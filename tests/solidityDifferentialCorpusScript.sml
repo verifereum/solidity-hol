@@ -42,6 +42,7 @@ Ancestors
   solidityDifferentialCorpus_constant_array_lengths
   solidityDifferentialCorpus_constant_conversions
   solidityDifferentialCorpus_constants
+  solidityDifferentialCorpus_constructor_halt
   solidityDifferentialCorpus_constructors
   solidityDifferentialCorpus_context
   solidityDifferentialCorpus_contract_creation
@@ -50,6 +51,7 @@ Ancestors
   solidityDifferentialCorpus_contract_types
   solidityDifferentialCorpus_control
   solidityDifferentialCorpus_creation_dispatch
+  solidityDifferentialCorpus_creation_tail
   solidityDifferentialCorpus_dirty_bits
   solidityDifferentialCorpus_dynamic_bytes
   solidityDifferentialCorpus_dynamic_storage_arrays

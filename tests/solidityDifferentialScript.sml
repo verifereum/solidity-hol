@@ -265,12 +265,15 @@ Definition differential_world_def:
 End
 
 (* The outcome, complete committed contract storage and logs of a run; a
- * creation returns the words of its immutables at the references refs. *)
+ * creation returns the words of its immutables at the references refs, or,
+ * when it returned its own code, the words of that code there, as the
+ * bytecode run observes its deployed code. *)
 Definition contract_observation_def:
-  contract_observation u refs a r =
+  contract_observation creating u refs a r =
     case r of
       ContractReturned data w =>
-        (Returned data, SOME (lookup_account a w.accounts).storage, w.logs)
+        (Returned (if creating then code_immutable_words refs data else data),
+         SOME (lookup_account a w.accounts).storage, w.logs)
     | ContractCreated imm w =>
         (Returned (created_immutable_words u refs imm),
          SOME (lookup_account a w.accounts).storage, w.logs)
@@ -308,7 +311,9 @@ Definition source_frame_execution_at_def:
           | _ => call_contract_frame fuel prog
                    (FEMPTY |++ MAP (λ(x, s, _). (x, s)) imm) fr w
                    (MAP GasLeftObservation c.case_gas) in
-        (contract_observation u c.case_immutable_refs a r, image)
+        (contract_observation
+           (case c.case_input of Deploy _ _ => T | _ => F)
+           u c.case_immutable_refs a r, image)
 End
 
 Definition source_execution_at_def:
