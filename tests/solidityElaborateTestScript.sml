@@ -742,6 +742,35 @@ Proof
   EVAL_TAC
 QED
 
+(* A literal signature's selector is computed when elaborating, as the
+ * compiler does; a signature that is not a string is reported with the
+ * arguments' blockers, and one that is missing is reported on the node. *)
+Theorem abi_signature_literal_is_constant_selector:
+  elab_expr ^ctx0 10
+    (SrcAbiEncode ^(at 30) ^(at 31) AbiWithSignature
+       [SrcLiteral ^(at 32) StringLiteral "f()" "t_stringliteral_f"]
+       "t_bytes_memory_ptr") =
+  INL (([DefineStmt (AstId 10) (SingleType (LocatedT MemoryLoc BytesT))
+           (AbiEncodeOperation
+              (SOME (ConstantAtom (BytesValue (TAKE 4 (Keccak_256_w64
+                 (MAP (n2w o ORD) "f()")))))) [] [])],
+        BoundAtom (AstId 10), ElabType (LocatedT MemoryLoc BytesT)), 11)
+Proof
+  CONV_TAC (computeLib.RESTR_EVAL_CONV [“Keccak_256_w64”])
+QED
+
+Theorem abi_signature_not_string_reports:
+  ^(reports “elab_expr ^ctx0 10
+               (SrcAbiEncode ^(at 30) ^(at 31) AbiWithSignature
+                  [^(one_at 32); ^(bad_at 33)] "t_bytes_memory_ptr")”
+     [“(32, "signature not a string")”, “(33, "bad")”]) ∧
+  ^(reports “elab_expr ^ctx0 10
+               (SrcAbiEncode ^(at 30) ^(at 31) AbiWithSignature [] "t_bytes_memory_ptr")”
+     [“(30, "missing signature")”])
+Proof
+  EVAL_TAC
+QED
+
 (* A selector that fails to elaborate next to an argument that fails to
  * convert: both are reported. *)
 Theorem abi_selector_failure_reports_arguments:

@@ -161,13 +161,13 @@ Datatype:
   |>
 End
 
-(* abi.encode, abi.encodePacked, abi.encodeWithSelector (the selector is the
- * first argument) and abi.encodeWithSignature (of the bytes of a literal
- * signature, which is not among the arguments). bytes.concat is
- * abi.encodePacked, and string.concat (AbiStringConcat) is too, as a string.
+(* abi.encode, abi.encodePacked, abi.encodeWithSelector and
+ * abi.encodeWithSignature (the selector or signature is the first argument).
+ * bytes.concat is abi.encodePacked, and string.concat (AbiStringConcat) is
+ * too, as a string.
  *)
 Datatype:
-  abi_form = AbiPlain | AbiPacked | AbiWithSelector | AbiWithSignature (byte list)
+  abi_form = AbiPlain | AbiPacked | AbiWithSelector | AbiWithSignature
            | AbiCall (string list)
            | AbiStringConcat
 End
