@@ -16,6 +16,7 @@ library ExternalFunctionLibrary {
 }
 
 contract ExternalFunctionValues {
+    using ExternalFunctionLibrary for *;
     struct Entry {
         function(uint256) external view returns (uint256) operation;
     }
@@ -82,7 +83,8 @@ contract ExternalFunctionValues {
     }
 
     function selectorViaLibrary() external view returns (bytes4) {
-        return ExternalFunctionLibrary.identity(this.quote).selector;
+        function(uint256) external view returns (uint256) operation = this.quote;
+        return operation.identity().selector;
     }
 
     function echo(function(uint256) external view returns (uint256) operation)
