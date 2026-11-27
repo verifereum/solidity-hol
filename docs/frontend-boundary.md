@@ -185,9 +185,8 @@ encoding the resulting value reproduces that exact word. Non-canonical
 words are sign-extended and fixed-byte words are left-aligned. An enum local
 is its member's index, and a word past the last member fails closed where
 solc would panic or keep the dirty word; a user-defined value type local is
-its underlying type's word (`assembly_library_forms.sol`). Internal function
-type locals are rejected: their word is a code location the source does not
-have.
+its underlying type's word (`assembly_library_forms.sol`). An internal
+function local holds the full dispatch word (`function_values.sol`).
 
 Inline assembly reads a storage pointer local's `x.slot` and `x.offset` as
 its reference's slot and offset (`assembly_pointers.sol`). Assigning `x.slot`,
@@ -223,20 +222,17 @@ of the words it reads (`bool` normalised, integers and addresses masked or
 sign-extended, `bytesN` high-masked, an out-of-range enum Panic `0x21`).
 Under the pinned profile (via-IR, optimizer off) the free memory pointer
 starts at `0x80`, past a creation frame's reserved immutable words, where the
-model's does; the `memory_images` suite compares it byte for byte. An internal function pointer's word
-is the function's number in the compiler's internal dispatch, which the
-importer reads from `ContractDefinition.internalFunctionIDs` in the analyzed
-AST, and 0 for the zero value. A word no function has reads as itself and
-panics with 0x51 when called, as the compiler's internal dispatch does; a word
-of a function of another type fails closed. The creation code's dispatch
-holds only the functions named as values in the creation code and in every
-function that code calls or names as a value, transitively, whether or not
-that code runs (bare references and discarded tuple components included);
-a function creation only calls directly is not in it. The model's dispatch
-is the same: a constructor calling through a word that assembly set to a
-function outside it panics with 0x51. A constructor keeps the
-immutables only in their reserved words, as the compiled constructor does: it
-reads them from there with the same cleanup, and the created contract's
+model's does; the `memory_images` suite compares it byte for byte. An internal
+function pointer holds the function's number in the compiler's dispatch table,
+read from `ContractDefinition.internalFunctionIDs` in the analyzed AST. The
+zero value holds 0. Persistent and transient storage pack the low eight bytes.
+Memory and inline assembly preserve the full word. An unassigned word is
+preserved and panics with 0x51 when called. A word that names a function with
+a different signature fails closed. The creation dispatch includes functions
+named as values by creation code or any function it reaches, including bare
+references, discarded tuple components and parenthesized declaration callees.
+Calling through a word outside that dispatch during creation panics with 0x51.
+A constructor keeps the immutables in their reserved words. It reads them from there with the same cleanup, and the created contract's
 immutables are those words when it ends; a word its immutable's type cannot
 hold (one assembly left dirty) fails closed.
 
@@ -504,14 +500,13 @@ its most derived override. Its type keeps the declared mutability, and a
 pure function converts implicitly to view and nonpayable function types, a
 view one to nonpayable. A call through a value evaluates the callee
 expression first and copies its value, then the arguments in order; the zero
-value, held by a local or named return never assigned, and any other word
-no function has panic with 0x51 after the arguments, as the compiler's
-internal dispatch does. Parameters
-and returns of a function type are value types other than function types, or
-storage, memory or calldata references. External function values, function values in storage, arrays,
-structs, events, the ABI or inline assembly, and comparisons of function
-values are rejected; a function-typed state variable, or an external
-function type in a function's header, rejects the whole unit.
+value and any other unassigned word panic with 0x51 after the arguments.
+Internal function values can be parameters, returns, state variables, struct
+fields, array elements and mapping values. They support `delete`, `==` and
+`!=`. Import rejects source external function types. Mapping keys and ABI
+encodings exclude internal function types. Calldata objects require an ABI
+representation for every field and array element, including when a local
+calldata reference is set in assembly.
 
 `abi.encode`, `abi.encodePacked`, `abi.encodeWithSelector` and
 `abi.encodeWithSignature` give a new memory `bytes`, allocated as the

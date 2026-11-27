@@ -1,10 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity >=0.8.0;
 
-// Function types the core does not model inside a body: function values in
-// inline assembly and comparisons of function values. Those functions are
-// unsupported; an internal function value in a local runs.
 contract FunctionTypeLimits {
+    struct Entry {
+        function(uint256) internal pure returns (uint256) operation;
+    }
+
+    function fromCalldata() public pure returns (uint256) {
+        Entry calldata entry;
+        assembly { entry := 4 }
+        return entry.operation(5);
+    }
+
     function inc(uint256 x) internal pure returns (uint256) {
         return x + 1;
     }

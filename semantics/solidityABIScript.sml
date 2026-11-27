@@ -806,7 +806,7 @@ Definition store_scalar_elements_def:
          | (INL (ScalarValue x), st1) =>
              (case eval_conversion env src dst x of
                 ScalarOk y =>
-                  (case write_storage_word word offset dst y of
+                  (case write_storage_word env word offset dst y of
                      NONE => (INR (InvalidCompletion "bad storage write"), st1)
                    | SOME word1 =>
                        let cache1 = if r' = r then cache
@@ -825,8 +825,8 @@ Termination
 End
 
 Definition store_storage_word_def:
-  store_storage_word addr slot offset ty x (st : source_state) =
-    case write_storage st.world.accounts addr slot offset ty x of
+  store_storage_word env addr slot offset ty x (st : source_state) =
+    case write_storage env st.world.accounts addr slot offset ty x of
       SOME accounts => (INL (), st with world := st.world with accounts := accounts)
     | NONE => (INR (InvalidCompletion "bad storage write"), st)
 End
@@ -915,7 +915,7 @@ Definition store_storage_value_def:
             let s = slot + m.state_slot in
             case (if is_stored_scalar_type ty then
                     (case x of
-                       ScalarValue y => store_storage_word addr s m.state_offset ty y st1
+                       ScalarValue y => store_storage_word env addr s m.state_offset ty y st1
                      | _ => (INR (InvalidCompletion "bad stored field"), st1))
                   else case ty of
                     MappingT _ _ => (INL (), st1)

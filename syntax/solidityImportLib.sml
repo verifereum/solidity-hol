@@ -779,13 +779,12 @@ fun check_using d = within d (fn d =>
               | NONE => false))
     "using directive has no library or nonempty function list")
 
-(* A type-valued expression without its parentheses: (T) is a one-component
- * tuple around T, and denotes T. *)
-fun unparenthesized_type v =
+(* A parenthesized expression is a one-component tuple around its operand. *)
+fun unparenthesized v =
   if node_type v = "TupleExpression" andalso not (bool_field v "isInlineArray") then
     case JSONUtil.arrayMap I (field v "components") of
       [JSON.NULL] => v
-    | [c] => unparenthesized_type c
+    | [c] => unparenthesized c
     | _ => v
   else v
 
@@ -825,7 +824,7 @@ fun operator_call v args =
        ("node_location", location v)]
   in
     con "SrcFunctionCall"
-      [info v, con "SrcIdentifier"
+      [info v, F, con "SrcIdentifier"
          [callee_info, mk_str (string_field f "name"), mk_num id,
           mk_str (normalize_type_id tid)],
        listSyntax.mk_list (args, expr_ty), listSyntax.mk_nil numSyntax.num, type_id v]
@@ -982,7 +981,7 @@ fun expr v = guarded (fn e => [ExprChild e]) unsupported_expr (fn v => within v 
                    string_field (field base "expression") "name" = "type" andalso
                    int_field (field base "expression") "referencedDeclaration" < 0
            then
-             (case map unparenthesized_type (JSONUtil.arrayMap I (field base "arguments")) of
+             (case map unparenthesized (JSONUtil.arrayMap I (field base "arguments")) of
                 [arg] =>
                   if String.isPrefix "t_type$_t_contract$_" (raw_type_id arg) then
                     contract_type_member v base arg
@@ -1141,7 +1140,12 @@ fun expr v = guarded (fn e => [ExprChild e]) unsupported_expr (fn v => within v 
       end
   | "FunctionCall" =>
       let
-        val callee = field v "expression"
+        val written_callee = field v "expression"
+        val callee = unparenthesized written_callee
+        (* A parenthesized declaration still resolves the target and names
+         * its parameters, but solc invokes it through the dispatch. *)
+        val through_value =
+          if int_field written_callee "id" = int_field callee "id" then F else T
         val abi_member =
           node_type callee = "MemberAccess" andalso
           node_type (field callee "expression") = "Identifier" andalso
@@ -1294,13 +1298,13 @@ fun expr v = guarded (fn e => [ExprChild e]) unsupported_expr (fn v => within v 
                 if List.exists (fn x => x = r) (!super_calls) then ()
                 else super_calls := !super_calls @ [r];
                 con "SrcSuperCall"
-                  [info v, mk_num r, listSyntax.mk_list (args, expr_ty),
+                  [info v, through_value, mk_num r, listSyntax.mk_list (args, expr_ty),
                    argument_order v r 0, type_id v]
               end
             else if is_base_member callee then
               let val r = int_field callee "referencedDeclaration" in
                 con "SrcBaseCall"
-                  [info v, mk_num r, listSyntax.mk_list (args, expr_ty),
+                  [info v, through_value, mk_num r, listSyntax.mk_list (args, expr_ty),
                    argument_order v r 0, type_id v]
               end
             else if is_library_member callee andalso is_attached callee then
@@ -1308,7 +1312,7 @@ fun expr v = guarded (fn e => [ExprChild e]) unsupported_expr (fn v => within v 
                * evaluation/conversion schedule after it becomes argument 0. *)
               let val receiver = expr (field callee "expression") in
                 con "SrcFunctionCall"
-                  [info v,
+                  [info v, through_value,
                    con "SrcIdentifier"
                      [info callee, mk_str (string_field callee "memberName"),
                       mk_num (int_field callee "referencedDeclaration"),
@@ -1318,13 +1322,13 @@ fun expr v = guarded (fn e => [ExprChild e]) unsupported_expr (fn v => within v 
                    type_id v]
               end
             else con "SrcFunctionCall"
-              [info v, expr callee, listSyntax.mk_list (args, expr_ty),
+              [info v, through_value, expr callee, listSyntax.mk_list (args, expr_ty),
                case optional_field callee "referencedDeclaration" of
                  SOME _ => argument_order v (int_field callee "referencedDeclaration") 0
                | NONE => (positional (); listSyntax.mk_nil numSyntax.num),
                type_id v]
         | "typeConversion" =>
-            let val callee = unparenthesized_type callee in
+            let val callee = unparenthesized callee in
             (positional ();
              require v (length args = 1) "a conversion takes one argument";
              if String.isPrefix "t_type$_t_contract$_" (raw_type_id callee) then
@@ -1344,7 +1348,7 @@ fun expr v = guarded (fn e => [ExprChild e]) unsupported_expr (fn v => within v 
                    type_id v]))
             end
         | "structConstructorCall" =>
-            let val s = int_field (unparenthesized_type callee) "referencedDeclaration" in
+            let val s = int_field (unparenthesized callee) "referencedDeclaration" in
               con "SrcStructConstructor"
                 [info v, mk_num s, listSyntax.mk_list (args, expr_ty),
                  argument_order v s 0, type_id v]
@@ -1359,7 +1363,7 @@ fun expr v = guarded (fn e => [ExprChild e]) unsupported_expr (fn v => within v 
 and wrap_call v callee args =
   let
     val (nominal, ty) =
-      case value_type_expression (unparenthesized_type (field callee "expression")) of
+      case value_type_expression (unparenthesized (field callee "expression")) of
         SOME pair => pair
       | NONE => fail (describe v ^ ": wrap/unwrap requires a user-defined value type")
     val member = string_field callee "memberName"
@@ -1413,7 +1417,7 @@ and abi_decode_call v callee args =
       case c of
         JSON.NULL => NONE
       | _ =>
-        let val c = unparenthesized_type c in
+        let val c = unparenthesized c in
         case node_type c of
           "ElementaryTypeNameExpression" => SOME (type_name (field c "typeName"))
         | "IndexAccess" =>
@@ -2087,9 +2091,11 @@ fun super_members (v as JSON.OBJECT fields) =
 (* Only a call executes a static member; f.selector does not. *)
 fun static_references (v as JSON.OBJECT fields) =
       (if JSONUtil.testField "nodeType"
-            (fn JSON.STRING s => s = "FunctionCall" | _ => false) v andalso
-          is_base_member (field v "expression")
-       then [int_field (field v "expression") "referencedDeclaration"] else []) @
+            (fn JSON.STRING s => s = "FunctionCall" | _ => false) v then
+         let val callee = unparenthesized (field v "expression") in
+           if is_base_member callee then [int_field callee "referencedDeclaration"] else []
+         end
+       else []) @
       List.concat (map (static_references o #2) fields)
   | static_references (JSON.ARRAY vs) = List.concat (map static_references vs)
   | static_references _ = []

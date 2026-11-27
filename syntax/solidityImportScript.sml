@@ -207,9 +207,11 @@ Datatype:
   | SrcTupleExpression node_info (src_expr option list) string
   (* [e0, ..., ek-1], a fixed-size memory array *)
   | SrcInlineArray node_info (src_expr list) string
-  | SrcFunctionCall node_info src_expr (src_expr list) (num list) string
-  | SrcSuperCall node_info num (src_expr list) (num list) string
-  | SrcBaseCall node_info num (src_expr list) (num list) string
+  (* The flag preserves a parenthesized callee's use of the internal
+   * dispatch when the importer resolves the declaration. *)
+  | SrcFunctionCall node_info bool src_expr (src_expr list) (num list) string
+  | SrcSuperCall node_info bool num (src_expr list) (num list) string
+  | SrcBaseCall node_info bool num (src_expr list) (num list) string
   | SrcBuiltinCall node_info node_info src_builtin (src_expr option)
       (src_expr option) string
   | SrcRequireError node_info node_info src_expr src_error (src_expr list)
@@ -563,15 +565,31 @@ Definition decode_struct_identifier_def:
     | NONE => struct_with_suffix "_storage" c
 End
 
-(* An array identifier's base and the dimension fields after it. A struct
- * base spans fields, from "_t_struct" to its id and location: the first
- * field without a leading "_". *)
+(* A struct display name can contain dollar escapes or spell a type
+ * constructor. Remove display names before counting component delimiters. *)
+Definition type_identifier_fields_def:
+  type_identifier_fields s =
+    separated_fields #"$" "" (canonical_storage_identifier 0 0 s)
+End
+
+(* An array, struct or internal function adds a level to a delimited
+ * type identifier. An array dimension, struct id, or function's final
+ * delimiter closes that level. *)
+Definition identifier_component_depth_def:
+  identifier_component_depth (depth : num) f =
+    if f = "_t_array" ∨ f = "_t_struct" ∨
+       isPREFIX "_t_function_internal_" f then depth + 1
+    else if f = "_" then depth - 1
+    else if isPREFIX "_" f ∨ f = "returns" then depth
+    else depth - 1
+End
+
 Definition array_base_split_def:
-  (array_base_split acc [] = NONE) ∧
-  (array_base_split acc (f :: fs) =
+  (array_base_split depth acc [] = NONE) ∧
+  (array_base_split depth acc (f :: fs) =
     let b = if acc = "" then f else acc ++ "$" ++ f in
-    if b ≠ "_t_struct" ∧ (acc = "" ∨ ¬isPREFIX "_" f) then SOME (b, fs)
-    else array_base_split b fs)
+    let depth' = identifier_component_depth depth f in
+    if depth' = 0 then SOME (b, fs) else array_base_split depth' b fs)
 End
 
 (* A non-array identifier's type, shared by direct and array decoding. *)
@@ -592,54 +610,27 @@ End
 (* Array bases carry their location only for reference types. Storage uses
  * unlocated bases, whereas memory and calldata use matching pointers. *)
 Definition array_element_def:
-  array_element loc name =
-    case decode_base_identifier name of
-      SOME (LocatedT loc' ty) =>
-        if loc' = loc ∧ loc ≠ StorageLoc then SOME ty else NONE
-    | SOME ty =>
-        if is_stored_scalar_type ty ∨ loc = StorageLoc then SOME ty else NONE
-    | NONE => NONE
+  array_element loc ty =
+    case ty of
+      LocatedT loc' element =>
+        if loc' = loc ∧ loc ≠ StorageLoc then SOME element else NONE
+    | _ => if is_stored_scalar_type ty ∨ loc = StorageLoc then SOME ty else NONE
 End
 
-(* A memory, calldata or storage array type identifier, nested to any depth. *)
-Definition decode_located_array_def:
-  decode_located_array loc s =
-    case separated_fields #"$" "" s of
+Definition array_identifier_parts_def:
+  array_identifier_parts s =
+    case type_identifier_fields s of
       f :: fs =>
         if f ≠ "t_array" then NONE else
         let k = array_prefix_fields fs in
-        (case array_base_split "" (DROP k fs) of
+        (case array_base_split 0 "" (DROP k fs) of
            SOME (b, dimensions) =>
              if LENGTH dimensions ≠ k + 1 ∨ LENGTH b < 2 ∨ ¬isPREFIX "_" b ∨
                 ¬isPREFIX "_" (REVERSE b) then NONE else
-             (case array_element loc (TAKE (LENGTH b - 2) (DROP 1 b)) of
-                SOME element =>
-                  (case array_dimensions loc element dimensions of
-                     SOME ty =>
-                       if located_object_shape loc ty ∧
-                          valid_type_shape (LocatedT loc ty)
-                       then SOME (LocatedT loc ty) else NONE
-                   | NONE => NONE)
-              | NONE => NONE)
+             SOME (TAKE (LENGTH b - 2) (DROP 1 b), dimensions)
          | NONE => NONE)
     | [] => NONE
 End
-
-Definition decode_elementary_identifier_def:
-  decode_elementary_identifier s =
-    if isPREFIX "t_array$_" s then
-      (* The outer dimension's suffix names the location. A storage array
-       * value is unlocated, as t_bytes_storage is. *)
-      (if isPREFIX (REVERSE (location_suffix StorageLoc)) (REVERSE s) then
-         case decode_located_array StorageLoc s of
-           SOME (LocatedT _ ty) => SOME ty
-         | _ => NONE
-       else if isPREFIX (REVERSE (location_suffix CalldataLoc)) (REVERSE s) then
-         decode_located_array CalldataLoc s
-       else decode_located_array MemoryLoc s)
-    else decode_base_identifier s
-End
-
 
 Definition rational_type_def:
   rational_type negative a b =
@@ -687,12 +678,7 @@ Definition tuple_identifier_components_def:
     if depth = 0 ∧ acc = "" then SOME [] else NONE) ∧
   (tuple_identifier_components depth acc (f :: fs) =
     let component = if acc = "" then f else acc ++ "$" ++ f in
-    let depth' = if f = "_t_array" ∨ f = "_t_struct" ∨
-                    isPREFIX "_t_function_internal_" f
-                 then depth + 1
-                 else if f = "_" then depth - 1
-                 else if isPREFIX "_" f ∨ f = "returns" then depth
-                 else depth - 1 in
+    let depth' = identifier_component_depth depth f in
     if depth' = 0 then
       case tuple_identifier_components 0 "" fs of
         SOME cs => SOME (component :: cs)
@@ -700,66 +686,115 @@ Definition tuple_identifier_components_def:
     else tuple_identifier_components depth' component fs)
 End
 
-(* A function type's parameter or return type, from its field "_tid_". A
- * storage pointer "..._storage_ptr" is the type "..._storage" located in
- * storage. *)
-Definition function_type_component_def:
-  function_type_component p =
-    if 2 < LENGTH p ∧ isPREFIX "_" p ∧ isPREFIX "_" (REVERSE p) then
-      let tid = TAKE (LENGTH p - 2) (DROP 1 p) in
-      if isPREFIX (REVERSE "_storage_ptr") (REVERSE tid) then
-        case decode_elementary_identifier (TAKE (LENGTH tid - 4) tid) of
-          SOME ty =>
-            if valid_type_shape (LocatedT StorageLoc ty)
-            then SOME (LocatedT StorageLoc ty) else NONE
-        | NONE => NONE
-      else decode_elementary_identifier tid
+(* The type named by a component of a tuple or function signature. *)
+Definition component_identifier_def:
+  component_identifier p =
+    if 2 ≤ LENGTH p ∧ isPREFIX "_" p ∧ isPREFIX "_" (REVERSE p) then
+      SOME (TAKE (LENGTH p - 2) (DROP 1 p))
     else NONE
 End
 
-(* A function type's parameter or return list, "$_t1_$_t2_$", from its fields
- * between the "$"s, rejoined as a tuple's are: "__" alone for the empty
- * list. *)
 Definition function_type_components_def:
   function_type_components fs =
     if fs = ["__"] then SOME [] else
     case tuple_identifier_components 0 "" fs of
-      SOME (c :: cs) => all_some (MAP function_type_component (c :: cs))
+      SOME (c :: cs) => all_some (MAP component_identifier (c :: cs))
     | _ => NONE
 End
 
-(* The fields before the first "returns" field and those after it. *)
+(* The parameter and return fields are separated by the outer "returns". *)
 Definition split_at_returns_def:
-  (split_at_returns acc [] = NONE) ∧
-  (split_at_returns acc (f :: fs) =
-    if f = "returns" then SOME (REVERSE acc, fs)
-    else split_at_returns (f :: acc) fs)
+  (split_at_returns depth acc [] = NONE) ∧
+  (split_at_returns depth acc (f :: fs) =
+    if depth = 0 ∧ f = "returns" then SOME (REVERSE acc, fs)
+    else split_at_returns (identifier_component_depth depth f) (f :: acc) fs)
 End
 
-(* An internal function type's identifier,
- * "t_function_internal_" m "$_p1_$_p2_$returns$_r1_$", whose parameters and
- * returns are values or references. An internal function is never payable. *)
-Definition function_type_identifier_def:
-  function_type_identifier s =
-    case separated_fields #"$" "" s of
+Definition internal_function_mutability_def:
+  internal_function_mutability head =
+    if head = "t_function_internal_pure" then SOME PureMut
+    else if head = "t_function_internal_view" then SOME ViewMut
+    else if head = "t_function_internal_nonpayable" then SOME NonpayableMut
+    else NONE
+End
+
+(* The function's mutability and its parameter and return identifiers. *)
+Definition function_identifier_parts_def:
+  function_identifier_parts s =
+    case type_identifier_fields s of
       head :: fs =>
-        let mutability =
-          if head = "t_function_internal_pure" then SOME PureMut
-          else if head = "t_function_internal_view" then SOME ViewMut
-          else if head = "t_function_internal_nonpayable" then SOME NonpayableMut
-          else NONE in
-        (case (mutability, split_at_returns [] fs) of
+        (case (internal_function_mutability head, split_at_returns 0 [] fs) of
            (SOME m, SOME (ps, rs)) =>
              (case REVERSE rs of
-                [] :: rrs =>
+                [] :: rev_rs =>
                   (case (function_type_components ps,
-                         function_type_components (REVERSE rrs)) of
-                     (SOME params, SOME rets) =>
-                       SOME (FunctionT InternalFn m params rets)
+                         function_type_components (REVERSE rev_rs)) of
+                     (SOME params, SOME rets) => SOME (m, params, rets)
                    | _ => NONE)
               | _ => NONE)
          | _ => NONE)
     | [] => NONE
+End
+
+(* Each recursive step consumes a constructor and decodes its component
+ * identifiers. The original identifier length bounds the nesting depth. *)
+Definition decode_identifier_fuel_def:
+  (decode_identifier_fuel 0 s = NONE) ∧
+  (decode_identifier_fuel (SUC n) s =
+    if isPREFIX "t_function_internal_" s then
+      (case function_identifier_parts s of
+         SOME (m, ps, rs) =>
+           (case (decode_identifiers_fuel n ps, decode_identifiers_fuel n rs) of
+              (SOME params, SOME rets) => SOME (FunctionT InternalFn m params rets)
+            | _ => NONE)
+       | NONE => NONE)
+    else if isPREFIX "t_array$_" s then
+      let loc =
+        if isPREFIX (REVERSE "_storage") (REVERSE s) ∨
+           isPREFIX (REVERSE "_storage_ptr") (REVERSE s) then StorageLoc
+        else if isPREFIX (REVERSE "_calldata_ptr") (REVERSE s) then CalldataLoc
+        else MemoryLoc in
+      let ptr = (loc = StorageLoc ∧ isPREFIX (REVERSE "_storage_ptr") (REVERSE s)) in
+      let root = if ptr then TAKE (LENGTH s - 4) s else s in
+      (case array_identifier_parts root of
+         SOME (base_id, dims) =>
+           (case decode_identifier_fuel n base_id of
+              SOME ty =>
+                (case array_element loc ty of
+                   SOME element =>
+                     (case array_dimensions loc element dims of
+                        SOME array =>
+                          if loc = StorageLoc ∧ ¬ptr then SOME array
+                          else SOME (LocatedT loc array)
+                      | NONE => NONE)
+                 | NONE => NONE)
+            | NONE => NONE)
+       | NONE => NONE)
+    else decode_base_identifier s) ∧
+  (decode_identifiers_fuel n [] = SOME []) ∧
+  (decode_identifiers_fuel n (s :: ss) =
+    case (decode_identifier_fuel n s, decode_identifiers_fuel n ss) of
+      (SOME ty, SOME tys) => SOME (ty :: tys)
+    | _ => NONE)
+Termination
+  WF_REL_TAC ‘inv_image ($< LEX $<) (λx. case x of
+    INL (n, s) => (n, 0)
+  | INR (n, ss) => (n, SUC (LENGTH ss)))’ >>
+  simp[]
+End
+
+Definition decode_elementary_identifier_def:
+  decode_elementary_identifier s =
+    case decode_identifier_fuel (LENGTH s) s of
+      SOME ty => if valid_type_shape ty ∧ function_type_ok ty then SOME ty else NONE
+    | NONE => NONE
+End
+
+Definition function_type_identifier_def:
+  function_type_identifier s =
+    case decode_elementary_identifier s of
+      SOME (FunctionT InternalFn m ps rs) => SOME (FunctionT InternalFn m ps rs)
+    | _ => NONE
 End
 
 Definition normalize_type_name_def:
@@ -770,7 +805,7 @@ Definition normalize_type_name_def:
     | NONE => NONE) ∧
   (normalize_type_name (SrcArrayTypeName _ element n) =
     case normalize_type_name element of
-      SOME ty => if 0 < n ∧ n < 2 ** 256 ∧ ¬is_function_type ty
+      SOME ty => if 0 < n ∧ n < 2 ** 256
                  then SOME (ArrayT ty (SOME n)) else NONE
     | NONE => NONE) ∧
   (normalize_type_name (SrcStructTypeName _ id tid) =
@@ -782,12 +817,12 @@ Definition normalize_type_name_def:
   (normalize_type_name (SrcUnsupportedTypeName _ _) = NONE) ∧
   (normalize_type_name (SrcDynamicArrayTypeName _ element) =
     case normalize_type_name element of
-      SOME ty => if is_function_type ty then NONE else SOME (ArrayT ty NONE)
+      SOME ty => SOME (ArrayT ty NONE)
     | NONE => NONE) ∧
   (normalize_type_name (SrcMappingTypeName _ key value) =
     case (normalize_type_name key, normalize_type_name value) of
       (SOME k, SOME v) =>
-        if (is_stored_scalar_type k ∨ byte_sequence_type k) ∧ ¬is_function_type v
+        if (is_stored_scalar_type k ∧ ¬is_function_type k) ∨ byte_sequence_type k
         then SOME (MappingT k v) else NONE
     | _ => NONE)
 End
@@ -806,7 +841,6 @@ Definition tuple_component_def:
           SOME (SrcRational i d) =>
             if d = 1 then SOME (if i < 0 then IntT 256 else UintT 256) else NONE
         | _ => NONE
-      else if isPREFIX "t_function_internal_" tid then function_type_identifier tid
       else decode_elementary_identifier tid
     else NONE
 End
@@ -817,14 +851,12 @@ Definition decode_type_identifier_def:
     else if isPREFIX "t_stringliteral_" s then SOME SrcByteLiteral
     else if s = "t_tuple$__$" then SOME (SrcTupleType [])
     else if isPREFIX "t_tuple$" s then
-      case REVERSE (separated_fields #"$" "" (DROP 8 s)) of
+      case REVERSE (type_identifier_fields (DROP 8 s)) of
         [] :: pieces =>
           (case tuple_identifier_components 0 "" (REVERSE pieces) of
              SOME cs => OPTION_MAP SrcTupleType (all_some (MAP tuple_component cs))
            | NONE => NONE)
       | _ => NONE
-    else if isPREFIX "t_function_internal_" s then
-      OPTION_MAP SrcType (function_type_identifier s)
     else OPTION_MAP SrcType (decode_elementary_identifier s)
 End
 
@@ -844,48 +876,26 @@ Proof
 QED
 
 Theorem elementary_mapping_key[local]:
-  is_stored_scalar_type ty ∧ valid_type_shape ty ⇒ valid_mapping_key ty
+  is_stored_scalar_type ty ∧ ¬is_function_type ty ∧ valid_type_shape ty ⇒
+  valid_mapping_key ty
 Proof
   Cases_on ‘ty’ >> simp[solidityCoreWfTheory.is_elementary_type_def, valid_type_shape_def,
                        valid_mapping_key_def]
 QED
 
-Theorem decode_struct_identifier_valid[local]:
-  decode_struct_identifier s = SOME ty ⇒ valid_type_shape ty
-Proof
-  ‘∀sfx c ty. struct_with_suffix sfx c = SOME ty ⇒ ∃id. ty = StructT id’
-    by rw[struct_with_suffix_def, optionTheory.OPTION_MAP_EQ_SOME] >>
-  rw[decode_struct_identifier_def, AllCaseEqs()] >> res_tac >>
-  gvs[valid_type_shape_def, outer_location_free_def, location_shape_ok_def,
-      is_reference_type_def, contains_mapping_def]
-QED
-
 Theorem decode_elementary_identifier_valid:
   decode_elementary_identifier s = SOME ty ⇒ valid_type_shape ty
 Proof
-  rw[decode_elementary_identifier_def, decode_base_identifier_def,
-     scalar_type_identifier_def, decode_located_array_def, AllCaseEqs()] >>
-  imp_res_tac elementary_type_valid >>
-  imp_res_tac decode_struct_identifier_valid >>
-  gvs[valid_type_shape_def, outer_location_free_def, location_shape_ok_def,
-      is_reference_type_def, contains_mapping_def]
+  rw[decode_elementary_identifier_def, AllCaseEqs()]
 QED
 
 Theorem function_type_identifier_valid[local]:
   function_type_identifier s = SOME ty ⇒
   valid_type_shape ty ∧ outer_location_free ty
 Proof
-  ‘∀p ty. function_type_component p = SOME ty ⇒ valid_type_shape ty’
-    by (rw[function_type_component_def, LET_THM, AllCaseEqs()] >>
-        metis_tac[decode_elementary_identifier_valid]) >>
-  ‘∀ps tys. all_some (MAP function_type_component ps) = SOME tys ⇒
-            EVERY valid_type_shape tys’
-    by (Induct >> rw[all_some_def, AllCaseEqs()] >> gvs[] >> metis_tac[]) >>
-  ‘∀fs tys. function_type_components fs = SOME tys ⇒ EVERY valid_type_shape tys’
-    by (rw[function_type_components_def, AllCaseEqs()] >> gvs[] >>
-        qpat_x_assum ‘∀ps tys. all_some _ = _ ⇒ _’ (qspec_then ‘c::cs’ mp_tac) >> gvs[]) >>
   rw[function_type_identifier_def, AllCaseEqs()] >>
-  simp[valid_type_shape_def, outer_location_free_def] >> metis_tac[]
+  simp[outer_location_free_def] >>
+  metis_tac[decode_elementary_identifier_valid]
 QED
 
 Theorem normalize_type_name_shape[local]:
@@ -946,63 +956,76 @@ Definition identifier_integer_def:
     | _ => NONE
 End
 
-(* Canonical compiler identifiers for the admitted storage types. Mapping
- * children are checked against their AST types, including nested mappings.
- *)
-Definition storage_type_identifier_def:
-  (storage_type_identifier (LocatedT loc ty) =
-    if byte_sequence_type ty then
-      (if ty = BytesT then "t_bytes" else "t_string") ++
-      (case loc of MemoryLoc => "_memory_ptr" | CalldataLoc => "_calldata_ptr"
-                 | StorageLoc => "_storage_ptr")
-    else if loc = StorageLoc then
-      (* A storage pointer: the storage type's identifier with "_ptr", except
-       * that a mapping's identifier names no location. *)
-      (case ty of
-         MappingT _ _ => storage_type_identifier ty
-       | _ => storage_type_identifier ty ++ "_ptr")
-    else "") ∧
-  (storage_type_identifier BytesT = "t_bytes_storage") ∧
-  (storage_type_identifier StringT = "t_string_storage") ∧
-  (storage_type_identifier BoolT = "t_bool") ∧
-  (storage_type_identifier (UintT n) = "t_uint" ++ toString n) ∧
-  (storage_type_identifier (IntT n) = "t_int" ++ toString n) ∧
-  (storage_type_identifier (AddressT NonpayableAddress) = "t_address") ∧
-  (storage_type_identifier (AddressT PayableAddress) = "t_address_payable") ∧
-  (storage_type_identifier (FixedBytesT n) = "t_bytes" ++ toString n) ∧
-  (storage_type_identifier (ArrayT element (SOME n)) =
-    "t_array$_" ++ storage_type_identifier element ++ "_$" ++ toString n ++
-    "_storage") ∧
-  (storage_type_identifier (StructT (AstId id)) =
-    "t_struct$__$" ++ toString id ++ "_storage") ∧
-  (storage_type_identifier (EnumT (AstId id)) = "t_enum_" ++ toString id) ∧
-  (storage_type_identifier (ArrayT element NONE) =
-    "t_array$_" ++ storage_type_identifier element ++ "_$dyn_storage") ∧
-  (storage_type_identifier (MappingT key value) =
-    "t_mapping$_" ++
-    (if key = BytesT then "t_bytes_memory_ptr"
-     else if key = StringT then "t_string_memory_ptr"
-     else storage_type_identifier key) ++ "_$_" ++
-    storage_type_identifier value ++ "_$") ∧
-  (storage_type_identifier _ = "")
+(* Storage objects have no pointer suffix until given a location. *)
+Definition storage_identifier_suffix_def:
+  storage_identifier_suffix loc =
+    case loc of
+      NONE => "_storage"
+    | SOME StorageLoc => "_storage_ptr"
+    | SOME l => location_suffix l
 End
 
-(* storageLayout uses parentheses and commas where AST identifiers use $_. *)
-Definition storage_layout_identifier_def:
-  (storage_layout_identifier (ArrayT element (SOME n)) =
-    "t_array(" ++ storage_layout_identifier element ++ ")" ++ toString n ++
-    "_storage") ∧
-  (storage_layout_identifier (ArrayT element NONE) =
-    "t_array(" ++ storage_layout_identifier element ++ ")dyn_storage") ∧
-  (storage_layout_identifier (MappingT key value) =
-    "t_mapping(" ++
+(* Canonical compiler identifiers. The AST and the layout encode the
+ * same type structure with different delimiters. *)
+Definition storage_identifier_def:
+  (storage_identifier layout loc (LocatedT l ty) =
+    storage_identifier layout (SOME l) ty) ∧
+  (storage_identifier layout loc BytesT = "t_bytes" ++ storage_identifier_suffix loc) ∧
+  (storage_identifier layout loc StringT = "t_string" ++ storage_identifier_suffix loc) ∧
+  (storage_identifier layout loc BoolT = "t_bool") ∧
+  (storage_identifier layout loc (UintT n) = "t_uint" ++ toString n) ∧
+  (storage_identifier layout loc (IntT n) = "t_int" ++ toString n) ∧
+  (storage_identifier layout loc (AddressT NonpayableAddress) = "t_address") ∧
+  (storage_identifier layout loc (AddressT PayableAddress) = "t_address_payable") ∧
+  (storage_identifier layout loc (FixedBytesT n) = "t_bytes" ++ toString n) ∧
+  (storage_identifier layout loc (ArrayT element length) =
+    (if layout then "t_array(" else "t_array$_") ++
+    storage_identifier layout
+      (if loc ≠ SOME StorageLoc ∧ is_reference_type element then loc else NONE) element ++
+    (if layout then ")" else "_$") ++
+    (case length of SOME n => toString n | NONE => "dyn") ++
+    storage_identifier_suffix loc) ∧
+  (storage_identifier layout loc (StructT (AstId id)) =
+    (if layout then "t_struct()" else "t_struct$__$") ++ toString id ++
+    storage_identifier_suffix loc) ∧
+  (storage_identifier layout loc (EnumT (AstId id)) = "t_enum_" ++ toString id) ∧
+  (storage_identifier layout loc (MappingT key value) =
+    (if layout then "t_mapping(" else "t_mapping$_") ++
     (if key = BytesT then "t_bytes_memory_ptr"
      else if key = StringT then "t_string_memory_ptr"
-     else storage_layout_identifier key) ++ "," ++
-    storage_layout_identifier value ++ ")") ∧
-  (storage_layout_identifier (StructT (AstId id)) =
-    "t_struct()" ++ toString id ++ "_storage") ∧
-  (storage_layout_identifier ty = storage_type_identifier ty)
+     else storage_identifier layout NONE key) ++
+    (if layout then "," else "_$_") ++ storage_identifier layout NONE value ++
+    (if layout then ")" else "_$")) ∧
+  (storage_identifier layout loc (FunctionT InternalFn m ps rs) =
+    "t_function_internal_" ++
+    (case m of PureMut => "pure" | ViewMut => "view"
+             | NonpayableMut => "nonpayable" | PayableMut => "payable") ++
+    (if layout then
+       "(" ++ storage_identifiers layout ps ++ ")returns(" ++
+       storage_identifiers layout rs ++ ")"
+     else
+       (if NULL ps then "$__$" else "$_" ++ storage_identifiers layout ps ++ "_$") ++
+       "returns" ++
+       (if NULL rs then "$__$" else "$_" ++ storage_identifiers layout rs ++ "_$"))) ∧
+  (storage_identifier layout loc _ = "") ∧
+  (storage_identifiers layout [] = "") ∧
+  (storage_identifiers layout (ty :: tys) =
+    storage_identifier layout NONE ty ++
+    (if NULL tys then "" else
+     (if layout then "," else "_$_") ++ storage_identifiers layout tys))
+Termination
+  WF_REL_TAC ‘measure (λx. case x of
+    INL (layout, loc, ty) => sol_type_size ty
+  | INR (layout, tys) => list_size sol_type_size tys)’ >>
+  rw[solidityASTTheory.sol_type_size_def, listTheory.list_size_def]
+End
+
+Definition storage_type_identifier_def:
+  storage_type_identifier ty = storage_identifier F NONE ty
+End
+
+Definition storage_layout_identifier_def:
+  storage_layout_identifier ty = storage_identifier T NONE ty
 End
 
 (* Memory and calldata types: an array's elements are values or pointers in
@@ -1155,10 +1178,10 @@ Definition expr_ids_def:
   (expr_ids (SrcTupleExpression info cs _) =
     info.node_id :: component_ids cs) ∧
   (expr_ids (SrcInlineArray info es _) = info.node_id :: exprs_ids es) ∧
-  (expr_ids (SrcFunctionCall info f args _ _) =
+  (expr_ids (SrcFunctionCall info _ f args _ _) =
     info.node_id :: expr_ids f ++ exprs_ids args) ∧
-  (expr_ids (SrcSuperCall info _ args _ _) = info.node_id :: exprs_ids args) ∧
-  (expr_ids (SrcBaseCall info _ args _ _) = info.node_id :: exprs_ids args) ∧
+  (expr_ids (SrcSuperCall info _ _ args _ _) = info.node_id :: exprs_ids args) ∧
+  (expr_ids (SrcBaseCall info _ _ args _ _) = info.node_id :: exprs_ids args) ∧
   (expr_ids (SrcBuiltinCall info callee _ condition message _) =
     [info.node_id; callee.node_id] ++
     (case condition of NONE => [] | SOME c => expr_ids c) ++
@@ -1356,7 +1379,7 @@ Definition abi_call_parameter_def:
   abi_call_parameter tid =
     case decode_type_identifier tid of
       SOME (SrcType ty) =>
-        if is_stored_scalar_type ty then SOME ty else
+        if abi_scalar_type ty then SOME ty else
         (case ty of
            LocatedT _ element =>
              if located_object_shape MemoryLoc element
@@ -1389,7 +1412,6 @@ Definition state_variable_def:
         else if byte_sequence_type ty then
           if v.var_location = NONE ∧ source_type_matches ty v.var_type_id then
             SOME (v.var_info.node_id, ty) else NONE
-        else if is_function_type ty then NONE
         else scoped_variable v.var_scope v
     | NONE => NONE
 End
@@ -1421,7 +1443,7 @@ Definition immutable_variable_def:
     if v.var_transient ∨ ¬MEM v.var_scope bases then NONE else
     case scoped_variable v.var_scope v of
       SOME (x, ty) =>
-        if is_stored_scalar_type ty ∨ is_function_type ty then SOME (x, ty)
+        if is_stored_scalar_type ty then SOME (x, ty)
         else NONE
     | NONE => NONE
 End
@@ -1904,6 +1926,21 @@ End
  * mutually recursive checkers terminate on the cv size of their syntax.
  *)
 
+val decode_identifier_fuel_pre_def = cv_auto_trans_pre_rec
+  "decode_identifier_fuel_pre decode_identifiers_fuel_pre" decode_identifier_fuel_def (
+  WF_REL_TAC ‘inv_image ($< LEX $<) (λx. case x of
+    INL (n, s) => (cv$c2n n, 0)
+  | INR (n, ss) => (cv$c2n n, SUC (cv_size ss)))’ >>
+  cv_termination_tac
+);
+Theorem decode_identifier_fuel_pre[cv_pre,local]:
+  (∀n s. decode_identifier_fuel_pre n s) ∧
+  (∀n ss. decode_identifiers_fuel_pre n ss)
+Proof
+  ho_match_mp_tac decode_identifier_fuel_ind >> rpt strip_tac >>
+  simp[Once decode_identifier_fuel_pre_def] >> rw[AllCaseEqs()] >> fs[]
+QED
+
 val () = cv_auto_trans decode_type_identifier_def;
 val () = cv_auto_trans identifier_type_def;
 val () = cv_auto_trans identifier_integer_def;
@@ -1922,6 +1959,21 @@ QED
 val () = cv_auto_trans normalize_type_name_def;
 (* canonical_storage_identifier is translated above, as a dependency of
  * decode_type_identifier. *)
+val storage_identifier_pre_def = cv_auto_trans_pre_rec
+  "storage_identifier_pre storage_identifiers_pre" storage_identifier_def (
+  WF_REL_TAC ‘measure (λx. case x of
+    INL (layout, loc, ty) => cv_size ty
+  | INR (layout, tys) => cv_size tys)’ >>
+  cv_termination_tac
+);
+Theorem storage_identifier_pre[cv_pre,local]:
+  (∀layout loc ty. storage_identifier_pre layout loc ty) ∧
+  (∀layout tys. storage_identifiers_pre layout tys)
+Proof
+  ho_match_mp_tac storage_identifier_ind >> rpt strip_tac >>
+  simp[Once storage_identifier_pre_def] >> rw[AllCaseEqs()] >> fs[]
+QED
+
 val () = cv_auto_trans storage_type_identifier_def;
 val () = cv_auto_trans located_type_identifier_def;
 val () = cv_auto_trans source_type_matches_def;
