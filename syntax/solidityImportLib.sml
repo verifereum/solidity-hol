@@ -1369,8 +1369,7 @@ and wrap_call v callee args =
   end
 
 (* abi.encode, abi.encodePacked, abi.encodeWithSelector and
- * abi.encodeWithSignature of a literal signature; the signature's bytes are
- * taken from the literal, which is not kept as an argument. *)
+ * abi.encodeWithSignature; the selector or signature is the first argument. *)
 and abi_encode v callee args =
   if string_field callee "memberName" = "encodeCall" then abi_encode_call v callee else
   let
@@ -1379,19 +1378,8 @@ and abi_encode v callee args =
         "encode" => con "AbiPlain" []
       | "encodePacked" => con "AbiPacked" []
       | "encodeWithSelector" => con "AbiWithSelector" []
-      | "encodeWithSignature" =>
-          let
-            val sig_node = hd (JSONUtil.arrayMap I (field v "arguments"))
-              handle Empty => fail (describe v ^ ": encodeWithSignature takes a signature")
-          in
-            require v (node_type sig_node = "Literal" andalso
-                       string_field sig_node "kind" = "string")
-              "abi.encodeWithSignature of a non-literal signature is not supported";
-            con "AbiWithSignature" [mk_bytes sig_node (string_field sig_node "hexValue")]
-          end
+      | "encodeWithSignature" => con "AbiWithSignature" []
       | member => fail (describe v ^ ": unsupported abi." ^ member)
-    val args =
-      if string_field callee "memberName" = "encodeWithSignature" then tl args else args
   in
     con "SrcAbiEncode"
       [info v, info callee, form, listSyntax.mk_list (args, expr_ty), type_id v]

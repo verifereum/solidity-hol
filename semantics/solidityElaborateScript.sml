@@ -742,10 +742,13 @@ End
  * type (EncodedAs), keeping byte-sequence and array references live until
  * serialization, since an encoded argument needs no location copy and the
  * encoder reads it where it is, in memory, calldata or storage; or for ABI
- * encoding as its own type (Encoded, packed or not); or as the selector of
- * abi.encodeWithSelector and abi.encodeCall (AbiSelector). *)
+ * encoding as its own type (Encoded, packed or not); as the selector of
+ * abi.encodeWithSelector and abi.encodeCall (AbiSelector); or as the
+ * signature of abi.encodeWithSignature (AbiSignature). *)
 Datatype:
-  operand_target = ValueOf sol_type | EncodedAs sol_type | Encoded bool | AbiSelector
+  operand_target
+  = ValueOf sol_type | EncodedAs sol_type | Encoded bool | AbiSelector
+  | AbiSignature
 End
 
 Definition values_of_def:
@@ -830,6 +833,16 @@ Definition convert_operand_def:
         (case coerce n (FixedBytesT 4) a vt of
            INL ((ss, a'), n1) => INL ((ss, FixedBytesT 4, a'), n1)
          | INR _ => INR "selector not a bytes4")
+    (* A literal signature's selector is a constant, as the compiler computes
+       it; any other signature string stays a reference, hashed where it is
+       when the encoding runs. *)
+    | AbiSignature =>
+        (case (a, vt) of
+           (ConstantAtom (BytesValue bs), ElabBytesLiteral) =>
+             INL (([], FixedBytesT 4,
+                   ConstantAtom (BytesValue (TAKE 4 (Keccak_256_w64 bs)))), n)
+         | (_, ElabType (LocatedT loc StringT)) => INL (([], LocatedT loc StringT, a), n)
+         | _ => INR "signature not a string")
     | Encoded packed =>
         (case abi_argument packed a vt of
            INL (ty, a') => INL (([], ty, a'), n)
@@ -917,19 +930,20 @@ End
 
 (* The operation of abi.encode* on the values of its arguments, after any
  * statements converting the arguments: a selector given as an argument
- * converts to a bytes4 (a hex literal binds its bytes), and the other
+ * converts to a bytes4 (a hex literal binds its bytes), a signature as
+ * AbiSignature converts it, and the other
  * arguments are scalars, arrays without structs or byte sequences (arrays and
  * integer literals only unpacked, as the compiler requires). *)
 Definition selector_encoding_def:
-  selector_encoding (i : num) so r =
+  selector_encoding target (i : num) so r =
     case (so, r) of
       (INL (s, svt), INL (css, tys, args, n1)) =>
-        (case convert_operand n1 AbiSelector s svt of
+        (case convert_operand n1 target s svt of
            INL ((ss, _, s'), n2) =>
              INL ((css ++ ss, AbiEncodeOperation (SOME s') tys args), n2)
          | INR why => INR [(i, why)])
     | (INL (s, svt), INR bs) =>
-        INR ((case convert_operand 0 AbiSelector s svt of
+        INR ((case convert_operand 0 target s svt of
                 INL _ => []
               | INR why => [(i, why)]) ++ bs)
     | (INR sbs, _) => INR (sbs ++ blockers r)
@@ -939,17 +953,22 @@ Definition abi_encoding_def:
   abi_encoding n (id : num) ids form os =
     case (form, ids, os) of
       (AbiWithSelector, i :: rest_ids, s :: rest) =>
-        selector_encoding i s
+        selector_encoding AbiSelector i s
+          (convert_operands n id rest_ids (REPLICATE (LENGTH rest) (Encoded F)) rest)
+    | (AbiWithSignature, i :: rest_ids, s :: rest) =>
+        selector_encoding AbiSignature i s
           (convert_operands n id rest_ids (REPLICATE (LENGTH rest) (Encoded F)) rest)
     | (AbiCall tids, i :: rest_ids, s :: rest) =>
         (case all_some (MAP abi_call_parameter tids) of
            SOME tys =>
-             selector_encoding i s (convert_operands n id rest_ids (encoded_as tys) rest)
+             selector_encoding AbiSelector i s
+               (convert_operands n id rest_ids (encoded_as tys) rest)
          | NONE =>
-             selector_encoding i s
+             selector_encoding AbiSelector i s
                (INR ((id, "abi encoding of this type") :: FLAT (MAP blockers rest))))
     | (AbiWithSelector, _, _) => INR [(id, "missing selector")]
     | (AbiCall _, _, _) => INR [(id, "missing selector")]
+    | (AbiWithSignature, _, _) => INR [(id, "missing signature")]
     | (AbiPacked, _, _) =>
         (case convert_operands n id ids (REPLICATE (LENGTH os) (Encoded T)) os of
            INL (_, tys, args, _) => INL (([], AbiEncodePackedOperation tys args), n)
@@ -961,13 +980,6 @@ Definition abi_encoding_def:
     | (AbiPlain, _, _) =>
         (case convert_operands n id ids (REPLICATE (LENGTH os) (Encoded F)) os of
            INL (_, tys, args, _) => INL (([], AbiEncodeOperation NONE tys args), n)
-         | INR bs => INR bs)
-    | (AbiWithSignature signature, _, _) =>
-        (case convert_operands n id ids (REPLICATE (LENGTH os) (Encoded F)) os of
-           INL (_, tys, args, _) =>
-             INL (([], AbiEncodeOperation
-                         (SOME (ConstantAtom (BytesValue (TAKE 4 (Keccak_256_w64 signature)))))
-                         tys args), n)
          | INR bs => INR bs)
 End
 

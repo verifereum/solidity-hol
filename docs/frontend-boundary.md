@@ -521,14 +521,20 @@ and string and hex literals; `abi.encode` also takes integer literals, encoded a
 their smallest type, which has the encoding of `int256` or `uint256`.
 `abi.encode` gives the standard ABI encoding of the arguments, after the four
 bytes of a `bytes4` selector for `encodeWithSelector`, or of the Keccak-256
-hash of a literal signature for `encodeWithSignature`; `abi.encodePacked`
-gives each scalar in its own width, a `bytesN` as its N bytes, and a byte
-sequence as its contents. Unpacked encoding also accepts arrays and structs
-of any nesting in memory, calldata or storage, retaining the reference until
-all arguments have been evaluated.
+hash of the signature for `encodeWithSignature`; `abi.encodePacked`
+gives each scalar in its own width, a `bytesN` as its N bytes, a byte
+sequence as its contents, and an array of scalars, or of fixed-length arrays
+of them, as each scalar in a full word, with no length. Unpacked encoding
+also accepts arrays and structs of any nesting in memory, calldata or storage,
+retaining the reference until all arguments have been evaluated.
 A selector converts implicitly to `bytes4`, as a hex literal such as
-`0xa9059cbb` does. Packed arrays and structs, a selector that does not, and a
-signature that is not a plain string literal are rejected.
+`0xa9059cbb` does. A literal signature's hash is a constant. Any other
+signature string is hashed after the arguments are evaluated, as the compiler
+does: a calldata or storage one is first copied to memory at the free memory
+pointer, and the pointer is set back afterwards, so the encoding is allocated
+where the copy was. A selector that does not convert, a signature that is not
+a string, and packed structs and arrays of structs or of dynamic arrays (which
+the compiler rejects too) are rejected.
 
 `abi.encodeCall(f, (a, b))` gives `f`'s selector followed by the standard ABI
 encoding of the arguments, each converted to its parameter's type as an

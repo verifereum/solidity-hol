@@ -1398,7 +1398,13 @@ Theorem packed_array_shape_checked:
   packed_type (LocatedT MemoryLoc (ArrayT (IntT 16) (SOME 2))) ∧
   packed_type (LocatedT MemoryLoc (ArrayT (FixedBytesT 2) NONE)) ∧
   ¬packed_type (LocatedT MemoryLoc (ArrayT (UintT 8) (SOME 0))) ∧
+  packed_type (LocatedT MemoryLoc (ArrayT (ArrayT (UintT 8) (SOME 2)) NONE)) ∧
+  packed_type (LocatedT MemoryLoc
+    (ArrayT (ArrayT (ArrayT (FixedBytesT 3) (SOME 2)) (SOME 2)) (SOME 1))) ∧
+  ¬packed_type (LocatedT MemoryLoc (ArrayT (ArrayT (UintT 8) (SOME 0)) NONE)) ∧
   ¬packed_type (LocatedT MemoryLoc (ArrayT (ArrayT (UintT 8) NONE) NONE)) ∧
+  ¬packed_type (LocatedT MemoryLoc (ArrayT (ArrayT (UintT 8) NONE) (SOME 2))) ∧
+  ¬packed_type (LocatedT MemoryLoc (ArrayT (ArrayT (StructT (AstId 1)) (SOME 2)) NONE)) ∧
   ¬packed_type (LocatedT MemoryLoc (ArrayT BytesT NONE)) ∧
   ¬packed_type (LocatedT MemoryLoc (StructT (AstId 1)))
 Proof

@@ -1180,7 +1180,7 @@ Definition packed_value_def:
   packed_value env reach st ty v =
     case ty of
       LocatedT _ (ArrayT element length) =>
-        if ¬is_stored_scalar_type element then
+        if ¬packed_element_type element then
           (INR (InvalidCompletion "bad packed array", []), reach, st)
         else
           (case runtime_abi_value env reach st ty v of
