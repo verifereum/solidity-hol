@@ -247,6 +247,8 @@ Definition environment_value_def:
     | BlockCoinbase => ValueOk (ScalarValue (AddressValue fr.tx_params.blockCoinBase))
     | BlockBaseFee =>
         ValueOk (ScalarValue (IntegerValue (wrap_integer F 256 (&fr.tx_params.baseFeePerGas))))
+    | BlockBlobBaseFee =>
+        ValueOk (ScalarValue (IntegerValue (wrap_integer F 256 (&fr.tx_params.baseFeePerBlobGas))))
     | BlockGasLimit =>
         ValueOk (ScalarValue (IntegerValue (wrap_integer F 256 (&fr.tx_params.blockGasLimit))))
     | BlockPrevRandao => ValueOk (ScalarValue (IntegerValue (&w2n fr.tx_params.prevRandao)))
@@ -285,11 +287,31 @@ Definition packed_call_data_def:
     | INR c => INR c
 End
 
+(* The gas a high-level call gives its callee. The source does not track gas,
+ * where the bytecode passes all but a 64th of what it has left.
+ *)
+Definition external_call_gas_def:
+  external_call_gas = 10000000n
+End
+
+(* The 32-byte word ERC-7201's runtime helper writes at scratch 0. *)
+Definition erc7201_preimage_def:
+  erc7201_preimage bs =
+    word_to_bytes ((word_of_bytes_be (Keccak_256_w64 bs) : bytes32) - 1w) T
+End
+
+(* The namespace slot for the preimage, with the low byte cleared. *)
+Definition erc7201_slot_def:
+  erc7201_slot preimage =
+    w2n (word_and (word_of_bytes_be (Keccak_256_w64 preimage) : bytes32)
+                 (word_1comp 0xffw))
+End
+
 (* A builtin's value on its operands' values, and the state after it, with
  * the memory the compiler's code uses for it. keccak256 hashes the bytes in
- * place. sha256 and ecrecover call their precompile on an encoding at the
- * free memory pointer, which they do not raise (sha256's by
- * packed_call_data), and read its output from the scratch word at 0:
+ * place. sha256, ripemd160 and ecrecover use precompile output at scratch 0
+ * on an encoding at the unchanged free memory pointer (sha256 and ripemd160
+ * use packed_call_data):
  * ecrecover zeroes it first, as an invalid signature returns nothing, which
  * reads as address(0), and the precompile reads its input from memory after
  * that. a.code allocates memory bytes and copies the code there. *)
@@ -331,6 +353,30 @@ Definition eval_builtin_def:
              let hash = num_to_bytes 32 (w2n (SHA_256_bytes bs)) in
              INL (ScalarValue (BytesValue hash), memory_write 0 hash st1)
          | INR c => INR c)
+    | (Ripemd160Builtin, [v]) =>
+        (case packed_call_data st v of
+           INL (bs, st1) =>
+             (case run_external_call st1.frame.self_address 3w bs 0 T external_call_gas
+                     st1.world.accounts st1.world.original st1.world.transient
+                     st1.frame.tx_params of
+                SOME r =>
+                  if r.call_success ∧ LENGTH r.call_return = 32 then
+                    INL (ScalarValue (BytesValue (DROP 12 r.call_return)),
+                         memory_write 0 r.call_return
+                           (st1 with return_data := SOME r.call_return))
+                  else INR (InvalidCompletion "ripemd160 precompile did not return a digest")
+              | NONE => INR (InvalidCompletion "ripemd160 precompile call outside the model"))
+         | INR c => INR c)
+    | (Erc7201Builtin, [ReferenceValue r]) =>
+        (case byte_contents st r of
+           INL (bs, st1) =>
+             let preimage = erc7201_preimage bs in
+             INL (ScalarValue (IntegerValue (&(erc7201_slot preimage))),
+                  memory_write 0 preimage st1)
+         | INR c => INR c)
+    | (BlobhashBuiltin, [ScalarValue (IntegerValue n)]) =>
+        INL (ScalarValue (BytesValue
+          (word_to_bytes (blob_hash_word st.frame.tx_params (Num n)) T)), st)
     | (BlockhashBuiltin, [ScalarValue (IntegerValue n)]) =>
         INL (ScalarValue (BytesValue (num_to_bytes 32
           (w2n (block_hash_word st.frame.tx_params (Num n))))), st)
@@ -343,8 +389,8 @@ Definition eval_builtin_def:
     | _ => INR (InvalidCompletion "bad builtin operands")
 End
 
-(* The builtins the compiler computes by calling a precompile: ecrecover at
- * address 1 and sha256 at address 2. *)
+(* Builtins whose precompile call is modelled without retaining returndata.
+ * Calls through the external adapter carry their returndata in eval_builtin. *)
 Definition builtin_calls_precompile_def:
   builtin_calls_precompile b ⇔ b = EcrecoverBuiltin ∨ b = Sha256Builtin
 End
@@ -839,13 +885,6 @@ Definition emit_event_def:
                    world := st2.world with logs := st2.world.logs ++ [e]) gas
         | (INR (c, ws), st1) =>
             abrupt_result c (apply_writes (FST (memory_load 64 st1)) ws st1) gas
-End
-
-(* The gas a high-level call gives its callee. The source does not track gas,
- * where the bytecode passes all but a 64th of what it has left.
- *)
-Definition external_call_gas_def:
-  external_call_gas = 10000000n
 End
 
 (* The gas a call gives its callee with its gas option: the option, capped at
@@ -1389,8 +1428,7 @@ Definition simple_stmt_def:
                          value g args) =>
         call_external_mode T env x ty kind selector params rets target value g
           args st gas
-    (* A builtin computed by a precompile call leaves return data the source
-     * computes no bytes for. *)
+    (* Clear return data after precompile builtins that leave it unknown. *)
     | DefineStmt x ty (BuiltinOperation b args) =>
         (case eval_atoms st.scopes args of
            SOME vs =>

@@ -38,7 +38,7 @@ Datatype:
   | YSignExtend
     (* comparison and bitwise *)
   | YLt | YGt | YSLt | YSGt | YEq | YIsZero | YAnd | YOr | YXor | YNot
-  | YShl | YShr | YSar | YByte
+  | YShl | YShr | YSar | YByte | YClz
     (* hashing, memory, storage, transient storage *)
   | YKeccak256 | YMLoad | YMStore | YMStore8 | YMCopy | YSLoad | YSStore | YTLoad | YTStore
     (* frame and call data *)
@@ -46,7 +46,7 @@ Datatype:
   | YLoadImmutable | YAddress | YSelfBalance
     (* the transaction and block *)
   | YOrigin | YGasPrice | YChainId | YNumber | YTimestamp | YCoinbase | YBaseFee
-  | YGasLimit | YBlockHash | YPrevRandao
+  | YGasLimit | YBlockHash | YPrevRandao | YBlobHash | YBlobBaseFee
     (* message calls, other accounts and the frame's gas *)
   | YCall | YStaticCall | YDelegateCall | YBalance | YExtCodeSize | YExtCodeCopy | YExtCodeHash
   | YReturnDataSize | YReturnDataCopy
