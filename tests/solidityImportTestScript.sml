@@ -482,18 +482,18 @@ val () =
 (* Every unsupported reference of an inline assembly block is a line. *)
 val () =
   let
-    fun selector_suffix (JSON.OBJECT kvs) =
+    fun unknown_suffix (JSON.OBJECT kvs) =
           JSON.OBJECT
             (map (fn ("externalReferences", JSON.ARRAY rs) =>
                        ("externalReferences",
-                        JSON.ARRAY (map (set_field "suffix" (JSON.STRING "selector")) rs))
+                        JSON.ARRAY (map (set_field "suffix" (JSON.STRING "unknown")) rs))
                    | kv => kv) kvs)
-      | selector_suffix v = v
+      | unknown_suffix v = v
   in
     expect_function_lines "unsupported assembly references"
       "../testdata/differential/expected/inline_assembly.json"
       "testdata/differential/inline_assembly.sol"
-      "locations" (edit_first "InlineAssembly" selector_suffix)
+      "locations" (edit_first "InlineAssembly" unknown_suffix)
       ["unsupported reference packedHigh.offset", "unsupported reference packedHigh.slot",
        "unsupported reference total.offset", "unsupported reference total.slot"]
   end
