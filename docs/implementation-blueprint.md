@@ -36,9 +36,8 @@ Public state variables, constants and immutables may override external
 functions. The importer removes the replaced function implementations along
 `baseFunctions`, including transitive overrides, so the existing getter is the
 only dispatch entry for that selector. Replaced implementations do not pull in
-unused library dependencies. Custom errors accept elementary and enum
-parameters; enums keep their declaration identity and encode as `uint8` through
-the existing scalar ABI encoder.
+unused library dependencies. Custom error arguments go through the shared ABI
+encoder; enums keep their declaration identity and encode as `uint8`.
 
 ## Destinations and storage
 
@@ -47,8 +46,7 @@ already evaluated reference. `elab_destination`, `read_destination` and
 `write_destination` are shared by assignment, compound assignment, increment
 and scalar `delete`. Deletion writes the type's default without reading its
 old value, so it preserves neighboring packed storage.
-Tuple writes use the same helpers, retaining identifier-only target coverage and
-right-to-left writes. The pinned profile evaluates the assignment RHS before
+Tuple writes use the same helpers and write right to left. The pinned profile evaluates the assignment RHS before
 capturing a computed LHS. Snapshots keep earlier values stable while later
 operands run. Postfix increment preserves its old value; compound assignment
 reads and writes the captured location once.
@@ -57,7 +55,6 @@ Scalar state variables use `StateReferenceOperation`, `ReadOperation` and
 `CaptureValueStmt`, like navigated storage. There is no second scalar-state
 read/capture operation. `WriteScalarStmt`, `BindReferenceStmt` and
 `CopyContentsStmt` remain distinct: changing an alias is not copying an aggregate.
-The latter operations are extension points, not aggregate execution coverage.
 
 `solidityStorage` owns concrete storage encoding, packed scalar access, mapping
 hashing, array navigation, state references and struct-field navigation. Scalar
@@ -111,11 +108,16 @@ source and invalid generated core distinguishable. The acceptance census tracks
 which upstream tests prepare; executing upstream semanticTests expectations is
 separate work.
 
-Memory/calldata execution, a memory model compatible with inline assembly, and
-aggregate aliasing/copying remain unresolved. Concrete CALL/CREATE experiments
-below do not settle the source external-call context, transaction bookkeeping or
-gas contract. Deployment and exact gas/refund correspondence also remain open.
-Full type safety and whole-language coverage are later obligations.
+Memory executes on one byte-addressed memory per frame, shared with inline
+assembly; calldata is read from the frame's call data. Reference rebinding and aggregate copies execute
+(`BindReferenceStmt`, `CopyContentsStmt`). Deployment runs through
+`deploy_contract`; creation and external calls run on Verifereum through the
+provisional adapter (`run_create_call`, `run_external_call`). The concrete
+CALL/CREATE experiments below do not settle that adapter's obligations for the
+source external-call context, transaction bookkeeping or gas
+([source-evm-adapter-contract.md](source-evm-adapter-contract.md)); exact
+gas/refund correspondence remains open. Full type safety and whole-language
+coverage are later obligations.
 
 ## Concrete EVM boundary experiment
 
