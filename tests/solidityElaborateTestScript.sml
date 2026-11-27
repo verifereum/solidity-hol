@@ -639,6 +639,19 @@ Proof
   EVAL_TAC
 QED
 
+Theorem abi_encode_function_fixed_array_packed_refused:
+  elab_expr (^ctx0 with variables :=
+      [(40, LocatedT MemoryLoc (ArrayT
+             (FunctionT InternalFn PureMut [UintT 256] [UintT 256]) (SOME 2)))]) 10
+    (SrcAbiEncode ^(at 30) ^(at 31) AbiPacked
+      [SrcIdentifier ^(at 32) "fns" 40
+         "t_array$_t_function_internal_pure$_t_uint256_$returns$_t_uint256_$_$2_memory_ptr"]
+      "t_bytes_memory_ptr") =
+  INR [(32, "abi encoding of this type")]
+Proof
+  EVAL_TAC
+QED
+
 (* A recursive memory object is unsupported even when referenced only by a
  * function signature in a struct field. A signature pointing back to its
  * own struct does not make the struct's memory layout recursive. *)

@@ -179,8 +179,8 @@ Definition byte_sequence_type_def:
   byte_sequence_type ty ⇔ ty = BytesT ∨ ty = StringT
 End
 
-(* The ABI has no encoding for internal dispatch ids. External function
- * values are admitted separately with their ABI codec. *)
+(* The ABI has no encoding for function values, including internal dispatch
+ * ids. *)
 Definition abi_scalar_type_def:
   abi_scalar_type ty ⇔ is_stored_scalar_type ty ∧ ¬is_function_type ty
 End
@@ -191,7 +191,7 @@ End
 Definition packed_element_type_def:
   (packed_element_type (ArrayT item (SOME k)) ⇔
     valid_array_length (SOME k) ∧ packed_element_type item) ∧
-  (packed_element_type ty ⇔ is_stored_scalar_type ty)
+  (packed_element_type ty ⇔ abi_scalar_type ty)
 End
 
 (* Packed ABI arrays contain one full ABI word per scalar leaf. *)
