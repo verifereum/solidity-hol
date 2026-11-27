@@ -2614,9 +2614,10 @@ Definition elab_expr_def:
              INR (bs ++ type_name_blockers (info.node_id, "unsupported type name") tn))
     | SrcUnsupportedExpr info msg es =>
         INR ((info.node_id, msg) :: blockers (operand_values (elab_arg_values ctx n es)))) ∧
-  (* The early prefix belongs to forming the callee. Remaining arguments
-   * are all evaluated before conversion, in source order, then arranged in
-   * parameter order. Both schedules use assignment's coerce. *)
+  (* The early prefix is evaluated and converted one argument at a time: the
+   * arguments forming the callee, or all of a base constructor's. Remaining
+   * arguments are all evaluated before conversion, in source order, then
+   * arranged in parameter order. Both schedules use assignment's coerce. *)
   (elab_args ctx n (id : num) early order tys es =
     if early = 0 then
       let ((ss, os), n1) = elab_arg_values ctx n es in
@@ -4009,7 +4010,10 @@ End
  * functions in testdata/differential/expected/constructors.json). First the
  * base constructor arguments, in evaluation order, each list with the
  * parameters of the giving base's constructor in scope, define the
- * parameters of the constructor they are given to. Then, base first, each
+ * parameters of the constructor they are given to. Each argument is
+ * converted to its parameter's type before the next is evaluated, as the
+ * compiler does; the parameters are defined after the whole list. Then,
+ * base first, each
  * base's state variable initializers in declaration order, then its
  * constructor.
  *)
@@ -4018,7 +4022,8 @@ Definition elab_base_arguments_def:
   (elab_base_arguments ctx fs n ((x, b, args) :: rest) =
     case (constructor_parameters x fs, constructor_parameters b fs) of
       (SOME xps, SOME bps) =>
-        (case elab_args (ctx with variables := xps) n b 0 [] (values_of (MAP SND bps)) args of
+        (case elab_args (ctx with variables := xps) n b (LENGTH args) []
+                (values_of (MAP SND bps)) args of
            INL ((ss, atoms), n1) =>
              (case elab_base_arguments ctx fs n1 rest of
                 INL (ss', n2) => INL (ss ++ define_parameters bps atoms ++ ss', n2)
