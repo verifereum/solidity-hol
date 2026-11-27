@@ -455,8 +455,9 @@ fun type_name v = guarded (fn _ => []) unsupported_type_name (fn v => within v (
            con "SrcArrayTypeName"
              [info v, type_name (field v "baseType"), mk_num (array_dimension v length)])
   | "FunctionTypeName" =>
-      (require v (string_field v "visibility" = "internal")
-         "external function types are not supported";
+      (require v (List.exists (fn vis => vis = string_field v "visibility")
+                     ["internal", "external"])
+         "unsupported function type visibility";
        con "SrcFunctionTypeName" [info v, type_id v])
   | other => fail (describe v ^ ": unsupported type name " ^ other))) v
 
@@ -532,11 +533,17 @@ fun error_declaration v id =
            ("error_parameters", #2 (parameter_list (field d "parameters")))])
   | NONE => fail (describe v ^ ": reverts only with errors declared in the compilation")
 
-(* A call of an external function of a contract or interface value. *)
-fun is_external_call callee =
+fun has_external_function_type e =
+  String.isPrefix "t_function_external_" (raw_type_id e)
+
+(* A declared external member of a contract or interface receiver. *)
+fun is_external_member callee =
   node_type callee = "MemberAccess" andalso
-  String.isPrefix "t_function_external_"
-    (string_field (field callee "typeDescriptions") "typeIdentifier")
+  has_external_function_type callee andalso
+  String.isPrefix "t_contract$_" (raw_type_id (field callee "expression"))
+
+fun has_dynamic_selector base =
+  has_external_function_type base andalso not (is_external_member base)
 
 (* a.call, a.staticcall or a.delegatecall, as a callee: the address member,
  * not a function attached to addresses by using for. Its low_level_kind. *)
@@ -849,16 +856,14 @@ fun is_base_member v =
 
 (* C.v names the variable v through a contract name: it is v itself, as
  * variables are not virtual, and its receiver has no runtime evaluation. *)
-fun is_contract_variable_member v =
-  node_type v = "MemberAccess" andalso
-  String.isPrefix "t_type$_t_contract$_" (raw_type_id (field v "expression")) andalso
-  unevaluated_receiver (field v "expression") andalso
-  (case optional_field v "referencedDeclaration" of
-     SOME d =>
-       (case List.find (fn (i, _) => i = JSONUtil.asIntInf d) (!selector_declarations) of
-          SOME (_, n) => node_type n = "VariableDeclaration"
-        | NONE => false)
-   | NONE => false)
+fun contract_variable_member v id =
+  let val receiver = field v "expression" in
+    if String.isPrefix "t_type$_t_contract$_" (raw_type_id receiver) andalso
+       unevaluated_receiver receiver then
+      Option.map #2 (List.find (fn (i, d) =>
+        i = id andalso node_type d = "VariableDeclaration") (!selector_declarations))
+    else NONE
+  end
 
 fun is_attached v =
   String.isSubstring "_$attached_to$_"
@@ -955,18 +960,27 @@ fun expr v = guarded (fn e => [ExprChild e]) unsupported_expr (fn v => within v 
                   [info v, con "SrcEnumTypeName" [info (field v "expression"), mk_num enum],
                    mk_num (IntInf.fromInt index), type_id v]
             | NONE =>
-           if is_library_member v orelse is_contract_variable_member v then
-             (if is_attached v then
-                (ignore (expr (field v "expression"));
-                 fail (describe v ^ ": an attached function is supported only as a callee"))
-              else ();
-              con "SrcIdentifier"
-                [info v, mk_str (string_field v "memberName"),
-                 mk_num (JSONUtil.asIntInf declaration), type_id v])
-           else
-           con "SrcMemberAccess"
-             [info v, expr (field v "expression"),
-              mk_num (JSONUtil.asIntInf declaration), type_id v])
+              let
+                val id = JSONUtil.asIntInf declaration
+                val variable = contract_variable_member v id
+                val () = Option.app (fn d =>
+                  require v (has_external_function_type d = has_external_function_type v)
+                    "contract variable function type annotation mismatch") variable
+              in
+                if is_external_member v then
+                  con "SrcExternalFunction"
+                    [info v, expr (field v "expression"), selector_bytes v v, type_id v]
+                else if is_library_member v orelse isSome variable then
+                  (if is_attached v then
+                     (ignore (expr (field v "expression"));
+                      fail (describe v ^ ": an attached function is supported only as a callee"))
+                   else ();
+                   con "SrcIdentifier"
+                     [info v, mk_str (string_field v "memberName"), mk_num id, type_id v])
+                else
+                  con "SrcMemberAccess"
+                    [info v, expr (field v "expression"), mk_num id, type_id v]
+              end)
        | NONE =>
            let val base = field v "expression" in
            if node_type base = "Identifier" andalso
@@ -1011,6 +1025,14 @@ fun expr v = guarded (fn e => [ExprChild e]) unsupported_expr (fn v => within v 
            else if String.isPrefix "t_struct$_"
                  (string_field (field (field v "expression") "typeDescriptions") "typeIdentifier")
             then raise MalformedInput (describe v ^ ": missing struct field declaration")
+            else if (string_field v "memberName" = "address" andalso
+                     has_external_function_type base) orelse
+                    (is_selector v andalso has_dynamic_selector base) then
+              con "SrcFunctionMember"
+                [info v, prim_mk_const {Thy = "solidityCore", Name =
+                   if string_field v "memberName" = "address"
+                   then "FunctionAddress" else "FunctionSelector"},
+                 expr base, type_id v]
             else if string_field v "memberName" = "selector" then
               con "SrcSelector"
                 [info v,
@@ -1203,8 +1225,17 @@ fun expr v = guarded (fn e => [ExprChild e]) unsupported_expr (fn v => within v 
               (positional (); wrap_call v callee args)
             else if is_external_library_call callee then
               library_call v callee args
-            else if is_external_call callee orelse
-               node_type callee = "FunctionCallOptions" then
+            else if is_external_member (unparenthesized (options_target callee)) then
+              external_call v callee args
+            else if has_external_function_type (unparenthesized (options_target callee)) then
+              (positional ();
+               let val options = call_options false callee in
+                 con "SrcExternalFunctionCall"
+                   [info v, expr (unparenthesized (options_target callee)),
+                    listSyntax.mk_list (map #1 options, call_option_ty),
+                    listSyntax.mk_list (map #2 options @ args, expr_ty), type_id v]
+               end)
+            else if node_type callee = "FunctionCallOptions" then
               external_call v callee args
             else if isSome (builtin_function callee) then
               let val (_, name, arity, msg) = valOf (builtin_function callee) in
@@ -1580,15 +1611,14 @@ and low_level_call v callee args =
 (* c.f{value: v, gas: g}(args), with c of a contract type. *)
 and external_call v callee args =
   let
-    val member = options_target callee
-    val target = Option.map expr (optional_field member "expression")
+    val member = unparenthesized (options_target callee)
+    val direct = is_external_member member
+    val target = expr (if direct then field member "expression" else member)
     val options = call_options false callee
-    val () = require member (is_external_call member)
-               "unsupported call options"
-    val () =
-      within (field member "expression") (fn b =>
-        require b (String.isPrefix "t_contract$_" (raw_type_id b))
-          "external calls only on contract-typed values")
+    val () = require member direct
+               (if has_external_function_type member andalso bool_field v "tryCall"
+                then "try/catch through an external function value"
+                else "unsupported call options")
   in
     con "SrcExternalCall"
       [info v,
@@ -1598,7 +1628,7 @@ and external_call v callee args =
             SOME (_, d) => d
           | NONE => fail (describe member ^ ": calls only declarations in the compilation")),
        listSyntax.mk_list (map #1 options, call_option_ty),
-       listSyntax.mk_list (valOf target :: map #2 options @ args, expr_ty),
+       listSyntax.mk_list (target :: map #2 options @ args, expr_ty),
        argument_order v (int_field member "referencedDeclaration") 0,
        type_id v]
   end
@@ -1658,8 +1688,7 @@ fun optional_expr v k =
 (* An inline assembly block's code, and the Solidity variables it names. The
  * compiler lists each use of one in externalReferences, by the source range
  * of the identifier naming it, so the name comes from the identifier at that
- * range. A suffix other than slot, offset and length (address, selector) is
- * a reference this semantics does not read.
+ * range.
  *)
 fun yul_identifiers v =
   case v of
@@ -1699,6 +1728,8 @@ fun inline_assembly v =
           | SOME (JSON.STRING "slot") => "SrcAssemblySlot"
           | SOME (JSON.STRING "offset") => "SrcAssemblyOffset"
           | SOME (JSON.STRING "length") => "SrcAssemblyLength"
+          | SOME (JSON.STRING "address") => "SrcAssemblyFunctionAddress"
+          | SOME (JSON.STRING "selector") => "SrcAssemblyFunctionSelector"
           | SOME _ => fail (describe v ^ ": unsupported reference " ^ name)
       in
         (name, con kind [decl])
@@ -2111,12 +2142,15 @@ fun is_delegate_call_reference v =
 (* The declarations the nodes of v refer to; when internal, without the
  * callee of a delegate call, which runs as the linked library's code. *)
 fun declaration_references internal (v as JSON.OBJECT fields) =
-      (* Only a selector's computed receiver executes, not the function it
-       * names. Include that receiver's helper and constant dependencies. *)
+      (* A function value is evaluated to read its selector. A declared
+       * selector comes from the declaration and only evaluates its receiver. *)
       if is_selector v then
-        (case selector_receiver (field v "expression") of
-           SOME receiver => declaration_references internal receiver
-         | NONE => [])
+        let val base = field v "expression" in
+          if has_dynamic_selector base then declaration_references internal base
+          else case selector_receiver base of
+                 SOME receiver => declaration_references internal receiver
+               | NONE => []
+        end
       else if JSONUtil.testField "nodeType"
            (fn JSON.STRING s => s = "UsingForDirective" | _ => false) v
       then [] else

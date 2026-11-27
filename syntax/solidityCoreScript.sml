@@ -163,6 +163,10 @@ End
  * giving whether it succeeded and its return data as a new memory bytes.
  *)
 Datatype:
+  function_member = FunctionAddress | FunctionSelector
+End
+
+Datatype:
   core_operation
   = ScalarOperation sol_type arithmetic_mode core_operator (core_atom list)
   | ConvertOperation sol_type core_atom
@@ -200,7 +204,9 @@ Datatype:
   | InternalCallOperation ast_id (core_atom list)
   (* a call of the procedure an internal function value names *)
   | FunctionValueCallOperation core_atom (core_atom list)
-  | ExternalCallOperation external_kind (byte list) (sol_type list)
+  | ExternalFunctionOperation core_atom core_atom
+  | FunctionMemberOperation function_member core_atom
+  | ExternalCallOperation external_kind core_atom (sol_type list)
       (sol_type list) core_atom core_atom (core_atom option) (core_atom list)
   | LowLevelCallOperation external_kind core_atom core_atom (core_atom option)
       core_atom
@@ -232,12 +238,15 @@ End
  * and x.length of a byte sequence or dynamic array, the plain name of a
  * static array; assigning either rebinds the local), the value of a constant
  * of value type, held in an atom, or the memory address of a local holding a
- * memory byte sequence of the given type (bytes or string). Only locals,
- * storage pointer slots and calldata offsets and lengths are assignable.
+ * memory byte sequence of the given type (bytes or string). An external
+ * function local has two assignable Yul words, its address and selector.
+ * Locals, storage pointer slots and calldata offsets and lengths are assignable.
  *)
 Datatype:
   assembly_reference
   = AssemblyLocal ast_id sol_type
+  | AssemblyFunctionAddress ast_id
+  | AssemblyFunctionSelector ast_id
   | AssemblySlot ast_id
   | AssemblyOffset ast_id
   | AssemblyPointerSlot ast_id

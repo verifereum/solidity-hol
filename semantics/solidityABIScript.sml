@@ -23,6 +23,7 @@ Definition abi_type_def:
     | BoolT => Bool
     | AddressT _ => Address
     | FixedBytesT n => Bytes (SOME n)
+    | FunctionT ExternalFn _ _ _ => Bytes (SOME 24)
     | EnumT _ => Uint 8
     | BytesT => Bytes NONE
     | StringT => String
@@ -52,6 +53,8 @@ Definition abi_value_def:
   (abi_value (AddressT _) (ScalarValue (AddressValue a)) =
     SOME (NumV (w2n a))) ∧
   (abi_value (FixedBytesT _) (ScalarValue (BytesValue bs)) = SOME (BytesV bs)) ∧
+  (abi_value (FunctionT ExternalFn _ _ _) (ScalarValue (ExternalFunctionValue a selector)) =
+    SOME (BytesV (num_to_bytes 20 (w2n a) ++ selector))) ∧
   (abi_value (EnumT _) (ScalarValue (IntegerValue i)) = SOME (NumV (Num i))) ∧
   (abi_value BytesT (ScalarValue (BytesValue bs)) = SOME (BytesV bs)) ∧
   (abi_value StringT (ScalarValue (BytesValue bs)) = SOME (BytesV bs)) ∧
@@ -336,6 +339,9 @@ Definition abi_runtime_value_def:
     SOME (ScalarValue (AddressValue (n2w n)))) ∧
   (abi_runtime_value (FixedBytesT _) (BytesV bs) =
     SOME (ScalarValue (BytesValue bs))) ∧
+  (abi_runtime_value (FunctionT ExternalFn _ _ _) (BytesV bs) =
+    SOME (ScalarValue (ExternalFunctionValue
+      (n2w (num_of_be_bytes (TAKE 20 bs))) (DROP 20 bs)))) ∧
   (* a uint8, which dispatch checks against the enum's members *)
   (abi_runtime_value (EnumT _) (NumV n) = SOME (ScalarValue (IntegerValue (&n)))) ∧
   (abi_runtime_value _ _ = NONE)
@@ -1211,8 +1217,8 @@ Definition packed_value_def:
       case (abi_value ty v, storage_bytes ty) of
         (SOME a, SOME width) =>
           let word = enc (abi_type env 0 ty) a in
-          (INL (case ty of
-                  FixedBytesT _ => TAKE width word
+          (INL (case a of
+                  BytesV _ => TAKE width word
                 | _ => DROP (32 - width) word), reach, st)
       | _ => (INR (InvalidCompletion "bad packed value", []), reach, st)
 End

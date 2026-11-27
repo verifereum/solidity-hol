@@ -16,7 +16,7 @@ val () = holbuild_extra_deps [
   "../testdata/frontend/expected/fallback_params.json",
   "../testdata/frontend/expected/creation_argument.json",
   "../testdata/frontend/expected/function_type_limits.json",
-  "../testdata/frontend/expected/function_type_refused.json"
+  "../testdata/frontend/expected/external_function_limits.json"
 ]
 
 val prepared = #prepared (solidityPrepareLib.prepare_artifact
@@ -353,16 +353,23 @@ Proof
   CONV_TAC (QUANT_CONV (LAND_CONV cv_eval)) >> simp[] >> EVAL_TAC
 QED
 
-(* An external function type parameter refuses the unit, which also stores
- * a supported internal function value. *)
+(* A function value can be called normally, while try/catch needs a named
+ * external declaration. A rejected function leaves the other entries intact. *)
+val external_limits_prepared = #prepared (solidityPrepareLib.prepare_artifact
+  {root = "..", path = "../testdata/frontend/expected/external_function_limits.json",
+   source = "testdata/frontend/external_function_limits.sol"});
+
+val external_limits_outcomes =
+  map (fn {name, reason, ...} => (name, reason)) (#functions external_limits_prepared);
+
 val () =
-  (ignore (solidityPrepareLib.prepare_artifact
-     {root = "..", path = "../testdata/frontend/expected/function_type_refused.json",
-      source = "testdata/frontend/function_type_refused.sol"});
-   raise Fail "function_type_refused unexpectedly prepared")
-  handle solidityPrepareLib.PreparationError
-           (solidityPrepareLib.UnsupportedImport, msg) =>
-    if String.isSubstring "external function types are not supported" msg andalso
-       not (String.isSubstring "unsupported state variable" msg)
-    then ()
-    else raise Fail ("function_type_refused reason missing: " ^ msg);
+  if List.length external_limits_outcomes = 3 andalso
+     List.exists (fn item => item = ("readsStored", NONE)) external_limits_outcomes andalso
+     List.exists (fn item => item = ("callsExternal", NONE)) external_limits_outcomes andalso
+     List.exists (fn ("catchesExternal", SOME why) =>
+                      String.isSubstring "try/catch through an external function value" why
+                   | _ => false) external_limits_outcomes
+  then ()
+  else raise Fail ("unexpected external_function_limits outcomes: " ^
+    String.concatWith "; " (map (fn (n, r) => n ^ " " ^
+      (case r of SOME m => m | NONE => "supported")) external_limits_outcomes));

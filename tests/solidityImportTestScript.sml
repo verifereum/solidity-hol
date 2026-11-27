@@ -441,17 +441,24 @@ val () =
       [": unsupported expression UnknownTarget", "Error catch requires one string memory parameter"]
   end
 
-(* A state variable of a struct left out (a function-typed member)
- * rejects the unit at import, rather than reaching the core unchecked. *)
+(* A struct can hold an external function. If a member type cannot be
+ * imported, its state variable still rejects the unit. *)
 val () =
-  case (ignore (import_artifact "../testdata/frontend/expected/struct_state.json"
-                  "testdata/frontend/struct_state.sol"); NONE)
-       handle ImportError msg => SOME msg of
-    SOME msg =>
-      if String.isSubstring "state variable of a struct the core cannot hold" msg
-      then ()
+  let
+    val fixture = "../testdata/frontend/expected/struct_state.json"
+    val source = "testdata/frontend/struct_state.sol"
+    val _ = import_artifact fixture source
+    val unit = artifact_part fixture ["sources", source, "ast"]
+    val artifact_contracts = artifact_part fixture ["contracts", source]
+    val unsupported = edit_first "FunctionTypeName"
+      (set_field "nodeType" (JSON.STRING "UnknownType")) unit
+  in
+    (ignore (import_source_unit [] unsupported artifact_contracts);
+     raise Fail "state variable of a left-out struct: imported")
+    handle ImportError msg =>
+      if String.isSubstring "state variable of a struct the core cannot hold" msg then ()
       else raise Fail ("state variable of a left-out struct: " ^ msg)
-  | NONE => raise Fail "state variable of a left-out struct: imported"
+  end
 
 (* An unsupported call option does not hide the blockers of the receiver. *)
 val () =
@@ -482,18 +489,18 @@ val () =
 (* Every unsupported reference of an inline assembly block is a line. *)
 val () =
   let
-    fun selector_suffix (JSON.OBJECT kvs) =
+    fun unknown_suffix (JSON.OBJECT kvs) =
           JSON.OBJECT
             (map (fn ("externalReferences", JSON.ARRAY rs) =>
                        ("externalReferences",
-                        JSON.ARRAY (map (set_field "suffix" (JSON.STRING "selector")) rs))
+                        JSON.ARRAY (map (set_field "suffix" (JSON.STRING "unknown")) rs))
                    | kv => kv) kvs)
-      | selector_suffix v = v
+      | unknown_suffix v = v
   in
     expect_function_lines "unsupported assembly references"
       "../testdata/differential/expected/inline_assembly.json"
       "testdata/differential/inline_assembly.sol"
-      "locations" (edit_first "InlineAssembly" selector_suffix)
+      "locations" (edit_first "InlineAssembly" unknown_suffix)
       ["unsupported reference packedHigh.offset", "unsupported reference packedHigh.slot",
        "unsupported reference total.offset", "unsupported reference total.slot"]
   end

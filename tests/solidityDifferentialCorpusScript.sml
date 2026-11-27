@@ -67,6 +67,7 @@ Ancestors
   solidityDifferentialCorpus_errors
   solidityDifferentialCorpus_expression_members
   solidityDifferentialCorpus_external
+  solidityDifferentialCorpus_external_function_values
   solidityDifferentialCorpus_fallback
   solidityDifferentialCorpus_function_references
   solidityDifferentialCorpus_function_types
