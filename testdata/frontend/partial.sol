@@ -2,8 +2,8 @@
 pragma solidity >=0.8.0;
 
 // The unsupported functions, and those calling them, have no procedure.
-// callcode is unsupported at import, and halting constructor assembly is
-// unsupported at elaboration.
+// abi.encodeCall through a computed receiver is unsupported at import.
+// Halting constructor assembly is unsupported at elaboration.
 contract Base {
     function twice(uint256 x) public virtual returns (uint256) {
         return x * 2;
@@ -12,8 +12,8 @@ contract Base {
 
 contract Mid is Base {
     function twice(uint256 x) public virtual override returns (uint256) {
-        assembly { pop(callcode(0, 0, 0, 0, 0, 0, 0)) }
-        return x;
+        bytes memory data = abi.encodeCall(IPair(address(this)).put, (Pair(1, 2)));
+        return x + data.length;
     }
 }
 
@@ -81,8 +81,8 @@ contract Partial is Mid {
     }
 
     function digest(bytes memory b) public returns (bytes32) {
-        assembly { pop(callcode(0, 0, 0, 0, 0, 0, 0)) }
-        return bytes32(b.length);
+        bytes memory data = abi.encodeCall(IPair(address(this)).put, (Pair(1, 2)));
+        return bytes32(b.length + data.length);
     }
 
     function digestTwice(bytes memory b) public returns (bytes32) {
@@ -159,7 +159,7 @@ contract Partial is Mid {
     }
 
     fallback() external {
-        assembly { pop(callcode(0, 0, 0, 0, 0, 0, 0)) }
-        total = msg.data.length;
+        bytes memory data = abi.encodeCall(IPair(address(this)).put, (Pair(1, 2)));
+        total = msg.data.length + data.length;
     }
 }
