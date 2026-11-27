@@ -8,8 +8,8 @@ library FunctionValueLibrary {
 }
 
 abstract contract FunctionValueBase {
-    function adjust(uint256 value) internal pure virtual returns (uint256) {
-        return value + 8;
+    function adjust(uint256 value, uint256 delta) internal pure virtual returns (uint256) {
+        return value * 2 + delta;
     }
 }
 
@@ -126,12 +126,12 @@ contract FunctionValues is FunctionValueBase {
         return (raw, low, current(value), high);
     }
 
-    function adjust(uint256 value) internal pure override returns (uint256) {
-        return value + 80;
+    function adjust(uint256 value, uint256 delta) internal pure override returns (uint256) {
+        return value * 10 + delta;
     }
 
     function qualified(uint256 value) external pure returns (uint256, uint256) {
-        return ((FunctionValueBase.adjust)(value), adjust(value));
+        return ((FunctionValueBase.adjust)({delta: 3, value: value}), adjust(value, 3));
     }
 
     function attached(uint256 value) external pure returns (uint256) {

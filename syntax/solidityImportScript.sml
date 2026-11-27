@@ -563,6 +563,13 @@ Definition decode_struct_identifier_def:
     | NONE => struct_with_suffix "_storage" c
 End
 
+(* A struct display name can contain dollar escapes or spell a type
+ * constructor. Remove display names before counting component delimiters. *)
+Definition type_identifier_fields_def:
+  type_identifier_fields s =
+    separated_fields #"$" "" (canonical_storage_identifier 0 0 s)
+End
+
 (* An array, struct or internal function adds a level to a delimited
  * type identifier. An array dimension, struct id, or function's final
  * delimiter closes that level. *)
@@ -610,7 +617,7 @@ End
 
 Definition array_identifier_parts_def:
   array_identifier_parts s =
-    case separated_fields #"$" "" s of
+    case type_identifier_fields s of
       f :: fs =>
         if f ≠ "t_array" then NONE else
         let k = array_prefix_fields fs in
@@ -712,7 +719,7 @@ End
 (* The function's mutability and its parameter and return identifiers. *)
 Definition function_identifier_parts_def:
   function_identifier_parts s =
-    case separated_fields #"$" "" s of
+    case type_identifier_fields s of
       head :: fs =>
         (case (internal_function_mutability head, split_at_returns 0 [] fs) of
            (SOME m, SOME (ps, rs)) =>
@@ -842,7 +849,7 @@ Definition decode_type_identifier_def:
     else if isPREFIX "t_stringliteral_" s then SOME SrcByteLiteral
     else if s = "t_tuple$__$" then SOME (SrcTupleType [])
     else if isPREFIX "t_tuple$" s then
-      case REVERSE (separated_fields #"$" "" (DROP 8 s)) of
+      case REVERSE (type_identifier_fields (DROP 8 s)) of
         [] :: pieces =>
           (case tuple_identifier_components 0 "" (REVERSE pieces) of
              SOME cs => OPTION_MAP SrcTupleType (all_some (MAP tuple_component cs))

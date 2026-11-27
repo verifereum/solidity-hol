@@ -144,6 +144,17 @@ Proof
   EVAL_TAC
 QED
 
+Theorem struct_names_in_type_identifier_components:
+  decode_type_identifier "t_array$_t_struct$_t_function_internal_pure_$4_memory_ptr_$dyn_memory_ptr" =
+    SOME (SrcType (LocatedT MemoryLoc (ArrayT (StructT (AstId 4)) NONE))) ∧
+  decode_type_identifier "t_tuple$_t_struct$_t_array_$4_memory_ptr_$_t_uint256_$" =
+    SOME (SrcTupleType [LocatedT MemoryLoc (StructT (AstId 4)); UintT 256]) ∧
+  function_type_identifier "t_function_internal_pure$_t_struct$_A$$$B_$4_memory_ptr_$returns$__$" =
+    SOME (FunctionT InternalFn PureMut [LocatedT MemoryLoc (StructT (AstId 4))] [])
+Proof
+  EVAL_TAC
+QED
+
 (* Negative fixtures: the fixture's AST with one edit to the first node, in
  * document order, of a given nodeType.
  *)
@@ -286,10 +297,10 @@ val () =
     fun parenthesize (callee as JSON.OBJECT kvs) =
           JSON.OBJECT
             ([("nodeType", JSON.STRING "TupleExpression"),
+              ("id", JSON.INT 999999),
               ("isInlineArray", JSON.BOOL false),
               ("components", JSON.ARRAY [callee])] @
-             List.filter (fn (k, _) => k = "id" orelse k = "src" orelse
-                                       k = "typeDescriptions") kvs)
+             List.filter (fn (k, _) => k = "src" orelse k = "typeDescriptions") kvs)
       | parenthesize v = v
     fun edit call =
       case JSONUtil.findField call "expression" of
