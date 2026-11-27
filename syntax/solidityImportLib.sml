@@ -2833,7 +2833,11 @@ fun import_unit units v contracts selected = within v (fn v =>
                            List.exists (fn i => i = int_field m "id")
                              (inherited @ created))
              then NONE
-             else keep (contract structs contracts declared) m)
+             else
+               (recover m (fn () =>
+                  require m (not (bool_field m "abstract"))
+                    "abstract contract has no bytecode");
+                keep (contract structs contracts declared) m))
       | other => (ignore (note m ("unsupported source unit member " ^ other)); NONE)
     val contracts = List.mapPartial (fn m => within m member) members
   in

@@ -1620,6 +1620,18 @@ val () =
      handle ImportError _ => ())
   end
 
+(* An abstract contract selected by name is rejected: it has no bytecode. *)
+val () =
+  let
+    val artifact = JSONParser.parseFile
+      "../testdata/differential/expected/abstract_child_unit.json"
+    val (_, blockers) = import_contract_artifact_unit_blockers artifact
+      "testdata/differential/abstract_child_unit.sol" (SOME "AbstractChildLogic")
+  in
+    if List.exists (String.isSubstring "abstract contract has no bytecode") blockers
+    then () else raise Fail "abstract contract selected: not rejected"
+  end
+
 (* abi.encodeWithSignature keeps its signature as its first argument, a
  * literal or not (a parameter, a state variable, a struct field), as
  * abi.encodeWithSelector keeps its selector. *)
