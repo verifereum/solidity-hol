@@ -1,12 +1,12 @@
 {
   "counts": {
-    "admitted": 1349,
+    "admitted": 1354,
     "compile-failure": 0,
     "elaboration-rejected": 52,
     "import-rejected": 31,
     "invalid-core": 0,
     "malformed-input": 0,
-    "partially-admitted": 113,
+    "partially-admitted": 108,
     "skipped": 100,
     "source-rejected": 25
   },
@@ -63,6 +63,11 @@
     },
     {
       "feature": "unsupported external call",
+      "only_blocker": 0,
+      "tests": 8
+    },
+    {
+      "feature": "value count mismatch",
       "only_blocker": 0,
       "tests": 8
     },
@@ -137,11 +142,6 @@
       "tests": 2
     },
     {
-      "feature": "assembly reference of this type",
-      "only_blocker": 0,
-      "tests": 2
-    },
-    {
       "feature": "unsupported binary operator",
       "only_blocker": 0,
       "tests": 2
@@ -177,6 +177,11 @@
       "tests": 1
     },
     {
+      "feature": "assembly reference of this type",
+      "only_blocker": 0,
+      "tests": 1
+    },
+    {
       "feature": "no supported function or creation",
       "only_blocker": 0,
       "tests": 1
@@ -200,17 +205,12 @@
       "feature": "unsupported identifier",
       "only_blocker": 0,
       "tests": 1
-    },
-    {
-      "feature": "value count mismatch",
-      "only_blocker": 0,
-      "tests": 1
     }
   ],
   "format": "solidity-hol-semantic-tests-coverage-v1",
   "functions": {
     "total": 3642,
-    "unsupported": 162
+    "unsupported": 149
   },
   "greedy_order": [
     {
@@ -275,23 +275,23 @@
     },
     {
       "admitted": 81,
-      "feature": "unsupported external call"
-    },
-    {
-      "admitted": 84,
       "feature": "return type"
     },
     {
-      "admitted": 87,
-      "feature": "unsupported parameter type"
-    },
-    {
-      "admitted": 88,
+      "admitted": 82,
       "feature": "type annotation mismatch"
     },
     {
-      "admitted": 91,
+      "admitted": 85,
       "feature": "unsupported type name"
+    },
+    {
+      "admitted": 86,
+      "feature": "unsupported parameter type"
+    },
+    {
+      "admitted": 87,
+      "feature": "unsupported variable type"
     }
   ],
   "profile": "solc-0.8.37-via-ir-osaka",
@@ -825,11 +825,14 @@
         "31: unsupported callee",
         "35: unsupported callee",
         "58: unsupported external call",
+        "58: value count mismatch",
         "116: not a storage location",
         "123: not a storage location",
         "130: not a storage location",
         "138: unsupported external call",
-        "142: unsupported external call"
+        "138: value count mismatch",
+        "142: unsupported external call",
+        "142: value count mismatch"
       ],
       "category": "import-rejected",
       "creation": [],
@@ -839,10 +842,11 @@
         "not a storage location",
         "parameter type",
         "unsupported callee",
-        "unsupported external call"
+        "unsupported external call",
+        "value count mismatch"
       ],
       "functions": 0,
-      "reason": "FunctionTypeName 6: external function types are not supported\nFunctionTypeName 44: external function types are not supported\n39: parameter type\n61: parameter type\nFunctionTypeName 100: external function types are not supported\nFunctionTypeName 107: external function types are not supported\n19: length of a non-array\n27: unsupported callee\n31: unsupported callee\n35: unsupported callee\n58: unsupported external call\n116: not a storage location\n123: not a storage location\n130: not a storage location\n138: unsupported external call\n142: unsupported external call",
+      "reason": "FunctionTypeName 6: external function types are not supported\nFunctionTypeName 44: external function types are not supported\n39: parameter type\n61: parameter type\nFunctionTypeName 100: external function types are not supported\nFunctionTypeName 107: external function types are not supported\n19: length of a non-array\n27: unsupported callee\n31: unsupported callee\n35: unsupported callee\n58: unsupported external call\n58: value count mismatch\n116: not a storage location\n123: not a storage location\n130: not a storage location\n138: unsupported external call\n138: value count mismatch\n142: unsupported external call\n142: value count mismatch",
       "test": "abicoder/calldataDecoding/array/calldata_array_function_types_v2.sol",
       "unsupported": []
     },
@@ -1463,25 +1467,25 @@
         "31: unsupported memory struct type",
         "27: unknown struct member",
         "50: unsupported struct constructor",
-        "52: assembly reference of this type",
         "57: unsupported external call",
+        "57: value count mismatch",
         "56: unknown struct member",
         "61: unsupported external call"
       ],
       "category": "import-rejected",
       "creation": [],
       "features": [
-        "assembly reference of this type",
         "function types",
         "parameter type",
         "unknown struct member",
         "unsupported ABI parameter or return type",
         "unsupported external call",
         "unsupported memory struct type",
-        "unsupported struct constructor"
+        "unsupported struct constructor",
+        "value count mismatch"
       ],
       "functions": 0,
-      "reason": "FunctionTypeName 9: external function types are not supported\n17: parameter type\n31: unsupported ABI parameter or return type\n31: unsupported memory struct type\n27: unknown struct member\n50: unsupported struct constructor\n52: assembly reference of this type\n57: unsupported external call\n56: unknown struct member\n61: unsupported external call",
+      "reason": "FunctionTypeName 9: external function types are not supported\n17: parameter type\n31: unsupported ABI parameter or return type\n31: unsupported memory struct type\n27: unknown struct member\n50: unsupported struct constructor\n57: unsupported external call\n57: value count mismatch\n56: unknown struct member\n61: unsupported external call",
       "test": "abicoder/cleanup/function_v2.sol",
       "unsupported": []
     },
@@ -3014,6 +3018,7 @@
         "89: not a storage location",
         "96: not a storage location",
         "104: unsupported external call",
+        "104: value count mismatch",
         "109: unsupported callee",
         "114: unsupported callee",
         "144: not a storage location",
@@ -3034,10 +3039,11 @@
         "storage layout",
         "unsupported callee",
         "unsupported external call",
-        "unsupported parameter type"
+        "unsupported parameter type",
+        "value count mismatch"
       ],
       "functions": 0,
-      "reason": "FunctionTypeName 5: external function types are not supported\nFunctionTypeName 10: external function types are not supported\nFunctionTypeName 41: external function types are not supported\nFunctionTypeName 54: external function types are not supported\n199: storage layout\n51: parameter type\n64: parameter type\n199: state variable type\nFunctionTypeName 75: external function types are not supported\nFunctionTypeName 80: external function types are not supported\nFunctionTypeName 130: external function types are not supported\nFunctionTypeName 135: external function types are not supported\n89: not a storage location\n96: not a storage location\n104: unsupported external call\n109: unsupported callee\n114: unsupported callee\n144: not a storage location\n151: not a storage location\n157: unsupported parameter type\n162: unsupported callee\n167: unsupported callee\n188: unsupported callee\n193: unsupported callee",
+      "reason": "FunctionTypeName 5: external function types are not supported\nFunctionTypeName 10: external function types are not supported\nFunctionTypeName 41: external function types are not supported\nFunctionTypeName 54: external function types are not supported\n199: storage layout\n51: parameter type\n64: parameter type\n199: state variable type\nFunctionTypeName 75: external function types are not supported\nFunctionTypeName 80: external function types are not supported\nFunctionTypeName 130: external function types are not supported\nFunctionTypeName 135: external function types are not supported\n89: not a storage location\n96: not a storage location\n104: unsupported external call\n104: value count mismatch\n109: unsupported callee\n114: unsupported callee\n144: not a storage location\n151: not a storage location\n157: unsupported parameter type\n162: unsupported callee\n167: unsupported callee\n188: unsupported callee\n193: unsupported callee",
       "test": "array/copying/function_type_array_to_storage.sol",
       "unsupported": []
     },
@@ -3626,6 +3632,7 @@
         "99: not a storage location",
         "107: not a storage location",
         "126: unsupported external call",
+        "126: value count mismatch",
         "131: unsupported callee",
         "135: unsupported callee",
         "139: unsupported callee",
@@ -3641,10 +3648,11 @@
         "not a storage location",
         "return type",
         "unsupported callee",
-        "unsupported external call"
+        "unsupported external call",
+        "value count mismatch"
       ],
       "functions": 0,
-      "reason": "FunctionTypeName 175: external function types are not supported\nFunctionTypeName 195: external function types are not supported\n189: return type\n202: return type\nFunctionTypeName 68: external function types are not supported\nFunctionTypeName 79: external function types are not supported\nFunctionTypeName 115: external function types are not supported\nFunctionTypeName 9: external function types are not supported\nFunctionTypeName 17: external function types are not supported\n91: length of a non-array\n99: not a storage location\n107: not a storage location\n126: unsupported external call\n131: unsupported callee\n135: unsupported callee\n139: unsupported callee\n182: not a storage location\n184: not a storage location\n198: not a storage location",
+      "reason": "FunctionTypeName 175: external function types are not supported\nFunctionTypeName 195: external function types are not supported\n189: return type\n202: return type\nFunctionTypeName 68: external function types are not supported\nFunctionTypeName 79: external function types are not supported\nFunctionTypeName 115: external function types are not supported\nFunctionTypeName 9: external function types are not supported\nFunctionTypeName 17: external function types are not supported\n91: length of a non-array\n99: not a storage location\n107: not a storage location\n126: unsupported external call\n126: value count mismatch\n131: unsupported callee\n135: unsupported callee\n139: unsupported callee\n182: not a storage location\n184: not a storage location\n198: not a storage location",
       "test": "array/function_array_cross_calls.sol",
       "unsupported": []
     },
@@ -8245,6 +8253,7 @@
         "27: unsupported state variable",
         "64: call of an unsupported function",
         "83: unsupported external call",
+        "83: value count mismatch",
         "80: not a storage location",
         "85: call of an unsupported function"
       ],
@@ -8258,10 +8267,11 @@
         "state variable type",
         "storage layout",
         "unsupported external call",
-        "unsupported state variable"
+        "unsupported state variable",
+        "value count mismatch"
       ],
       "functions": 0,
-      "reason": "FunctionTypeName 34: external function types are not supported\nFunctionTypeName 42: external function types are not supported\nFunctionTypeName 58: external function types are not supported\n91: storage layout\n51: parameter type\n69: parameter type\n91: state variable type\n27: unsupported state variable\n64: call of an unsupported function\n83: unsupported external call\n80: not a storage location\n85: call of an unsupported function",
+      "reason": "FunctionTypeName 34: external function types are not supported\nFunctionTypeName 42: external function types are not supported\nFunctionTypeName 58: external function types are not supported\n91: storage layout\n51: parameter type\n69: parameter type\n91: state variable type\n27: unsupported state variable\n64: call of an unsupported function\n83: unsupported external call\n83: value count mismatch\n80: not a storage location\n85: call of an unsupported function",
       "test": "functionTypes/call_to_zero_initialized_function_type_ir.sol",
       "unsupported": []
     },
@@ -8442,6 +8452,7 @@
         "FunctionTypeName 36: external function types are not supported",
         "49: parameter type",
         "12: unsupported external call",
+        "12: value count mismatch",
         "9: not a storage location",
         "26: unsupported parameter type",
         "23: not a storage location",
@@ -8456,10 +8467,11 @@
         "not a storage location",
         "parameter type",
         "unsupported external call",
-        "unsupported parameter type"
+        "unsupported parameter type",
+        "value count mismatch"
       ],
       "functions": 0,
-      "reason": "FunctionTypeName 36: external function types are not supported\n49: parameter type\n12: unsupported external call\n9: not a storage location\n26: unsupported parameter type\n23: not a storage location\n44: call of an unsupported function\n22: call of an unsupported function",
+      "reason": "FunctionTypeName 36: external function types are not supported\n49: parameter type\n12: unsupported external call\n12: value count mismatch\n9: not a storage location\n26: unsupported parameter type\n23: not a storage location\n44: call of an unsupported function\n22: call of an unsupported function",
       "test": "functionTypes/pass_function_types_externally.sol",
       "unsupported": []
     },
@@ -8597,6 +8609,7 @@
         "64: call of an unsupported function",
         "75: unsupported function value",
         "87: unsupported external call",
+        "87: value count mismatch",
         "84: not a storage location",
         "89: call of an unsupported function"
       ],
@@ -8611,10 +8624,11 @@
         "storage layout",
         "unsupported external call",
         "unsupported function value",
-        "unsupported state variable"
+        "unsupported state variable",
+        "value count mismatch"
       ],
       "functions": 0,
-      "reason": "FunctionTypeName 34: external function types are not supported\nFunctionTypeName 42: external function types are not supported\nFunctionTypeName 58: external function types are not supported\n95: storage layout\n51: parameter type\n69: parameter type\n95: state variable type\n27: unsupported state variable\n64: call of an unsupported function\n75: unsupported function value\n87: unsupported external call\n84: not a storage location\n89: call of an unsupported function",
+      "reason": "FunctionTypeName 34: external function types are not supported\nFunctionTypeName 42: external function types are not supported\nFunctionTypeName 58: external function types are not supported\n95: storage layout\n51: parameter type\n69: parameter type\n95: state variable type\n27: unsupported state variable\n64: call of an unsupported function\n75: unsupported function value\n87: unsupported external call\n87: value count mismatch\n84: not a storage location\n89: call of an unsupported function",
       "test": "functionTypes/store_function.sol",
       "unsupported": []
     },
@@ -10143,27 +10157,23 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 2,
       "reason": null,
       "test": "inlineAssembly/optimize_memory_store_multi_block.sol",
-      "unsupported": [
-        "6: unsupported assembly memory use"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 2,
       "reason": null,
       "test": "inlineAssembly/optimize_memory_store_multi_block_bugreport.sol",
-      "unsupported": [
-        "21: unsupported assembly memory use"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -10297,15 +10307,13 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 2,
       "reason": null,
       "test": "inlineAssembly/transient_storage_sanity_checks.sol",
-      "unsupported": [
-        "14: unsupported assembly memory use"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -10688,7 +10696,7 @@
       "reason": null,
       "test": "libraries/external_call_with_function_pointer_parameter.sol",
       "unsupported": [
-        "FunctionTypeName 7: external function types are not supported\n45: unsupported external call\n42: not a storage location"
+        "FunctionTypeName 7: external function types are not supported\n45: unsupported external call\n45: value count mismatch\n42: not a storage location"
       ]
     },
     {
@@ -12535,35 +12543,23 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 6,
       "reason": null,
       "test": "operators/userDefined/operator_making_pure_external_call.sol",
-      "unsupported": [
-        "calls an unsupported function",
-        "calls an unsupported function",
-        "calls an unsupported function",
-        "calls an unsupported function",
-        "130: unsupported assembly memory use"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 6,
       "reason": null,
       "test": "operators/userDefined/operator_making_view_external_call.sol",
-      "unsupported": [
-        "calls an unsupported function",
-        "calls an unsupported function",
-        "calls an unsupported function",
-        "calls an unsupported function",
-        "152: unsupported assembly memory use"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -14686,7 +14682,7 @@
       "reason": null,
       "test": "structs/function_type_copy.sol",
       "unsupported": [
-        "FunctionTypeName 46: external function types are not supported\nFunctionTypeName 51: external function types are not supported\nFunctionTypeName 10: external function types are not supported\n60: not a storage location\n67: not a storage location\n74: not a storage location\n84: unsupported external call\n89: length of a non-array\n88: unknown struct member\n96: unknown struct member\n99: not a storage location\n106: unknown struct member\n109: not a storage location\n116: unknown struct member\n119: not a storage location"
+        "FunctionTypeName 46: external function types are not supported\nFunctionTypeName 51: external function types are not supported\nFunctionTypeName 10: external function types are not supported\n60: not a storage location\n67: not a storage location\n74: not a storage location\n84: unsupported external call\n84: value count mismatch\n89: length of a non-array\n88: unknown struct member\n96: unknown struct member\n99: not a storage location\n106: unknown struct member\n109: not a storage location\n116: unknown struct member\n119: not a storage location"
       ]
     },
     {

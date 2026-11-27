@@ -144,8 +144,8 @@ of eight shards can be reproduced locally with:
 python3 tools/run_differential.py -j2 --shard-count 8 --shard-index 2
 ```
 
-Integration pushes save all eight shard snapshots for later PRs; PR and
-merge-queue runs save only shard 0 to bound cache use.
+Pushes to `main` save all eight shard snapshots for later PRs. Other runs
+save only shard 0 to bound cache use.
 Shard 0 also builds `solidityHolBaseTheory`, including the creation-call tests
 but excluding the corpus already covered by the shards. `solidityHolTheory`
 retains the complete roll-up. Each shard preserves holbuild logs and reports
