@@ -756,7 +756,7 @@ Theorem abi_signature_literal_is_constant_selector:
                  (MAP (n2w o ORD) "f()")))))) [] [])],
         BoundAtom (AstId 10), ElabType (LocatedT MemoryLoc BytesT)), 11)
 Proof
-  CONV_TAC cv_eval
+  CONV_TAC (computeLib.RESTR_EVAL_CONV [“Keccak_256_w64”])
 QED
 
 Theorem abi_signature_not_string_reports:
