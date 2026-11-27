@@ -186,12 +186,13 @@ Proof
   CONV_TAC (LAND_CONV cv_eval) >> REFL_TAC
 QED
 
-(* The constructor is unsupported, so creation is refused. *)
-Theorem partial_creation_refused:
-  deploy_contract 1000 partial_program (differential_frame (n2w 0x1212) 0 [])
-    (differential_world empty_accounts) = ContractInvalid "unknown procedure"
+(* The constructor's assembly stop ends the creation with no data, so the
+ * contract deploys empty code. *)
+Theorem partial_creation_deploys_halt:
+  ∃w. deploy_contract 1000 partial_program (differential_frame (n2w 0x1212) 0 [])
+        (differential_world empty_accounts) = ContractReturned [] w
 Proof
-  CONV_TAC (LAND_CONV cv_eval) >> REFL_TAC
+  CONV_TAC (QUANT_CONV (LAND_CONV cv_eval)) >> simp[]
 QED
 
 (* A fallback taking the calldata as bytes and returning bytes
