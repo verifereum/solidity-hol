@@ -853,16 +853,14 @@ fun is_base_member v =
 
 (* C.v names the variable v through a contract name: it is v itself, as
  * variables are not virtual, and its receiver has no runtime evaluation. *)
-fun is_contract_variable_member v =
-  node_type v = "MemberAccess" andalso
-  String.isPrefix "t_type$_t_contract$_" (raw_type_id (field v "expression")) andalso
-  unevaluated_receiver (field v "expression") andalso
-  (case optional_field v "referencedDeclaration" of
-     SOME d =>
-       (case List.find (fn (i, _) => i = JSONUtil.asIntInf d) (!selector_declarations) of
-          SOME (_, n) => node_type n = "VariableDeclaration"
-        | NONE => false)
-   | NONE => false)
+fun contract_variable_member v id =
+  let val receiver = field v "expression" in
+    if String.isPrefix "t_type$_t_contract$_" (raw_type_id receiver) andalso
+       unevaluated_receiver receiver then
+      Option.map #2 (List.find (fn (i, d) =>
+        i = id andalso node_type d = "VariableDeclaration") (!selector_declarations))
+    else NONE
+  end
 
 fun is_attached v =
   String.isSubstring "_$attached_to$_"
@@ -959,21 +957,27 @@ fun expr v = guarded (fn e => [ExprChild e]) unsupported_expr (fn v => within v 
                   [info v, con "SrcEnumTypeName" [info (field v "expression"), mk_num enum],
                    mk_num (IntInf.fromInt index), type_id v]
             | NONE =>
-           if is_external_member v then
-             con "SrcExternalFunction"
-               [info v, expr (field v "expression"), selector_bytes v v, type_id v]
-           else if is_library_member v orelse is_contract_variable_member v then
-             (if is_attached v then
-                (ignore (expr (field v "expression"));
-                 fail (describe v ^ ": an attached function is supported only as a callee"))
-              else ();
-              con "SrcIdentifier"
-                [info v, mk_str (string_field v "memberName"),
-                 mk_num (JSONUtil.asIntInf declaration), type_id v])
-           else
-           con "SrcMemberAccess"
-             [info v, expr (field v "expression"),
-              mk_num (JSONUtil.asIntInf declaration), type_id v])
+              let
+                val id = JSONUtil.asIntInf declaration
+                val variable = contract_variable_member v id
+                val () = Option.app (fn d =>
+                  require v (has_external_function_type d = has_external_function_type v)
+                    "contract variable function type annotation mismatch") variable
+              in
+                if is_external_member v then
+                  con "SrcExternalFunction"
+                    [info v, expr (field v "expression"), selector_bytes v v, type_id v]
+                else if is_library_member v orelse isSome variable then
+                  (if is_attached v then
+                     (ignore (expr (field v "expression"));
+                      fail (describe v ^ ": an attached function is supported only as a callee"))
+                   else ();
+                   con "SrcIdentifier"
+                     [info v, mk_str (string_field v "memberName"), mk_num id, type_id v])
+                else
+                  con "SrcMemberAccess"
+                    [info v, expr (field v "expression"), mk_num id, type_id v]
+              end)
        | NONE =>
            let val base = field v "expression" in
            if node_type base = "Identifier" andalso
