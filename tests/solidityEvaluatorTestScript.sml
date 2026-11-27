@@ -492,16 +492,20 @@ QED
 
 (* Both components use right-aligned Yul words, with no implicit cleanup
  * of a non-canonical write. *)
+val external_function_assembly_state =
+  “define_binding (AstId 111) (SingleType (FunctionT ExternalFn ViewMut [] []))
+     (ScalarValue (ExternalFunctionValue 0w [0w; 0w; 0w; 0w])) initial_state”;
+
 Theorem asm_external_function_dirty_components:
-  let st = define_binding (AstId 111) (SingleType (FunctionT ExternalFn ViewMut [] []))
-             (ScalarValue (ExternalFunctionValue 0w [0w; 0w; 0w; 0w])) initial_state in
   (eval_assembly 20 test_env
     [YulAssign ["f.address"] (YulLit (LitNumber (n2w (2 ** 160))))]
-    [("f.address", AssemblyFunctionAddress (AstId 111))] st []).completion =
+    [("f.address", AssemblyFunctionAddress (AstId 111))]
+    ^external_function_assembly_state []).completion =
     InvalidCompletion "invalid assembly function address write-back" ∧
   (eval_assembly 20 test_env
     [YulAssign ["f.selector"] (YulLit (LitNumber (n2w (2 ** 32))))]
-    [("f.selector", AssemblyFunctionSelector (AstId 111))] st []).completion =
+    [("f.selector", AssemblyFunctionSelector (AstId 111))]
+    ^external_function_assembly_state []).completion =
     InvalidCompletion "invalid assembly function selector write-back"
 Proof
   CONV_TAC cv_eval
