@@ -26,7 +26,7 @@ val prepared = #prepared (solidityPrepareLib.prepare_artifact
 (* add is supported; digest, the fallback and Mid.twice use abi.encodeCall
  * through a computed receiver. Partial.twice reaches Mid.twice by super,
  * so Partial.twice, digestTwice and callsTwice call unsupported functions.
- * The constructor's halting assembly does not elaborate.
+ * The constructor's halting assembly elaborates: it deploys the halt's bytes.
  * Once Partial.twice is unsupported its super calls
  * reach nothing, so neither Mid.twice nor Base.twice is among the
  * functions calls reach. The constant DIGITS and digits, which reads it,
@@ -71,7 +71,7 @@ val () =
      length (reasons "digest") = 1 andalso
      length (reasons "") = 2 andalso
      List.exists computed_receiver_failure (reasons "") andalso
-     List.exists elaboration_failure (reasons "") andalso
+     List.exists (fn r => r = NONE) (reasons "") andalso
      reasons "digestTwice" = [calls_unsupported] andalso
      reasons "callsTwice" = [calls_unsupported] andalso
      reasons "twice" = [calls_unsupported] andalso
