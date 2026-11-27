@@ -97,6 +97,9 @@ deployed code is not compared. The words are compared as the code holds
 them, and the compiler writes an assigned value there without cleaning it,
 so a creation that assigns an immutable a value with dirty high bits (from
 inline assembly) shows as a disagreement even when every read of it agrees.
+A constructor whose inline assembly halts (`return`, `stop`) deploys the
+halt's bytes, so both sides read the immutables' words at the same offsets of
+the deployed code.
 
 A call case may give the immutables' values, by name, as an object
 `immutables` (not with `deploy`). They are patched into the runtime bytecode

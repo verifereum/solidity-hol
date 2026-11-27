@@ -26,7 +26,7 @@ val prepared = #prepared (solidityPrepareLib.prepare_artifact
 (* add is supported; digest, the fallback and Mid.twice use abi.encodeCall
  * through a computed receiver. Partial.twice reaches Mid.twice by super,
  * so Partial.twice, digestTwice and callsTwice call unsupported functions.
- * The constructor's halting assembly does not elaborate.
+ * The constructor's halting assembly elaborates: it deploys the halt's bytes.
  * Once Partial.twice is unsupported its super calls
  * reach nothing, so neither Mid.twice nor Base.twice is among the
  * functions calls reach. The constant DIGITS and digits, which reads it,
@@ -71,7 +71,7 @@ val () =
      length (reasons "digest") = 1 andalso
      length (reasons "") = 2 andalso
      List.exists computed_receiver_failure (reasons "") andalso
-     List.exists elaboration_failure (reasons "") andalso
+     List.exists (fn r => r = NONE) (reasons "") andalso
      reasons "digestTwice" = [calls_unsupported] andalso
      reasons "callsTwice" = [calls_unsupported] andalso
      reasons "twice" = [calls_unsupported] andalso
@@ -186,12 +186,13 @@ Proof
   CONV_TAC (LAND_CONV cv_eval) >> REFL_TAC
 QED
 
-(* The constructor is unsupported, so creation is refused. *)
-Theorem partial_creation_refused:
-  deploy_contract 1000 partial_program (differential_frame (n2w 0x1212) 0 [])
-    (differential_world empty_accounts) = ContractInvalid "unknown procedure"
+(* The constructor's assembly stop ends the creation with no data, so the
+ * contract deploys empty code. *)
+Theorem partial_creation_deploys_halt:
+  ∃w. deploy_contract 1000 partial_program (differential_frame (n2w 0x1212) 0 [])
+        (differential_world empty_accounts) = ContractReturned [] w
 Proof
-  CONV_TAC (LAND_CONV cv_eval) >> REFL_TAC
+  CONV_TAC (QUANT_CONV (LAND_CONV cv_eval)) >> simp[]
 QED
 
 (* A fallback taking the calldata as bytes and returning bytes

@@ -1174,11 +1174,38 @@ Proof
   CONV_TAC cv_eval
 QED
 
-(* A halt returns its bytes from a call frame and fails closed in a creation
- * frame. *)
-Theorem asm_halt_in_creation_invalid:
+(* A creation frame's halt: its bytes, or how it failed. *)
+Definition creation_halt_def:
+  creation_halt code =
+    case run_entry 20 (asm_env code) (asm_proc code) [ScalarValue (IntegerValue 7)]
+           initial_state.frame initial_state.world (SOME FEMPTY) 0 NONE
+           CreationEntry of
+      ContractReturned data _ => INL data
+    | ContractAborted w => if w = initial_state.world then INR "aborted"
+                           else INR "aborted with changes"
+    | ContractInvalid reason => INR reason
+    | _ => INR "other outcome"
+End
+
+val () = cv_auto_trans creation_halt_def;
+
+(* A halt returns its bytes from a call frame; in a creation frame they are
+ * the deployed code, unless the EVM refuses them, aborting the creation with
+ * the entry world, the storage write before the halt undone: a first byte
+ * 0xEF, or more than max_code_size bytes. *)
+Theorem asm_halt_in_creation_deploys:
   run_halt CallEntry = ContractReturned [] initial_state.world ∧
-  run_halt CreationEntry = ContractInvalid "assembly halt in a creation frame"
+  creation_halt [YulExprStmt (YulBuiltin YStop [])] = INL [] ∧
+  creation_halt [YulExprStmt (YulBuiltin YMStore [ylit 0w; YulName "x"]);
+                 YulExprStmt (YulBuiltin YReturn [ylit 30w; ylit 2w])] =
+    INL [0w; 7w] ∧
+  creation_halt [store_x;
+                 YulExprStmt (YulBuiltin YMStore [ylit 0w; ylit 0xEFw]);
+                 YulExprStmt (YulBuiltin YReturn [ylit 31w; ylit 1w])] =
+    INR "aborted" ∧
+  creation_halt [YulExprStmt (YulBuiltin YCallDataCopy [ylit 0w; ylit 0w; ylit 0x6001w]);
+                 YulExprStmt (YulBuiltin YReturn [ylit 0w; ylit 0x6001w])] =
+    INR "aborted"
 Proof
   CONV_TAC cv_eval
 QED

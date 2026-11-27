@@ -351,29 +351,6 @@ Proof
   CONV_TAC cv_eval
 QED
 
-(* A block a constructor runs may not halt, since the source installs no
- * runtime code from the returned bytes; elsewhere it may. *)
-Theorem asm_halt_rejected_in_constructor:
-  ∀info.
-    ISL (elab_stmt
-      <| functions := []; static_functions := []; supers := []; structs := []; enums := []; events := [];
-         variables := []; state := []; locations := []; immutables := [];
-         constants := []; returns := []; placeholder := NONE;
-         mode := CheckedArithmetic; creation := F; scope := 0;
-         returns_id := 0; in_loop := F; bad_ids := [] |> 0
-      (SrcInlineAssembly info [YulExprStmt (YulBuiltin YStop [])] [])) ∧
-    elab_stmt
-      <| functions := []; static_functions := []; supers := []; structs := []; enums := []; events := [];
-         variables := []; state := []; locations := []; immutables := [];
-         constants := []; returns := []; placeholder := NONE;
-         mode := CheckedArithmetic; creation := T; scope := 0;
-         returns_id := 0; in_loop := F; bad_ids := [] |> 0
-      (SrcInlineAssembly info [YulExprStmt (YulBuiltin YStop [])] []) =
-    INR [(info.node_id, "assembly halt in a constructor")]
-Proof
-  gen_tac >> EVAL_TAC
-QED
-
 Theorem no_exponent_assignment:
   compound_operator (SOME SrcExp) = NONE ∧
   compound_operator (SOME SrcAdd) = SOME AddOp
@@ -397,7 +374,7 @@ Theorem declaration_body_and_tuple_fraction_rejected:
       ctx = <| functions := []; static_functions := []; supers := []; structs := []; enums := [];
                events := []; variables := []; state := []; locations := [];
                immutables := []; constants := []; returns := [];
-               placeholder := NONE; mode := CheckedArithmetic; creation := F;
+               placeholder := NONE; mode := CheckedArithmetic;
                scope := 0; returns_id := 0; in_loop := F; bad_ids := [] |> in
     ISL (elab_stmt ctx 2 d) ∧
     elab_stmt ctx 2 (SrcIfStatement info c d NONE) = INR [(0, "declaration as a body")] ∧
@@ -420,7 +397,7 @@ Theorem bytes_to_fixed_bytes_admitted:
                variables := [(1, LocatedT MemoryLoc BytesT); (2, FixedBytesT 32)];
                state := []; locations := [];
                immutables := []; constants := []; returns := [];
-               placeholder := NONE; mode := CheckedArithmetic; creation := F;
+               placeholder := NONE; mode := CheckedArithmetic;
                scope := 0; returns_id := 0; in_loop := F; bad_ids := [] |> in
     ISL (elab_expr ctx 3 (to16 (SrcIdentifier info "b" 1 "t_bytes_memory_ptr"))) ∧
     ISL (elab_expr ctx 3 (to16 (SrcIdentifier info "w" 2 "t_bytes32")))
@@ -439,7 +416,7 @@ fun at id = “^info0 with node_id := ^(numSyntax.term_of_int id)”;
 val ctx0 = “<| functions := []; static_functions := []; supers := []; structs := []; enums := [];
                events := []; variables := []; state := []; locations := [];
                immutables := []; constants := []; returns := [];
-               placeholder := NONE; mode := CheckedArithmetic; creation := F;
+               placeholder := NONE; mode := CheckedArithmetic;
                scope := 0; returns_id := 0; in_loop := F; bad_ids := [] |>”;
 fun local_y tn = “<| var_info := ^(at 4); var_name := "y"; var_scope := 0;
                      var_type_name := ^tn; var_type_id := "t_uint256";

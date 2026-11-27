@@ -3,7 +3,7 @@ pragma solidity >=0.8.0;
 
 // The unsupported functions, and those calling them, have no procedure.
 // abi.encodeCall through a computed receiver is unsupported at import.
-// Halting constructor assembly is unsupported at elaboration.
+// Halting constructor assembly deploys the halt's bytes.
 contract Base {
     function twice(uint256 x) public virtual returns (uint256) {
         return x * 2;
@@ -70,7 +70,7 @@ contract Partial is Mid {
     // its getter and the functions reading it are unsupported
     bytes16 public constant DIGITS = bytes16(bytes32("0123456789abcdef")[0]);
 
-    // imports and passes the source check, but does not elaborate
+    // deploys the empty code its halt returns
     constructor() {
         assembly { stop() }
     }
