@@ -1342,6 +1342,23 @@ Definition abi_encode_packed_def:
     | NONE => abrupt_result (InvalidCompletion "bad abi.encodePacked operands") st gas
 End
 
+(* Source selfdestruct has the same account effect as the Yul builtin. *)
+Definition self_destruct_stmt_def:
+  self_destruct_stmt target (st : source_state) gas =
+    if st.frame.static_context then
+      abrupt_result (InvalidCompletion "selfdestruct in static frame") st gas
+    else
+      case eval_atom st.scopes target of
+        SOME (ScalarValue (AddressValue beneficiary)) =>
+          let (accounts, deletions) = self_destruct_accounts
+                st.frame.self_address beneficiary st.world.original st.world.accounts in
+          abrupt_result (HaltCompletion [])
+            (st with world := st.world with
+              <| accounts := accounts;
+                 to_delete := st.world.to_delete ++ deletions |>) gas
+      | _ => abrupt_result (InvalidCompletion "bad selfdestruct beneficiary") st gas
+End
+
 (* Every statement except internal calls, if and while. *)
 Definition simple_stmt_def:
   simple_stmt n env s st gas =
@@ -1489,6 +1506,8 @@ Definition simple_stmt_def:
          | _ => abrupt_result (InvalidCompletion "bad catch data") st gas)
     | DefineStmt x ty (TransferOperation target value) =>
         call_transfer x ty target value st gas
+    | DefineStmt x ty (SelfDestructOperation target) =>
+        self_destruct_stmt target st gas
     | DefineStmt x ty (TryExternalCallOperation kind selector params rets target
                          value g args) =>
         call_external_mode T env x ty kind selector params rets target value g

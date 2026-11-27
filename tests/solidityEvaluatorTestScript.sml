@@ -448,6 +448,48 @@ Proof
   CONV_TAC cv_eval
 QED
 
+(* Source and Yul selfdestruct share the balance transfer and EIP-6780 queue.
+ * Check both an existing account and one created during this transaction. *)
+Definition self_destruct_existing_state_def:
+  self_destruct_existing_state =
+    initial_state with
+      <| frame := initial_state.frame with self_address := 1w;
+         scopes := [FEMPTY |+ (1, <|
+           binding_type := SingleType (AddressT PayableAddress);
+           binding_value := ScalarValue (AddressValue 2w) |> )];
+         world := initial_state.world with <|
+           accounts := update_account 1w (empty_account_state with balance := 7)
+             (update_account 2w empty_account_state empty_accounts);
+           original := update_account 1w (empty_account_state with balance := 7)
+             (update_account 2w empty_account_state empty_accounts) |> |>
+End
+
+Definition self_destruct_created_state_def:
+  self_destruct_created_state =
+    self_destruct_existing_state with
+      world := self_destruct_existing_state.world with original := empty_accounts
+End
+
+val () = cv_auto_trans self_destruct_existing_state_def;
+val () = cv_auto_trans self_destruct_created_state_def;
+
+Theorem self_destruct_moves_balance_and_halts:
+  let existing = self_destruct_stmt (BoundAtom (AstId 1))
+                    self_destruct_existing_state [] in
+  let created = self_destruct_stmt (BoundAtom (AstId 1))
+                    self_destruct_created_state [] in
+  existing.completion = HaltCompletion [] ∧
+  (lookup_account 1w existing.state.world.accounts).balance = 0 ∧
+  (lookup_account 2w existing.state.world.accounts).balance = 7 ∧
+  existing.state.world.to_delete = [] ∧
+  created.completion = HaltCompletion [] ∧
+  (lookup_account 1w created.state.world.accounts).balance = 0 ∧
+  (lookup_account 2w created.state.world.accounts).balance = 7 ∧
+  created.state.world.to_delete = [1w]
+Proof
+  CONV_TAC cv_eval
+QED
+
 (* Inline assembly. asm(x) runs code with x bound to the block's "x" and
  * returns x; asm_caller() calls asm(7); halt() stops from a block. *)
 Overload ylit = “λn. YulLit (LitNumber n)”

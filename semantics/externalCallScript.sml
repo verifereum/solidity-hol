@@ -33,6 +33,18 @@ Ancestors
 Libs
   cv_transLib
 
+(* The account update shared by source and Yul selfdestruct. The beneficiary
+ * receives the executing balance. EIP-6780 queues deletion only when the
+ * executing account was empty in the transaction's original accounts. *)
+Definition self_destruct_accounts_def:
+  self_destruct_accounts self beneficiary original accounts =
+    let self_account = lookup_account self accounts;
+        transferred = transfer_value self beneficiary self_account.balance accounts in
+      if account_empty (lookup_account self original) then
+        (update_account self (self_account with balance := 0) transferred, [self])
+      else (transferred, [])
+End
+
 Datatype:
   call_outcome = <|
     call_success : bool;
@@ -268,3 +280,4 @@ val () = cv_auto_trans create_call_result_def;
 val () = cv_auto_trans run_create_call_def;
 val () = cv_auto_trans delegate_call_state_def;
 val () = cv_auto_trans run_delegate_call_def;
+val () = cv_auto_trans self_destruct_accounts_def;

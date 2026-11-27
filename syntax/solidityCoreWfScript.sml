@@ -1143,6 +1143,9 @@ Definition wf_core_operation_def:
     annotation = ProductType [] ∧
     wf_core_atom env ctx (SingleType (AddressT PayableAddress)) target ∧
     wf_core_atom env ctx (SingleType (UintT 256)) value) ∧
+  (wf_core_operation env ctx annotation (SelfDestructOperation target) ⇔
+    annotation = ProductType [] ∧
+    wf_core_atom env ctx (SingleType (AddressT PayableAddress)) target) ∧
   (wf_core_operation env ctx annotation
      (CreateContractOperation code params value salt args) ⇔
     annotation = SingleType (AddressT NonpayableAddress) ∧
@@ -1222,14 +1225,12 @@ End
 
 (* The builtins an inline assembly block may not use: the object's data
  * builtins, and setimmutable and linkersymbol, which only the compiler's code
- * uses, and selfdestruct, whose halt the constructor and static-frame checks
- * don't cover yet. codesize and codecopy read the running account's code,
+ * uses. codesize and codecopy read the running account's code,
  * which a creation frame doesn't have yet, so eval_assembly refuses them
  * there. Gas, calls and return data are limited by assembly_gas_ok instead. *)
 Definition assembly_unsupported_def:
   assembly_unsupported =
-    [YDataCopy; YDataSize; YDataOffset; YSetImmutable; YLinkerSymbol;
-     YSelfDestruct]
+    [YDataCopy; YDataSize; YDataOffset; YSetImmutable; YLinkerSymbol]
 End
 
 (* The builtins that change the world, which a static frame forbids. A call
@@ -1239,7 +1240,7 @@ End
 Definition assembly_state_writes_def:
   assembly_state_writes =
     [YSStore; YTStore; YLog0; YLog1; YLog2; YLog3; YLog4; YCall; YDelegateCall;
-     YCreate; YCreate2]
+     YCreate; YCreate2; YSelfDestruct]
 End
 
 (* Whether a block's code calls none of the builtins in bad. *)

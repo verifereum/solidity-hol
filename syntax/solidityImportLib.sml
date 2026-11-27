@@ -169,6 +169,7 @@ val msg_id : IntInf.int = ~15
 val mulmod_id : IntInf.int = ~16
 val require_id : IntInf.int = ~18
 val revert_id : IntInf.int = ~19
+val selfdestruct_id : IntInf.int = ~21
 val tx_id : IntInf.int = ~26
 val this_id : IntInf.int = ~28
 
@@ -1238,6 +1239,15 @@ fun expr v = guarded (fn e => [ExprChild e]) unsupported_expr (fn v => within v 
                   listSyntax.mk_list (args, expr_ty), type_id v])
             else if abi_member then
               (positional (); abi_encode v callee args)
+            else if node_type callee = "Identifier" andalso
+               int_field callee "referencedDeclaration" = selfdestruct_id then
+              (positional ();
+               require v (length args = 1) "selfdestruct takes one argument";
+               con "SrcBuiltinCall"
+                 [info v, info callee,
+                  prim_mk_const {Thy = "solidityImport", Name = "SelfDestructBuiltin"},
+                  optionSyntax.mk_some (hd args),
+                  optionSyntax.mk_none expr_ty, type_id v])
             else if node_type callee = "Identifier" andalso
                int_field callee "referencedDeclaration" = ~7 then
               (positional ();

@@ -1396,6 +1396,24 @@ Definition finish_transfer_def:
     | _ => INR [(id, "transfer operands")]
 End
 
+(* Finish the source selfdestruct after its beneficiary has been elaborated.
+ * The recursive expression call stays in elab_expr; this helper only checks
+ * and lowers its result. *)
+Definition finish_selfdestruct_def:
+  finish_selfdestruct (id : num) (beneficiary_id : num) tid r =
+    if tid ≠ "t_tuple$__$" then INR [(id, "unsupported selfdestruct call")] else
+    case r of
+      INL ((ss, a, vt), n) =>
+        (case coerce n (AddressT PayableAddress) a vt of
+           INL ((cs, a'), n1) =>
+             INL ((ss ++ cs ++
+                    [DefineStmt (AstId n1) (ProductType [])
+                       (SelfDestructOperation a')],
+                   ConstantAtom (BoolValue F), ElabTuple []), n1 + 1)
+         | INR why => INR [(beneficiary_id, why)])
+    | INR bs => INR bs
+End
+
 (* NONE requests the storage-location fallback. *)
 Definition finish_array_length_def:
   finish_array_length (id : num) tid r =
@@ -2096,7 +2114,18 @@ Definition elab_expr_def:
              bind_call callee rets (elab_args ctx n info.node_id 0 order (values_of params) args)
          | INR b => reject b (operand_values (elab_arg_values ctx n args)))
     | SrcBuiltinCall info _ builtin condition message tid =>
-        if ¬(builtin_shape builtin condition message ∧ tid = "t_tuple$__$") then
+        if builtin = SelfDestructBuiltin then
+          if tid ≠ "t_tuple$__$" then
+            INR [(info.node_id, "unsupported selfdestruct call")]
+          else
+            (case condition of
+               SOME beneficiary =>
+                 if IS_NONE message then
+                   finish_selfdestruct info.node_id (expr_id beneficiary) tid
+                     (elab_expr ctx n beneficiary)
+                 else INR [(info.node_id, "unsupported selfdestruct call")]
+             | NONE => INR [(info.node_id, "unsupported selfdestruct call")])
+        else if ¬(builtin_shape builtin condition message ∧ tid = "t_tuple$__$") then
           INR ((info.node_id, "unsupported builtin call") ::
                (case condition of NONE => [] | SOME c => blockers (elab_expr ctx n c)) ++
                (case message of NONE => [] | SOME m => blockers (elab_expr ctx n m)))
@@ -4396,6 +4425,7 @@ QED
 
 val () = cv_auto_trans builtin_failure_def;
 val () = cv_auto_trans builtin_result_def;
+val () = cv_auto_trans finish_selfdestruct_def;
 
 val () = cv_auto_trans values_of_def;
 val () = cv_auto_trans encoded_as_def;
