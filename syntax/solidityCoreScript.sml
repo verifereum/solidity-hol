@@ -213,6 +213,10 @@ Datatype:
   (* target.transfer(value): exact stipend, failure bytes forwarded, no
    * return-data allocation. *)
   | TransferOperation core_atom core_atom
+  (* selfdestruct(beneficiary): transfers the executing account's balance,
+   * queues EIP-6780 deletion when it was created in this transaction, and
+   * halts the frame. *)
+  | SelfDestructOperation core_atom
   (* success flag, scalar returns, RevertDataType; only a failed EVM call
    * is caught. Operand and return-decoding failures still propagate. *)
   | TryExternalCallOperation external_kind (byte list) (sol_type list)

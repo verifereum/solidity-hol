@@ -131,7 +131,7 @@ End
  * the blockers under and beside it.
  *)
 Datatype:
-  src_builtin = RequireBuiltin | AssertBuiltin | RevertBuiltin
+  src_builtin = RequireBuiltin | AssertBuiltin | RevertBuiltin | SelfDestructBuiltin
 End
 
 (* An external signature comes from a function's parameters and returns,
@@ -1322,7 +1322,9 @@ Definition builtin_shape_def:
   (builtin_shape RequireBuiltin condition message ⇔
     IS_SOME condition) ∧
   (builtin_shape RevertBuiltin condition message ⇔
-    condition = NONE)
+    condition = NONE) ∧
+  (builtin_shape SelfDestructBuiltin condition message ⇔
+    IS_SOME condition ∧ message = NONE)
 End
 
 (* type(T).max and type(T).min of an integer type T. *)

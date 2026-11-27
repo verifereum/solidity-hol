@@ -1,0 +1,52 @@
+{
+  "name": "selfdestruct_source",
+  "source": "testdata/differential/selfdestruct_source.sol",
+  "contract": "SelfDestructSource",
+  "artifact": "testdata/differential/expected/selfdestruct_source.json",
+  "cases": [
+    {
+      "name": "creation_without_selfdestruct_keeps_runtime",
+      "deploy": true,
+      "args": [0],
+      "expect": {"return": []},
+      "logs": [],
+      "final_storage": {"0": 1}
+    },
+    {
+      "name": "creation_source_selfdestruct_halts_without_runtime",
+      "deploy": true,
+      "args": [1],
+      "expect": {"return": []},
+      "logs": [],
+      "final_storage": {}
+    },
+    {
+      "name": "creation_assembly_selfdestruct_halts_without_runtime",
+      "deploy": true,
+      "args": [2],
+      "expect": {"return": []},
+      "logs": [],
+      "final_storage": {}
+    },
+    {
+      "name": "runtime_source_selfdestruct_keeps_existing_account",
+      "function": "sourceDestroy",
+      "args": [],
+      "value": 7,
+      "storage": {"0": 1},
+      "expect": {"return": []},
+      "logs": [],
+      "final_storage": {"0": 2}
+    },
+    {
+      "name": "runtime_assembly_selfdestruct_keeps_existing_account",
+      "function": "assemblyDestroy",
+      "args": [],
+      "value": 7,
+      "storage": {"0": 1},
+      "expect": {"return": []},
+      "logs": [],
+      "final_storage": {"0": 3}
+    }
+  ]
+}

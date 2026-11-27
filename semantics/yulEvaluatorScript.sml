@@ -428,14 +428,10 @@ End
  *)
 Definition yul_self_destruct_def:
   yul_self_destruct (m : yul_machine) (beneficiary : address) =
-    let self = lookup_account m.self_address m.accounts;
-        accounts = transfer_value m.self_address beneficiary self.balance
-                     m.accounts in
-      if account_empty (lookup_account m.self_address m.original) then
-        m with <| accounts := update_account m.self_address
-                                (self with balance := 0) accounts;
-                  to_delete := m.to_delete ++ [m.self_address] |>
-      else m with accounts := accounts
+    let (accounts, deletions) =
+          self_destruct_accounts m.self_address beneficiary m.original m.accounts in
+      m with <| accounts := accounts;
+                to_delete := m.to_delete ++ deletions |>
 End
 
 (* returndatacopy: the bytes it reads come from return_data, not from memory,
