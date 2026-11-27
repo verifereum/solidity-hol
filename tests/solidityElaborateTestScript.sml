@@ -675,6 +675,19 @@ Proof
   EVAL_TAC
 QED
 
+val uses_missing_struct =
+  “"t_function_external_view$_t_struct$_S_$40_memory_ptr_$returns$__$"”;
+
+Theorem external_function_value_signature_checked:
+  IS_SOME (function_type_identifier ^uses_missing_struct) ∧
+  elab_expr ^ctx0 10
+    (SrcExternalFunction ^(at 30) (SrcEnvironment ^(at 31) SelfAddress "t_address")
+       [1w; 2w; 3w; 4w] ^uses_missing_struct) =
+  INR [(30, "unsupported external function signature")]
+Proof
+  EVAL_TAC
+QED
+
 Theorem binary_operands_all_report:
   ^(reports “elab_expr ^ctx0 10
                (SrcBinaryOperation ^(at 30) SrcAdd ^(string_at 32) ^(string_at 33)

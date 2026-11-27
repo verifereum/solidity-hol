@@ -2523,12 +2523,15 @@ Definition elab_expr_def:
         (case (elab_expr ctx n target, function_type_identifier tid) of
            (INL ((ss, a, ElabType (AddressT NonpayableAddress)), n1),
             SOME (FunctionT ExternalFn m ps rs)) =>
-             if LENGTH selector = 4 then
-               let ty = FunctionT ExternalFn m ps rs in
+             let ty = FunctionT ExternalFn m ps rs in
+             if LENGTH selector ≠ 4 then
+               INR [(info.node_id, "invalid external function selector")]
+             else if ¬memory_binding_ok ctx.enums ctx.structs ty then
+               INR [(info.node_id, "unsupported external function signature")]
+             else
                let (fs, f) = bind_value n1 ty
                  (ExternalFunctionOperation a (ConstantAtom (BytesValue selector))) in
                INL ((ss ++ fs, f, ElabType ty), n1 + 1)
-             else INR [(info.node_id, "invalid external function selector")]
          | (INR bs, _) => INR bs
          | _ => INR [(info.node_id, "unsupported external function value")])
     | SrcFunctionMember info member e tid =>
