@@ -471,7 +471,7 @@ End
  * slots, rounded up modulo 2^256; the last kept slot keeps only its bytes
  * below the new end, then the old slots past it are cleared. Other elements
  * count slots as a checked product of the length (Panic 0x11 past 2^256),
- * and are cleared one by one. Clearing 2^64 slots or elements or more cannot
+ * and are cleared one by one. Clearing 2^64 slots or more cannot
  * finish within any gas limit. *)
 Definition clear_storage_value_def:
   (clear_storage_value env (fuel : num) accounts addr slot offset ty =
@@ -558,7 +558,7 @@ Definition clear_storage_value_def:
           NONE => INR (InvalidCompletion "bad array element type")
         | SOME slots =>
             if 2 ** 256 ≤ old * slots then INR (PanicCompletion 17)
-            else if 2 ** 64 ≤ old - new then INR FuelExhausted
+            else if 2 ** 64 ≤ (old - new) * slots then INR FuelExhausted
             else clear_storage_elements env fuel accounts addr data element new (old - new))
 Termination
   WF_REL_TAC ‘inv_image ($< LEX $< LEX $<) (λx. case x of
@@ -572,7 +572,7 @@ Termination
   rw[solidityASTTheory.sol_type_size_def, listTheory.list_size_def]
 End
 
-Theorem clear_storage_fuel_stable:
+Theorem clear_shrink_storage_fuel_stable[local]:
   (∀env fuel accounts addr slot offset ty m.
      clear_storage_value env fuel accounts addr slot offset ty ≠ INR FuelExhausted ∧
      fuel ≤ m ⇒
@@ -638,6 +638,36 @@ Proof
   BasicProvers.EVERY_CASE_TAC >> gvs[] >>
   rpt strip_tac >> spose_not_then strip_assume_tac >>
   rpt (first_x_assum (qspec_then ‘m’ mp_tac)) >> gvs[]
+QED
+
+Theorem clear_storage_fuel_stable:
+  (∀env fuel accounts addr slot offset ty m.
+     clear_storage_value env fuel accounts addr slot offset ty ≠ INR FuelExhausted ∧
+     fuel ≤ m ⇒
+     clear_storage_value env m accounts addr slot offset ty =
+       clear_storage_value env fuel accounts addr slot offset ty) ∧
+  (∀env fuel accounts addr data element i n m.
+     clear_storage_elements env fuel accounts addr data element i n ≠ INR FuelExhausted ∧
+     fuel ≤ m ⇒
+     clear_storage_elements env m accounts addr data element i n =
+       clear_storage_elements env fuel accounts addr data element i n) ∧
+  (∀env fuel accounts addr slot layout fields m.
+     clear_storage_fields env fuel accounts addr slot layout fields ≠ INR FuelExhausted ∧
+     fuel ≤ m ⇒
+     clear_storage_fields env m accounts addr slot layout fields =
+       clear_storage_fields env fuel accounts addr slot layout fields)
+Proof
+  ACCEPT_TAC (LIST_CONJ (List.take (CONJUNCTS clear_shrink_storage_fuel_stable, 3)))
+QED
+
+Theorem shrink_storage_array_fuel_stable:
+  ∀env fuel accounts addr data element old new m.
+     shrink_storage_array env fuel accounts addr data element old new ≠ INR FuelExhausted ∧
+     fuel ≤ m ⇒
+     shrink_storage_array env m accounts addr data element old new =
+       shrink_storage_array env fuel accounts addr data element old new
+Proof
+  ACCEPT_TAC (last (CONJUNCTS clear_shrink_storage_fuel_stable))
 QED
 
 (* Reading a whole storage value, as a copy to memory and the encoder do: a

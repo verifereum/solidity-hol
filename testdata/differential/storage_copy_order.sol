@@ -15,6 +15,12 @@ contract StorageCopyOrder {
         uint256[3] tail;
     }
 
+    struct Packs {
+        uint8[40] head;
+        uint8[64] tail;
+        uint256 pad;
+    }
+
     uint256[3][] words;
     uint128[6][] packed;
     bytes[] blobs;
@@ -23,6 +29,7 @@ contract StorageCopyOrder {
     uint16[] wide;
     Split[] splits;
     uint8[][] rows;
+    Packs[] packs;
 
     function copyWords(uint256 k) external returns (uint256[3] memory) {
         words[0] = words[k];
@@ -39,6 +46,13 @@ contract StorageCopyOrder {
     function copySplit(uint256 k) external returns (uint256[3] memory) {
         splits[0].tail = splits[k].head;
         return splits[0].tail;
+    }
+
+    // The destination's last kept slot keeps only its first 8 bytes before
+    // the source, which may sit on it, is read.
+    function copyPacks(uint256 k) external returns (uint8[64] memory) {
+        packs[0].tail = packs[k].head;
+        return packs[0].tail;
     }
 
     function assignBlobs(bytes[] calldata d) external returns (uint256) {
