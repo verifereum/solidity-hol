@@ -23,12 +23,14 @@ contract MinorBuiltins {
     }
 
     function digest(bytes calldata data)
-        external pure returns (bytes20 hash, bytes32 scratch, uint256 returnSize)
+        external pure returns (bytes20 hash, bytes32 scratch, uint256 returnSize, bytes32 returnWord)
     {
         hash = ripemd160(data);
         assembly {
             scratch := mload(0)
             returnSize := returndatasize()
+            returndatacopy(32, 0, 32)
+            returnWord := mload(32)
         }
     }
 

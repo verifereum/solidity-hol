@@ -475,9 +475,14 @@ its effects and failures; the selector still comes from the declaration.
 the interface `I` declares itself, not those it inherits, nor its `fallback`
 or `receive`; `I` must name an interface directly, not through a module, and
 an abstract contract's `interfaceId` is rejected. A selector of any other
-function-typed value is rejected, and so is `ripemd160`. `sha256(b)` hashes
-bytes in memory, as the precompile at address 2 does, and `blockhash(n)` is
-the hash of one of the 256 blocks before the current one, or 0.
+function-typed value is rejected. `sha256(b)` and `ripemd160(b)` hash bytes
+as the precompiles at addresses 2 and 3 do. The RIPEMD-160 call returns a
+`bytes20` digest and leaves the padded return word in scratch memory and in
+returndata. `blockhash(n)` is the hash of one of the 256 blocks before the
+current one, or 0. `blobhash(i)` reads the transaction's versioned blob hash
+at index `i`, or 0 if the index is out of range. `block.blobbasefee` reads
+the blob base fee. `erc7201(s)` computes the ERC-7201 namespace slot as a
+`uint256`. The compiler folds a literal argument without touching memory.
 
 `c ? a : b` evaluates `c`, then only the operand it chooses, converted to the
 type the compiler gives the whole expression, which must be a value type,
