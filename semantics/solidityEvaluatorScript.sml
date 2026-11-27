@@ -1269,13 +1269,13 @@ Definition signature_selector_def:
     case (case r of
             MemoryReference _ _ => INL (ReferenceValue r, st1)
           | _ => copy_to_memory env (ReferenceValue r) st1) of
-      INR (c, st2) => INR (c, st2)
+      INR (c, st2) => INR (c, if abi_read_failure c then st2 else st)
     | INL (ReferenceValue (MemoryReference q _), st2) =>
         let (bs, st3) = memory_bytes q st2 in
         (case finalize_allocation p 0 st3 of
            INL st4 => INL (TAKE 4 (Keccak_256_w64 bs), st4)
-         | INR c => INR (c, st3))
-    | INL (_, st2) => INR (InvalidCompletion "bad signature", st2)
+         | INR c => INR (c, if abi_read_failure c then st3 else st))
+    | INL _ => INR (InvalidCompletion "bad signature", st)
 End
 
 (* The bytes an encoding starts with: none, a bytes4 selector, or the
@@ -1318,7 +1318,7 @@ Definition abi_encode_def:
       NONE => abrupt_result (InvalidCompletion "bad abi.encode operands") st gas
     | SOME vs =>
       case encoding_selector env selector st of
-        INR (c, st0) => abrupt_result c st0 gas
+        INR (c, st0) => abrupt_result c (if abi_read_failure c then st0 else st) gas
       | INL (prefix, st0) =>
         case encoded_runtime_values env st0 tys vs of
           (INL (bs, spill), st1) => allocate_encoding x ty prefix bs spill st1 gas
