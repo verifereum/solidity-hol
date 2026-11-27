@@ -1193,7 +1193,10 @@ Definition packed_value_def:
                (case inplace_partial_writes (encoding_source v)
                        (abi_type env (LENGTH env.type_declarations) ty) q of
                   SOME ws => (INR (c, ws), reach1, st1)
-                | NONE => (INR (InvalidCompletion "bad packed array", []), reach1, st1)))
+                | NONE =>
+                    (INR (InvalidCompletion
+                            "unsupported: a partial in-place encoding of a packed array",
+                          []), reach1, st1)))
     | LocatedT _ _ =>
         (case v of
            ReferenceValue r =>

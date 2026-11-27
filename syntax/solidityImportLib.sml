@@ -1064,7 +1064,7 @@ fun expr v = guarded (fn e => [ExprChild e]) unsupported_expr (fn v => within v 
               | member =>
                   let val receiver = expr (field v "expression") in
                     require v (member = "push" orelse member = "pop")
-                      "unsupported built-in member";
+                      ("unsupported built-in member " ^ member);
                     con "SrcArrayMember" [info v, mk_str member, receiver, type_id v]
                   end
             end
@@ -1298,8 +1298,8 @@ fun expr v = guarded (fn e => [ExprChild e]) unsupported_expr (fn v => within v 
                 val builtin = if id = require_id then "RequireBuiltin"
                               else if id = assert_id then "AssertBuiltin"
                               else if id = revert_id then "RevertBuiltin"
-                              else fail (describe callee ^ ": unsupported built-in declaration " ^
-                                         IntInf.toString id)
+                              else fail (describe callee ^ ": built-in " ^
+                                         string_field callee "name" ^ " is not supported")
                 val (condition, message) =
                   case (builtin, args) of
                     ("AssertBuiltin", [c]) => (SOME c, NONE)
@@ -1618,6 +1618,8 @@ and external_call v callee args =
     val () = require member direct
                (if has_external_function_type member andalso bool_field v "tryCall"
                 then "try/catch through an external function value"
+                else if is_external_library_call member
+                then "try on a library call is not supported"
                 else "unsupported call options")
   in
     con "SrcExternalCall"

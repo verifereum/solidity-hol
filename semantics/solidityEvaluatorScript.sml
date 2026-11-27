@@ -735,6 +735,16 @@ Definition write_target_value_def:
     | _ => NONE
 End
 
+(* A target in persistent or transient storage, in a static frame: a write
+ * there fails, and this names why. *)
+Definition static_storage_target_def:
+  static_storage_target (st : source_state) t ⇔
+    st.frame.static_context ∧
+    case FLOOKUP st.targets (ast_key t) of
+      SOME (ValueTarget (StorageReference _ _ _ _ _ _)) => T
+    | _ => F
+End
+
 Definition write_target_def:
   write_target env t a st =
     case eval_atom st.scopes a of
@@ -775,7 +785,10 @@ Definition reset_target_def:
         | INL (v, st') =>
             case write_target_value env t v st' of
               SOME st'' => normal_result st'' gas
-            | NONE => abrupt_result (InvalidCompletion "bad reset target") st gas
+            | NONE =>
+                abrupt_result (InvalidCompletion
+                  (if static_storage_target st t then "transient reset in static frame"
+                   else "bad reset target")) st gas
 End
 
 (* The pinned profile checks push against 2^64, independently of source
@@ -1604,7 +1617,10 @@ Definition simple_stmt_def:
     | WriteScalarStmt t ty a =>
         (case write_target env t a st of
            SOME st' => normal_result st' gas
-         | NONE => abrupt_result (InvalidCompletion "bad scalar write") st gas)
+         | NONE =>
+             abrupt_result (InvalidCompletion
+               (if static_storage_target st t then "storage write in static frame"
+                else "bad scalar write")) st gas)
     | ReturnStmt atoms =>
         (case eval_atoms st.scopes atoms of
            SOME vs => abrupt_result (ReturnCompletion vs) st gas
@@ -2028,7 +2044,11 @@ Definition eval_assembly_def:
               then assembly_unsupported ++ assembly_state_writes ++ code_bad
               else assembly_unsupported ++ code_bad in
     if ¬assembly_stmts_ok bad code then
-      abrupt_result (InvalidCompletion "unsupported assembly builtin") st gas
+      abrupt_result (InvalidCompletion
+        (if st.frame.static_context ∧
+            assembly_stmts_ok (assembly_unsupported ++ code_bad) code
+         then "assembly state write in static frame"
+         else "unsupported assembly builtin")) st gas
     else if st.return_data = NONE ∧ ¬assembly_calls_ok code then
       abrupt_result (InvalidCompletion "assembly reads return data the source does not know") st gas
     else
@@ -2197,6 +2217,7 @@ val () = cv_auto_trans abi_encode_def;
 val () = cv_auto_trans abi_encode_packed_def;
 val () = cv_auto_trans write_target_value_def;
 val () = cv_auto_trans write_target_def;
+val () = cv_auto_trans static_storage_target_def;
 val () = cv_auto_trans reset_target_def;
 val () = cv_auto_trans simple_stmt_def;
 val () = cv_auto_trans assembly_value_def;
