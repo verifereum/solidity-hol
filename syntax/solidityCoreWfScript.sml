@@ -1783,14 +1783,9 @@ Definition wf_core_dispatch_def:
     (case prog.creation_procedure of
        SOME (f, _) =>
          MEM f prog.unsupported_procedures ∨
-         (abi_procedure env f ∧
-          case lookup_procedure env f of
+         (case lookup_procedure env f of
             SOME p => p.return_bindings = [] ∧
-              EVERY (λ(_, ty). is_elementary_type ty ∨
-                       case ty of
-                         LocatedT MemoryLoc _ => T
-                       | EnumT _ => T
-                       | _ => F) p.parameters
+              EVERY (decoded_type_ok env o SND) p.parameters
           | NONE => F)
      | NONE => T)
 End

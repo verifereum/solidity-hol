@@ -427,8 +427,8 @@ memory literal of the contract's name. `type(C).creationCode` and
 `type(C).runtimeCode` are new memory `bytes` holding C's creation and runtime
 bytecode from the compiler's output, copied as solc's `datacopy` does: the
 code's bytes only, the rest of the last word left as memory held it.
-`type(I).interfaceId` is below. External calls to getters and the
-members of external functions other than `selector` (below) are rejected.
+`type(I).interfaceId` is below. External calls admit public getters and
+function values with the same argument and return codec.
 Nominal parameter type identifiers keep overloads distinct for `super`
 lookup even when their runtime representations agree.
 
@@ -503,10 +503,20 @@ expression first and copies its value, then the arguments in order; the zero
 value and any other unassigned word panic with 0x51 after the arguments.
 Internal function values can be parameters, returns, state variables, struct
 fields, array elements and mapping values. They support `delete`, `==` and
-`!=`. Import rejects source external function types. Mapping keys and ABI
-encodings exclude internal function types. Calldata objects require an ABI
-representation for every field and array element, including when a local
-calldata reference is set in assembly.
+`!=`. Mapping keys exclude function types. ABI encodings exclude internal
+function types. Calldata objects require an ABI representation for every
+field and array element, including when a local calldata reference is set
+in assembly.
+
+External function values store an address followed by a four-byte selector.
+`c.f` and `this.f` construct values. The `.address` and `.selector` members
+read their components, and inline assembly can also assign either component
+on a local function value. Non-canonical assembly writes fail closed.
+Indirect calls capture both components before evaluating the options and
+arguments, using the same external call as a direct member call. The
+function type controls payability and whether the call is static. The ABI
+encodes the value as `bytes24`, including when a getter returns it or an
+event indexes it. `try` requires a named external member or creation.
 
 `abi.encode`, `abi.encodePacked`, `abi.encodeWithSelector` and
 `abi.encodeWithSignature` give a new memory `bytes`, allocated as the

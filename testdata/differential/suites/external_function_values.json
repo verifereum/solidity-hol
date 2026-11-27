@@ -10,6 +10,17 @@
   },
   "cases": [
     {
+      "name": "constructor_decodes_and_stores_function",
+      "deploy": true,
+      "calldata": "0x112233445566778899aabbccddeeff0011223344ed1bd76c0000000000000000",
+      "expect": {
+        "return": []
+      },
+      "final_storage": {
+        "0": "107549317471974251121239815853421600343337679054431434796032"
+      }
+    },
+    {
       "name": "store_and_call_with_packed_neighbors",
       "function": "storeAndCall",
       "args": [

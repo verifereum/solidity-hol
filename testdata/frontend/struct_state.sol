@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: CC0-1.0
 pragma solidity 0.8.37;
 
-// A state variable of a struct the core cannot hold (a function-typed
-// member) rejects the unit.
+// A stored struct can contain a function value beside another scalar.
 library Keys {
     struct Named {
         function () external f;

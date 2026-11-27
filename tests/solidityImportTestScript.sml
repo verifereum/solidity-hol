@@ -441,17 +441,24 @@ val () =
       [": unsupported expression UnknownTarget", "Error catch requires one string memory parameter"]
   end
 
-(* A state variable of a struct left out (a function-typed member)
- * rejects the unit at import, rather than reaching the core unchecked. *)
+(* A struct can hold an external function. If a member type cannot be
+ * imported, its state variable still rejects the unit. *)
 val () =
-  case (ignore (import_artifact "../testdata/frontend/expected/struct_state.json"
-                  "testdata/frontend/struct_state.sol"); NONE)
-       handle ImportError msg => SOME msg of
-    SOME msg =>
-      if String.isSubstring "state variable of a struct the core cannot hold" msg
-      then ()
+  let
+    val fixture = "../testdata/frontend/expected/struct_state.json"
+    val source = "testdata/frontend/struct_state.sol"
+    val _ = import_artifact fixture source
+    val unit = artifact_part fixture ["sources", source, "ast"]
+    val artifact_contracts = artifact_part fixture ["contracts", source]
+    val unsupported = edit_first "FunctionTypeName"
+      (set_field "nodeType" (JSON.STRING "UnknownType")) unit
+  in
+    (ignore (import_source_unit [] unsupported artifact_contracts);
+     raise Fail "state variable of a left-out struct: imported")
+    handle ImportError msg =>
+      if String.isSubstring "state variable of a struct the core cannot hold" msg then ()
       else raise Fail ("state variable of a left-out struct: " ^ msg)
-  | NONE => raise Fail "state variable of a left-out struct: imported"
+  end
 
 (* An unsupported call option does not hide the blockers of the receiver. *)
 val () =

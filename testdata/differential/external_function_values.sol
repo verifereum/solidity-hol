@@ -23,6 +23,10 @@ contract ExternalFunctionValues {
         function(uint256) external view returns (uint256) operation
     );
 
+    constructor(function(uint256) external view returns (uint256) initial) {
+        current = initial;
+    }
+
     function quote(uint256 x) external pure returns (uint256) {
         return x + 1;
     }
