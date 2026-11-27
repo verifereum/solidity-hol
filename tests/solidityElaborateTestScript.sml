@@ -693,7 +693,7 @@ val two_parameters = function_of “[^supported_y; ^supported_y]” “[] : src_
 
 Theorem internal_call_operands_all_report:
   ^(reports “elab_expr (^ctx0 with functions := [(1, ^two_parameters)]) 10
-               (SrcFunctionCall ^(at 30) (SrcIdentifier ^(at 31) "f" 1 "t_function")
+               (SrcFunctionCall ^(at 30) F (SrcIdentifier ^(at 31) "f" 1 "t_function")
                   [^(string_at 32); ^(string_at 33)] [] "t_tuple$__$")”
      string_32_33)
 Proof
@@ -855,7 +855,7 @@ QED
 
 Theorem internal_call_mixed_operands_report:
   ^(reports “elab_expr (^ctx0 with functions := [(1, ^two_parameters)]) 10
-               (SrcFunctionCall ^(at 30) (SrcIdentifier ^(at 31) "f" 1 "t_function")
+               (SrcFunctionCall ^(at 30) F (SrcIdentifier ^(at 31) "f" 1 "t_function")
                   [^(string_at 32); ^(bad_at 33)] [] "t_tuple$__$")”
      mixed_string)
 Proof
@@ -877,7 +877,7 @@ QED
  * still report their arguments. *)
 val array_ctx = “^ctx0 with state := [(5, ArrayT (UintT 256) NONE)]”;
 fun array_call member args order =
-  “SrcFunctionCall ^(at 30)
+  “SrcFunctionCall ^(at 30) F
      (SrcArrayMember ^(at 31) ^member
         (SrcIdentifier ^(at 35) "a" 5 "t_array$_t_uint256_$dyn_storage") "t_function")
      ^args ^order "t_tuple$__$"”;

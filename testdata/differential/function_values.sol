@@ -24,10 +24,18 @@ contract FunctionValues {
     mapping(uint256 => function(uint256) internal pure returns (uint256)) private byKey;
     function(uint256) internal pure returns (uint256) private transient temporary;
 
-    constructor() {
+    constructor(uint256 creationId) {
         low = 7;
         current = increment;
         high = 9;
+        (creationOnly)(0);
+        function(uint256) internal pure returns (uint256) operation;
+        assembly { operation := creationId }
+        require(operation(5) == 8);
+    }
+
+    function creationOnly(uint256 value) internal pure returns (uint256) {
+        return value + 3;
     }
 
     function increment(uint256 value) internal pure returns (uint256) {
@@ -100,6 +108,16 @@ contract FunctionValues {
             if invalidate { second := or(shl(255, 1), first) }
         }
         return second(value);
+    }
+
+    function dirtyWord(uint256 value) external returns (uint256 raw, uint8, uint256, uint8) {
+        function(uint256) internal pure returns (uint256) operation = increment;
+        assembly { operation := or(shl(255, 1), operation) }
+        Entry memory local = Entry(0, operation);
+        operation = local.operation;
+        assembly { raw := operation }
+        current = operation;
+        return (raw, low, current(value), high);
     }
 
     function attached(uint256 value) external pure returns (uint256) {

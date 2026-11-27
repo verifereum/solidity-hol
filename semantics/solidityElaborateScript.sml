@@ -158,9 +158,9 @@ Definition expr_id_def:
   (expr_id (SrcIndexRangeAccess info _ _ _ _) = info.node_id) ∧
   (expr_id (SrcTupleExpression info _ _) = info.node_id) ∧
   (expr_id (SrcInlineArray info _ _) = info.node_id) ∧
-  (expr_id (SrcFunctionCall info _ _ _ _) = info.node_id) ∧
-  (expr_id (SrcSuperCall info _ _ _ _) = info.node_id) ∧
-  (expr_id (SrcBaseCall info _ _ _ _) = info.node_id) ∧
+  (expr_id (SrcFunctionCall info _ _ _ _ _) = info.node_id) ∧
+  (expr_id (SrcSuperCall info _ _ _ _ _) = info.node_id) ∧
+  (expr_id (SrcBaseCall info _ _ _ _ _) = info.node_id) ∧
   (expr_id (SrcBuiltinCall info _ _ _ _ _) = info.node_id) ∧
   (expr_id (SrcRequireError info _ _ _ _ _ _) = info.node_id) ∧
   (expr_id (SrcTypeConversion info _ _ _) = info.node_id) ∧
@@ -526,7 +526,7 @@ Definition expr_assigns_def:
     expr_assigns l ∨ expr_assigns r) ∧
   (expr_assigns (SrcTupleExpression _ cs _) ⇔ components_assign cs) ∧
   (expr_assigns (SrcInlineArray _ es _) ⇔ exprs_assign es) ∧
-  (expr_assigns (SrcFunctionCall _ callee args _ _) ⇔
+  (expr_assigns (SrcFunctionCall _ _ callee args _ _) ⇔
     expr_assigns callee ∨ exprs_assign args) ∧
   (expr_assigns (SrcArrayMember _ _ root_expr _) ⇔ expr_assigns root_expr) ∧
   (expr_assigns (SrcBuiltinCall _ _ _ condition message _) ⇔
@@ -556,8 +556,8 @@ Definition expr_assigns_def:
   (expr_assigns (SrcAbiDecode _ _ e _ _) ⇔ expr_assigns e) ∧
   (expr_assigns (SrcTransfer _ _ target value _) ⇔ expr_assigns target ∨ expr_assigns value) ∧
   (expr_assigns (SrcLowLevelCall _ _ _ _ operands _) ⇔ exprs_assign operands) ∧
-  (expr_assigns (SrcSuperCall _ _ args _ _) ⇔ exprs_assign args) ∧
-  (expr_assigns (SrcBaseCall _ _ args _ _) ⇔ exprs_assign args) ∧
+  (expr_assigns (SrcSuperCall _ _ _ args _ _) ⇔ exprs_assign args) ∧
+  (expr_assigns (SrcBaseCall _ _ _ args _ _) ⇔ exprs_assign args) ∧
   (expr_assigns _ ⇔ F) ∧
   (components_assign [] ⇔ F) ∧
   (components_assign (NONE :: cs) ⇔ components_assign cs) ∧
@@ -1402,15 +1402,15 @@ End
 Definition call_target_def:
   call_target ctx e =
     case e of
-      SrcFunctionCall info (SrcIdentifier finfo _ f _) args order tid =>
+      SrcFunctionCall info _ (SrcIdentifier finfo _ f _) args order tid =>
         (case ALOOKUP ctx.functions f of
            SOME callee => checked_callee info.node_id callee args order tid
          | NONE => INR (finfo.node_id, "call of an unsupported function"))
-    | SrcSuperCall info r args order tid =>
+    | SrcSuperCall info _ r args order tid =>
         (case ALOOKUP ctx.supers r of
            SOME callee => checked_callee info.node_id callee args order tid
          | NONE => INR (info.node_id, "unresolved super call"))
-    | SrcBaseCall info r args order tid =>
+    | SrcBaseCall info _ r args order tid =>
         (case ALOOKUP ctx.static_functions r of
            SOME callee => checked_callee info.node_id callee args order tid
          | NONE => INR (info.node_id, "static call of an unsupported function"))
@@ -1423,19 +1423,29 @@ End
 Definition early_call_arguments_def:
   early_call_arguments e =
     case e of
-      SrcFunctionCall _ (SrcIdentifier _ _ _ tid) _ _ _ =>
+      SrcFunctionCall _ _ (SrcIdentifier _ _ _ tid) _ _ _ =>
         if IS_SUBLIST tid "_$attached_to$_" then 1n else 0
     | _ => 0
 End
 
-(* The call of callee with the arguments r elaborates to. *)
+(* A parenthesized declaration is named as a value, so its constant
+ * binding also registers it in the dispatch of the code that names it. *)
 Definition bind_call_def:
-  bind_call (callee : src_function) rets r =
+  bind_call through_value (callee : src_function) params rets r =
     case r of
       INL ((sa, atoms), n1) =>
-        INL ((sa ++ [DefineStmt (AstId n1) (call_result_type rets)
-                       (InternalCallOperation (AstId callee.fn_info.node_id) atoms)],
-              BoundAtom (AstId n1), call_value rets), n1 + 1)
+        let f = AstId callee.fn_info.node_id in
+        let (ss, op, n2) =
+          if through_value then
+            let m = if callee.fn_mutability = PayableMut then NonpayableMut
+                    else callee.fn_mutability in
+            let ty = FunctionT InternalFn m params rets in
+            let (gs, g) = bind_value n1 ty
+                            (ConvertOperation ty (ConstantAtom (InternalFunctionValue (INL f)))) in
+              (gs, FunctionValueCallOperation g atoms, n1 + 1)
+          else ([], InternalCallOperation f atoms, n1) in
+        INL ((ss ++ sa ++ [DefineStmt (AstId n2) (call_result_type rets) op],
+              BoundAtom (AstId n2), call_value rets), n2 + 1)
     | INR bs => INR bs
 End
 
@@ -1888,7 +1898,7 @@ Definition elab_expr_def:
          | (_, INR bs) => INR bs
          | _ => INR [(info.node_id, "type annotation mismatch")])
     | SrcArrayMember info _ _ _ => INR [(info.node_id, "array member as a value")]
-    | SrcFunctionCall info callee args order tid =>
+    | SrcFunctionCall info through_value callee args order tid =>
         (* the other callees are not matched as patterns, which would copy
            their code into a clause per callee constructor *)
         if is_array_member callee then
@@ -1948,7 +1958,9 @@ Definition elab_expr_def:
                 SOME _ =>
                   (case call_target ctx expression of
                      INL (callee, params, rets) =>
-                       bind_call callee rets (elab_args ctx n info.node_id (early_call_arguments expression) order (values_of params) args)
+                       bind_call through_value callee params rets
+                         (elab_args ctx n info.node_id (early_call_arguments expression)
+                            order (values_of params) args)
                    | INR b => reject b (operand_values (elab_arg_values ctx n args)))
               | NONE =>
                   (* a call through an internal function value: the callee,
@@ -1976,15 +1988,15 @@ Definition elab_expr_def:
                   | INR _ =>
                       INR (callee_failure info.node_id callee ::
                            blockers (operand_values (elab_arg_values ctx n args))))
-    | SrcSuperCall info r args order tid =>
+    | SrcSuperCall info through_value _ args order _ =>
         (case call_target ctx expression of
            INL (callee, params, rets) =>
-             bind_call callee rets (elab_args ctx n info.node_id 0 order (values_of params) args)
+             bind_call through_value callee params rets (elab_args ctx n info.node_id 0 order (values_of params) args)
          | INR b => reject b (operand_values (elab_arg_values ctx n args)))
-    | SrcBaseCall info _ args order _ =>
+    | SrcBaseCall info through_value _ args order _ =>
         (case call_target ctx expression of
            INL (callee, params, rets) =>
-             bind_call callee rets (elab_args ctx n info.node_id 0 order (values_of params) args)
+             bind_call through_value callee params rets (elab_args ctx n info.node_id 0 order (values_of params) args)
          | INR b => reject b (operand_values (elab_arg_values ctx n args)))
     | SrcBuiltinCall info _ builtin condition message tid =>
         if ¬(builtin_shape builtin condition message ∧ tid = "t_tuple$__$") then
@@ -2593,7 +2605,7 @@ Definition elab_expr_def:
                      INL _ => [(info.node_id, "index access on this type")]
                    | INR bs => bs) ++
                   blockers (elab_expr ctx n index)))
-    | SrcFunctionCall info (SrcArrayMember _ member root_expr _) [] [] tid =>
+    | SrcFunctionCall info _ (SrcArrayMember _ member root_expr _) [] [] tid =>
         (case elab_location ctx n root_expr of
            INL ((ss, ref, rty), n1) =>
              (case pushed_element rty of
@@ -2606,24 +2618,24 @@ Definition elab_expr_def:
                         BoundAtom (AstId n1), element), n1 + 1)
               | NONE => INR [(info.node_id, "unsupported array member call")])
          | INR bs => INR bs)
-    | SrcFunctionCall info (SrcIdentifier _ _ _ _) args order _ =>
+    | SrcFunctionCall info through_value (SrcIdentifier _ _ _ _) args order _ =>
         (case call_target ctx e of
            INL (callee, params, rets) =>
              call_location info.node_id
-               (bind_call callee rets
+               (bind_call through_value callee params rets
                  (elab_args ctx n info.node_id (early_call_arguments e) order (values_of params) args))
          | INR b => reject b (operand_values (elab_arg_values ctx n args)))
-    | SrcSuperCall info _ args order _ =>
+    | SrcSuperCall info through_value _ args order _ =>
         (case call_target ctx e of
            INL (callee, params, rets) =>
              call_location info.node_id
-               (bind_call callee rets (elab_args ctx n info.node_id 0 order (values_of params) args))
+               (bind_call through_value callee params rets (elab_args ctx n info.node_id 0 order (values_of params) args))
          | INR b => reject b (operand_values (elab_arg_values ctx n args)))
-    | SrcBaseCall info _ args order _ =>
+    | SrcBaseCall info through_value _ args order _ =>
         (case call_target ctx e of
            INL (callee, params, rets) =>
              call_location info.node_id
-               (bind_call callee rets (elab_args ctx n info.node_id 0 order (values_of params) args))
+               (bind_call through_value callee params rets (elab_args ctx n info.node_id 0 order (values_of params) args))
          | INR b => reject b (operand_values (elab_arg_values ctx n args)))
     | SrcTupleExpression info [SOME e'] tid =>
         (case elab_location ctx n e' of

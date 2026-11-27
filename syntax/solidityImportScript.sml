@@ -207,9 +207,11 @@ Datatype:
   | SrcTupleExpression node_info (src_expr option list) string
   (* [e0, ..., ek-1], a fixed-size memory array *)
   | SrcInlineArray node_info (src_expr list) string
-  | SrcFunctionCall node_info src_expr (src_expr list) (num list) string
-  | SrcSuperCall node_info num (src_expr list) (num list) string
-  | SrcBaseCall node_info num (src_expr list) (num list) string
+  (* The flag preserves a parenthesized callee's use of the internal
+   * dispatch when the importer resolves the declaration. *)
+  | SrcFunctionCall node_info bool src_expr (src_expr list) (num list) string
+  | SrcSuperCall node_info bool num (src_expr list) (num list) string
+  | SrcBaseCall node_info bool num (src_expr list) (num list) string
   | SrcBuiltinCall node_info node_info src_builtin (src_expr option)
       (src_expr option) string
   | SrcRequireError node_info node_info src_expr src_error (src_expr list)
@@ -1167,10 +1169,10 @@ Definition expr_ids_def:
   (expr_ids (SrcTupleExpression info cs _) =
     info.node_id :: component_ids cs) ∧
   (expr_ids (SrcInlineArray info es _) = info.node_id :: exprs_ids es) ∧
-  (expr_ids (SrcFunctionCall info f args _ _) =
+  (expr_ids (SrcFunctionCall info _ f args _ _) =
     info.node_id :: expr_ids f ++ exprs_ids args) ∧
-  (expr_ids (SrcSuperCall info _ args _ _) = info.node_id :: exprs_ids args) ∧
-  (expr_ids (SrcBaseCall info _ args _ _) = info.node_id :: exprs_ids args) ∧
+  (expr_ids (SrcSuperCall info _ _ args _ _) = info.node_id :: exprs_ids args) ∧
+  (expr_ids (SrcBaseCall info _ _ args _ _) = info.node_id :: exprs_ids args) ∧
   (expr_ids (SrcBuiltinCall info callee _ condition message _) =
     [info.node_id; callee.node_id] ++
     (case condition of NONE => [] | SOME c => expr_ids c) ++

@@ -816,7 +816,7 @@ fun operator_call v args =
        ("node_location", location v)]
   in
     con "SrcFunctionCall"
-      [info v, con "SrcIdentifier"
+      [info v, F, con "SrcIdentifier"
          [callee_info, mk_str (string_field f "name"), mk_num id,
           mk_str (normalize_type_id tid)],
        listSyntax.mk_list (args, expr_ty), listSyntax.mk_nil numSyntax.num, type_id v]
@@ -1129,7 +1129,12 @@ fun expr v = guarded (fn e => [ExprChild e]) unsupported_expr (fn v => within v 
       end
   | "FunctionCall" =>
       let
-        val callee = unparenthesized (field v "expression")
+        val written_callee = field v "expression"
+        val callee = unparenthesized written_callee
+        (* A parenthesized declaration still resolves the target and names
+         * its parameters, but solc invokes it through the dispatch. *)
+        val through_value =
+          if int_field written_callee "id" = int_field callee "id" then F else T
         val abi_member =
           node_type callee = "MemberAccess" andalso
           node_type (field callee "expression") = "Identifier" andalso
@@ -1273,13 +1278,13 @@ fun expr v = guarded (fn e => [ExprChild e]) unsupported_expr (fn v => within v 
                 if List.exists (fn x => x = r) (!super_calls) then ()
                 else super_calls := !super_calls @ [r];
                 con "SrcSuperCall"
-                  [info v, mk_num r, listSyntax.mk_list (args, expr_ty),
+                  [info v, through_value, mk_num r, listSyntax.mk_list (args, expr_ty),
                    argument_order v r 0, type_id v]
               end
             else if is_base_member callee then
               let val r = int_field callee "referencedDeclaration" in
                 con "SrcBaseCall"
-                  [info v, mk_num r, listSyntax.mk_list (args, expr_ty),
+                  [info v, through_value, mk_num r, listSyntax.mk_list (args, expr_ty),
                    argument_order v r 0, type_id v]
               end
             else if is_library_member callee andalso is_attached callee then
@@ -1287,7 +1292,7 @@ fun expr v = guarded (fn e => [ExprChild e]) unsupported_expr (fn v => within v 
                * evaluation/conversion schedule after it becomes argument 0. *)
               let val receiver = expr (field callee "expression") in
                 con "SrcFunctionCall"
-                  [info v,
+                  [info v, through_value,
                    con "SrcIdentifier"
                      [info callee, mk_str (string_field callee "memberName"),
                       mk_num (int_field callee "referencedDeclaration"),
@@ -1297,7 +1302,7 @@ fun expr v = guarded (fn e => [ExprChild e]) unsupported_expr (fn v => within v 
                    type_id v]
               end
             else con "SrcFunctionCall"
-              [info v, expr callee, listSyntax.mk_list (args, expr_ty),
+              [info v, through_value, expr callee, listSyntax.mk_list (args, expr_ty),
                case optional_field callee "referencedDeclaration" of
                  SOME _ => argument_order v (int_field callee "referencedDeclaration") 0
                | NONE => (positional (); listSyntax.mk_nil numSyntax.num),
