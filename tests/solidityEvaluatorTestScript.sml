@@ -1181,8 +1181,7 @@ Definition creation_halt_def:
            initial_state.frame initial_state.world (SOME FEMPTY) 0 NONE
            CreationEntry of
       ContractReturned data _ => INL data
-    | ContractAborted w => if w = initial_state.world then INR "aborted"
-                           else INR "aborted with changes"
+    | ContractAborted _ => INR "aborted"
     | ContractInvalid reason => INR reason
     | _ => INR "other outcome"
 End

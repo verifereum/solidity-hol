@@ -617,16 +617,17 @@ fun contract_declaration v id =
  * id, fully linked and nonempty, as hex. *)
 fun contract_code kind v id =
   let
+    val name = if kind = "bytecode" then "creation bytecode" else "runtime bytecode"
     val output = case List.find (fn (i, _) => i = id) (!creation_outputs) of
                    SOME (_, c) => c
-                 | NONE => fail (describe v ^ ": no " ^ kind)
+                 | NONE => fail (describe v ^ ": no " ^ name)
     val bytecode = field (field output "evm") kind
     val () = require v
       (case optional_field bytecode "linkReferences" of
          NONE => true | SOME refs => null (object refs))
-      (kind ^ " has unresolved links")
+      (name ^ " has unresolved links")
     val code = string_field bytecode "object"
-    val () = require v (code <> "") ("empty " ^ kind)
+    val () = require v (code <> "") ("empty " ^ name)
   in
     code
   end

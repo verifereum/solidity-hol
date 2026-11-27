@@ -232,7 +232,7 @@ Definition run_entry_frame_def:
     | FrameAbort w' => ContractAborted w'
     | FrameHalt data w' =>
         if kind = CreationEntry ∧
-           ((case data of h :: _ => h = 0xEFw | [] => F) ∨
+           ((case data of h :: _ => w2n h = 0xEF | [] => F) ∨
             max_code_size < LENGTH data)
         then ContractAborted w
         else ContractReturned data (settle_source_world w')

@@ -1542,18 +1542,19 @@ Definition create_contract_def:
                 INL (cs, _, atoms, n1) =>
                   let options = TAKE (LENGTH opts) atoms in
                   let address = AddressT NonpayableAddress in
-                  let operation = if catching then TryCreateContractOperation
-                                  else CreateContractOperation in
+                  let code = callee.create_bytecode in
+                  let value = option_value opts options in
+                  let salt = option_atom SaltOption opts options in
+                  let args = DROP (LENGTH opts) atoms in
                   INL ((ss ++ cs ++
-                        [DefineStmt (AstId n1)
-                           (if catching then
-                              ProductType [SingleType BoolT; SingleType address;
-                                           RevertDataType]
-                            else SingleType address)
-                           (operation callee.create_bytecode params
-                              (option_value opts options)
-                              (option_atom SaltOption opts options)
-                              (DROP (LENGTH opts) atoms))],
+                        [if catching then
+                           DefineStmt (AstId n1)
+                             (ProductType [SingleType BoolT; SingleType address;
+                                           RevertDataType])
+                             (TryCreateContractOperation code params value salt args)
+                         else
+                           DefineStmt (AstId n1) (SingleType address)
+                             (CreateContractOperation code params value salt args)],
                         BoundAtom (AstId n1), ElabType address), n1 + 1)
               | INR bs => INR bs)
          | _ => INR [(info.node_id, "argument order")])
