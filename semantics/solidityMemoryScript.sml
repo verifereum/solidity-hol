@@ -394,6 +394,7 @@ Definition default_elementary_def:
     | FixedBytesT n => SOME (BytesValue (REPLICATE n 0w))
     | EnumT _ => SOME (IntegerValue 0)
     | FunctionT InternalFn _ _ _ => SOME (InternalFunctionValue (INR 0))
+    | FunctionT ExternalFn _ _ _ => SOME (ExternalFunctionValue 0w (REPLICATE 4 0w))
     | _ => NONE
 End
 

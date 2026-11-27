@@ -1,0 +1,153 @@
+{
+  "name": "external_function_values",
+  "source": "testdata/differential/external_function_values.sol",
+  "contract": "ExternalFunctionValues",
+  "artifact": "testdata/differential/expected/external_function_values.json",
+  "peer": {
+    "source": "testdata/differential/external_function_target.sol",
+    "contract": "ExternalFunctionTargetCode",
+    "artifact": "testdata/differential/expected/external_function_target.json"
+  },
+  "cases": [
+    {
+      "name": "store_and_call_with_packed_neighbors",
+      "function": "storeAndCall",
+      "args": [
+        20480,
+        5
+      ],
+      "expect": {
+        "return": [
+          7,
+          20480,
+          "0xed1bd76c",
+          15,
+          9
+        ]
+      },
+      "final_storage": {
+        "0": "14462442398330912479877658831070463422699826966564152028916743"
+      }
+    },
+    {
+      "name": "call_local_pointer_with_value_and_gas",
+      "function": "callLocalPayable",
+      "args": [
+        5
+      ],
+      "expect": {
+        "return": [
+          12
+        ]
+      },
+      "value": 7
+    },
+    {
+      "name": "view_pointer_uses_staticcall",
+      "function": "callLocalView",
+      "args": [
+        20480
+      ],
+      "expect": {
+        "revert": "0x"
+      }
+    },
+    {
+      "name": "void_pointer_call_to_empty_code",
+      "function": "callNoReturn",
+      "args": [
+        24576
+      ],
+      "expect": {
+        "revert": "0x"
+      }
+    },
+    {
+      "name": "compare_with_same_pair_and_default",
+      "function": "compare",
+      "args": [],
+      "expect": {
+        "return": [
+          true,
+          false,
+          true
+        ]
+      }
+    },
+    {
+      "name": "struct_copy_and_array_element",
+      "function": "aggregates",
+      "args": [
+        5
+      ],
+      "expect": {
+        "return": [
+          6,
+          4096,
+          "0xed1bd76c"
+        ]
+      },
+      "final_storage": {
+        "1": "17596164069228",
+        "2": 1,
+        "29102676481673041902632991033461445430619272659676223336789171408008386403022": "17596164069228"
+      }
+    },
+    {
+      "name": "getter_encodes_stored_function",
+      "calldata": "0x9fa6a6e3",
+      "expect": {
+        "returned": "0x0000000000000000000000000000000000005000ed1bd76c0000000000000000"
+      },
+      "storage": {
+        "0": "14462442398330912479877658831070463422699826966564152028916743"
+      }
+    },
+    {
+      "name": "parameter_return_and_event_use_bytes24",
+      "calldata": "0x90898ee4112233445566778899aabbccddeeff0011223344ed1bd76c0000000000000000",
+      "expect": {
+        "returned": "0x112233445566778899aabbccddeeff0011223344ed1bd76c0000000000000000"
+      },
+      "logs": [
+        {
+          "topics": [
+            "0xf538d883270398e70e20a54322b4e5802e6487661099233163d5b826dd7156c0",
+            "0x112233445566778899aabbccddeeff0011223344ed1bd76c0000000000000000"
+          ],
+          "data": "0x112233445566778899aabbccddeeff0011223344ed1bd76c0000000000000000"
+        }
+      ]
+    },
+    {
+      "name": "reject_dirty_function_word_tail",
+      "calldata": "0x90898ee4112233445566778899aabbccddeeff0011223344ed1bd76c0000000000000001",
+      "expect": {
+        "revert": "0x"
+      }
+    },
+    {
+      "name": "abi_encode_and_encode_packed",
+      "calldata": "0x17e641bb112233445566778899aabbccddeeff0011223344ed1bd76c0000000000000000",
+      "expect": {
+        "returned": "0x000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000020112233445566778899aabbccddeeff0011223344ed1bd76c00000000000000000000000000000000000000000000000000000000000000000000000000000019112233445566778899aabbccddeeff0011223344ed1bd76cab00000000000000"
+      }
+    },
+    {
+      "name": "read_and_write_assembly_components",
+      "function": "assemble",
+      "args": [
+        20480,
+        19088743
+      ],
+      "expect": {
+        "return": [
+          4096,
+          3978024812,
+          20480,
+          "0x01234567"
+        ]
+      }
+    }
+  ]
+}

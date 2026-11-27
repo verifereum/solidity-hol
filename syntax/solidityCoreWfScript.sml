@@ -179,10 +179,10 @@ Definition byte_sequence_type_def:
   byte_sequence_type ty ⇔ ty = BytesT ∨ ty = StringT
 End
 
-(* The ABI has no encoding for function values, including internal dispatch
- * ids. *)
+(* The ABI has an encoding for external functions and ordinary scalars. *)
 Definition abi_scalar_type_def:
-  abi_scalar_type ty ⇔ is_stored_scalar_type ty ∧ ¬is_function_type ty
+  (abi_scalar_type (FunctionT kind _ _ _) ⇔ kind = ExternalFn) ∧
+  (abi_scalar_type ty ⇔ is_stored_scalar_type ty)
 End
 
 (* An element of a packed array: a scalar, or a fixed-length array of
@@ -266,7 +266,7 @@ End
  * checked separately, so a function signature can refer back to its struct. *)
 Definition function_type_ok_def:
   (function_type_ok (FunctionT kind m ps rs) ⇔
-    kind = InternalFn ∧ m ≠ PayableMut ∧
+    (kind = InternalFn ⇒ m ≠ PayableMut) ∧
     function_parameters_ok ps ∧ function_parameters_ok rs) ∧
   (function_type_ok (ArrayT ty _) ⇔ function_type_ok ty) ∧
   (function_type_ok (MappingT key value) ⇔
@@ -778,7 +778,7 @@ End
  * and returns that promises less: pure to view to non-payable. *)
 Definition function_mutability_convertible_def:
   function_mutability_convertible m m' ⇔
-    m = m' ∨ m = PureMut ∨ m' = NonpayableMut
+    m = m' ∨ m' = NonpayableMut ∨ (m = PureMut ∧ m' = ViewMut)
 End
 
 (* Explicit elementary conversions as solc admits them, including the identity
@@ -806,8 +806,8 @@ Definition elementary_convertible_def:
     | (EnumT _, UintT _) => T
     | (UintT _, EnumT _) => T
     | (IntT _, EnumT _) => T
-    | (FunctionT InternalFn m ps rs, FunctionT InternalFn m' ps' rs') =>
-        function_mutability_convertible m m' ∧ ps = ps' ∧ rs = rs'
+    | (FunctionT k m ps rs, FunctionT k' m' ps' rs') =>
+        k = k' ∧ function_mutability_convertible m m' ∧ ps = ps' ∧ rs = rs'
     | _ => F
 End
 
@@ -838,8 +838,8 @@ Definition implicitly_convertible_def:
     | (IntT m, IntT n) => m ≤ n
     | (FixedBytesT m, FixedBytesT n) => m ≤ n
     | (AddressT PayableAddress, AddressT NonpayableAddress) => T
-    | (FunctionT InternalFn m ps rs, FunctionT InternalFn m' ps' rs') =>
-        function_mutability_convertible m m' ∧ ps = ps' ∧ rs = rs'
+    | (FunctionT k m ps rs, FunctionT k' m' ps' rs') =>
+        k = k' ∧ function_mutability_convertible m m' ∧ ps = ps' ∧ rs = rs'
     | _ => F
 End
 
@@ -917,6 +917,18 @@ Definition catch_parameter_type_def:
   (catch_parameter_type ErrorCatch = LocatedT MemoryLoc StringT) ∧
   (catch_parameter_type PanicCatch = UintT 256) ∧
   (catch_parameter_type GenericCatch = LocatedT MemoryLoc BytesT)
+End
+
+Definition function_member_type_def:
+  (function_member_type FunctionAddress = AddressT NonpayableAddress) ∧
+  (function_member_type FunctionSelector = FixedBytesT 4)
+End
+
+Definition external_function_binding_def:
+  external_function_binding ctx x ⇔
+    case ALOOKUP ctx.bindings x of
+      SOME (SingleType (FunctionT ExternalFn _ _ _)) => T
+    | _ => F
 End
 
 Definition wf_core_operation_def:
@@ -1172,12 +1184,24 @@ Definition wf_core_operation_def:
     | ConstantAtom _ => F) ∧
   (wf_core_operation env ctx annotation (EnvironmentOperation f) ⇔
     annotation = SingleType (environment_type f)) ∧
+  (wf_core_operation env ctx annotation (ExternalFunctionOperation target selector) ⇔
+    (case annotation of
+       SingleType (FunctionT ExternalFn m ps rs) =>
+         core_scalar_type env (FunctionT ExternalFn m ps rs)
+     | _ => F) ∧
+    wf_core_atom env ctx (SingleType (AddressT NonpayableAddress)) target ∧
+    wf_core_atom env ctx (SingleType (FixedBytesT 4)) selector) ∧
+  (wf_core_operation env ctx annotation (FunctionMemberOperation member a) ⇔
+    annotation = SingleType (function_member_type member) ∧
+    case a of
+      BoundAtom x => external_function_binding ctx x
+    | ConstantAtom _ => F) ∧
   (* High-level calls pass ABI values; a view or pure callee is called
      statically, with no value. Returndata is decoded into the caller's
      memory. *)
   (wf_core_operation env ctx annotation
      (ExternalCallOperation kind selector params rets target value gas args) ⇔
-    LENGTH selector = 4 ∧
+    wf_core_atom env ctx (SingleType (FixedBytesT 4)) selector ∧
     EVERY (abi_type_ok env) params ∧ EVERY (decoded_type_ok env) rets ∧
     wf_core_atom env ctx (SingleType (AddressT NonpayableAddress)) target ∧
     wf_core_atom env ctx (SingleType (UintT 256)) value ∧
@@ -1455,6 +1479,8 @@ Definition assembly_reference_ok_def:
     case r of
       AssemblyLocal x ty =>
         ALOOKUP ctx.bindings x = SOME (SingleType ty) ∧ assembly_value_type env ty
+    | AssemblyFunctionAddress x => external_function_binding ctx x
+    | AssemblyFunctionSelector x => external_function_binding ctx x
     | AssemblySlot x => IS_SOME (lookup_state_variable env x)
     | AssemblyOffset x => IS_SOME (lookup_state_variable env x)
     | AssemblyPointerSlot x => storage_pointer_binding ctx x
@@ -1885,6 +1911,8 @@ Proof
 QED
 
 val () = cv_auto_trans packed_type_def;
+val () = cv_auto_trans function_member_type_def;
+val () = cv_auto_trans external_function_binding_def;
 val () = cv_auto_trans environment_type_def;
 val () = cv_auto_trans wf_abi_atom_def;
 val () = cv_auto_trans wf_builtin_operand_def;

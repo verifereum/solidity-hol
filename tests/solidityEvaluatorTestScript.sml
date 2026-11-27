@@ -490,6 +490,23 @@ Proof
   CONV_TAC cv_eval
 QED
 
+(* Both components use right-aligned Yul words, with no implicit cleanup
+ * of a non-canonical write. *)
+Theorem asm_external_function_dirty_components:
+  let st = define_binding (AstId 111) (SingleType (FunctionT ExternalFn ViewMut [] []))
+             (ScalarValue (ExternalFunctionValue 0w [0w; 0w; 0w; 0w])) initial_state in
+  (eval_assembly 20 test_env
+    [YulAssign ["f.address"] (YulLit (LitNumber (n2w (2 ** 160))))]
+    [("f.address", AssemblyFunctionAddress (AstId 111))] st []).completion =
+    InvalidCompletion "invalid assembly function address write-back" ∧
+  (eval_assembly 20 test_env
+    [YulAssign ["f.selector"] (YulLit (LitNumber (n2w (2 ** 32))))]
+    [("f.selector", AssemblyFunctionSelector (AstId 111))] st []).completion =
+    InvalidCompletion "invalid assembly function selector write-back"
+Proof
+  CONV_TAC cv_eval
+QED
+
 (* Inline assembly. asm(x) runs code with x bound to the block's "x" and
  * returns x; asm_caller() calls asm(7); halt() stops from a block. *)
 Overload ylit = “λn. YulLit (LitNumber n)”
@@ -1698,7 +1715,7 @@ End
 Definition rd_high_def:
   rd_high =
     DefineStmt (AstId 133) (SingleType u256)
-      (ExternalCallOperation ExternalCall [1w; 2w; 3w; 4w] [] [u256]
+      (ExternalCallOperation ExternalCall (ConstantAtom (BytesValue [1w; 2w; 3w; 4w])) [] [u256]
          (ConstantAtom (AddressValue 0x5000w)) (k 0) NONE [])
 End
 
@@ -2498,7 +2515,7 @@ Definition encoder_prefix_calls_def:
       [DefineStmt (AstId 2) (SingleType (ContractT (AstId 3)))
          (CreateContractOperation prefix params (k 0) NONE args);
        DefineStmt (AstId 2) (ProductType [SingleType u256])
-         (ExternalCallOperation ExternalCall prefix params [u256]
+         (ExternalCallOperation ExternalCall (ConstantAtom (BytesValue prefix)) params [u256]
             (ConstantAtom (AddressValue 0x5000w)) (k 0) NONE args);
        DefineStmt (AstId 2) (SingleType (LocatedT MemoryLoc BytesT))
          (AbiEncodeOperation (SOME (ConstantAtom (BytesValue prefix))) params args);

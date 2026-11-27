@@ -173,6 +173,9 @@ Definition expr_id_def:
   (expr_id (SrcModular info _ _ _ _) = info.node_id) ∧
   (expr_id (SrcSelector info _ _ _) = info.node_id) ∧
   (expr_id (SrcContractCode info _ _) = info.node_id) ∧
+  (expr_id (SrcExternalFunction info _ _ _) = info.node_id) ∧
+  (expr_id (SrcFunctionMember info _ _ _) = info.node_id) ∧
+  (expr_id (SrcExternalFunctionCall info _ _ _ _) = info.node_id) ∧
   (expr_id (SrcAbiEncode info _ _ _ _) = info.node_id) ∧
   (expr_id (SrcAbiDecode info _ _ _ _) = info.node_id) ∧
   (expr_id (SrcTransfer info _ _ _ _) = info.node_id) ∧
@@ -549,6 +552,10 @@ Definition expr_assigns_def:
   (expr_assigns (SrcStructConstructor _ _ args _ _) ⇔ exprs_assign args) ∧
   (expr_assigns (SrcBuiltinOperation _ _ _ args _) ⇔ exprs_assign args) ∧
   (expr_assigns (SrcModular _ _ _ args _) ⇔ exprs_assign args) ∧
+  (expr_assigns (SrcExternalFunction _ target _ _) ⇔ expr_assigns target) ∧
+  (expr_assigns (SrcFunctionMember _ _ e _) ⇔ expr_assigns e) ∧
+  (expr_assigns (SrcExternalFunctionCall _ f _ operands _) ⇔
+    expr_assigns f ∨ exprs_assign operands) ∧
   (expr_assigns (SrcSelector _ _ receiver _) ⇔
     case receiver of NONE => F | SOME e => expr_assigns e) ∧
   (expr_assigns (SrcAbiEncode _ _ _ args _) ⇔ exprs_assign args) ∧
@@ -598,21 +605,13 @@ Definition option_value_def:
     | NONE => ConstantAtom (IntegerValue 0)
 End
 
-(* A high-level call of a view or pure function is a static call. *)
-(* A caught call binds its success flag, its results and its raw revert
- * data. *)
+(* A regular high-level call, whether its selector is known or evaluated. *)
 Definition external_call_value_def:
-  external_call_value catching n kind selector params rets ss target opts
-                      atoms args =
+  external_call_value n kind selector params rets ss target opts atoms args =
     let value = option_value opts atoms in
     let gas = option_atom GasOption opts atoms in
-    ((ss ++ [if catching then
-               DefineStmt (AstId n)
-                 (ProductType (MAP SingleType (BoolT :: rets) ++ [RevertDataType]))
-                 (TryExternalCallOperation kind selector params rets target value gas args)
-             else
-               DefineStmt (AstId n) (call_result_type rets)
-                 (ExternalCallOperation kind selector params rets target value gas args)],
+    ((ss ++ [DefineStmt (AstId n) (call_result_type rets)
+               (ExternalCallOperation kind selector params rets target value gas args)],
       BoundAtom (AstId n), call_value rets), n + 1)
 End
 
@@ -781,8 +780,8 @@ Definition abi_argument_def:
   abi_argument packed a vt =
     case vt of
       ElabType ty =>
-        if is_function_type ty then INR "abi encoding of a function type"
-        else if abi_scalar_type ty then INL (ty, a) else
+        if abi_scalar_type ty then INL (ty, a)
+        else if is_function_type ty then INR "abi encoding of a function type" else
         (case ty of
            LocatedT _ element =>
              if (if packed then packed_type (LocatedT MemoryLoc element)
@@ -1569,10 +1568,37 @@ Definition external_call_def:
       (INR b, r) => reject b r
     | (INL _, INR bs) => INR bs
     | (INL (params, rets), INL ((ss, t :: atoms), next)) =>
-        INL (external_call_value catching next callee.ext_kind
-               callee.ext_selector params rets ss t opts
-               (TAKE (LENGTH opts) atoms) (DROP (LENGTH opts) atoms))
+        let options = TAKE (LENGTH opts) atoms in
+        let args = DROP (LENGTH opts) atoms in
+        if catching then
+          let value = option_value opts options in
+          let gas = option_atom GasOption opts options in
+          INL ((ss ++ [DefineStmt (AstId next)
+                  (ProductType (MAP SingleType (BoolT :: rets) ++ [RevertDataType]))
+                  (TryExternalCallOperation callee.ext_kind callee.ext_selector
+                     params rets t value gas args)],
+                BoundAtom (AstId next), call_value rets), next + 1)
+        else
+          INL (external_call_value next callee.ext_kind
+                 (ConstantAtom (BytesValue callee.ext_selector))
+                 params rets ss t opts options args)
     | _ => INR [(info.node_id, "unsupported external call")]
+End
+
+(* Capture both components of the callee before evaluating the operands. *)
+Definition external_function_call_def:
+  external_function_call n m params rets ss f opts r =
+    case r of
+      INL ((as_, atoms), next) =>
+        let kind = if m = PureMut ∨ m = ViewMut then ExternalStaticCall
+                   else ExternalCall in
+        let (ts, target) = bind_value n (function_member_type FunctionAddress)
+                            (FunctionMemberOperation FunctionAddress f) in
+        let (qs, selector) = bind_value (n + 1) (function_member_type FunctionSelector)
+                              (FunctionMemberOperation FunctionSelector f) in
+        INL (external_call_value next kind selector params rets (ss ++ ts ++ qs ++ as_)
+               target opts (TAKE (LENGTH opts) atoms) (DROP (LENGTH opts) atoms))
+    | INR bs => INR bs
 End
 
 (* Creation shares external-call argument conversion and ABI admission. A
@@ -2188,6 +2214,24 @@ Definition elab_expr_def:
           (elab_args ctx n info.node_id (if callee.ext_bound then 2 else 0)
              (external_operand_order opts order)
              (external_operand_targets ctx.structs callee opts) operands)
+    | SrcExternalFunctionCall info f opts operands tid =>
+        (case elab_expr ctx n f of
+           INL ((ss, a, ElabType (FunctionT ExternalFn m params rets)), n1) =>
+             if ¬MEM SaltOption opts ∧
+                (MEM ValueOption opts ⇒ m = PayableMut) ∧
+                LENGTH operands = LENGTH opts + LENGTH params ∧
+                decode_type_identifier tid = SOME (call_value_type rets) ∧
+                EVERY (abi_binding_ok ctx.enums ctx.structs) (params ++ rets)
+             then
+               external_function_call n1 m params rets ss a opts
+                 (elab_args ctx (n1 + 2) info.node_id 0 []
+                    (encoded_as (REPLICATE (LENGTH opts) (UintT 256) ++ params))
+                    operands)
+             else reject (info.node_id, "unsupported external function value call")
+                    (operand_values (elab_arg_values ctx n1 operands))
+         | r => INR ((case r of INR bs => bs
+                         | INL _ => [(info.node_id, "unsupported external function callee")]) ++
+                     blockers (operand_values (elab_arg_values ctx n operands))))
     | SrcCreate info callee opts operands order tid =>
         create_contract F ctx info callee opts operands order tid
           (operand_values (elab_arg_values ctx n operands))
@@ -2475,6 +2519,28 @@ Definition elab_expr_def:
         then INR [(info.node_id, "unsupported contract code")] else
         let (ss, a) = bind_value n ty (CodeCopyOperation code) in
         INL ((ss, a, ElabType ty), n + 1)
+    | SrcExternalFunction info target selector tid =>
+        (case (elab_expr ctx n target, function_type_identifier tid) of
+           (INL ((ss, a, ElabType (AddressT NonpayableAddress)), n1),
+            SOME (FunctionT ExternalFn m ps rs)) =>
+             if LENGTH selector = 4 then
+               let ty = FunctionT ExternalFn m ps rs in
+               let (fs, f) = bind_value n1 ty
+                 (ExternalFunctionOperation a (ConstantAtom (BytesValue selector))) in
+               INL ((ss ++ fs, f, ElabType ty), n1 + 1)
+             else INR [(info.node_id, "invalid external function selector")]
+         | (INR bs, _) => INR bs
+         | _ => INR [(info.node_id, "unsupported external function value")])
+    | SrcFunctionMember info member e tid =>
+        (case elab_expr ctx n e of
+           INL ((ss, a, ElabType (FunctionT ExternalFn _ _ _)), n1) =>
+             let ty = function_member_type member in
+             if source_type_matches ty tid then
+               let (fs, f) = bind_value n1 ty (FunctionMemberOperation member a) in
+               INL ((ss ++ fs, f, ElabType ty), n1 + 1)
+             else INR [(info.node_id, "type annotation mismatch")]
+         | INL _ => INR [(info.node_id, "member of a non-external function")]
+         | INR bs => INR bs)
     | SrcTypeMember info member tn tid =>
         (case normalize_type_name tn of
            SOME ty =>
@@ -3078,6 +3144,15 @@ Definition elab_enum_environment_def:
          MAP (λ(id, members). (AstId id, EnumDeclaration members)) ctx.enums |>
 End
 
+Definition elab_assembly_function_member_def:
+  elab_assembly_function_member ctx n id x member =
+    case ALOOKUP ctx.variables x of
+      SOME (FunctionT ExternalFn _ _ _) =>
+        INL (([], case member of FunctionAddress => AssemblyFunctionAddress (AstId x)
+                    | FunctionSelector => AssemblyFunctionSelector (AstId x)), n)
+    | _ => unknown_reference ctx id "assembly component requires a local external function" x
+End
+
 Definition elab_assembly_reference_def:
   (elab_assembly_reference ctx n (id : num) (SrcAssemblyValue x) =
     case ALOOKUP ctx.variables x of
@@ -3115,7 +3190,11 @@ Definition elab_assembly_reference_def:
     else unknown_reference ctx id "unsupported assembly reference" x) ∧
   (elab_assembly_reference ctx n id (SrcAssemblyLength x) =
     if calldata_slice ctx x then INL (([], AssemblyCalldataLength (AstId x)), n)
-    else unknown_reference ctx id "unsupported assembly reference" x)
+    else unknown_reference ctx id "unsupported assembly reference" x) ∧
+  (elab_assembly_reference ctx n id (SrcAssemblyFunctionAddress x) =
+    elab_assembly_function_member ctx n id x FunctionAddress) ∧
+  (elab_assembly_reference ctx n id (SrcAssemblyFunctionSelector x) =
+    elab_assembly_function_member ctx n id x FunctionSelector)
 End
 
 Definition elab_assembly_references_def:
@@ -4509,6 +4588,7 @@ val () = cv_auto_trans call_target_def;
 val () = cv_auto_trans external_abi_type_def;
 val () = cv_auto_trans external_operand_targets_def;
 val () = cv_auto_trans external_operand_order_def;
+val () = cv_auto_trans external_function_call_def;
 
 val sublist_pre_def = cv_auto_trans_pre_rec "sublist_pre"
   (INST_TYPE [alpha |-> “:char”] rich_listTheory.IS_SUBLIST)
@@ -4676,6 +4756,7 @@ QED
 
 val () = cv_auto_trans return_atoms_def;
 val () = cv_auto_trans elab_enum_environment_def;
+val () = cv_auto_trans elab_assembly_function_member_def;
 val () = cv_auto_trans elab_assembly_reference_def;
 val elab_assembly_references_pre_def =
   cv_auto_trans_pre "elab_assembly_references_pre" elab_assembly_references_def;

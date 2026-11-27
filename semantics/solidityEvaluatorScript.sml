@@ -172,6 +172,18 @@ Definition eval_pure_operation_def:
              if src = ty then ValueOk (ReferenceValue r)
              else convert_byte_reference src ty r
          | _ => ValueAbrupt (InvalidCompletion "ill-typed conversion"))
+    | ExternalFunctionOperation target selector =>
+        (case (eval_atom scopes target, eval_atom scopes selector) of
+           (SOME (ScalarValue (AddressValue a)), SOME (ScalarValue (BytesValue bs))) =>
+             if LENGTH bs = 4 then ValueOk (ScalarValue (ExternalFunctionValue a bs))
+             else ValueAbrupt (InvalidCompletion "bad external function selector")
+         | _ => ValueAbrupt (InvalidCompletion "bad external function operands"))
+    | FunctionMemberOperation member a =>
+        (case eval_atom scopes a of
+           SOME (ScalarValue (ExternalFunctionValue addr selector)) =>
+             ValueOk (ScalarValue (case member of FunctionAddress => AddressValue addr
+                                     | FunctionSelector => BytesValue selector))
+         | _ => ValueAbrupt (InvalidCompletion "bad external function value"))
     | TupleOperation atoms =>
         (case eval_atoms scopes atoms of
            SOME vs => ValueOk (TupleValue vs)
@@ -1102,8 +1114,12 @@ End
 
 Definition call_external_def:
   call_external env x ty kind selector params rets target value g args st gas =
-    call_external_mode F env x ty kind selector params rets target value g args
-      st gas
+    case eval_atom st.scopes selector of
+      SOME (ScalarValue (BytesValue bs)) =>
+        if LENGTH bs = 4 then
+          call_external_mode F env x ty kind bs params rets target value g args st gas
+        else abrupt_result (InvalidCompletion "bad external call selector") st gas
+    | _ => abrupt_result (InvalidCompletion "bad external call selector") st gas
 End
 
 (* The compiler's extract_returndata: no return data is the zero slot; other
@@ -1658,6 +1674,16 @@ Definition assembly_value_def:
     | _ => NONE
 End
 
+Definition assembly_function_parts_def:
+  assembly_function_parts scopes x =
+    case lookup_binding x scopes of
+      SOME b =>
+        (case b.binding_value of
+           ScalarValue (ExternalFunctionValue addr selector) => SOME (addr, selector)
+         | _ => NONE)
+    | NONE => NONE
+End
+
 Definition assembly_reference_word_def:
   assembly_reference_word env (st : source_state) r =
     case r of
@@ -1668,6 +1694,10 @@ Definition assembly_reference_word_def:
                 ScalarValue s => memory_word env ty (ScalarValue s)
               | _ => NONE)
          | NONE => NONE)
+    | AssemblyFunctionAddress x =>
+        OPTION_MAP (w2n o FST) (assembly_function_parts st.scopes x)
+    | AssemblyFunctionSelector x =>
+        OPTION_MAP (num_of_be_bytes o SND) (assembly_function_parts st.scopes x)
     | AssemblySlot x =>
         OPTION_MAP (λv. w2n v.state_slot) (lookup_state_variable env x)
     | AssemblyOffset x =>
@@ -1727,6 +1757,8 @@ Definition assembly_inputs_def:
       (SOME w, SOME (scope, literals)) =>
         (case r of
            AssemblyLocal _ _ => SOME (scope |+ (name, n2w w), literals)
+         | AssemblyFunctionAddress _ => SOME (scope |+ (name, n2w w), literals)
+         | AssemblyFunctionSelector _ => SOME (scope |+ (name, n2w w), literals)
          | AssemblyPointerSlot _ => SOME (scope |+ (name, n2w w), literals)
          | AssemblyMemory _ _ => SOME (scope |+ (name, n2w w), literals)
          | AssemblyCalldataOffset _ => SOME (scope |+ (name, n2w w), literals)
@@ -1838,6 +1870,22 @@ Definition assembly_write_one_def:
                  if memory_word env ty (ScalarValue s) = SOME (w2n w) then
                    update_binding x (ScalarValue s) scopes
                  else NONE)
+    | AssemblyFunctionAddress x =>
+        (case (yul_lookup name yscopes, assembly_function_parts scopes x) of
+           (SOME w, SOME (_, selector)) =>
+             if w2n w < 2 ** 160 then
+               update_binding x (ScalarValue (ExternalFunctionValue (n2w (w2n w)) selector))
+                 scopes
+             else NONE
+         | _ => NONE)
+    | AssemblyFunctionSelector x =>
+        (case (yul_lookup name yscopes, assembly_function_parts scopes x) of
+           (SOME w, SOME (addr, _)) =>
+             if w2n w < 2 ** 32 then
+               update_binding x (ScalarValue (ExternalFunctionValue addr (num_to_bytes 4 (w2n w))))
+                 scopes
+             else NONE
+         | _ => NONE)
     | AssemblyMemory x ty =>
         (case yul_lookup name yscopes of
            SOME w => update_binding x (ReferenceValue (MemoryReference (w2n w) ty)) scopes
@@ -1913,11 +1961,15 @@ Definition assembly_calldata_ok_def:
 End
 
 Definition assembly_write_back_def:
-  (assembly_write_back env self [] scopes yscopes = SOME scopes) ∧
+  (assembly_write_back env self [] scopes yscopes = INL scopes) ∧
   (assembly_write_back env self (r :: refs) scopes yscopes =
     case assembly_write_one env self r scopes yscopes of
-      NONE => NONE
-    | SOME scopes' => assembly_write_back env self refs scopes' yscopes)
+      SOME scopes' => assembly_write_back env self refs scopes' yscopes
+    | NONE =>
+        INR (case SND r of
+               AssemblyFunctionAddress _ => "invalid assembly function address write-back"
+             | AssemblyFunctionSelector _ => "invalid assembly function selector write-back"
+             | _ => "assembly write-back failed"))
 End
 
 (* The return data after a block that exits normally. A non-empty buffer
@@ -1940,7 +1992,7 @@ Definition assembly_result_def:
       YulNormal =>
         (case assembly_write_back env st.frame.self_address refs st.scopes
                 r.machine.scopes of
-           SOME scopes =>
+           INL scopes =>
              if ¬assembly_calldata_ok env st.frame.call_data scopes refs then
                abrupt_result
                  (InvalidCompletion "assembly left a calldata reference outside the calldata")
@@ -1950,8 +2002,7 @@ Definition assembly_result_def:
                    memory := r.machine.memory;
                    memory_size := r.machine.memory_size;
                    return_data := assembly_return_data st r.machine |>) gas
-         | NONE =>
-             abrupt_result (InvalidCompletion "assembly write-back failed") st gas)
+         | INR reason => abrupt_result (InvalidCompletion reason) st gas)
     | YulReturn data =>
         abrupt_result (HaltCompletion data)
           (st with <| world := world; memory := r.machine.memory;
@@ -2149,6 +2200,7 @@ val () = cv_auto_trans write_target_def;
 val () = cv_auto_trans reset_target_def;
 val () = cv_auto_trans simple_stmt_def;
 val () = cv_auto_trans assembly_value_def;
+val () = cv_auto_trans assembly_function_parts_def;
 val () = cv_auto_trans assembly_reference_word_def;
 val () = cv_auto_trans assembly_inputs_def;
 val yul_substitute_expr_pre_def = cv_auto_trans_pre

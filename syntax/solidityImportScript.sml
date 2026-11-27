@@ -236,6 +236,9 @@ Datatype:
   | SrcSelector node_info (byte list) (src_expr option) string
   (* type(C).creationCode or type(C).runtimeCode: the code's bytes *)
   | SrcContractCode node_info (byte list) string
+  | SrcExternalFunction node_info src_expr (byte list) string
+  | SrcFunctionMember node_info function_member src_expr string
+  | SrcExternalFunctionCall node_info src_expr (call_option list) (src_expr list) string
   | SrcAbiEncode node_info node_info abi_form (src_expr list) string
   | SrcAbiDecode node_info node_info src_expr (src_type_name list) string
   | SrcLowLevelCall node_info node_info low_level_kind (call_option list)
@@ -258,6 +261,8 @@ Datatype:
                          | SrcAssemblySlot num
                          | SrcAssemblyOffset num
                          | SrcAssemblyLength num
+                         | SrcAssemblyFunctionAddress num
+                         | SrcAssemblyFunctionSelector num
 End
 
 Datatype:
@@ -572,13 +577,14 @@ Definition type_identifier_fields_def:
     separated_fields #"$" "" (canonical_storage_identifier 0 0 s)
 End
 
-(* An array, struct or internal function adds a level to a delimited
+(* An array, struct or function adds a level to a delimited
  * type identifier. An array dimension, struct id, or function's final
  * delimiter closes that level. *)
 Definition identifier_component_depth_def:
   identifier_component_depth (depth : num) f =
     if f = "_t_array" ∨ f = "_t_struct" ∨
-       isPREFIX "_t_function_internal_" f then depth + 1
+       isPREFIX "_t_function_internal_" f ∨
+       isPREFIX "_t_function_external_" f then depth + 1
     else if f = "_" then depth - 1
     else if isPREFIX "_" f ∨ f = "returns" then depth
     else depth - 1
@@ -671,7 +677,7 @@ QED
  * rejoining an array's or a struct's fields: "_t_array" or "_t_struct"
  * opens one, and the field without a leading "_" (a dimension, or a struct's
  * id and location) closes it. A function type's fields are rejoined
- * likewise: "_t_function_internal_..." opens it, its "returns" field stays
+ * likewise: the function kind and mutability open it, "returns" stays
  * inside, and the field "_" (its closing "$" then "_") closes it. *)
 Definition tuple_identifier_components_def:
   (tuple_identifier_components (depth : num) acc [] =
@@ -710,26 +716,37 @@ Definition split_at_returns_def:
     else split_at_returns (identifier_component_depth depth f) (f :: acc) fs)
 End
 
-Definition internal_function_mutability_def:
-  internal_function_mutability head =
-    if head = "t_function_internal_pure" then SOME PureMut
-    else if head = "t_function_internal_view" then SOME ViewMut
-    else if head = "t_function_internal_nonpayable" then SOME NonpayableMut
+Definition function_kind_prefix_def:
+  (function_kind_prefix InternalFn = "t_function_internal_") ∧
+  (function_kind_prefix ExternalFn = "t_function_external_")
+End
+
+Definition function_type_head_def:
+  function_type_head head =
+    let k = if isPREFIX (function_kind_prefix InternalFn) head then InternalFn
+            else ExternalFn in
+    let prefix = function_kind_prefix k in
+    if ¬isPREFIX prefix head then NONE else
+    let m = DROP (LENGTH prefix) head in
+    if m = "pure" then SOME (k, PureMut)
+    else if m = "view" then SOME (k, ViewMut)
+    else if m = "nonpayable" then SOME (k, NonpayableMut)
+    else if m = "payable" ∧ k = ExternalFn then SOME (k, PayableMut)
     else NONE
 End
 
-(* The function's mutability and its parameter and return identifiers. *)
+(* Function kind, mutability and the parameter and return identifiers. *)
 Definition function_identifier_parts_def:
   function_identifier_parts s =
     case type_identifier_fields s of
       head :: fs =>
-        (case (internal_function_mutability head, split_at_returns 0 [] fs) of
-           (SOME m, SOME (ps, rs)) =>
+        (case (function_type_head head, split_at_returns 0 [] fs) of
+           (SOME (k, m), SOME (ps, rs)) =>
              (case REVERSE rs of
                 [] :: rev_rs =>
                   (case (function_type_components ps,
                          function_type_components (REVERSE rev_rs)) of
-                     (SOME params, SOME rets) => SOME (m, params, rets)
+                     (SOME params, SOME rets) => SOME (k, m, params, rets)
                    | _ => NONE)
               | _ => NONE)
          | _ => NONE)
@@ -741,11 +758,12 @@ End
 Definition decode_identifier_fuel_def:
   (decode_identifier_fuel 0 s = NONE) ∧
   (decode_identifier_fuel (SUC n) s =
-    if isPREFIX "t_function_internal_" s then
+    if isPREFIX (function_kind_prefix InternalFn) s ∨
+       isPREFIX (function_kind_prefix ExternalFn) s then
       (case function_identifier_parts s of
-         SOME (m, ps, rs) =>
+         SOME (k, m, ps, rs) =>
            (case (decode_identifiers_fuel n ps, decode_identifiers_fuel n rs) of
-              (SOME params, SOME rets) => SOME (FunctionT InternalFn m params rets)
+              (SOME params, SOME rets) => SOME (FunctionT k m params rets)
             | _ => NONE)
        | NONE => NONE)
     else if isPREFIX "t_array$_" s then
@@ -793,7 +811,7 @@ End
 Definition function_type_identifier_def:
   function_type_identifier s =
     case decode_elementary_identifier s of
-      SOME (FunctionT InternalFn m ps rs) => SOME (FunctionT InternalFn m ps rs)
+      SOME (FunctionT k m ps rs) => SOME (FunctionT k m ps rs)
     | _ => NONE
 End
 
@@ -996,8 +1014,8 @@ Definition storage_identifier_def:
      else storage_identifier layout NONE key) ++
     (if layout then "," else "_$_") ++ storage_identifier layout NONE value ++
     (if layout then ")" else "_$")) ∧
-  (storage_identifier layout loc (FunctionT InternalFn m ps rs) =
-    "t_function_internal_" ++
+  (storage_identifier layout loc (FunctionT k m ps rs) =
+    function_kind_prefix k ++
     (case m of PureMut => "pure" | ViewMut => "view"
              | NonpayableMut => "nonpayable" | PayableMut => "payable") ++
     (if layout then
@@ -1201,6 +1219,10 @@ Definition expr_ids_def:
   (expr_ids (SrcSelector info _ receiver _) =
     info.node_id :: (case receiver of NONE => [] | SOME e => expr_ids e)) ∧
   (expr_ids (SrcContractCode info _ _) = [info.node_id]) ∧
+  (expr_ids (SrcExternalFunction info target _ _) = info.node_id :: expr_ids target) ∧
+  (expr_ids (SrcFunctionMember info _ e _) = info.node_id :: expr_ids e) ∧
+  (expr_ids (SrcExternalFunctionCall info f _ operands _) =
+    info.node_id :: expr_ids f ++ exprs_ids operands) ∧
   (expr_ids (SrcAbiEncode info callee _ args _) =
     info.node_id :: callee.node_id :: exprs_ids args) ∧
   (expr_ids (SrcLowLevelCall info callee _ _ operands _) =
