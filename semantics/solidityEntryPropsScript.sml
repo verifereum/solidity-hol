@@ -18,6 +18,32 @@ Proof
   rw[dispatch_def] >> fs[]
 QED
 
+(* With no receive or fallback, every accepted dispatch is an external entry. *)
+Theorem selected_external_entry:
+  prog.receive_procedure = NONE ∧ prog.fallback_procedure = NONE ∧
+  dispatch env prog fr = DispatchCall p args kind ⇒
+  ∃entry. MEM entry prog.external_functions ∧
+    lookup_procedure env entry.external_procedure = SOME p ∧
+    decode_arguments env (MAP SND p.parameters) (DROP 4 fr.call_data) 4 128 =
+      INL args ∧ kind = CallEntry
+Proof
+  ‘∀entries sel e. lookup_external sel entries = SOME e ⇒ MEM e entries’ by
+    (Induct >> simp[lookup_external_def] >> rw[] >> gvs[] >> metis_tac[]) >>
+  strip_tac >>
+  fs[dispatch_def] >>
+  gvs[AllCaseEqs()] >>
+  metis_tac[]
+QED
+
+Theorem selected_external_arguments:
+  prog.receive_procedure = NONE ∧ prog.fallback_procedure = NONE ∧
+  dispatch env prog fr = DispatchCall p args kind ⇒
+  decode_arguments env (MAP SND p.parameters) (DROP 4 fr.call_data) 4 128 =
+    INL args ∧ kind = CallEntry
+Proof
+  metis_tac[selected_external_entry]
+QED
+
 Theorem call_contract_dispatch_call:
   dispatch (core_program_environment prog) prog fr = DispatchCall p args kind ⇒
   call_contract fuel prog imm fr w =
@@ -180,6 +206,60 @@ Proof
   Induct_on ‘args’ >> simp[materialize_arguments_def] >>
   gen_tac >> PairCases_on ‘h’ >> Cases_on ‘h0’ >>
   simp[materialize_arguments_def, is_elementary_type_def]
+QED
+
+(* Shape of successful decoding for addresses, unsigned integers, enums, and bools. *)
+Definition decoded_scalar_argument_def:
+  (decoded_scalar_argument (AddressT p) v ⇔ ∃a. v = ScalarValue (AddressValue a)) ∧
+  (decoded_scalar_argument (UintT n) v ⇔ ∃i. v = ScalarValue (IntegerValue (&i))) ∧
+  (decoded_scalar_argument (EnumT e) v ⇔ ∃i. v = ScalarValue (IntegerValue (&i))) ∧
+  (decoded_scalar_argument BoolT v ⇔ ∃b. v = ScalarValue (BoolValue b)) ∧
+  (decoded_scalar_argument _ _ ⇔ F)
+End
+
+Definition abi_scalar_argument_type_def:
+  (abi_scalar_argument_type (AddressT p) ⇔ T) ∧
+  (abi_scalar_argument_type (UintT n) ⇔ T) ∧
+  (abi_scalar_argument_type (EnumT e) ⇔ T) ∧
+  (abi_scalar_argument_type BoolT ⇔ T) ∧
+  (abi_scalar_argument_type _ ⇔ F)
+End
+
+Theorem decode_abi_argument_shape:
+  abi_scalar_argument_type ty ∧
+  decode_abi_argument env ty bs len bound pos arg_base free reach =
+    INL (v, next, reach') ⇒
+  decoded_scalar_argument ty v
+Proof
+  Cases_on ‘ty’ >> simp[abi_scalar_argument_type_def] >>
+  simp[decode_abi_argument_def] >>
+  simp[Once (CONJUNCT1 decode_memory_value_def), byte_sequence_type_def] >>
+  rpt (gen_tac ORELSE strip_tac) >>
+  gvs[AllCaseEqs(), abi_type_def, abi_runtime_value_def, decoded_scalar_argument_def,
+      LET_THM]
+QED
+
+Theorem decode_abi_arguments_shape:
+  ∀tys args pos free reach reach'.
+    EVERY abi_scalar_argument_type tys ∧
+    decode_abi_arguments env tys bs len bound pos arg_base free reach =
+      INL (args, reach') ⇒
+    LIST_REL decoded_scalar_argument tys args
+Proof
+  Induct >> simp[decode_abi_arguments_def] >>
+  rpt gen_tac >> strip_tac >>
+  fs[AllCaseEqs()] >>
+  metis_tac[decode_abi_argument_shape]
+QED
+
+Theorem decode_arguments_shape:
+  EVERY abi_scalar_argument_type tys ∧
+  decode_arguments env tys bs arg_base free = INL args ⇒
+  LIST_REL decoded_scalar_argument tys args
+Proof
+  simp[decode_arguments_def, decode_input_def] >>
+  rw[AllCaseEqs()] >>
+  metis_tac[decode_abi_arguments_shape]
 QED
 
 Theorem elementary_abi_layout:
