@@ -34,25 +34,29 @@ The 1516 admitted and partially admitted tests have 3832 functions that calls re
 
 | reason | functions |
 | --- | ---: |
-| unsupported identifier | 13 |
-| not a storage location | 6 |
+| unsupported identifier | 14 |
 | unsupported callee | 6 |
-| type annotation mismatch | 6 |
+| unsupported tuple type | 6 |
 | IndexAccess: expected ElementaryTypeNameExpression | 5 |
+| identifier is not a state variable | 5 |
 | Identifier: built-in super is not supported | 5 |
-| MemberAccess: unsupported built-in member | 5 |
 | FunctionCall: abi.encodeCall of an unnamed function | 4 |
 | calls an unsupported function | 4 |
-| length of a non-array | 4 |
+| .length of this expression | 4 |
+| unsupported expression as a storage location | 4 |
 | array member as a value | 2 |
+| MemberAccess: unsupported built-in member send | 2 |
 | NewExpression: unsupported expression NewExpression | 2 |
 | unsupported external call | 2 |
 | unsupported calldata slice type | 2 |
 | unsupported new expression | 2 |
 | unsupported declaration | 2 |
-| MemberAccess: unsupported call options | 2 |
+| MemberAccess: try on a library call is not supported | 2 |
+| MemberAccess: unsupported built-in member wrap | 2 |
+| MemberAccess: unsupported built-in member unwrap | 2 |
 | unsupported operator type | 1 |
 | call of an unsupported function | 1 |
+| MemberAccess: unsupported built-in member transfer | 1 |
 | FunctionCallOptions: unsupported call options | 1 |
 | FunctionCallOptions: unsupported expression FunctionCallOptions | 1 |
 | static call of an unsupported function | 1 |
@@ -60,11 +64,11 @@ The 1516 admitted and partially admitted tests have 3832 functions that calls re
 | InlineAssembly: YulFunctionDefinition: unsupported statement YulFunctionDefinition | 1 |
 | unsupported conditional type | 1 |
 | assignment to this target | 1 |
-| MemberAccess: unsupported built-in member encodeWithSelector | 1 |
 | MemberAccess: unsupported built-in member encodeWithSignature | 1 |
-| MemberAccess: unsupported built-in member decode | 1 |
-| MemberAccess: unsupported built-in member encodePacked | 1 |
 | MemberAccess: unsupported built-in member encode | 1 |
+| MemberAccess: unsupported built-in member encodePacked | 1 |
+| MemberAccess: unsupported built-in member decode | 1 |
+| MemberAccess: unsupported built-in member encodeWithSelector | 1 |
 | unsupported struct constructor | 1 |
 | unsupported inline array | 1 |
 | IndexAccess: array type expressions are not supported | 1 |
@@ -84,7 +88,7 @@ The 1516 admitted and partially admitted tests have 3832 functions that calls re
 | more than one contract | 17 | 17 |
 | storage copy of this type | 1 | 0 |
 | unsupported declaration | 1 | 0 |
-| unsupported memory struct type | 1 | 0 |
+| unsupported parameter or return type | 1 | 0 |
 
 ## Features in order of tests admitted
 
@@ -96,7 +100,7 @@ Supporting the features in this order admits the most rejected tests at each ste
 | 2 | more than one contract | 53 |
 | 3 | storage copy of this type | 53 |
 | 4 | unsupported declaration | 53 |
-| 5 | unsupported memory struct type | 54 |
+| 5 | unsupported parameter or return type | 54 |
 
 ## Skipped and compile failures
 
@@ -1748,8 +1752,8 @@ None.
   - 38: storage copy of this type
   - 77: storage copy of this type
   - 123: storage copy of this type
-  - 188: unsupported memory struct type
-  - 237: unsupported memory struct type
+  - 188: unsupported parameter or return type
+  - 237: unsupported parameter or return type
   - 246: unsupported declaration
 - `userDefinedValueType/multisource.sol`
   - 5: no contract
