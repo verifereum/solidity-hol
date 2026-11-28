@@ -137,6 +137,12 @@ Definition mapping_slot_def:
     word_of_bytes_be (Keccak_256_w64 (key_bytes ++ num_to_bytes 32 (w2n slot)))
 End
 
+(* A mapping is a storage array base with no element slots to clear. *)
+Definition mapping_base_type_def:
+  (mapping_base_type (MappingT _ _) = T) ∧
+  (mapping_base_type _ = F)
+End
+
 (* Short bytes share the root word with a low-byte length tag; long bytes
  * start at keccak256(root). Invalid length tags panic before any access. *)
 Definition storage_byte_length_def:
@@ -257,17 +263,20 @@ End
  * follows with a write of b at the returned location: a short sequence's
  * length tag rises by 2; at 31 bytes the root word, its tag byte cleared,
  * moves to the data area; a long sequence's length rises by one. solc's
- * push() also clears a short root word past the new length; its own writes
- * keep those bytes zero, so push() shares this update. *)
+ * no-argument push() also clears a short root word past the new length,
+ * while push(value) preserves those bytes until its value write. *)
 Definition push_storage_bytes_def:
-  push_storage_bytes accounts addr slot =
+  push_storage_bytes clear_tail accounts addr slot =
     case storage_byte_length accounts addr slot of
       INR c => INR c
     | INL length =>
         if 2 ** 64 ≤ length then INR (PanicCompletion 65) else
         let root = lookup_storage slot (lookup_account addr accounts).storage in
         let accounts' =
-          if length < 31 then set_storage_word accounts addr slot (root + 2w)
+          if length < 31 then set_storage_word accounts addr slot
+            (if clear_tail then
+               word_prefix root (length + 1) + n2w (2 * (length + 1))
+             else root + 2w)
           else if length = 31 then
             set_storage_word
               (set_storage_word accounts addr (mapping_slot [] slot) (word_prefix root 31))
@@ -520,7 +529,10 @@ Definition clear_storage_value_def:
                 long_bytes_scratch accounts addr slot))
     else case ty of
       ArrayT element l =>
-        (case storage_array_data accounts addr slot ty of
+        (if mapping_base_type element then
+           INL (if l = NONE then set_storage_word accounts addr slot 0w
+                else accounts, NONE)
+         else case storage_array_data accounts addr slot ty of
            (length, data) =>
              let accounts1 = if l = NONE then set_storage_word accounts addr slot 0w
                              else accounts in
@@ -856,6 +868,7 @@ val () = cv_auto_trans write_storage_word_def;
 val () = cv_auto_trans write_storage_def;
 val () = cv_auto_trans state_reference_def;
 val () = cv_auto_trans storage_byte_length_def;
+val () = cv_auto_trans mapping_base_type_def;
 val () = cv_auto_trans storage_byte_location_def;
 val () = cv_auto_trans navigate_storage_byte_def;
 val () = cv_auto_trans storage_byte_range_def;

@@ -1,0 +1,22 @@
+{
+  "name": "base_argument_order",
+  "source": "testdata/differential/base_argument_order.sol",
+  "contract": "BaseArgumentOrder",
+  "artifact": "testdata/differential/expected/base_argument_order.json",
+  "cases": [
+    {
+      "name": "storage_copies_before_later_argument",
+      "deploy": true,
+      "args": [],
+      "expect": {
+        "return": []
+      },
+      "final_storage": {
+        "0": 1,
+        "1": 1,
+        "2": "0x2a00000000000000000000000000000000000000000000000000000000000002",
+        "0xb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6": 7
+      }
+    }
+  ]
+}

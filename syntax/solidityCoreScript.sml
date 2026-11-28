@@ -197,9 +197,9 @@ Datatype:
   | AbiDecodeOperation (sol_type list) core_atom
   (* A non-reverting typed catch decoder, and the generic catch's lazy copy
    * of the internal RevertDataType value into source memory. *)
-  | TryDecodeErrorOperation catch_kind core_atom
+  | TryDecodeErrorOperation catch_kind bool core_atom
   | MaterializeRevertDataOperation core_atom
-  | ArrayPushOperation core_atom
+  | ArrayPushOperation bool core_atom
   | ArrayPopOperation core_atom
   | InternalCallOperation ast_id (core_atom list)
   (* a call of the procedure an internal function value names *)

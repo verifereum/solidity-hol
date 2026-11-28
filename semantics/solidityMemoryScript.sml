@@ -511,16 +511,22 @@ Definition copy_bytes_to_storage_def:
             | INR c => (INR c, st3)
 End
 
-(* A byte copy into storage; one from the slot it targets changes nothing,
- * since the compiler's copy returns before it writes or uses its scratch. *)
+(* A byte copy into storage from v: a reference's bytes as they are, or a
+ * literal's constant bytes, which are written with no copy in memory first;
+ * one from the slot it targets changes nothing, since the compiler's copy
+ * returns before it writes or uses its scratch. *)
 Definition copy_byte_contents_def:
-  copy_byte_contents src dst st =
+  copy_byte_contents v dst st =
     case dst of
       StorageReference PersistentStorage dst_addr dst_slot dst_offset dst_ty _ =>
-        (case src of
-           StorageReference PersistentStorage src_addr src_slot _ _ _ =>
+        (case v of
+           ReferenceValue (StorageReference PersistentStorage src_addr src_slot
+                             src_offset src_ty src_layout) =>
              if src_addr = dst_addr ∧ src_slot = dst_slot then (INL (), st) else
-             (case copy_storage_bytes st.world.accounts src dst st.frame.static_context of
+             (case copy_storage_bytes st.world.accounts
+                     (StorageReference PersistentStorage src_addr src_slot
+                        src_offset src_ty src_layout)
+                     dst st.frame.static_context of
                 INL accounts =>
                   let accounts0 = st.world.accounts in
                   (INL (), scratch_write
@@ -533,16 +539,16 @@ Definition copy_byte_contents_def:
              if dst_offset ≠ 0 ∨ ¬byte_sequence_type dst_ty then
                (INR (InvalidCompletion "not storage bytes"), st)
              else
-             case src of
-               MemoryReference _ _ =>
-                 copy_bytes_to_storage dst_addr dst_slot (ReferenceValue src)
-                   st.frame.static_context st
-             | _ =>
-                 case byte_contents st src of
-                   INR c => (INR c, st)
-                 | INL (bs, st1) =>
-                     copy_bytes_to_storage dst_addr dst_slot (ScalarValue (BytesValue bs))
-                       st.frame.static_context st1)
+             case v of
+               ReferenceValue (MemoryReference _ _) =>
+                 copy_bytes_to_storage dst_addr dst_slot v st.frame.static_context st
+             | ReferenceValue src =>
+                 (case byte_contents st src of
+                    INR c => (INR c, st)
+                  | INL (bs, st1) =>
+                      copy_bytes_to_storage dst_addr dst_slot (ScalarValue (BytesValue bs))
+                        st.frame.static_context st1)
+             | _ => copy_bytes_to_storage dst_addr dst_slot v st.frame.static_context st)
     | _ => (INR (InvalidCompletion "bad storage byte copy"), st)
 End
 

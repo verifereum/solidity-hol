@@ -735,6 +735,16 @@ Definition write_target_value_def:
     | _ => NONE
 End
 
+(* A target in persistent or transient storage, in a static frame: a write
+ * there fails, and this names why. *)
+Definition static_storage_target_def:
+  static_storage_target (st : source_state) t ⇔
+    st.frame.static_context ∧
+    case FLOOKUP st.targets (ast_key t) of
+      SOME (ValueTarget (StorageReference _ _ _ _ _ _)) => T
+    | _ => F
+End
+
 Definition write_target_def:
   write_target env t a st =
     case eval_atom st.scopes a of
@@ -775,7 +785,10 @@ Definition reset_target_def:
         | INL (v, st') =>
             case write_target_value env t v st' of
               SOME st'' => normal_result st'' gas
-            | NONE => abrupt_result (InvalidCompletion "bad reset target") st gas
+            | NONE =>
+                abrupt_result (InvalidCompletion
+                  (if static_storage_target st t then "transient reset in static frame"
+                   else "bad reset target")) st gas
 End
 
 (* The pinned profile checks push against 2^64, independently of source
@@ -784,7 +797,7 @@ End
  * collisions; pop clears the element before updating length. A byte array
  * pushes and pops as solc's byte array functions do (solidityStorage). *)
 Definition push_storage_array_def:
-  push_storage_array env x annotation a (st : source_state) gas =
+  push_storage_array clear_tail env x annotation a (st : source_state) gas =
     if st.frame.static_context then
       abrupt_result (InvalidCompletion "array push in static frame") st gas
     else case eval_atom st.scopes a of
@@ -810,7 +823,7 @@ Definition push_storage_array_def:
          | _ => abrupt_result (InvalidCompletion "bad array push element") st gas)
     | SOME (ReferenceValue
         (StorageReference PersistentStorage addr slot 0 BytesT layout)) =>
-        (case push_storage_bytes st.world.accounts addr slot of
+        (case push_storage_bytes clear_tail st.world.accounts addr slot of
            INL (accounts, data_slot, offset) =>
              normal_result
                (define_binding x annotation
@@ -1133,14 +1146,15 @@ Definition materialize_revert_data_def:
     | INR c => INR c
 End
 
-(* The compiler's catch decoders. Both first copy the selector to the scratch
- * space when there is one. Panic copies its code word to the scratch space.
+(* The compiler's catch decoders. The first typed clause copies the selector
+ * to the scratch space when there is one. Panic copies its code word there.
  * Error copies the data after the selector to the free memory pointer, where
  * the string stays: the decoder does not require canonical offsets or
  * padding, and only a successful decode moves the free memory pointer. *)
 Definition try_decode_error_def:
-  try_decode_error kind data st =
-    let st0 = if 3 < LENGTH data then memory_write 0 (TAKE 4 data) st else st in
+  try_decode_error kind write_selector data st =
+    let st0 = if write_selector ∧ 3 < LENGTH data
+              then memory_write 0 (TAKE 4 data) st else st in
     case kind of
       PanicCatch =>
         if 36 ≤ LENGTH data ∧ TAKE 4 data = [0x4ew; 0x48w; 0x7bw; 0x71w] then
@@ -1163,6 +1177,7 @@ Definition try_decode_error_def:
           INL (missing, st2) else
         (case finalize_allocation p (offset + 32 + length) st2 of
            INL st3 =>
+             if p + offset = 0 then INL (missing, st3) else
              INL (TupleValue [ScalarValue (BoolValue T);
                     ReferenceValue (MemoryReference (p + offset) StringT)], st3)
          | INR c => INR c)
@@ -1493,8 +1508,8 @@ Definition simple_stmt_def:
         abi_encode env x ty selector tys args st gas
     | DefineStmt x ty (AbiEncodePackedOperation tys args) =>
         abi_encode_packed env x ty tys args st gas
-    | DefineStmt x ty (ArrayPushOperation a) =>
-        push_storage_array env x ty a st gas
+    | DefineStmt x ty (ArrayPushOperation clear_tail a) =>
+        push_storage_array clear_tail env x ty a st gas
     | DefineStmt x ty (ArrayPopOperation a) =>
         pop_storage_array n env x ty a st gas
     | DefineStmt x ty (ExternalCallOperation kind selector params rets target
@@ -1506,10 +1521,10 @@ Definition simple_stmt_def:
         call_create F env x ty code params value salt args st gas
     | DefineStmt x ty (TryCreateContractOperation code params value salt args) =>
         call_create T env x ty code params value salt args st gas
-    | DefineStmt x ty (TryDecodeErrorOperation kind a) =>
+    | DefineStmt x ty (TryDecodeErrorOperation kind write_selector a) =>
         (case eval_atom st.scopes a of
            SOME (ScalarValue (BytesValue data)) =>
-             (case try_decode_error kind data st of
+             (case try_decode_error kind write_selector data st of
                 INL (v, st1) => normal_result (define_binding x ty v st1) gas
               | INR c => abrupt_result c st gas)
          | _ => abrupt_result (InvalidCompletion "bad catch data") st gas)
@@ -1584,14 +1599,14 @@ Definition simple_stmt_def:
          | NONE => abrupt_result (InvalidCompletion "bad reference binding") st gas)
     | CopyContentsStmt src_ty _ a b =>
         (case (eval_atom st.scopes a, eval_atom st.scopes b) of
-           (SOME (ReferenceValue src), SOME (ReferenceValue dst)) =>
+           (SOME src, SOME (ReferenceValue dst)) =>
              (case (case src_ty of
                       LocatedT _ (ArrayT element length) => SOME (ArrayT element length)
                     | LocatedT _ (StructT s) => SOME (StructT s)
                     | _ => NONE) of
                 SOME cty =>
                   (* The source is read as the copy reaches it. *)
-                  (case copy_to_storage env cty (ReferenceValue src) dst
+                  (case copy_to_storage env cty src dst
                           st.frame.static_context st of
                      (INL _, st1) => normal_result st1 gas
                    | (INR c, st1) => abrupt_result c st1 gas)
@@ -1604,7 +1619,10 @@ Definition simple_stmt_def:
     | WriteScalarStmt t ty a =>
         (case write_target env t a st of
            SOME st' => normal_result st' gas
-         | NONE => abrupt_result (InvalidCompletion "bad scalar write") st gas)
+         | NONE =>
+             abrupt_result (InvalidCompletion
+               (if static_storage_target st t then "storage write in static frame"
+                else "bad scalar write")) st gas)
     | ReturnStmt atoms =>
         (case eval_atoms st.scopes atoms of
            SOME vs => abrupt_result (ReturnCompletion vs) st gas
@@ -2019,6 +2037,15 @@ Definition assembly_result_def:
           st gas
 End
 
+(* Why a block naming a builtin it may not run is rejected: a state write
+ * in a static frame, or a builtin the block may never run here. *)
+Definition assembly_rejection_def:
+  assembly_rejection static code_bad code =
+    if static ∧ assembly_stmts_ok (assembly_unsupported ++ code_bad) code
+    then "assembly state write in static frame"
+    else "unsupported assembly builtin"
+End
+
 Definition eval_assembly_def:
   eval_assembly n env code refs (st : source_state) gas =
     let code_bad =
@@ -2028,7 +2055,8 @@ Definition eval_assembly_def:
               then assembly_unsupported ++ assembly_state_writes ++ code_bad
               else assembly_unsupported ++ code_bad in
     if ¬assembly_stmts_ok bad code then
-      abrupt_result (InvalidCompletion "unsupported assembly builtin") st gas
+      abrupt_result (InvalidCompletion
+        (assembly_rejection st.frame.static_context code_bad code)) st gas
     else if st.return_data = NONE ∧ ¬assembly_calls_ok code then
       abrupt_result (InvalidCompletion "assembly reads return data the source does not know") st gas
     else
@@ -2197,6 +2225,7 @@ val () = cv_auto_trans abi_encode_def;
 val () = cv_auto_trans abi_encode_packed_def;
 val () = cv_auto_trans write_target_value_def;
 val () = cv_auto_trans write_target_def;
+val () = cv_auto_trans static_storage_target_def;
 val () = cv_auto_trans reset_target_def;
 val () = cv_auto_trans simple_stmt_def;
 val () = cv_auto_trans assembly_value_def;
@@ -2235,6 +2264,7 @@ val () = cv_auto_trans calldata_in_bounds_def;
 val () = cv_auto_trans assembly_calldata_ok_def;
 val () = cv_auto_trans assembly_write_back_def;
 val () = cv_auto_trans assembly_result_def;
+val () = cv_auto_trans assembly_rejection_def;
 val () = cv_auto_trans eval_assembly_def;
 val () = cv_auto_trans bind_call_result_def;
 val () = cv_auto_trans procedure_completion_def;

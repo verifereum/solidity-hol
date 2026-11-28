@@ -25,6 +25,7 @@ Ancestors
   solidityDifferentialCorpus_assembly_return_data
   solidityDifferentialCorpus_assembly_scratch
   solidityDifferentialCorpus_assembly_structs
+  solidityDifferentialCorpus_base_argument_order
   solidityDifferentialCorpus_builtins
   solidityDifferentialCorpus_byte_mapping_keys
   solidityDifferentialCorpus_bytes_constants
@@ -69,6 +70,7 @@ Ancestors
   solidityDifferentialCorpus_external
   solidityDifferentialCorpus_external_function_values
   solidityDifferentialCorpus_fallback
+  solidityDifferentialCorpus_free_pointer_moves
   solidityDifferentialCorpus_function_references
   solidityDifferentialCorpus_function_types
   solidityDifferentialCorpus_function_values
@@ -90,6 +92,7 @@ Ancestors
   solidityDifferentialCorpus_library_calls
   solidityDifferentialCorpus_library_structs
   solidityDifferentialCorpus_literal_bytes
+  solidityDifferentialCorpus_literal_storage
   solidityDifferentialCorpus_literals
   solidityDifferentialCorpus_low_level_calls
   solidityDifferentialCorpus_mappings
@@ -128,9 +131,11 @@ Ancestors
   solidityDifferentialCorpus_storage_arrays
   solidityDifferentialCorpus_storage_bytes
   solidityDifferentialCorpus_storage_bytes_aliases
+  solidityDifferentialCorpus_storage_bytes_audit
   solidityDifferentialCorpus_storage_call_data
   solidityDifferentialCorpus_storage_copy_order
   solidityDifferentialCorpus_storage_enum_arrays
+  solidityDifferentialCorpus_storage_mapping_audit
   solidityDifferentialCorpus_storage_memory_padding
   solidityDifferentialCorpus_storage_pointer_base
   solidityDifferentialCorpus_storage_pointers
@@ -149,6 +154,7 @@ Ancestors
   solidityDifferentialCorpus_type_bounds
   solidityDifferentialCorpus_type_members
   solidityDifferentialCorpus_typed_catches
+  solidityDifferentialCorpus_typed_catches_audit
   solidityDifferentialCorpus_udvt
   solidityDifferentialCorpus_uninitialized_storage_pointers
   solidityDifferentialCorpus_using_for

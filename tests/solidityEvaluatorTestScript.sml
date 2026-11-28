@@ -353,7 +353,7 @@ QED
 
 (* The EVM halts exceptionally on SSTORE in a static frame. *)
 Theorem static_store_invalid:
-  run_store static_state 5 = InvalidCompletion "bad scalar write"
+  run_store static_state 5 = InvalidCompletion "storage write in static frame"
 Proof
   CONV_TAC cv_eval
 QED
@@ -395,7 +395,7 @@ QED
 Definition static_byte_copy_def:
   static_byte_copy bad_src bad_dst =
     FST (copy_byte_contents
-      (StorageReference PersistentStorage 0w 0w 0 BytesT (LayoutId 1))
+      (ReferenceValue (StorageReference PersistentStorage 0w 0w 0 BytesT (LayoutId 1)))
       (StorageReference PersistentStorage 0w 1w 0 BytesT (LayoutId 2))
       (static_state with world := static_state.world with accounts :=
         set_storage_word (set_storage_word empty_accounts 0w 0w bad_src) 0w 1w bad_dst))
@@ -588,10 +588,10 @@ QED
 (* A static frame rejects a block naming sstore, even on a path not taken. *)
 Theorem asm_static_store_invalid:
   run_asm [store_x] static_state (AstId 110) [ScalarValue (IntegerValue 7)] =
-    InvalidCompletion "unsupported assembly builtin" ∧
+    InvalidCompletion "assembly state write in static frame" ∧
   run_asm [YulIf (ylit 0w) [store_x]] static_state (AstId 110)
     [ScalarValue (IntegerValue 7)] =
-    InvalidCompletion "unsupported assembly builtin"
+    InvalidCompletion "assembly state write in static frame"
 Proof
   CONV_TAC cv_eval
 QED
@@ -1442,7 +1442,7 @@ Theorem asm_calls_run:
   run_asm [YulAssign ["x"] (ycall (ylit 0x5000w) 0w 0w 0w 32w)]
     (call_state with frame := call_state.frame with static_context := T)
     (AstId 110) [ScalarValue (IntegerValue 7)] =
-    InvalidCompletion "unsupported assembly builtin" ∧
+    InvalidCompletion "assembly state write in static frame" ∧
   run_asm [YulAssign ["x"] (YulBuiltin YStaticCall
              [YulBuiltin YGas []; ylit 0x5000w; ylit 0w; ylit 0w; ylit 0w; ylit 32w])]
     (call_state with frame := call_state.frame with static_context := T)
@@ -1491,7 +1491,7 @@ Theorem asm_delegate_call:
   run_asm [YulAssign ["x"] (ydelegate (ylit 0x5005w) 0w 32w)]
     (delegate_state with frame := delegate_state.frame with static_context := T)
     (AstId 110) [ScalarValue (IntegerValue 7)] =
-    InvalidCompletion "unsupported assembly builtin"
+    InvalidCompletion "assembly state write in static frame"
 Proof
   CONV_TAC cv_eval
 QED
@@ -1631,7 +1631,7 @@ Proof
 QED
 
 Theorem transient_static_write_rejected:
-  (transient_counter_run static_state 5).completion = InvalidCompletion "bad scalar write"
+  (transient_counter_run static_state 5).completion = InvalidCompletion "storage write in static frame"
 Proof
   CONV_TAC cv_eval
 QED
@@ -2005,6 +2005,17 @@ Theorem reset_storage_in_static_frame_fails:
   (reset_target 1 recursive_reset_env (AstId 1) (StructT (AstId 900))
      (recursive_reset_state with frame := recursive_reset_state.frame with static_context := T)
      []).completion = InvalidCompletion "storage reset in static frame"
+Proof
+  CONV_TAC cv_eval
+QED
+
+Theorem reset_transient_in_static_frame_fails:
+  (reset_target 1 test_env (AstId 1) (UintT 8)
+     (initial_state with <|
+        frame := initial_state.frame with static_context := T;
+        targets := FEMPTY |+ (ast_key (AstId 1), ValueTarget
+          (StorageReference TransientStorage 0w 3w 0 (UintT 8) (LayoutId 0))) |>)
+     []).completion = InvalidCompletion "transient reset in static frame"
 Proof
   CONV_TAC cv_eval
 QED

@@ -32,7 +32,7 @@
       "tests": 1
     },
     {
-      "feature": "unsupported memory struct type",
+      "feature": "unsupported parameter or return type",
       "only_blocker": 0,
       "tests": 1
     }
@@ -61,7 +61,7 @@
     },
     {
       "admitted": 54,
-      "feature": "unsupported memory struct type"
+      "feature": "unsupported parameter or return type"
     }
   ],
   "profile": "solc-0.8.37-via-ir-osaka",
@@ -654,10 +654,10 @@
       "reason": null,
       "test": "abicoder/calldataDecoding/array/calldata_array_slicing_v2.sol",
       "unsupported": [
-        "IndexAccess 15: expected ElementaryTypeNameExpression\n21: length of a non-array",
-        "IndexAccess 42: expected ElementaryTypeNameExpression\n51: length of a non-array",
-        "IndexAccess 66: expected ElementaryTypeNameExpression\n71: length of a non-array",
-        "IndexAccess 86: expected ElementaryTypeNameExpression\n91: length of a non-array",
+        "IndexAccess 15: expected ElementaryTypeNameExpression\n21: .length of this expression",
+        "IndexAccess 42: expected ElementaryTypeNameExpression\n51: .length of this expression",
+        "IndexAccess 66: expected ElementaryTypeNameExpression\n71: .length of this expression",
+        "IndexAccess 86: expected ElementaryTypeNameExpression\n91: .length of this expression",
         "IndexAccess 110: expected ElementaryTypeNameExpression"
       ]
     },
@@ -4995,7 +4995,7 @@
       "reason": null,
       "test": "deployedCodeExclusion/static_base_function_deployed.sol",
       "unsupported": [
-        "29: not a storage location"
+        "29: identifier is not a state variable"
       ]
     },
     {
@@ -5309,7 +5309,7 @@
       "reason": null,
       "test": "errors/require_custom_error_can_be_parenthesized.sol",
       "unsupported": [
-        "11: call of an unsupported function"
+        "11: call of an unsupported function\n11: unsupported identifier"
       ]
     },
     {
@@ -5975,7 +5975,7 @@
       "reason": null,
       "test": "events/event_indexed_string.sol",
       "unsupported": [
-        "30: not a storage location"
+        "30: unsupported expression as a storage location"
       ]
     },
     {
@@ -6374,7 +6374,7 @@
       "reason": null,
       "test": "expressions/uncalled_address_transfer_send.sol",
       "unsupported": [
-        "MemberAccess 7: unsupported built-in member"
+        "MemberAccess 7: unsupported built-in member transfer"
       ]
     },
     {
@@ -6386,7 +6386,7 @@
       "reason": null,
       "test": "externalContracts/FixedFeeRegistrar.sol",
       "unsupported": [
-        "MemberAccess 120: unsupported built-in member\n122: unsupported callee"
+        "MemberAccess 120: unsupported built-in member send\n122: unsupported callee"
       ]
     },
     {
@@ -7472,7 +7472,7 @@
       "reason": null,
       "test": "functionCall/send_zero_ether.sol",
       "unsupported": [
-        "MemberAccess 26: unsupported built-in member\n28: unsupported callee"
+        "MemberAccess 26: unsupported built-in member send\n28: unsupported callee"
       ]
     },
     {
@@ -7807,7 +7807,7 @@
       "reason": null,
       "test": "functionTypes/ternary_contract_internal_function.sol",
       "unsupported": [
-        "30: unsupported callee"
+        "30: unsupported callee\n24: identifier is not a state variable\n26: identifier is not a state variable"
       ]
     },
     {
@@ -7819,7 +7819,7 @@
       "reason": null,
       "test": "functionTypes/ternary_contract_library_internal_function.sol",
       "unsupported": [
-        "31: unsupported callee"
+        "31: unsupported callee\n27: identifier is not a state variable"
       ]
     },
     {
@@ -7831,7 +7831,7 @@
       "reason": null,
       "test": "functionTypes/ternary_contract_public_function.sol",
       "unsupported": [
-        "30: unsupported callee"
+        "30: unsupported callee\n24: identifier is not a state variable\n26: identifier is not a state variable"
       ]
     },
     {
@@ -8425,7 +8425,7 @@
       "reason": null,
       "test": "inheritance/inherited_function_through_dispatch.sol",
       "unsupported": [
-        "31: not a storage location"
+        "31: identifier is not a state variable"
       ]
     },
     {
@@ -13524,8 +13524,8 @@
         "38: storage copy of this type",
         "77: storage copy of this type",
         "123: storage copy of this type",
-        "188: unsupported memory struct type",
-        "237: unsupported memory struct type",
+        "188: unsupported parameter or return type",
+        "237: unsupported parameter or return type",
         "246: unsupported declaration"
       ],
       "category": "elaboration-rejected",
@@ -13533,10 +13533,10 @@
       "features": [
         "storage copy of this type",
         "unsupported declaration",
-        "unsupported memory struct type"
+        "unsupported parameter or return type"
       ],
       "functions": 0,
-      "reason": "38: storage copy of this type\n77: storage copy of this type\n123: storage copy of this type\n188: unsupported memory struct type\n237: unsupported memory struct type\n246: unsupported declaration",
+      "reason": "38: storage copy of this type\n77: storage copy of this type\n123: storage copy of this type\n188: unsupported parameter or return type\n237: unsupported parameter or return type\n246: unsupported declaration",
       "test": "structs/conversion/recursive_storage_memory_complex.sol",
       "unsupported": []
     },
@@ -14323,8 +14323,8 @@
       "reason": null,
       "test": "tryCatch/try_catch_library_call.sol",
       "unsupported": [
-        "MemberAccess 67: unsupported call options\n67: unsupported identifier\n74: unsupported identifier\n84: unsupported identifier",
-        "MemberAccess 107: an attached function is supported only as a callee\nMemberAccess 107: unsupported call options\n113: unsupported identifier\n123: unsupported identifier"
+        "MemberAccess 67: try on a library call is not supported\n67: unsupported identifier\n74: unsupported identifier\n84: unsupported identifier",
+        "MemberAccess 107: an attached function is supported only as a callee\nMemberAccess 107: try on a library call is not supported\n113: unsupported identifier\n123: unsupported identifier"
       ]
     },
     {
@@ -14616,11 +14616,11 @@
       "reason": null,
       "test": "types/nested_tuples.sol",
       "unsupported": [
-        "15: not a storage location",
-        "43: type annotation mismatch\n37: not a storage location",
-        "65: type annotation mismatch\n59: not a storage location",
-        "86: type annotation mismatch",
-        "107: type annotation mismatch"
+        "15: unsupported expression as a storage location",
+        "43: unsupported tuple type\n37: unsupported expression as a storage location",
+        "65: unsupported tuple type\n59: unsupported expression as a storage location",
+        "86: unsupported tuple type",
+        "107: unsupported tuple type"
       ]
     },
     {
@@ -14672,7 +14672,7 @@
       "reason": null,
       "test": "types/tuple_assign_multi_slot_grow.sol",
       "unsupported": [
-        "27: type annotation mismatch\n24: string literal conversion\n25: string literal conversion"
+        "27: unsupported tuple type\n24: string literal conversion\n25: string literal conversion"
       ]
     },
     {
@@ -14914,7 +14914,7 @@
       "reason": null,
       "test": "userDefinedValueType/in_parenthesis.sol",
       "unsupported": [
-        "MemberAccess 12: unsupported built-in member\nMemberAccess 24: unsupported built-in member\n10: unsupported identifier\n22: unsupported identifier"
+        "MemberAccess 12: unsupported built-in member wrap\nMemberAccess 24: unsupported built-in member unwrap\n10: unsupported identifier\n22: unsupported identifier"
       ]
     },
     {
@@ -15034,7 +15034,7 @@
       "reason": null,
       "test": "userDefinedValueType/wrap_unwrap.sol",
       "unsupported": [
-        "MemberAccess 7: unsupported built-in member\nMemberAccess 11: unsupported built-in member\n5: unsupported identifier\n9: unsupported identifier"
+        "MemberAccess 7: unsupported built-in member wrap\nMemberAccess 11: unsupported built-in member unwrap\n5: unsupported identifier\n9: unsupported identifier"
       ]
     },
     {
@@ -15330,7 +15330,7 @@
       "reason": null,
       "test": "variables/mapping_local_tuple_assignment.sol",
       "unsupported": [
-        "39: type annotation mismatch"
+        "39: unsupported tuple type"
       ]
     },
     {

@@ -1126,7 +1126,7 @@ Definition wf_core_operation_def:
     annotation = call_result_type tys ∧
     (wf_core_atom env ctx (SingleType (LocatedT MemoryLoc BytesT)) a ∨
      wf_core_atom env ctx (SingleType (LocatedT CalldataLoc BytesT)) a)) ∧
-  (wf_core_operation env ctx annotation (TryDecodeErrorOperation kind a) ⇔
+  (wf_core_operation env ctx annotation (TryDecodeErrorOperation kind _ a) ⇔
     kind ≠ GenericCatch ∧
     annotation = call_result_type [BoolT; catch_parameter_type kind] ∧
     wf_core_atom env ctx RevertDataType a) ∧
@@ -1143,7 +1143,7 @@ Definition wf_core_operation_def:
          | SOME (ReferenceType (ArrayT _ NONE)) => T
          | _ => F)
     | _ => F) ∧
-  (wf_core_operation env ctx annotation (ArrayPushOperation a) ⇔
+  (wf_core_operation env ctx annotation (ArrayPushOperation _ a) ⇔
     case a of
       BoundAtom x =>
         (case storage_base (ALOOKUP ctx.bindings x) of
@@ -1561,13 +1561,17 @@ Definition check_core_stmts_def:
     if ALOOKUP ctx.targets t = SOME ty ∧ located_value_type ty ∧
        wf_core_atom env ctx (SingleType ty) a
     then check_core_stmts env ctx ss else NONE) ∧
+  (* A byte sequence may also be copied from literal bytes, with no copy in
+     memory first. *)
   (check_core_stmts env ctx (CopyContentsStmt src dst a b :: ss) =
     if (case (src, dst) of
           (LocatedT src_loc ty, LocatedT StorageLoc ty') =>
             copy_convertible (src_loc, ty) (StorageLoc, ty') ∧
-            memory_type_ok env (LENGTH env.type_declarations) ty
+            memory_type_ok env (LENGTH env.type_declarations) ty ∧
+            (case a of
+               ConstantAtom (BytesValue _) => byte_sequence_type ty
+             | _ => wf_core_atom env ctx (SingleType src) a)
         | _ => F) ∧
-       wf_core_atom env ctx (SingleType src) a ∧
        wf_core_atom env ctx (SingleType dst) b
     then check_core_stmts env ctx ss else NONE) ∧
   (check_core_stmts env ctx (ResetTargetStmt t ty :: ss) =
