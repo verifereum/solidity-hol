@@ -2076,7 +2076,7 @@ Definition elab_expr_def:
                             let (rs, a) = bind_value (n1 + 1) ty
                                             (ReadOperation element target) in
                             INL ((ss ++ [DefineStmt (AstId n1) (ReferenceType element)
-                                           (ArrayPushOperation ref)] ++ rs,
+                                           (ArrayPushOperation T ref)] ++ rs,
                                   a, ElabType ty), n1 + 2)
                         | [arg] =>
                             ensure (tid = "t_tuple$__$") (info.node_id, "type annotation mismatch")
@@ -2091,7 +2091,7 @@ Definition elab_expr_def:
                                     INL ((cs, _, _), n3) =>
                                       INL ((ss ++ saved ++ sa ++
                                               [DefineStmt (AstId n2) (ReferenceType element)
-                                                 (ArrayPushOperation array)] ++ cs,
+                                                 (ArrayPushOperation F array)] ++ cs,
                                             ConstantAtom (BoolValue F), ElabTuple []), n3)
                                   | INR why => INR [(expr_id arg, why)])
                              | INR bs => INR bs)
@@ -2818,7 +2818,7 @@ Definition elab_expr_def:
                        source_type_matches element tid)
                   then INR [(info.node_id, "unsupported array member call")] else
                   INL ((ss ++ [DefineStmt (AstId n1) (ReferenceType element)
-                                 (ArrayPushOperation ref)],
+                                 (ArrayPushOperation T ref)],
                         BoundAtom (AstId n1), element), n1 + 1)
               | NONE => INR [(info.node_id, "unsupported array member call")])
          | INR bs => INR bs)

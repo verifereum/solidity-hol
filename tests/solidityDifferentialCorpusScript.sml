@@ -131,6 +131,7 @@ Ancestors
   solidityDifferentialCorpus_storage_arrays
   solidityDifferentialCorpus_storage_bytes
   solidityDifferentialCorpus_storage_bytes_aliases
+  solidityDifferentialCorpus_storage_bytes_audit
   solidityDifferentialCorpus_storage_call_data
   solidityDifferentialCorpus_storage_copy_order
   solidityDifferentialCorpus_storage_enum_arrays

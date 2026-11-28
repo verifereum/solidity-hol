@@ -257,17 +257,20 @@ End
  * follows with a write of b at the returned location: a short sequence's
  * length tag rises by 2; at 31 bytes the root word, its tag byte cleared,
  * moves to the data area; a long sequence's length rises by one. solc's
- * push() also clears a short root word past the new length; its own writes
- * keep those bytes zero, so push() shares this update. *)
+ * no-argument push() also clears a short root word past the new length,
+ * while push(value) preserves those bytes until its value write. *)
 Definition push_storage_bytes_def:
-  push_storage_bytes accounts addr slot =
+  push_storage_bytes clear_tail accounts addr slot =
     case storage_byte_length accounts addr slot of
       INR c => INR c
     | INL length =>
         if 2 ** 64 ≤ length then INR (PanicCompletion 65) else
         let root = lookup_storage slot (lookup_account addr accounts).storage in
         let accounts' =
-          if length < 31 then set_storage_word accounts addr slot (root + 2w)
+          if length < 31 then set_storage_word accounts addr slot
+            (if clear_tail then
+               word_prefix root (length + 1) + n2w (2 * (length + 1))
+             else root + 2w)
           else if length = 31 then
             set_storage_word
               (set_storage_word accounts addr (mapping_slot [] slot) (word_prefix root 31))

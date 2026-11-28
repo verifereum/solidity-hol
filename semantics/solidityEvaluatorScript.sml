@@ -797,7 +797,7 @@ End
  * collisions; pop clears the element before updating length. A byte array
  * pushes and pops as solc's byte array functions do (solidityStorage). *)
 Definition push_storage_array_def:
-  push_storage_array env x annotation a (st : source_state) gas =
+  push_storage_array clear_tail env x annotation a (st : source_state) gas =
     if st.frame.static_context then
       abrupt_result (InvalidCompletion "array push in static frame") st gas
     else case eval_atom st.scopes a of
@@ -823,7 +823,7 @@ Definition push_storage_array_def:
          | _ => abrupt_result (InvalidCompletion "bad array push element") st gas)
     | SOME (ReferenceValue
         (StorageReference PersistentStorage addr slot 0 BytesT layout)) =>
-        (case push_storage_bytes st.world.accounts addr slot of
+        (case push_storage_bytes clear_tail st.world.accounts addr slot of
            INL (accounts, data_slot, offset) =>
              normal_result
                (define_binding x annotation
@@ -1506,8 +1506,8 @@ Definition simple_stmt_def:
         abi_encode env x ty selector tys args st gas
     | DefineStmt x ty (AbiEncodePackedOperation tys args) =>
         abi_encode_packed env x ty tys args st gas
-    | DefineStmt x ty (ArrayPushOperation a) =>
-        push_storage_array env x ty a st gas
+    | DefineStmt x ty (ArrayPushOperation clear_tail a) =>
+        push_storage_array clear_tail env x ty a st gas
     | DefineStmt x ty (ArrayPopOperation a) =>
         pop_storage_array n env x ty a st gas
     | DefineStmt x ty (ExternalCallOperation kind selector params rets target

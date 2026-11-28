@@ -1143,7 +1143,7 @@ Definition wf_core_operation_def:
          | SOME (ReferenceType (ArrayT _ NONE)) => T
          | _ => F)
     | _ => F) ∧
-  (wf_core_operation env ctx annotation (ArrayPushOperation a) ⇔
+  (wf_core_operation env ctx annotation (ArrayPushOperation _ a) ⇔
     case a of
       BoundAtom x =>
         (case storage_base (ALOOKUP ctx.bindings x) of
