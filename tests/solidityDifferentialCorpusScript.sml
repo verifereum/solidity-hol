@@ -154,6 +154,7 @@ Ancestors
   solidityDifferentialCorpus_type_bounds
   solidityDifferentialCorpus_type_members
   solidityDifferentialCorpus_typed_catches
+  solidityDifferentialCorpus_typed_catches_audit
   solidityDifferentialCorpus_udvt
   solidityDifferentialCorpus_uninitialized_storage_pointers
   solidityDifferentialCorpus_using_for

@@ -1126,7 +1126,7 @@ Definition wf_core_operation_def:
     annotation = call_result_type tys ∧
     (wf_core_atom env ctx (SingleType (LocatedT MemoryLoc BytesT)) a ∨
      wf_core_atom env ctx (SingleType (LocatedT CalldataLoc BytesT)) a)) ∧
-  (wf_core_operation env ctx annotation (TryDecodeErrorOperation kind a) ⇔
+  (wf_core_operation env ctx annotation (TryDecodeErrorOperation kind _ a) ⇔
     kind ≠ GenericCatch ∧
     annotation = call_result_type [BoolT; catch_parameter_type kind] ∧
     wf_core_atom env ctx RevertDataType a) ∧

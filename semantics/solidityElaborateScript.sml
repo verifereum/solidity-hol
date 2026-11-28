@@ -3269,7 +3269,7 @@ End
 (* The bindings supplied to one handler. A bare catch neither decodes nor
  * materializes the raw failure data. *)
 Definition catch_binding_def:
-  catch_binding n (info : node_info) kind ps failure =
+  catch_binding write_selector n (info : node_info) kind ps failure =
     case all_some (MAP (scoped_variable info.node_id) ps) of
       NONE => NONE
     | SOME locals =>
@@ -3283,7 +3283,7 @@ Definition catch_binding_def:
           let types = [BoolT; catch_parameter_type kind] in
           let r = BoundAtom (AstId n) in
           let ss = [DefineStmt (AstId n) (ProductType (MAP SingleType types))
-                      (TryDecodeErrorOperation kind failure)] in
+                      (TryDecodeErrorOperation kind write_selector failure)] in
           let (xs, vs, n1) = tuple_components (n + 1) r 0 types in
           case vs of
             [(condition, _); value] => SOME (ss ++ xs, SOME condition, [value], n1)
@@ -3338,7 +3338,7 @@ Definition elab_stmts_def:
     case try_operation ctx n info.node_id call of
       INR bs =>
         INR (bs ++ blockers (elab_stmt (bind_failed ctx (MAP SOME ps)) n body) ++
-             blockers (elab_catches ctx n (ConstantAtom (BytesValue [])) handlers))
+             blockers (elab_catches ctx n (ConstantAtom (BytesValue [])) T handlers))
     | INL ((ss, r, _), n1) =>
     case try_call ctx.structs n1 call ok.node_id ps body ss r of
       NONE =>
@@ -3346,21 +3346,21 @@ Definition elab_stmts_def:
                 [] => [(info.node_id, "unsupported try statement")]
               | bs => bs) ++
              blockers (elab_stmt (bind_failed ctx (MAP SOME ps)) n body) ++
-             blockers (elab_catches ctx n (ConstantAtom (BytesValue [])) handlers))
+             blockers (elab_catches ctx n (ConstantAtom (BytesValue [])) T handlers))
     | SOME (cs, condition, values, failure, n2) =>
         (case declare_values ctx n2 info.node_id
                 (MAP (λv. if v.var_name = "" then NONE else SOME v) ps) values of
            INL (ds, ctx1, n3) =>
              (case elab_stmt ctx1 n3 body of
                 INL ((bs, _), n4) =>
-                  (case elab_catches ctx n4 failure handlers of
+                  (case elab_catches ctx n4 failure T handlers of
                      INL ((hs, _), n5) =>
                        INL ((cs ++ [IfStmt condition (ds ++ bs) hs], ctx), n5)
                    | INR bs => INR bs)
-              | INR bs => INR (bs ++ blockers (elab_catches ctx n failure handlers)))
+              | INR bs => INR (bs ++ blockers (elab_catches ctx n failure T handlers)))
          | INR bs =>
              INR (bs ++ blockers (elab_stmt (bind_failed ctx (MAP SOME ps)) n body) ++
-                  blockers (elab_catches ctx n failure handlers)))) ∧
+                  blockers (elab_catches ctx n failure T handlers)))) ∧
   (elab_stmt ctx n (SrcVariableDeclarationStatement info assigned [SOME v] NONE) =
     case variable_type v of
       SOME ty =>
@@ -3552,25 +3552,25 @@ Definition elab_stmts_def:
   (* An optional for initialization or loop expression. *)
   (elab_for_init ctx n NONE = INL (([], ctx), n)) ∧
   (elab_for_init ctx n (SOME st) = elab_stmt ctx n st) ∧
-  (elab_catches ctx n failure [] = INL (([RevertStmt failure], ctx), n)) ∧
-  (elab_catches ctx n failure (SrcCatchClause info kind ps body :: rest) =
-    case catch_binding n info kind ps failure of
+  (elab_catches ctx n failure write_selector [] = INL (([RevertStmt failure], ctx), n)) ∧
+  (elab_catches ctx n failure write_selector (SrcCatchClause info kind ps body :: rest) =
+    case catch_binding write_selector n info kind ps failure of
       NONE =>
         INR ((case variables_blockers (MAP SOME ps) of
                 [] => [(info.node_id, "unsupported catch parameters")]
               | bs => bs) ++
              blockers (elab_stmt (bind_failed ctx (MAP SOME ps)) n body) ++
-             blockers (elab_catches ctx n failure rest))
+             blockers (elab_catches ctx n failure F rest))
     | SOME (pre, condition, values, n1) =>
       case declare_values ctx n1 info.node_id (MAP SOME ps) values of
         INR bs =>
           INR (bs ++ blockers (elab_stmt (bind_failed ctx (MAP SOME ps)) n body) ++
-               blockers (elab_catches ctx n failure rest))
+               blockers (elab_catches ctx n failure F rest))
       | INL (ds, ctx1, n2) =>
         case elab_stmt ctx1 n2 body of
-          INR bs => INR (bs ++ blockers (elab_catches ctx n failure rest))
+          INR bs => INR (bs ++ blockers (elab_catches ctx n failure F rest))
         | INL ((hs, _), n3) =>
-          case elab_catches ctx n3 failure rest of
+          case elab_catches ctx n3 failure F rest of
             INR bs => INR bs
           | INL ((tail, _), n4) =>
               INL ((pre ++ (case condition of NONE => ds ++ hs
@@ -3580,7 +3580,8 @@ Termination
      INL (ctx, n, ss) => list_size src_stmt_size ss
    | INR (INL (ctx, n, st)) => src_stmt_size st
    | INR (INR (INL (ctx, n, st))) => option_size src_stmt_size st
-   | INR (INR (INR (ctx, n, failure, cs))) => list_size src_catch_size cs)’ >>
+   | INR (INR (INR (ctx, n, failure, write_selector, cs))) =>
+       list_size src_catch_size cs)’ >>
   conj_tac >- simp[prim_recTheory.WF_measure] >>
   rpt conj_tac >>
   FIRST [rpt strip_tac >> rpt BasicProvers.VAR_EQ_TAC >>
@@ -4812,7 +4813,7 @@ val elab_stmts_pre_def = cv_auto_trans_pre_rec
      INL (ctx, n, ss) => cv_size ss
    | INR (INL (ctx, n, st)) => cv_size st
    | INR (INR (INL (ctx, n, st))) => cv_size st
-   | INR (INR (INR (ctx, n, failure, cs))) => cv_size cs)’ >>
+   | INR (INR (INR (ctx, n, failure, write_selector, cs))) => cv_size cs)’ >>
   cv_termination_tac
 );
 
@@ -4825,7 +4826,9 @@ Theorem elab_stmts_pre_bounded[local]:
   (!ctx n ss. list_size src_stmt_size ss < b ==> elab_stmts_pre ctx n ss) /\
   (!ctx n st. src_stmt_size st < b ==> elab_stmt_pre ctx n st) /\
   (!ctx n st. option_size src_stmt_size st < b ==> elab_for_init_pre ctx n st) /\
-  (!ctx n failure cs. list_size src_catch_size cs < b ==> elab_catches_pre ctx n failure cs)
+  (!ctx n failure write_selector cs.
+      list_size src_catch_size cs < b ==>
+      elab_catches_pre ctx n failure write_selector cs)
 Proof
   completeInduct_on ‘b’ >> rpt conj_tac >> rpt gen_tac >> disch_tac >>
   qpat_x_assum ‘!m. m < b ==> _’ (drule_then strip_assume_tac) >>
@@ -4841,7 +4844,8 @@ Theorem elab_stmts_pre[cv_pre,local]:
   (∀ctx n ss. elab_stmts_pre ctx n ss) ∧
   (∀ctx n st. elab_stmt_pre ctx n st) ∧
   (∀ctx n st. elab_for_init_pre ctx n st) ∧
-  (∀ctx n failure cs. elab_catches_pre ctx n failure cs)
+  (∀ctx n failure write_selector cs.
+      elab_catches_pre ctx n failure write_selector cs)
 Proof
   rpt conj_tac >> rpt gen_tac >| [
     irule (cj 1 elab_stmts_pre_bounded) >>

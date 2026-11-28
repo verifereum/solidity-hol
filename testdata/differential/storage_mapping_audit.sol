@@ -8,6 +8,7 @@ contract StorageMappingAudit {
 
     function deleteMapArr() external returns (uint256 scratch0) {
         a.push();
+        a[0][7] = 1;
         m[7] = 1;
         delete a;
         assembly { scratch0 := mload(0) }
@@ -15,6 +16,7 @@ contract StorageMappingAudit {
 
     function popMapArr() external returns (uint256 scratch0) {
         a.push();
+        a[0][7] = 1;
         m[7] = 1;
         a.pop();
         assembly { scratch0 := mload(0) }
