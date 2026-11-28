@@ -1694,6 +1694,85 @@ Definition call_argument_suffix_order_def:
     | i :: is => if i = 0 ∧ ¬MEM 0 is then SOME (MAP PRE is) else NONE
 End
 
+(* Keep higher-order list and option operations outside the expression mutual
+ * translation. *)
+Definition conditional_value_type_def:
+  conditional_value_type tid = OPTION_MAP read_value_type (identifier_type tid)
+End
+
+Definition tuple_copy_targets_ok_def:
+  tuple_copy_targets_ok enums structs targets =
+    EVERY (λc. case c of
+                   SOME (_, target) => copy_target_ok enums structs target
+                 | NONE => T) targets
+End
+
+Definition slice_bounds_ok_def:
+  slice_bounds_ok vs = EVERY (λ(a, vt). index_value_ok a vt) vs
+End
+
+Definition struct_constructor_fields_def:
+  struct_constructor_fields structs id =
+    OPTION_BIND (source_struct_members structs id) struct_field_types
+End
+
+(* Finish an argument list after its recursive operand walk has returned. *)
+Definition finish_elab_args_def:
+  finish_elab_args id order tys es r =
+    case r of
+      ((ss, os), n1) =>
+        case (arrange order os, arrange order (expr_ids es)) of
+          (SOME os', SOME ids) =>
+            (case convert_operands n1 id ids tys os' of
+               INL (cs, _, as, n2) =>
+                 if EVERY ISL os then INL ((ss ++ cs, as), n2)
+                 else INR (FLAT (MAP blockers os))
+             | INR bs =>
+                 (* an order that isn't a permutation can drop an operand *)
+                 INR (if argument_order_ok order (LENGTH order) then bs
+                      else bs ++ FLAT (MAP blockers os)))
+        | _ => INR ((id, "argument order") :: FLAT (MAP blockers os))
+End
+
+Definition finish_builtin_operation_def:
+  finish_builtin_operation id result args op r =
+    case r of
+      ((ss, os), n1) =>
+        (case elab_builtin n1 id (expr_ids args) op os of
+           INL ((cs, a), n2) => INL ((ss ++ cs, a, ElabType result), n2)
+         | INR bs => INR bs)
+End
+
+Definition finish_modular_operation_def:
+  finish_modular_operation id op args r =
+    case r of
+      ((ss, os), n1) =>
+        (case convert_operands n1 id (expr_ids args)
+               (values_of [UintT 256; UintT 256; UintT 256]) os of
+           INL (cs, _, as, n2) =>
+             let (rs, a) = bind_value n2 (UintT 256)
+                             (ScalarOperation (UintT 256) CheckedArithmetic op as) in
+             INL ((ss ++ cs ++ rs, a, ElabType (UintT 256)), n2 + 1)
+         | INR bs => INR bs)
+End
+
+Definition finish_abi_encode_def:
+  finish_abi_encode enums structs id ty form args r =
+    case r of
+      ((ss, os), n1) =>
+        (case checked_abi_encoding enums structs n1 id (expr_ids args) form os of
+           INL ((cs, op), n2) =>
+             let (es, a) = bind_value n2 ty op in
+             INL ((ss ++ cs ++ es, a, ElabType ty), n2 + 1)
+         | INR bs => INR bs)
+End
+
+Definition prepend_elab_arg_def:
+  prepend_elab_arg ss saved outcome r =
+    let ((ss', os), n) = r in
+    ((ss ++ saved ++ ss', outcome :: os), n)
+End
+
 (* Index the size equations once for the recursive calls and preconditions. *)
 val elab_size_ss = boss_ss () &&
   [prim_recTheory.measure_thm, solidityImportTheory.src_expr_size_def,
@@ -1817,7 +1896,7 @@ Definition elab_expr_def:
                       | (SOME a, SOME b) => [a; b] in
              (case operand_values (elab_arg_values ctx n2 es) of
                 INL ((bs, vs), n3) =>
-                  if ¬EVERY (λ(a, vt). index_value_ok a vt) vs
+                  if ¬slice_bounds_ok vs
                   then INR [(info.node_id, "slice bound of this type")] else
                   (case convert_operands n3 info.node_id (expr_ids es)
                           (REPLICATE (LENGTH es) (ValueOf (UintT 256))) (MAP INL vs) of
@@ -1977,10 +2056,7 @@ Definition elab_expr_def:
                   let (ss, vs', n2) = snapshot_values n1 vs in
                   (case elab_destinations ctx n2 cs of
                      INL ((ls, targets), n3) =>
-                       if ¬EVERY (λc. case c of
-                                        SOME (_, target) =>
-                                          copy_target_ok ctx.enums ctx.structs target
-                                      | NONE => T) targets
+                       if ¬tuple_copy_targets_ok ctx.enums ctx.structs targets
                        then INR [(info.node_id, "storage copy of this type")] else
                        (case tuple_writes n3 linfo.node_id targets vs' of
                           INL (ws, n4) =>
@@ -2243,7 +2319,7 @@ Definition elab_expr_def:
        allocated, and each field converted and written in declaration order *)
     | SrcStructConstructor info id args order tid =>
         let sty = LocatedT MemoryLoc (StructT (AstId id)) in
-        (case OPTION_BIND (source_struct_members ctx.structs id) struct_field_types of
+        (case struct_constructor_fields ctx.structs id of
            NONE => INR [(info.node_id, "unsupported struct constructor")]
          | SOME fields =>
            ensure (source_type_matches sty tid ∧ LENGTH args = LENGTH fields ∧
@@ -2362,7 +2438,7 @@ Definition elab_expr_def:
              else
              (case elab_expr ctx (n2 + 2) t of
                 INL ((st, at, vt), n3) =>
-                  (case OPTION_MAP read_value_type (identifier_type tid) of
+                  (case conditional_value_type tid of
                      SOME ty =>
                        if ¬(located_value_type ty ∨ is_stored_scalar_type ty) ∨
                           ¬memory_binding_ok ctx.enums ctx.structs ty
@@ -2404,32 +2480,19 @@ Definition elab_expr_def:
     | SrcBuiltinOperation info _ op args tid =>
         let result = SND (builtin_signature op) in
         ensure (source_type_matches result tid) (info.node_id, "type annotation mismatch")
-        (let ((ss, os), n1) = elab_arg_values ctx n args in
-         case elab_builtin n1 info.node_id (expr_ids args) op os of
-           INL ((cs, r), n2) => INL ((ss ++ cs, r, ElabType result), n2)
-         | INR bs => INR bs)
+        (finish_builtin_operation info.node_id result args op
+           (elab_arg_values ctx n args))
     | SrcModular info _ op args tid =>
         (* the operands in order, then the modulus check and the operation *)
         ensure (source_type_matches (UintT 256) tid) (info.node_id, "type annotation mismatch")
-        (let ((ss, os), n1) = elab_arg_values ctx n args in
-         case convert_operands n1 info.node_id (expr_ids args)
-                (values_of [UintT 256; UintT 256; UintT 256]) os of
-           INL (cs, _, as, n2) =>
-             let (rs, r) = bind_value n2 (UintT 256)
-                             (ScalarOperation (UintT 256) CheckedArithmetic op as) in
-             INL ((ss ++ cs ++ rs, r, ElabType (UintT 256)), n2 + 1)
-         | INR bs => INR bs)
+        (finish_modular_operation info.node_id op args
+           (elab_arg_values ctx n args))
     | SrcAbiEncode info _ form args tid =>
         (let ty = LocatedT MemoryLoc
                     (if form = AbiStringConcat then StringT else BytesT) in
          ensure (source_type_matches ty tid) (info.node_id, "type annotation mismatch")
-         (let ((ss, os), n1) = elab_arg_values ctx n args in
-          case checked_abi_encoding ctx.enums ctx.structs n1 info.node_id
-                 (expr_ids args) form os of
-            INL ((cs, op), n2) =>
-              let (es, r) = bind_value n2 ty op in
-              INL ((ss ++ cs ++ es, r, ElabType ty), n2 + 1)
-          | INR bs => INR bs))
+         (finish_abi_encode ctx.enums ctx.structs info.node_id ty form args
+            (elab_arg_values ctx n args)))
     (* The operands are the target, the call options in source order and
        the data, evaluated in that order. Only call sends value. *)
     | SrcLowLevelCall info _ kind opts operands tid =>
@@ -2624,18 +2687,7 @@ Definition elab_expr_def:
    * arranged in parameter order. Both schedules use assignment's coerce. *)
   (elab_args ctx n (id : num) early order tys es =
     if early = 0 then
-      let ((ss, os), n1) = elab_arg_values ctx n es in
-      case (arrange order os, arrange order (expr_ids es)) of
-        (SOME os', SOME ids) =>
-          (case convert_operands n1 id ids tys os' of
-             INL (cs, _, as, n2) =>
-               if EVERY ISL os then INL ((ss ++ cs, as), n2)
-               else INR (FLAT (MAP blockers os))
-           | INR bs =>
-               (* an order that isn't a permutation can drop an operand *)
-               INR (if argument_order_ok order (LENGTH order) then bs
-                    else bs ++ FLAT (MAP blockers os)))
-      | _ => INR ((id, "argument order") :: FLAT (MAP blockers os))
+      finish_elab_args id order tys es (elab_arg_values ctx n es)
     else
       case es of
         [] => INR [(id, "call with too few arguments")]
@@ -2946,11 +2998,10 @@ Definition elab_expr_def:
         let (captured, n2) =
           if exprs_assign es then snapshot n1 a vt else (([], a), n1) in
         let (saved, a') = captured in
-        let ((ss', os), n3) = elab_arg_values ctx n2 es in
-        ((ss ++ saved ++ ss', INL (a', vt) :: os), n3)
+        prepend_elab_arg ss saved (INL (a', vt))
+          (elab_arg_values ctx n2 es)
     | INR bs =>
-        let ((ss', os), n3) = elab_arg_values ctx n es in
-        ((ss', INR bs :: os), n3)) ∧
+        prepend_elab_arg [] [] (INR bs) (elab_arg_values ctx n es)) ∧
   (elab_destinations ctx n [] = INL (([], []), n)) ∧
   (elab_destinations ctx n (NONE :: cs) =
     case elab_destinations ctx n cs of
@@ -4624,10 +4675,18 @@ val () = cv_auto_trans finish_array_location_length_def;
 val () = cv_auto_trans finish_selector_def;
 val () = cv_auto_trans inline_array_type_def;
 val () = cv_auto_trans conditional_tuple_types_def;
+val () = cv_auto_trans conditional_value_type_def;
+val () = cv_auto_trans tuple_copy_targets_ok_def;
+val () = cv_auto_trans slice_bounds_ok_def;
+val () = cv_auto_trans struct_constructor_fields_def;
+val () = cv_auto_trans finish_elab_args_def;
+val () = cv_auto_trans finish_builtin_operation_def;
+val () = cv_auto_trans finish_modular_operation_def;
+val () = cv_auto_trans finish_abi_encode_def;
+val () = cv_auto_trans prepend_elab_arg_def;
 
 (* A missing dependency restarts the expression mutual translation. *)
 val () = cv_auto_trans function_value_type_def;
-val () = cv_auto_trans index_value_ok_def;
 val () = cv_auto_trans is_array_member_def;
 val () = cv_auto_trans direct_callee_def;
 val () = cv_auto_trans function_signature_def;
