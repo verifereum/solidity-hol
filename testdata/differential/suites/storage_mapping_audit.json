@@ -1,0 +1,38 @@
+{
+  "name": "storage_mapping_audit",
+  "source": "testdata/differential/storage_mapping_audit.sol",
+  "contract": "StorageMappingAudit",
+  "artifact": "testdata/differential/expected/storage_mapping_audit.json",
+  "cases": [
+    {
+      "name": "delete_map_array",
+      "calldata": "0xc2609fc2",
+      "expect": {
+        "returned": "0x0000000000000000000000000000000000000000000000000000000000000007"
+      },
+      "final_storage": {
+        "0xdc686ec4a0ff239c70e7c7c36e8f853eced3bc8618f48d2b816da2a74311237e": 1
+      }
+    },
+    {
+      "name": "pop_map_array",
+      "calldata": "0x892c3509",
+      "expect": {
+        "returned": "0x0000000000000000000000000000000000000000000000000000000000000002"
+      },
+      "final_storage": {
+        "0xdc686ec4a0ff239c70e7c7c36e8f853eced3bc8618f48d2b816da2a74311237e": 1
+      }
+    },
+    {
+      "name": "delete_static_map_array",
+      "calldata": "0xed8e9bf2",
+      "expect": {
+        "returned": "0x0000000000000000000000000000000000000000000000000000000000000007"
+      },
+      "final_storage": {
+        "0xf2c49132ed1cee2a7e75bde50d332a2f81f1d01e5456d8a19d1df09bd561dbd2": 1
+      }
+    }
+  ]
+}

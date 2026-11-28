@@ -137,6 +137,12 @@ Definition mapping_slot_def:
     word_of_bytes_be (Keccak_256_w64 (key_bytes ++ num_to_bytes 32 (w2n slot)))
 End
 
+(* A mapping is a storage array base with no element slots to clear. *)
+Definition mapping_base_type_def:
+  (mapping_base_type (MappingT _ _) = T) ∧
+  (mapping_base_type _ = F)
+End
+
 (* Short bytes share the root word with a low-byte length tag; long bytes
  * start at keccak256(root). Invalid length tags panic before any access. *)
 Definition storage_byte_length_def:
@@ -523,7 +529,10 @@ Definition clear_storage_value_def:
                 long_bytes_scratch accounts addr slot))
     else case ty of
       ArrayT element l =>
-        (case storage_array_data accounts addr slot ty of
+        (if mapping_base_type element then
+           INL (if l = NONE then set_storage_word accounts addr slot 0w
+                else accounts, NONE)
+         else case storage_array_data accounts addr slot ty of
            (length, data) =>
              let accounts1 = if l = NONE then set_storage_word accounts addr slot 0w
                              else accounts in
@@ -859,6 +868,7 @@ val () = cv_auto_trans write_storage_word_def;
 val () = cv_auto_trans write_storage_def;
 val () = cv_auto_trans state_reference_def;
 val () = cv_auto_trans storage_byte_length_def;
+val () = cv_auto_trans mapping_base_type_def;
 val () = cv_auto_trans storage_byte_location_def;
 val () = cv_auto_trans navigate_storage_byte_def;
 val () = cv_auto_trans storage_byte_range_def;

@@ -135,6 +135,7 @@ Ancestors
   solidityDifferentialCorpus_storage_call_data
   solidityDifferentialCorpus_storage_copy_order
   solidityDifferentialCorpus_storage_enum_arrays
+  solidityDifferentialCorpus_storage_mapping_audit
   solidityDifferentialCorpus_storage_memory_padding
   solidityDifferentialCorpus_storage_pointer_base
   solidityDifferentialCorpus_storage_pointers
