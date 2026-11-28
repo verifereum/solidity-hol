@@ -17,93 +17,62 @@ tools/semantic_tests_coverage.py ../solidity-tests --solc /path/to/solc
 
 | outcome | tests |
 | --- | ---: |
-| admitted | 1354 |
-| partially-admitted | 108 |
-| elaboration-rejected | 52 |
-| import-rejected | 31 |
+| admitted | 1465 |
+| partially-admitted | 51 |
+| elaboration-rejected | 54 |
+| import-rejected | 0 |
 | compile-failure | 0 |
 | malformed-input | 0 |
-| source-rejected | 25 |
+| source-rejected | 0 |
 | invalid-core | 0 |
 | skipped | 100 |
 | total | 1670 |
 
 ## Functions of admitted units
 
-The 1462 admitted and partially admitted tests have 3642 functions that calls reach, library functions included; 3493 are supported and 149 unsupported, for these reasons (a function can have several):
+The 1516 admitted and partially admitted tests have 3832 functions that calls reach, library functions included; 3764 are supported and 68 unsupported, for these reasons (a function can have several):
 
 | reason | functions |
 | --- | ---: |
-| not a storage location | 28 |
-| Identifier: unsupported built-in declaration ~30 | 20 |
-| FunctionTypeName: external function types are not supported | 19 |
-| unsupported callee | 16 |
-| unsupported identifier | 15 |
-| MemberAccess: unsupported built-in member | 9 |
-| FunctionCall: abi.encodeWithSignature of a non-literal signature is not supported | 8 |
-| length of a non-array | 6 |
+| unsupported identifier | 13 |
+| not a storage location | 6 |
+| unsupported callee | 6 |
 | type annotation mismatch | 6 |
 | IndexAccess: expected ElementaryTypeNameExpression | 5 |
-| unsupported external call | 5 |
-| MemberAccess: unsupported selector | 4 |
-| unsupported variable type | 4 |
-| Identifier: unsupported built-in declaration ~29 | 4 |
-| MemberAccess: selectors of computed values are not supported | 4 |
-| unknown struct member | 3 |
-| unsupported struct constructor | 3 |
-| unsupported type name | 3 |
-| Identifier: unsupported built-in declaration ~20 | 3 |
-| call of an unsupported function | 3 |
-| calls an unsupported function | 3 |
-| NewExpression: unsupported call options | 3 |
-| Identifier: built-in super is not supported | 3 |
-| InlineAssembly: YulFunctionCall: call to clz, which is neither a builtin nor a function the object defines | 3 |
+| Identifier: built-in super is not supported | 5 |
+| MemberAccess: unsupported built-in member | 5 |
+| FunctionCall: abi.encodeCall of an unnamed function | 4 |
+| calls an unsupported function | 4 |
+| length of a non-array | 4 |
 | array member as a value | 2 |
-| MemberAccess: an attached function is supported only as a callee | 2 |
-| FunctionCallOptions: unsupported call options | 2 |
-| InlineAssembly: YulFunctionCall: call to blobhash, which is neither a builtin nor a function the object defines | 2 |
-| InlineAssembly: unsupported reference fp.address | 2 |
-| InlineAssembly: unsupported reference fp.selector | 2 |
-| value count mismatch | 2 |
+| NewExpression: unsupported expression NewExpression | 2 |
+| unsupported external call | 2 |
 | unsupported calldata slice type | 2 |
 | unsupported new expression | 2 |
 | unsupported declaration | 2 |
 | MemberAccess: unsupported call options | 2 |
-| MemberAccess: unsupported contract type member runtimeCode | 2 |
-| unsupported binary operator | 2 |
-| FunctionCall: abi.encodeCall of an unnamed function | 1 |
-| unsupported memory struct type | 1 |
-| unsupported ABI parameter or return type | 1 |
-| Identifier: external calls only on contract-typed values | 1 |
 | unsupported operator type | 1 |
-| unsupported contract creation | 1 |
-| FunctionCall: named arguments are not supported here | 1 |
-| InlineAssembly: unsupported reference g_ptr_dirty.selector | 1 |
-| InlineAssembly: unsupported reference g_ptr_dirty.address | 1 |
-| IndexAccess: unsupported call options | 1 |
+| call of an unsupported function | 1 |
+| FunctionCallOptions: unsupported call options | 1 |
 | FunctionCallOptions: unsupported expression FunctionCallOptions | 1 |
-| TupleExpression: unsupported call options | 1 |
+| static call of an unsupported function | 1 |
+| NewExpression: unsupported call options | 1 |
 | InlineAssembly: YulFunctionDefinition: unsupported statement YulFunctionDefinition | 1 |
-| assembly reference of this type | 1 |
 | unsupported conditional type | 1 |
 | assignment to this target | 1 |
-| MemberAccess: unsupported built-in member encodePacked | 1 |
+| MemberAccess: unsupported built-in member encodeWithSelector | 1 |
 | MemberAccess: unsupported built-in member encodeWithSignature | 1 |
 | MemberAccess: unsupported built-in member decode | 1 |
-| MemberAccess: unsupported built-in member encodeWithSelector | 1 |
+| MemberAccess: unsupported built-in member encodePacked | 1 |
 | MemberAccess: unsupported built-in member encode | 1 |
-| MemberAccess: unsupported built-in member blobbasefee | 1 |
-| InlineAssembly: YulFunctionCall: call to blobbasefee, which is neither a builtin nor a function the object defines | 1 |
-| Identifier: built-in blobhash is not supported | 1 |
-| Identifier: built-in blockhash is not supported | 1 |
+| unsupported struct constructor | 1 |
 | unsupported inline array | 1 |
 | IndexAccess: array type expressions are not supported | 1 |
-| MemberAccess: external calls only on contract-typed values | 1 |
 | delete of this type or location | 1 |
+| MemberAccess: an attached function is supported only as a callee | 1 |
 | string literal conversion | 1 |
 | index access on this type | 1 |
 | ElementaryTypeNameExpression: unsupported expression ElementaryTypeNameExpression | 1 |
-| call does not match the function | 1 |
 
 ## Features blocking rejected tests
 
@@ -111,45 +80,11 @@ The 1462 admitted and partially admitted tests have 3642 functions that calls re
 
 | feature | tests | only blocker |
 | --- | ---: | ---: |
-| no contract | 36 | 35 |
-| state variable type | 34 | 0 |
-| storage layout | 34 | 0 |
-| unsupported state variable | 30 | 0 |
-| function types | 25 | 0 |
-| not a storage location | 23 | 0 |
-| call of an unsupported function | 21 | 0 |
-| more than one contract | 17 | 14 |
-| unsupported callee | 14 | 0 |
-| parameter type | 12 | 0 |
-| unsupported external call | 8 | 0 |
-| value count mismatch | 8 | 0 |
-| return type | 7 | 0 |
-| length of a non-array | 6 | 0 |
-| VariableDeclaration: state variable of a struct the core cannot hold | 5 | 0 |
-| unknown struct member | 5 | 0 |
-| built-ins | 4 | 0 |
-| type annotation mismatch | 4 | 0 |
-| unsupported struct constructor | 4 | 0 |
-| MemberAccess: unsupported contract type member runtimeCode | 3 | 0 |
-| storage copy of this type | 3 | 0 |
-| unsupported function value | 3 | 0 |
-| unsupported parameter type | 3 | 0 |
-| unsupported type name | 3 | 0 |
-| unsupported variable type | 3 | 0 |
-| IndexAccess: external calls only on contract-typed values | 2 | 0 |
-| unsupported binary operator | 2 | 0 |
-| unsupported declaration | 2 | 0 |
-| unsupported event parameter type | 2 | 0 |
-| unsupported memory struct type | 2 | 0 |
-| FunctionCall: abi.encodeCall of an unnamed function | 1 | 0 |
-| FunctionCall: abi.encodeWithSignature of a non-literal signature is not supported | 1 | 0 |
-| MemberAccess: unsupported selector | 1 | 0 |
-| assembly reference of this type | 1 | 0 |
-| no supported function or creation | 1 | 0 |
-| static call of an unsupported function | 1 | 0 |
-| unsupported ABI parameter or return type | 1 | 0 |
-| unsupported constructor parameters | 1 | 0 |
-| unsupported identifier | 1 | 0 |
+| no contract | 36 | 36 |
+| more than one contract | 17 | 17 |
+| storage copy of this type | 1 | 0 |
+| unsupported declaration | 1 | 0 |
+| unsupported memory struct type | 1 | 0 |
 
 ## Features in order of tests admitted
 
@@ -157,26 +92,11 @@ Supporting the features in this order admits the most rejected tests at each ste
 
 | step | feature | admitted |
 | ---: | --- | ---: |
-| 1 | no contract | 35 |
-| 2 | more than one contract | 49 |
-| 3 | MemberAccess: unsupported contract type member runtimeCode | 50 |
-| 4 | length of a non-array | 52 |
-| 5 | state variable type | 52 |
-| 6 | storage layout | 52 |
-| 7 | unsupported state variable | 54 |
-| 8 | call of an unsupported function | 66 |
-| 9 | built-ins | 68 |
-| 10 | unsupported binary operator | 70 |
-| 11 | not a storage location | 71 |
-| 12 | function types | 74 |
-| 13 | parameter type | 76 |
-| 14 | unsupported event parameter type | 78 |
-| 15 | unsupported callee | 79 |
-| 16 | return type | 81 |
-| 17 | type annotation mismatch | 82 |
-| 18 | unsupported type name | 85 |
-| 19 | unsupported parameter type | 86 |
-| 20 | unsupported variable type | 87 |
+| 1 | no contract | 36 |
+| 2 | more than one contract | 53 |
+| 3 | storage copy of this type | 53 |
+| 4 | unsupported declaration | 53 |
+| 5 | unsupported memory struct type | 54 |
 
 ## Skipped and compile failures
 
@@ -225,6 +145,8 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `abicoder/abi_encode_v2_in_modifier_used_in_v1_contract.sol`
 - `abicoder/abi_encode_with_selector_v1.sol`
 - `abicoder/abi_encode_with_selector_v2.sol`
+- `abicoder/abi_encode_with_signature_v1.sol`
+- `abicoder/abi_encode_with_signature_v2.sol`
 - `abicoder/bug_abi_encoder_v2_head_overflow_with_static_array_cleanup.sol`
 - `abicoder/calldataDecoding/array/byte_arrays.sol`
 - `abicoder/calldataDecoding/array/calldata_array_2d_dynamic_dynamic_v2.sol`
@@ -236,6 +158,7 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `abicoder/calldataDecoding/array/calldata_array_dynamic_static_in_library_v2.sol`
 - `abicoder/calldataDecoding/array/calldata_array_dynamic_static_short_decode_v2.sol`
 - `abicoder/calldataDecoding/array/calldata_array_dynamic_static_short_reencode_v2.sol`
+- `abicoder/calldataDecoding/array/calldata_array_function_types_v2.sol`
 - `abicoder/calldataDecoding/array/calldata_array_indexing_1d_2d_v2.sol`
 - `abicoder/calldataDecoding/array/calldata_array_indexing_3d_v2.sol`
 - `abicoder/calldataDecoding/array/calldata_array_indexing_dynamic_bytes_v2.sol`
@@ -269,6 +192,7 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `abicoder/calldataDecoding/struct/member_array_dynamic_multiple_fields_v2.sol`
 - `abicoder/calldataDecoding/struct/member_array_dynamic_v2.sol`
 - `abicoder/calldataDecoding/struct/member_array_static_mulitple_fields_v2.sol`
+- `abicoder/calldataDecoding/struct/member_external_function_v2.sol`
 - `abicoder/calldataDecoding/struct/member_offset_v2.sol`
 - `abicoder/calldataDecoding/struct/multiple_structs_v2.sol`
 - `abicoder/calldataDecoding/struct/nested_static_3_fields_v2.sol`
@@ -288,6 +212,7 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `abicoder/cleanup/cleanup_v2.sol`
 - `abicoder/cleanup/dynamic_array_v2.sol`
 - `abicoder/cleanup/enum_v2.sol`
+- `abicoder/cleanup/function_v2.sol`
 - `abicoder/cleanup/intx_v2.sol`
 - `abicoder/cleanup/reencoded_calldata_string.sol`
 - `abicoder/cleanup/static_array_v2.sol`
@@ -324,6 +249,7 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `array/array_2d_new.sol`
 - `array/array_3d_assignment.sol`
 - `array/array_3d_new.sol`
+- `array/array_function_pointers.sol`
 - `array/array_memory_as_parameter.sol`
 - `array/array_memory_create.sol`
 - `array/array_memory_index_access.sol`
@@ -377,6 +303,8 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `array/copying/array_copy_target_simple.sol`
 - `array/copying/array_copy_target_simple_2.sol`
 - `array/copying/array_elements_to_mapping.sol`
+- `array/copying/array_of_function_external_storage_to_storage_dynamic.sol`
+- `array/copying/array_of_function_external_storage_to_storage_dynamic_different_mutability.sol`
 - `array/copying/array_of_struct_calldata_to_memory.sol`
 - `array/copying/array_of_struct_calldata_to_storage.sol`
 - `array/copying/array_of_struct_memory_to_storage.sol`
@@ -407,12 +335,15 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `array/copying/cleanup_during_multi_element_per_slot_copy.sol`
 - `array/copying/copy_byte_array_in_struct_to_storage.sol`
 - `array/copying/copy_byte_array_to_storage.sol`
+- `array/copying/copy_function_internal_storage_array.sol`
+- `array/copying/copy_internal_function_array_to_storage.sol`
 - `array/copying/copy_removes_bytes_data.sol`
 - `array/copying/copying_bytes_multiassign.sol`
 - `array/copying/dirty_memory_bytes_to_storage_copy_ir.sol`
 - `array/copying/elements_of_nested_array_of_structs_calldata_to_storage.sol`
 - `array/copying/elements_of_nested_array_of_structs_memory_to_storage.sol`
 - `array/copying/empty_bytes_copy.sol`
+- `array/copying/function_type_array_to_storage.sol`
 - `array/copying/memory_dyn_2d_bytes_to_storage.sol`
 - `array/copying/memory_to_storage_different_base.sol`
 - `array/copying/nested_array_calldata_to_memory.sol`
@@ -470,6 +401,8 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `array/fixed_arrays_in_storage.sol`
 - `array/fixed_bytes_length_access.sol`
 - `array/fixed_out_of_bounds_array_access.sol`
+- `array/function_array_cross_calls.sol`
+- `array/function_memory_array.sol`
 - `array/indexAccess/arrays_complex_memory_index_access.sol`
 - `array/indexAccess/bytes_index_access.sol`
 - `array/indexAccess/bytes_index_access_memory.sol`
@@ -503,6 +436,7 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `array/pop/byte_array_pop_long_storage_empty_garbage_ref.sol`
 - `array/pop/byte_array_pop_masking_long.sol`
 - `array/pop/byte_array_pop_storage_empty.sol`
+- `array/pop/parenthesized.sol`
 - `array/push/array_push.sol`
 - `array/push/array_push_nested.sol`
 - `array/push/array_push_nested_from_calldata.sol`
@@ -531,12 +465,26 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `array/string_literal_assign_to_storage_bytes.sol`
 - `array/strings_in_struct.sol`
 - `builtinFunctions/assignment_to_const_var_involving_keccak.sol`
+- `builtinFunctions/blobhash.sol`
 - `builtinFunctions/blobhash_shadow_resolution.sol`
 - `builtinFunctions/blockhash.sol`
 - `builtinFunctions/blockhash_shadow_resolution.sol`
+- `builtinFunctions/erc7201_equivalent_solidity_spec.sol`
 - `builtinFunctions/erc7201_equivalent_solidity_spec_comptime.sol`
 - `builtinFunctions/erc7201_layout_specifier_slot_match_comptime.sol`
+- `builtinFunctions/erc7201_overflow_expression.sol`
+- `builtinFunctions/erc7201_param_abi_encode.sol`
+- `builtinFunctions/erc7201_param_array_string_literal.sol`
+- `builtinFunctions/erc7201_param_locations.sol`
+- `builtinFunctions/erc7201_param_pure_function.sol`
+- `builtinFunctions/erc7201_param_string_concat.sol`
+- `builtinFunctions/erc7201_param_string_literal_with_escaped_chars.sol`
+- `builtinFunctions/erc7201_param_ternary_operator.sol`
+- `builtinFunctions/erc7201_param_unicode_string_literal.sol`
+- `builtinFunctions/erc7201_param_unicode_string_variable.sol`
+- `builtinFunctions/erc7201_param_with_zero_last_byte_of_inner_hash.sol`
 - `builtinFunctions/erc7201_param_with_zero_last_byte_of_inner_hash_comptime.sol`
+- `builtinFunctions/function_types_sig.sol`
 - `builtinFunctions/iterated_keccak256_with_bytes.sol`
 - `builtinFunctions/keccak256.sol`
 - `builtinFunctions/keccak256_empty.sol`
@@ -548,6 +496,9 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `builtinFunctions/keccak256_with_bytes.sol`
 - `builtinFunctions/msg_sig.sol`
 - `builtinFunctions/msg_sig_after_internal_call_is_same.sol`
+- `builtinFunctions/ripemd160.sol`
+- `builtinFunctions/ripemd160_empty.sol`
+- `builtinFunctions/ripemd160_packed.sol`
 - `builtinFunctions/sha256.sol`
 - `builtinFunctions/sha256_empty.sol`
 - `builtinFunctions/sha256_packed.sol`
@@ -588,6 +539,8 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `constructor/bytes_in_constructors_unpacker.sol`
 - `constructor/constructor_arguments_external.sol`
 - `constructor/constructor_arguments_internal.sol`
+- `constructor/constructor_function_argument.sol`
+- `constructor/constructor_function_complex.sol`
 - `constructor/constructor_static_array_argument.sol`
 - `constructor/evm_exceptions_in_constructor_call_fail.sol`
 - `constructor/function_usage_in_constructor_arguments.sol`
@@ -598,12 +551,18 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `constructor/order_of_evaluation.sol`
 - `constructor/payable_constructor.sol`
 - `constructor/state_variable_initialization.sol`
+- `constructor/store_function_in_constructor.sol`
+- `constructor/store_function_in_constructor_packed.sol`
+- `constructor/store_internal_unused_function_in_constructor.sol`
+- `constructor/store_internal_unused_library_function_in_constructor.sol`
 - `constructor/transient_state_variable_initialization.sol`
 - `conversions/calldata_bytes_to_memory.sol`
 - `conversions/calldata_bytes_to_memory_reencode.sol`
+- `conversions/function_type_array_to_storage.sol`
 - `conversions/string_to_bytes.sol`
 - `deployedCodeExclusion/bound_function.sol`
 - `deployedCodeExclusion/library_function.sol`
+- `deployedCodeExclusion/library_function_deployed.sol`
 - `deployedCodeExclusion/static_base_function.sol`
 - `deployedCodeExclusion/subassembly_deduplication.sol`
 - `deployedCodeExclusion/super_function.sol`
@@ -626,6 +585,7 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `errors/error_in_library_and_interface.sol`
 - `errors/error_selector.sol`
 - `errors/error_static_calldata_uint_array_and_dynamic_array.sol`
+- `errors/errors_by_parameter_type.sol`
 - `errors/named_parameters_shadowing_types.sol`
 - `errors/require_custom_error_constructor_side_effect.sol`
 - `errors/require_different_errors_same_parameters.sol`
@@ -634,11 +594,13 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `errors/require_error_evaluation_order_2.sol`
 - `errors/require_error_evaluation_order_3.sol`
 - `errors/require_error_function_join_control_flow.sol`
+- `errors/require_error_function_pointer_parameter.sol`
 - `errors/require_error_multiple_arguments.sol`
 - `errors/require_error_named_parameters.sol`
 - `errors/require_error_named_parameters_implicit_string_conversions.sol`
 - `errors/require_error_named_parameters_literal_conversions.sol`
 - `errors/require_error_named_parameters_stack_misalignment.sol`
+- `errors/require_error_stack_check.sol`
 - `errors/require_error_string_literal.sol`
 - `errors/require_error_string_memory.sol`
 - `errors/require_error_uint256.sol`
@@ -672,6 +634,8 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `events/event_emit_interface_event_via_library.sol`
 - `events/event_emit_via_interface.sol`
 - `events/event_emit_with_named_parameters.sol`
+- `events/event_indexed_function.sol`
+- `events/event_indexed_function2.sol`
 - `events/event_indexed_mixed.sol`
 - `events/event_lots_of_data.sol`
 - `events/event_no_arguments.sol`
@@ -739,9 +703,12 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `functionCall/array_multiple_local_vars.sol`
 - `functionCall/bare_call_no_returndatacopy.sol`
 - `functionCall/call_attached_library_function_on_function.sol`
+- `functionCall/call_attached_library_function_on_storage_variable.sol`
 - `functionCall/call_attached_library_function_on_string.sol`
+- `functionCall/call_function_returning_function.sol`
 - `functionCall/call_function_returning_nothing_via_pointer.sol`
 - `functionCall/call_internal_function_via_expression.sol`
+- `functionCall/call_internal_function_with_multislot_arguments_via_pointer.sol`
 - `functionCall/call_options_overload.sol`
 - `functionCall/calldata_and_memory_arguments.sol`
 - `functionCall/calldata_argument_external_bytes.sol`
@@ -756,6 +723,9 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `functionCall/calldata_argument_internal_struct_v2.sol`
 - `functionCall/calling_nonexisting_contract_throws.sol`
 - `functionCall/calling_other_functions.sol`
+- `functionCall/calling_uninitialized_function.sol`
+- `functionCall/calling_uninitialized_function_in_detail.sol`
+- `functionCall/calling_uninitialized_function_through_array.sol`
 - `functionCall/conditional_with_arguments.sol`
 - `functionCall/creation_function_call_no_args.sol`
 - `functionCall/creation_function_call_with_args.sol`
@@ -792,13 +762,35 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `functionCall/return_size_shorter_than_expected_evm_version_after_homestead.sol`
 - `functionCall/transaction_status.sol`
 - `functionCall/value_test.sol`
+- `functionTypes/address_member.sol`
+- `functionTypes/call_to_zero_initialized_function_type_ir.sol`
+- `functionTypes/comparison_operator_for_external_function_cleans_dirty_bits.sol`
+- `functionTypes/comparison_operators_for_external_functions.sol`
 - `functionTypes/duplicated_function_definition_with_same_id_in_internal_dispatcher.sol`
+- `functionTypes/external_functions_with_calldata_args_assigned_to_function_pointers_with_memory_type.sol`
 - `functionTypes/function_delete_stack.sol`
+- `functionTypes/function_delete_storage.sol`
+- `functionTypes/function_external_delete_storage.sol`
 - `functionTypes/function_type_library_internal.sol`
+- `functionTypes/inline_array_with_value_call_option.sol`
+- `functionTypes/internal_function_pointer_with_calldata_args.sol`
+- `functionTypes/mapping_of_functions.sol`
+- `functionTypes/pass_function_types_externally.sol`
 - `functionTypes/pass_function_types_internally.sol`
 - `functionTypes/same_function_in_construction_and_runtime.sol`
+- `functionTypes/same_function_in_construction_and_runtime_equality_check.sol`
 - `functionTypes/selector_1.sol`
+- `functionTypes/selector_assignment_expression.sol`
 - `functionTypes/selector_expression_side_effect.sol`
+- `functionTypes/selector_ternary.sol`
+- `functionTypes/selector_ternary_function_pointer_from_function_call.sol`
+- `functionTypes/store_function.sol`
+- `functionTypes/struct_with_external_function.sol`
+- `functionTypes/struct_with_functions.sol`
+- `functionTypes/uninitialized_internal_storage_function_call.sol`
+- `functionTypes/uninitialized_internal_storage_function_pointer_comparison.sol`
+- `functionTypes/uninitialized_internal_storage_function_pointer_slot_edges.sol`
+- `functionTypes/uninitialized_internal_transient_storage_function_pointer_comparison.sol`
 - `getters/array_mapping_struct.sol`
 - `getters/arrays.sol`
 - `getters/bytes.sol`
@@ -818,6 +810,7 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `immutable/delete.sol`
 - `immutable/fun_read_in_ctor.sol`
 - `immutable/getter.sol`
+- `immutable/getter_call_in_constructor.sol`
 - `immutable/immutable_signed.sol`
 - `immutable/immutable_tag_too_large_bug.sol`
 - `immutable/increment_decrement.sol`
@@ -865,6 +858,8 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `inheritance/super_overload.sol`
 - `inheritance/transient_storage_state_variable.sol`
 - `inheritance/transient_storage_state_variable_abstract_contract.sol`
+- `inlineAssembly/blobhash.sol`
+- `inlineAssembly/blobhash_index_exceeding_blob_count.sol`
 - `inlineAssembly/calldata_array_assign_dynamic.sol`
 - `inlineAssembly/calldata_array_assign_static.sol`
 - `inlineAssembly/calldata_array_read.sol`
@@ -876,8 +871,13 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `inlineAssembly/calldata_struct_assign.sol`
 - `inlineAssembly/calldata_struct_assign_and_return.sol`
 - `inlineAssembly/chainid.sol`
+- `inlineAssembly/clz.sol`
 - `inlineAssembly/constant_access.sol`
 - `inlineAssembly/constant_access_referencing.sol`
+- `inlineAssembly/external_function_pointer_address.sol`
+- `inlineAssembly/external_function_pointer_address_assignment.sol`
+- `inlineAssembly/external_function_pointer_selector.sol`
+- `inlineAssembly/external_function_pointer_selector_assignment.sol`
 - `inlineAssembly/external_identifier_access_shadowing.sol`
 - `inlineAssembly/for_loop_break.sol`
 - `inlineAssembly/for_loop_continue.sol`
@@ -929,6 +929,7 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `inlineAssembly/transient_storage_selfdestruct.sol`
 - `inlineAssembly/transient_storage_simple_reentrancy_lock.sol`
 - `inlineAssembly/truefalse.sol`
+- `inlineAssembly/tstore_hidden_staticcall.sol`
 - `integer/basic.sol`
 - `integer/int.sol`
 - `integer/many_local_variables.sol`
@@ -961,8 +962,10 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `libraries/attached_internal_library_function_returning_calldata.sol`
 - `libraries/attached_public_library_function_accepting_calldata.sol`
 - `libraries/attached_public_library_function_returning_calldata.sol`
+- `libraries/external_call_with_function_pointer_parameter.sol`
 - `libraries/external_call_with_storage_array_parameter.sol`
 - `libraries/external_call_with_storage_mapping_parameter.sol`
+- `libraries/internal_call_attached_with_parentheses.sol`
 - `libraries/internal_call_unattached_with_parentheses.sol`
 - `libraries/internal_library_function.sol`
 - `libraries/internal_library_function_attached_to_address.sol`
@@ -972,6 +975,7 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `libraries/internal_library_function_attached_to_contract.sol`
 - `libraries/internal_library_function_attached_to_dynamic_array.sol`
 - `libraries/internal_library_function_attached_to_enum.sol`
+- `libraries/internal_library_function_attached_to_external_function_type.sol`
 - `libraries/internal_library_function_attached_to_fixed_array.sol`
 - `libraries/internal_library_function_attached_to_fixed_bytes.sol`
 - `libraries/internal_library_function_attached_to_integer.sol`
@@ -1135,6 +1139,7 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `reverts/revert_return_area.sol`
 - `reverts/simple_throw.sol`
 - `saltedCreate/prediction_example.sol`
+- `saltedCreate/salted_create.sol`
 - `saltedCreate/salted_create_with_value.sol`
 - `scoping/c99_scoping_activation.sol`
 - `shanghai/evmone_support.sol`
@@ -1149,8 +1154,11 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `smoke/multiline.sol`
 - `smoke/multiline_comments.sol`
 - `smoke/structs.sol`
+- `specialFunctions/abi_encode_with_signature_from_string.sol`
 - `specialFunctions/keccak256_optimized.sol`
+- `state/blobhash.sol`
 - `state/block_basefee.sol`
+- `state/block_blobbasefee.sol`
 - `state/block_chainid.sol`
 - `state/block_coinbase.sol`
 - `state/block_difficulty_post_paris.sol`
@@ -1166,6 +1174,8 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `state/msg_value.sol`
 - `state/tx_gasprice.sol`
 - `state/tx_origin.sol`
+- `state/uncalled_blobhash.sol`
+- `state/uncalled_blockhash.sol`
 - `statements/do_while_loop_continue.sol`
 - `statements/empty_for_loop.sol`
 - `storage/accessors_mapping_for_array.sol`
@@ -1189,6 +1199,7 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `storage/mapping_string_key.sol`
 - `storage/mappings_array2d_pop_delete.sol`
 - `storage/mappings_array_pop_delete.sol`
+- `storage/packed_functions.sol`
 - `storage/packed_storage_overflow.sol`
 - `storage/packed_storage_signed.sol`
 - `storage/packed_storage_structs_bytes.sol`
@@ -1279,6 +1290,7 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `structs/copy_to_mapping.sol`
 - `structs/delete_struct.sol`
 - `structs/event.sol`
+- `structs/function_type_copy.sol`
 - `structs/global.sol`
 - `structs/memory_struct_named_constructor.sol`
 - `structs/memory_structs_as_function_args.sol`
@@ -1286,6 +1298,7 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `structs/memory_structs_nested_load.sol`
 - `structs/memory_structs_read_write.sol`
 - `structs/msg_data_to_struct_member_copy.sol`
+- `structs/multislot_struct_allocation.sol`
 - `structs/nested_struct_allocation.sol`
 - `structs/packed_storage_structs_delete.sol`
 - `structs/recursive_struct_2.sol`
@@ -1310,15 +1323,18 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `structs/struct_delete_storage_with_arrays_small.sol`
 - `structs/struct_delete_struct_in_mapping.sol`
 - `structs/struct_memory_to_storage.sol`
+- `structs/struct_memory_to_storage_function_ptr.sol`
 - `structs/struct_named_constructor.sol`
 - `structs/struct_reference.sol`
 - `structs/struct_referencing.sol`
 - `structs/struct_storage_push_zero_value.sol`
 - `structs/struct_storage_to_mapping.sol`
 - `structs/struct_storage_to_memory.sol`
+- `structs/struct_storage_to_memory_function_ptr.sol`
 - `structs/structs.sol`
 - `structs/using_for_function_on_struct.sol`
 - `tryCatch/assert.sol`
+- `tryCatch/create.sol`
 - `tryCatch/invalid_error_encoding.sol`
 - `tryCatch/lowLevel.sol`
 - `tryCatch/malformed_error.sol`
@@ -1329,6 +1345,7 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `tryCatch/nested.sol`
 - `tryCatch/panic.sol`
 - `tryCatch/require.sol`
+- `tryCatch/return_function.sol`
 - `tryCatch/simple.sol`
 - `tryCatch/simple_notuple.sol`
 - `tryCatch/structured.sol`
@@ -1346,6 +1363,7 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `types/convert_uint_to_fixed_bytes_same_min_size.sol`
 - `types/convert_uint_to_fixed_bytes_same_size.sol`
 - `types/convert_uint_to_fixed_bytes_smaller_size.sol`
+- `types/external_function_to_address.sol`
 - `types/mapping/copy_from_mapping_to_mapping.sol`
 - `types/mapping/copy_struct_to_array_stored_in_mapping.sol`
 - `types/mapping/user_defined_types_mapping_storage.sol`
@@ -1365,6 +1383,9 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `underscore/as_function.sol`
 - `uninitializedFunctionPointer/invalidInConstructor.sol`
 - `uninitializedFunctionPointer/invalidStoredInConstructor.sol`
+- `uninitializedFunctionPointer/store2.sol`
+- `uninitializedFunctionPointer/storeInConstructor.sol`
+- `uninitializedFunctionPointer/uninitialized_internal_storage_function_via_yul.sol`
 - `userDefinedValueType/abicodec.sol`
 - `userDefinedValueType/assembly_access_bytes2_abicoder_v2.sol`
 - `userDefinedValueType/calldata.sol`
@@ -1402,6 +1423,7 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `variables/public_state_overridding_dynamic_struct.sol`
 - `variables/public_state_overridding_mapping_to_dynamic_struct.sol`
 - `variables/storing_invalid_boolean.sol`
+- `variables/transient_function_type_state_variable.sol`
 - `variables/transient_state_address_variable_members.sol`
 - `variables/transient_state_enum_variable.sol`
 - `variables/transient_state_variable.sol`
@@ -1416,6 +1438,8 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `various/assignment_to_const_var_involving_expression.sol`
 - `various/balance.sol`
 - `various/byte_optimization_bug.sol`
+- `various/code_access_content.sol`
+- `various/code_access_runtime.sol`
 - `various/code_length.sol`
 - `various/code_length_contract_member.sol`
 - `various/codebalance_assembly.sol`
@@ -1460,6 +1484,7 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `various/swap_in_storage_overwrite.sol`
 - `various/test_underscore_in_hex.sol`
 - `various/transient_storage_reentrancy_lock.sol`
+- `various/tuples.sol`
 - `various/typed_multi_variable_declaration.sol`
 - `various/write_storage_external.sol`
 - `viaYul/assert.sol`
@@ -1468,6 +1493,7 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `viaYul/cleanup/checked_arithmetic.sol`
 - `viaYul/cleanup/comparison.sol`
 - `viaYul/comparison.sol`
+- `viaYul/comparison_functions.sol`
 - `viaYul/conditional/conditional_multiple.sol`
 - `viaYul/conditional/conditional_true_false_literal.sol`
 - `viaYul/conditional/conditional_tuple.sol`
@@ -1476,9 +1502,11 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `viaYul/conversion/explicit_cast_assignment.sol`
 - `viaYul/conversion/explicit_cast_function_call.sol`
 - `viaYul/conversion/explicit_cast_local_assignment.sol`
+- `viaYul/conversion/function_cast.sol`
 - `viaYul/conversion/implicit_cast_assignment.sol`
 - `viaYul/conversion/implicit_cast_function_call.sol`
 - `viaYul/conversion/implicit_cast_local_assignment.sol`
+- `viaYul/copy_struct_invalid_ir_bug.sol`
 - `viaYul/define_tuple_from_function_call.sol`
 - `viaYul/delete.sol`
 - `viaYul/detect_add_overflow.sol`
@@ -1504,7 +1532,10 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `viaYul/exp_neg_overflow.sol`
 - `viaYul/exp_overflow.sol`
 - `viaYul/exp_various.sol`
+- `viaYul/function_address.sol`
 - `viaYul/function_entry_checks.sol`
+- `viaYul/function_pointers.sol`
+- `viaYul/function_selector.sol`
 - `viaYul/if.sol`
 - `viaYul/keccak.sol`
 - `viaYul/local_address_assignment.sol`
@@ -1556,75 +1587,31 @@ Supporting the features in this order admits the most rejected tests at each ste
 
 ## Partially admitted
 
+- `abicoder/abi_encode_call_is_consistent_v2.sol`
 - `abicoder/abi_encode_call_memory_v2.sol`
-- `abicoder/abi_encode_with_signature_v1.sol`
-- `abicoder/abi_encode_with_signature_v2.sol`
 - `abicoder/calldataDecoding/array/calldata_array_slicing_v2.sol`
-- `abicoder/calldataDecoding/struct/member_external_function_v2.sol`
-- `array/array_function_pointers.sol`
-- `array/function_memory_array.sol`
 - `array/pop/array_pop_isolated.sol`
 - `array/pop/byte_array_pop_isolated.sol`
-- `array/pop/parenthesized.sol`
-- `builtinFunctions/blobhash.sol`
-- `builtinFunctions/erc7201_equivalent_solidity_spec.sol`
-- `builtinFunctions/erc7201_overflow_expression.sol`
-- `builtinFunctions/erc7201_param_abi_encode.sol`
-- `builtinFunctions/erc7201_param_array_string_literal.sol`
-- `builtinFunctions/erc7201_param_locations.sol`
-- `builtinFunctions/erc7201_param_pure_function.sol`
-- `builtinFunctions/erc7201_param_string_concat.sol`
-- `builtinFunctions/erc7201_param_string_literal_with_escaped_chars.sol`
-- `builtinFunctions/erc7201_param_ternary_operator.sol`
-- `builtinFunctions/erc7201_param_unicode_string_literal.sol`
-- `builtinFunctions/erc7201_param_unicode_string_variable.sol`
-- `builtinFunctions/erc7201_param_with_zero_last_byte_of_inner_hash.sol`
-- `builtinFunctions/function_types_sig.sol`
-- `builtinFunctions/ripemd160.sol`
-- `builtinFunctions/ripemd160_empty.sol`
-- `builtinFunctions/ripemd160_packed.sol`
 - `constantEvaluator/negative_fractional_mod.sol`
-- `constructor/constructor_function_complex.sol`
-- `errors/errors_by_parameter_type.sol`
+- `deployedCodeExclusion/static_base_function_deployed.sol`
+- `deployedCodeExclusion/super_function_deployed.sol`
+- `deployedCodeExclusion/virtual_function_deployed.sol`
 - `errors/require_custom_error_can_be_parenthesized.sol`
-- `errors/require_error_function_pointer_parameter.sol`
-- `errors/require_error_stack_check.sol`
 - `events/event_indexed_string.sol`
 - `expressions/module_from_ternary_expression.sol`
 - `expressions/uncalled_address_transfer_send.sol`
 - `externalContracts/FixedFeeRegistrar.sol`
-- `functionCall/call_attached_library_function_on_storage_variable.sol`
-- `functionCall/calling_uninitialized_function.sol`
-- `functionCall/calling_uninitialized_function_through_array.sol`
 - `functionCall/failed_create.sol`
 - `functionCall/send_zero_ether.sol`
-- `functionTypes/address_member.sol`
-- `functionTypes/comparison_operator_for_external_function_cleans_dirty_bits.sol`
-- `functionTypes/comparison_operators_for_external_functions.sol`
-- `functionTypes/external_functions_with_calldata_args_assigned_to_function_pointers_with_memory_type.sol`
-- `functionTypes/inline_array_with_value_call_option.sol`
-- `functionTypes/selector_assignment_expression.sol`
-- `functionTypes/selector_ternary.sol`
-- `functionTypes/selector_ternary_function_pointer_from_function_call.sol`
 - `functionTypes/stack_height_check_on_adding_gas_variable_to_function.sol`
 - `functionTypes/ternary_contract_internal_function.sol`
 - `functionTypes/ternary_contract_library_internal_function.sol`
 - `functionTypes/ternary_contract_public_function.sol`
-- `immutable/getter_call_in_constructor.sol`
+- `inheritance/base_access_to_function_type_variables.sol`
 - `inheritance/inherited_function_through_dispatch.sol`
 - `inheritance/super_in_constructor_assignment.sol`
 - `inheritance/value_for_constructor.sol`
-- `inlineAssembly/blobhash.sol`
-- `inlineAssembly/blobhash_index_exceeding_blob_count.sol`
-- `inlineAssembly/clz.sol`
-- `inlineAssembly/external_function_pointer_address.sol`
-- `inlineAssembly/external_function_pointer_address_assignment.sol`
-- `inlineAssembly/external_function_pointer_selector.sol`
-- `inlineAssembly/external_function_pointer_selector_assignment.sol`
 - `inlineAssembly/inline_assembly_embedded_function_call.sol`
-- `inlineAssembly/tstore_hidden_staticcall.sol`
-- `libraries/external_call_with_function_pointer_parameter.sol`
-- `libraries/internal_call_attached_with_parentheses.sol`
 - `libraries/library_enum_as_an_expression.sol`
 - `libraries/library_return_struct_with_mapping.sol`
 - `libraries/library_stray_values.sol`
@@ -1634,21 +1621,12 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `modifiers/function_modifier_return_reference.sol`
 - `modifiers/function_return_parameter.sol`
 - `modifiers/function_return_parameter_complex.sol`
-- `saltedCreate/salted_create.sol`
-- `specialFunctions/abi_encode_with_signature_from_string.sol`
 - `specialFunctions/abi_functions_member_access.sol`
-- `state/blobhash.sol`
-- `state/block_blobbasefee.sol`
-- `state/uncalled_blobhash.sol`
-- `state/uncalled_blockhash.sol`
 - `strings/concat/string_concat_different_types.sol`
 - `structs/array_of_recursive_struct.sol`
 - `structs/conversion/recursive_storage_memory.sol`
-- `structs/function_type_copy.sol`
 - `structs/lone_struct_array_type.sol`
-- `structs/multislot_struct_allocation.sol`
 - `structs/recursive_structs.sol`
-- `tryCatch/create.sol`
 - `tryCatch/try_catch_library_call.sol`
 - `types/nested_tuples.sol`
 - `types/tuple_assign_multi_slot_grow.sol`
@@ -1656,154 +1634,14 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `userDefinedValueType/wrap_unwrap.sol`
 - `variables/mapping_local_compound_assignment.sol`
 - `variables/mapping_local_tuple_assignment.sol`
-- `various/code_access_content.sol`
-- `various/code_access_runtime.sol`
 - `various/crazy_elementary_typenames_on_stack.sol`
 - `various/super_alone.sol`
 - `various/super_parentheses.sol`
-- `various/tuples.sol`
-- `viaYul/comparison_functions.sol`
 - `viaYul/conversion/explicit_string_bytes_calldata_cast.sol`
 
 ## Source validation rejections
 
-- `array/copying/copy_function_internal_storage_array.sol`
-  - 56: storage layout
-  - 56: state variable type
-  - 7: unsupported state variable
-  - 14: unsupported state variable
-  - 28: unsupported type name
-  - 44: unsupported callee
-- `array/copying/copy_internal_function_array_to_storage.sol`
-  - 55: storage layout
-  - 55: state variable type
-  - 8: unsupported state variable
-  - 22: unsupported variable type
-  - 49: unsupported callee
-- `constructor/store_function_in_constructor.sol`
-  - 51: storage layout
-  - 51: state variable type
-  - 10: unsupported state variable
-  - 45: call of an unsupported function
-- `constructor/store_function_in_constructor_packed.sol`
-  - 56: storage layout
-  - 56: state variable type
-  - 10: unsupported state variable
-  - 50: call of an unsupported function
-- `constructor/store_internal_unused_function_in_constructor.sol`
-  - 32: storage layout
-  - 32: state variable type
-  - 6: unsupported state variable
-  - 27: call of an unsupported function
-- `constructor/store_internal_unused_library_function_in_constructor.sol`
-  - 34: storage layout
-  - 34: state variable type
-  - 15: unsupported state variable
-  - 29: call of an unsupported function
-- `deployedCodeExclusion/library_function_deployed.sol`
-  - 48: storage layout
-  - 48: state variable type
-  - 17: unsupported state variable
-  - 41: call of an unsupported function
-- `deployedCodeExclusion/module_function_deployed.sol`
-  - 40: storage layout
-  - 40: state variable type
-  - 9: unsupported state variable
-  - 33: call of an unsupported function
-  - 50: no contract
-- `deployedCodeExclusion/static_base_function_deployed.sol`
-  - 50: storage layout
-  - 50: state variable type
-  - 19: unsupported state variable
-  - 29: not a storage location
-  - 43: call of an unsupported function
-- `deployedCodeExclusion/super_function_deployed.sol`
-  - 50: storage layout
-  - 50: state variable type
-  - Identifier 29: built-in super is not supported
-  - 19: unsupported state variable
-  - 43: call of an unsupported function
-- `deployedCodeExclusion/virtual_function_deployed.sol`
-  - 59: storage layout
-  - 59: state variable type
-  - Identifier 38: built-in super is not supported
-  - 28: unsupported state variable
-  - 52: call of an unsupported function
-- `functionCall/call_function_returning_function.sol`
-  - 36: return type
-  - 56: return type
-  - 31: unsupported variable type
-  - 33: unsupported function value
-  - 51: unsupported variable type
-  - 53: unsupported function value
-  - 78: unsupported variable type
-  - 81: unsupported function value
-  - 88: unsupported callee
-- `functionCall/calling_uninitialized_function_in_detail.sol`
-  - 30: storage layout
-  - 30: state variable type
-  - 6: unsupported state variable
-  - 23: call of an unsupported function
-- `functionTypes/function_delete_storage.sol`
-  - 48: storage layout
-  - 48: state variable type
-  - 14: unsupported state variable
-  - 23: call of an unsupported function
-  - 43: call of an unsupported function
-- `functionTypes/internal_function_pointer_with_calldata_args.sol`
-  - 71: storage layout
-  - 71: state variable type
-  - 8: unsupported state variable
-  - 35: call of an unsupported function
-- `functionTypes/mapping_of_functions.sol`
-  - 64: storage layout
-  - 64: state variable type
-  - 8: unsupported state variable
-  - 58: unsupported callee
-- `functionTypes/same_function_in_construction_and_runtime_equality_check.sol`
-  - 41: storage layout
-  - 41: state variable type
-  - 8: unsupported state variable
-- `functionTypes/uninitialized_internal_storage_function_call.sol`
-  - 16: storage layout
-  - 16: state variable type
-  - 4: unsupported state variable
-  - 9: call of an unsupported function
-- `functionTypes/uninitialized_internal_storage_function_pointer_comparison.sol`
-  - 55: storage layout
-  - 55: state variable type
-  - 7: unsupported state variable
-  - 47: unsupported binary operator
-- `functionTypes/uninitialized_internal_storage_function_pointer_slot_edges.sol`
-  - 52: storage layout
-  - 52: state variable type
-  - 4: unsupported state variable
-  - 13: unsupported state variable
-- `functionTypes/uninitialized_internal_transient_storage_function_pointer_comparison.sol`
-  - 69: storage layout
-  - 69: state variable type
-  - 6: unsupported state variable
-  - 61: unsupported binary operator
-- `inheritance/base_access_to_function_type_variables.sol`
-  - 35: storage layout
-  - 35: state variable type
-  - 6: unsupported state variable
-  - 31: static call of an unsupported function
-- `uninitializedFunctionPointer/store2.sol`
-  - 77: storage layout
-  - 77: state variable type
-  - 5: unsupported state variable
-  - 65: call of an unsupported function
-- `uninitializedFunctionPointer/storeInConstructor.sol`
-  - 37: storage layout
-  - 37: state variable type
-  - 4: unsupported state variable
-  - 32: call of an unsupported function
-- `uninitializedFunctionPointer/uninitialized_internal_storage_function_via_yul.sol`
-  - 29: storage layout
-  - 29: state variable type
-  - 4: unsupported state variable
-  - 18: assembly reference of this type
+None.
 
 ## Elaborator rejections
 
@@ -1813,6 +1651,9 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `abicoder/abi_encode_v2_in_function_inherited_in_v1_contract.sol`
   - 29: more than one contract
   - 46: more than one contract
+- `constants/assign_type_info.sol`
+  - 1: more than one contract
+  - 30: more than one contract
 - `constants/constants_at_file_level_referencing.sol`
   - 15: no contract
 - `constants/same_constants_different_files.sol`
@@ -1825,6 +1666,8 @@ Supporting the features in this order admits the most rejected tests at each ste
   - 106: more than one contract
 - `deployedCodeExclusion/module_function.sol`
   - 39: no contract
+- `deployedCodeExclusion/module_function_deployed.sol`
+  - 50: no contract
 - `errors/error_throw_from_module_via_member_access.sol`
   - 5: no contract
 - `errors/panic_via_import.sol`
@@ -1866,10 +1709,8 @@ Supporting the features in this order admits the most rejected tests at each ste
 - `externalSource/source_name_starting_with_dots.sol`
   - 13: no contract
 - `freeFunctions/free_runtimecode.sol`
-  - MemberAccess 12: unsupported contract type member runtimeCode
   - 4: more than one contract
   - 28: more than one contract
-  - 13: length of a non-array
 - `freeFunctions/import.sol`
   - 19: no contract
 - `freeFunctions/new_operator.sol`
@@ -1940,7 +1781,6 @@ Supporting the features in this order admits the most rejected tests at each ste
   - 19: more than one contract
   - 42: more than one contract
 - `various/code_access_padding.sol`
-  - MemberAccess 26: unsupported contract type member runtimeCode
   - 9: more than one contract
   - 31: more than one contract
 - `various/contract_binary_dependencies.sol`
