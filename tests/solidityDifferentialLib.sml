@@ -878,12 +878,16 @@ fun run_expectations {root, manifest} =
                    val prior_world = !world
                    val () = block := !block + 1
                    val bn = num_term (IntInf.fromInt (!block))
+                   (* The pinned solc test/EVMHost.cpp supplies both blob hashes. *)
                    val fr = eval “(differential_frame ^sender ^value ^data) with
                      <| self_address := ^address; code_address := ^address;
                         tx_params := (differential_frame ^sender ^value ^data).tx_params with
                           <| origin := 0x9292929292929292929292929292929292929292w;
                              gasPrice := 3000000000; blockNumber := ^bn;
                              prevHashes := test_block_hashes ^bn;
+                             blobHashes :=
+                               [0x0100000000000000000000000000000000000000000000000000000000000001w;
+                                0x0100000000000000000000000000000000000000000000000000000000000002w];
                              blockTimeStamp := 15 * ^bn; chainId := 1;
                              blockCoinBase := 0x7878787878787878787878787878787878787878w;
                              blockGasLimit := 20000000;
@@ -1037,9 +1041,28 @@ fun run_expectations {root, manifest} =
                            else ();
                            (con "Returned" [bytes_term []], eval “^w.logs”)
                          end
+                     (* A creation that returned its own code deploys it;
+                      * later calls would run the source program against
+                      * other code, so the sequence stops there. *)
                      | ("ContractReturned", [bs, w]) =>
-                         (world := result_world;
-                          (con "Returned" [bs], eval “^result_world.logs”))
+                         if creating then
+                           let
+                             val destroyed = eval “(lookup_account ^address
+                               ^result_world.accounts).nonce = 0” ~~ T
+                           in
+                             world := (if destroyed then result_world
+                               else “^result_world with accounts :=
+                                 update_account ^address
+                                   ((lookup_account ^address ^result_world.accounts)
+                                      with code := ^bs) ^result_world.accounts”);
+                             stopped := SOME (if destroyed
+                               then "constructor destroyed the contract"
+                               else "constructor returned its own code");
+                             (con "Returned" [bytes_term []], eval “^result_world.logs”)
+                           end
+                         else
+                           (world := result_world;
+                            (con "Returned" [bs], eval “^result_world.logs”))
                      | ("ContractReverted", [bs, _]) => rolled_back "deployment reverted" bs
                      (* An abort fails with no return data, which the expectation
                       * format, like the bytecode run, shows as an empty revert. *)

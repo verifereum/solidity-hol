@@ -28,6 +28,7 @@ val () = holbuild_extra_deps [
   "../testdata/differential/expected/hashes.json",
   "../testdata/differential/expected/conditionals.json",
   "../testdata/differential/expected/encode_calls.json",
+  "../testdata/differential/expected/abi_signatures.json",
   "../testdata/differential/expected/bytes_constants.json",
   "../testdata/differential/expected/try_calls.json",
   "../testdata/differential/expected/inline_assembly.json",
@@ -140,6 +141,17 @@ Theorem array_identifier_locations:
   decode_type_identifier "t_array$_t_string_$dyn_storage" = NONE ∧
   decode_type_identifier "t_array$_t_enum_37_$dyn_calldata_ptr" =
     SOME (SrcType (LocatedT CalldataLoc (ArrayT (EnumT (AstId 37)) NONE)))
+Proof
+  EVAL_TAC
+QED
+
+Theorem struct_names_in_type_identifier_components:
+  decode_type_identifier "t_array$_t_struct$_t_function_internal_pure_$4_memory_ptr_$dyn_memory_ptr" =
+    SOME (SrcType (LocatedT MemoryLoc (ArrayT (StructT (AstId 4)) NONE))) ∧
+  decode_type_identifier "t_tuple$_t_struct$_t_array_$4_memory_ptr_$_t_uint256_$" =
+    SOME (SrcTupleType [LocatedT MemoryLoc (StructT (AstId 4)); UintT 256]) ∧
+  function_type_identifier "t_function_internal_pure$_t_struct$_A$$$B_$4_memory_ptr_$returns$__$" =
+    SOME (FunctionT InternalFn PureMut [LocatedT MemoryLoc (StructT (AstId 4))] [])
 Proof
   EVAL_TAC
 QED
@@ -279,17 +291,17 @@ val () = function_error "modifier invocation of unknown kind"
 val () = function_error "a named argument naming no parameter"
   (edit_first "FunctionCall"
      (set_field "names" (JSON.ARRAY [JSON.STRING "noSuchParameter"])) ast)
-(* (fact)({n: ...}): the callee names no declaration to take the parameter
- * names from, so the call fails import as unsupported, naming the cause. *)
+(* (fact)({n: ...}) takes the parameter name from the same declaration as
+ * fact({n: ...}). *)
 val () =
   let
     fun parenthesize (callee as JSON.OBJECT kvs) =
           JSON.OBJECT
             ([("nodeType", JSON.STRING "TupleExpression"),
+              ("id", JSON.INT 999999),
               ("isInlineArray", JSON.BOOL false),
               ("components", JSON.ARRAY [callee])] @
-             List.filter (fn (k, _) => k = "id" orelse k = "src" orelse
-                                       k = "typeDescriptions") kvs)
+             List.filter (fn (k, _) => k = "src" orelse k = "typeDescriptions") kvs)
       | parenthesize v = v
     fun edit call =
       case JSONUtil.findField call "expression" of
@@ -299,11 +311,9 @@ val () =
       | NONE => raise Fail "a call without a callee"
   in
     case import_rejection [] (edit_first "FunctionCall" edit ast) contracts of
-      NONE => raise Fail "named arguments of a parenthesized callee: imported"
-    | SOME (k, msg) =>
-        if k = UnsupportedFunction andalso
-           String.isSubstring "named arguments are not supported" msg then ()
-        else raise Fail ("named arguments of a parenthesized callee: " ^ msg)
+      NONE => ()
+    | SOME (_, msg) =>
+        raise Fail ("named arguments of a parenthesized callee: " ^ msg)
   end
 val () = import_error "base outside the compilation"
   (edit_first "ContractDefinition"
@@ -431,17 +441,24 @@ val () =
       [": unsupported expression UnknownTarget", "Error catch requires one string memory parameter"]
   end
 
-(* A state variable of a struct left out (a function-typed member)
- * rejects the unit at import, rather than reaching the core unchecked. *)
+(* A struct can hold an external function. If a member type cannot be
+ * imported, its state variable still rejects the unit. *)
 val () =
-  case (ignore (import_artifact "../testdata/frontend/expected/struct_state.json"
-                  "testdata/frontend/struct_state.sol"); NONE)
-       handle ImportError msg => SOME msg of
-    SOME msg =>
-      if String.isSubstring "state variable of a struct the core cannot hold" msg
-      then ()
+  let
+    val fixture = "../testdata/frontend/expected/struct_state.json"
+    val source = "testdata/frontend/struct_state.sol"
+    val _ = import_artifact fixture source
+    val unit = artifact_part fixture ["sources", source, "ast"]
+    val artifact_contracts = artifact_part fixture ["contracts", source]
+    val unsupported = edit_first "FunctionTypeName"
+      (set_field "nodeType" (JSON.STRING "UnknownType")) unit
+  in
+    (ignore (import_source_unit [] unsupported artifact_contracts);
+     raise Fail "state variable of a left-out struct: imported")
+    handle ImportError msg =>
+      if String.isSubstring "state variable of a struct the core cannot hold" msg then ()
       else raise Fail ("state variable of a left-out struct: " ^ msg)
-  | NONE => raise Fail "state variable of a left-out struct: imported"
+  end
 
 (* An unsupported call option does not hide the blockers of the receiver. *)
 val () =
@@ -472,18 +489,18 @@ val () =
 (* Every unsupported reference of an inline assembly block is a line. *)
 val () =
   let
-    fun selector_suffix (JSON.OBJECT kvs) =
+    fun unknown_suffix (JSON.OBJECT kvs) =
           JSON.OBJECT
             (map (fn ("externalReferences", JSON.ARRAY rs) =>
                        ("externalReferences",
-                        JSON.ARRAY (map (set_field "suffix" (JSON.STRING "selector")) rs))
+                        JSON.ARRAY (map (set_field "suffix" (JSON.STRING "unknown")) rs))
                    | kv => kv) kvs)
-      | selector_suffix v = v
+      | unknown_suffix v = v
   in
     expect_function_lines "unsupported assembly references"
       "../testdata/differential/expected/inline_assembly.json"
       "testdata/differential/inline_assembly.sol"
-      "locations" (edit_first "InlineAssembly" selector_suffix)
+      "locations" (edit_first "InlineAssembly" unknown_suffix)
       ["unsupported reference packedHigh.offset", "unsupported reference packedHigh.slot",
        "unsupported reference total.offset", "unsupported reference total.slot"]
   end
@@ -1581,3 +1598,31 @@ val () =
      handle ImportError _ => ())
   end
 
+(* abi.encodeWithSignature keeps its signature as its first argument, a
+ * literal or not (a parameter, a state variable, a struct field), as
+ * abi.encodeWithSelector keeps its selector. *)
+local
+  val fixture = "../testdata/differential/expected/abi_signatures.json"
+  val source = "testdata/differential/abi_signatures.sol"
+  val unit_tm =
+    import_source_unit []
+      (artifact_part fixture ["sources", source, "ast"])
+      (artifact_part fixture ["contracts", source])
+  fun const_name tm = if is_const tm then fst (dest_const tm) else ""
+  fun signature_call tm =
+    case strip_comb tm of
+      (c, [_, _, form, _, _]) =>
+        const_name c = "SrcAbiEncode" andalso const_name form = "AbiWithSignature"
+    | _ => false
+  val firsts =
+    List.map (fn tm => case fst (listSyntax.dest_list (el 4 (snd (strip_comb tm)))) of
+                         first :: _ => const_name (fst (strip_comb first))
+                       | [] => raise Fail "abi_signatures: a signature call without arguments")
+      (find_terms signature_call unit_tm)
+in
+  val () =
+    List.app (fn kind =>
+      if List.exists (fn k => k = kind) firsts then ()
+      else raise Fail ("abi_signatures: no signature given as " ^ kind))
+    ["SrcLiteral", "SrcIdentifier", "SrcMemberAccess"]
+end

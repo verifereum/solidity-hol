@@ -86,7 +86,7 @@ STAGES = (
 # carries those names separately instead of quietly counting them as builtins.
 EVM_DIALECT_BUILTINS = frozenset(
     """stop add sub mul div sdiv mod smod addmod mulmod exp signextend lt gt slt sgt
-    eq iszero and or xor not byte shl shr sar keccak256 address balance selfbalance
+    eq iszero and or xor not byte shl shr sar clz keccak256 address balance selfbalance
     origin caller callvalue calldataload calldatasize calldatacopy codesize codecopy
     gasprice extcodesize extcodecopy returndatasize returndatacopy extcodehash
     create create2 call callcode delegatecall staticcall mload mstore mstore8 mcopy

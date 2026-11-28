@@ -1,297 +1,67 @@
 {
   "counts": {
-    "admitted": 1354,
+    "admitted": 1465,
     "compile-failure": 0,
-    "elaboration-rejected": 52,
-    "import-rejected": 31,
+    "elaboration-rejected": 54,
+    "import-rejected": 0,
     "invalid-core": 0,
     "malformed-input": 0,
-    "partially-admitted": 108,
+    "partially-admitted": 51,
     "skipped": 100,
-    "source-rejected": 25
+    "source-rejected": 0
   },
   "features": [
     {
       "feature": "no contract",
-      "only_blocker": 35,
+      "only_blocker": 36,
       "tests": 36
     },
     {
-      "feature": "state variable type",
-      "only_blocker": 0,
-      "tests": 34
-    },
-    {
-      "feature": "storage layout",
-      "only_blocker": 0,
-      "tests": 34
-    },
-    {
-      "feature": "unsupported state variable",
-      "only_blocker": 0,
-      "tests": 30
-    },
-    {
-      "feature": "function types",
-      "only_blocker": 0,
-      "tests": 25
-    },
-    {
-      "feature": "not a storage location",
-      "only_blocker": 0,
-      "tests": 23
-    },
-    {
-      "feature": "call of an unsupported function",
-      "only_blocker": 0,
-      "tests": 21
-    },
-    {
       "feature": "more than one contract",
-      "only_blocker": 14,
+      "only_blocker": 17,
       "tests": 17
-    },
-    {
-      "feature": "unsupported callee",
-      "only_blocker": 0,
-      "tests": 14
-    },
-    {
-      "feature": "parameter type",
-      "only_blocker": 0,
-      "tests": 12
-    },
-    {
-      "feature": "unsupported external call",
-      "only_blocker": 0,
-      "tests": 8
-    },
-    {
-      "feature": "value count mismatch",
-      "only_blocker": 0,
-      "tests": 8
-    },
-    {
-      "feature": "return type",
-      "only_blocker": 0,
-      "tests": 7
-    },
-    {
-      "feature": "length of a non-array",
-      "only_blocker": 0,
-      "tests": 6
-    },
-    {
-      "feature": "VariableDeclaration: state variable of a struct the core cannot hold",
-      "only_blocker": 0,
-      "tests": 5
-    },
-    {
-      "feature": "unknown struct member",
-      "only_blocker": 0,
-      "tests": 5
-    },
-    {
-      "feature": "built-ins",
-      "only_blocker": 0,
-      "tests": 4
-    },
-    {
-      "feature": "type annotation mismatch",
-      "only_blocker": 0,
-      "tests": 4
-    },
-    {
-      "feature": "unsupported struct constructor",
-      "only_blocker": 0,
-      "tests": 4
-    },
-    {
-      "feature": "MemberAccess: unsupported contract type member runtimeCode",
-      "only_blocker": 0,
-      "tests": 3
     },
     {
       "feature": "storage copy of this type",
       "only_blocker": 0,
-      "tests": 3
-    },
-    {
-      "feature": "unsupported function value",
-      "only_blocker": 0,
-      "tests": 3
-    },
-    {
-      "feature": "unsupported parameter type",
-      "only_blocker": 0,
-      "tests": 3
-    },
-    {
-      "feature": "unsupported type name",
-      "only_blocker": 0,
-      "tests": 3
-    },
-    {
-      "feature": "unsupported variable type",
-      "only_blocker": 0,
-      "tests": 3
-    },
-    {
-      "feature": "IndexAccess: external calls only on contract-typed values",
-      "only_blocker": 0,
-      "tests": 2
-    },
-    {
-      "feature": "unsupported binary operator",
-      "only_blocker": 0,
-      "tests": 2
+      "tests": 1
     },
     {
       "feature": "unsupported declaration",
       "only_blocker": 0,
-      "tests": 2
-    },
-    {
-      "feature": "unsupported event parameter type",
-      "only_blocker": 0,
-      "tests": 2
+      "tests": 1
     },
     {
       "feature": "unsupported memory struct type",
-      "only_blocker": 0,
-      "tests": 2
-    },
-    {
-      "feature": "FunctionCall: abi.encodeCall of an unnamed function",
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "FunctionCall: abi.encodeWithSignature of a non-literal signature is not supported",
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "MemberAccess: unsupported selector",
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "assembly reference of this type",
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "no supported function or creation",
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "static call of an unsupported function",
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "unsupported ABI parameter or return type",
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "unsupported constructor parameters",
-      "only_blocker": 0,
-      "tests": 1
-    },
-    {
-      "feature": "unsupported identifier",
       "only_blocker": 0,
       "tests": 1
     }
   ],
   "format": "solidity-hol-semantic-tests-coverage-v1",
   "functions": {
-    "total": 3642,
-    "unsupported": 149
+    "total": 3832,
+    "unsupported": 68
   },
   "greedy_order": [
     {
-      "admitted": 35,
+      "admitted": 36,
       "feature": "no contract"
     },
     {
-      "admitted": 49,
+      "admitted": 53,
       "feature": "more than one contract"
     },
     {
-      "admitted": 50,
-      "feature": "MemberAccess: unsupported contract type member runtimeCode"
+      "admitted": 53,
+      "feature": "storage copy of this type"
     },
     {
-      "admitted": 52,
-      "feature": "length of a non-array"
-    },
-    {
-      "admitted": 52,
-      "feature": "state variable type"
-    },
-    {
-      "admitted": 52,
-      "feature": "storage layout"
+      "admitted": 53,
+      "feature": "unsupported declaration"
     },
     {
       "admitted": 54,
-      "feature": "unsupported state variable"
-    },
-    {
-      "admitted": 66,
-      "feature": "call of an unsupported function"
-    },
-    {
-      "admitted": 68,
-      "feature": "built-ins"
-    },
-    {
-      "admitted": 70,
-      "feature": "unsupported binary operator"
-    },
-    {
-      "admitted": 71,
-      "feature": "not a storage location"
-    },
-    {
-      "admitted": 74,
-      "feature": "function types"
-    },
-    {
-      "admitted": 76,
-      "feature": "parameter type"
-    },
-    {
-      "admitted": 78,
-      "feature": "unsupported event parameter type"
-    },
-    {
-      "admitted": 79,
-      "feature": "unsupported callee"
-    },
-    {
-      "admitted": 81,
-      "feature": "return type"
-    },
-    {
-      "admitted": 82,
-      "feature": "type annotation mismatch"
-    },
-    {
-      "admitted": 85,
-      "feature": "unsupported type name"
-    },
-    {
-      "admitted": 86,
-      "feature": "unsupported parameter type"
-    },
-    {
-      "admitted": 87,
-      "feature": "unsupported variable type"
+      "feature": "unsupported memory struct type"
     }
   ],
   "profile": "solc-0.8.37-via-ir-osaka",
@@ -474,37 +244,19 @@
       "unsupported": []
     },
     {
-      "blockers": [
-        "FunctionTypeName 11: external function types are not supported",
-        "FunctionTypeName 30: external function types are not supported",
-        "254: storage layout",
-        "41: return type",
-        "254: state variable type",
-        "FunctionCall 83: abi.encodeWithSignature of a non-literal signature is not supported",
-        "FunctionCall 115: abi.encodeWithSignature of a non-literal signature is not supported",
+      "blockers": [],
+      "category": "partially-admitted",
+      "creation": [],
+      "features": [],
+      "functions": 11,
+      "reason": null,
+      "test": "abicoder/abi_encode_call_is_consistent_v2.sol",
+      "unsupported": [
         "FunctionCall 134: abi.encodeCall of an unnamed function",
-        "FunctionTypeName 148: external function types are not supported",
         "FunctionCall 159: abi.encodeCall of an unnamed function",
         "FunctionCall 174: abi.encodeCall of an unnamed function",
-        "37: not a storage location",
-        "124: not a storage location",
-        "150: not a storage location"
-      ],
-      "category": "import-rejected",
-      "creation": [],
-      "features": [
-        "FunctionCall: abi.encodeCall of an unnamed function",
-        "FunctionCall: abi.encodeWithSignature of a non-literal signature is not supported",
-        "function types",
-        "not a storage location",
-        "return type",
-        "state variable type",
-        "storage layout"
-      ],
-      "functions": 0,
-      "reason": "FunctionTypeName 11: external function types are not supported\nFunctionTypeName 30: external function types are not supported\n254: storage layout\n41: return type\n254: state variable type\nFunctionCall 83: abi.encodeWithSignature of a non-literal signature is not supported\nFunctionCall 115: abi.encodeWithSignature of a non-literal signature is not supported\nFunctionCall 134: abi.encodeCall of an unnamed function\nFunctionTypeName 148: external function types are not supported\nFunctionCall 159: abi.encodeCall of an unnamed function\nFunctionCall 174: abi.encodeCall of an unnamed function\n37: not a storage location\n124: not a storage location\n150: not a storage location",
-      "test": "abicoder/abi_encode_call_is_consistent_v2.sol",
-      "unsupported": []
+        "calls an unsupported function"
+      ]
     },
     {
       "blockers": [],
@@ -515,7 +267,7 @@
       "reason": null,
       "test": "abicoder/abi_encode_call_memory_v2.sol",
       "unsupported": [
-        "FunctionTypeName 17: external function types are not supported\nFunctionTypeName 42: external function types are not supported\nFunctionCall 56: abi.encodeCall of an unnamed function\nFunctionCall 66: abi.encodeCall of an unnamed function\nFunctionCall 74: abi.encodeCall of an unnamed function\nMemberAccess 123: unsupported selector\n25: not a storage location\n35: not a storage location"
+        "FunctionCall 56: abi.encodeCall of an unnamed function\nFunctionCall 66: abi.encodeCall of an unnamed function\nFunctionCall 74: abi.encodeCall of an unnamed function"
       ]
     },
     {
@@ -675,32 +427,23 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 4,
       "reason": null,
       "test": "abicoder/abi_encode_with_signature_v1.sol",
-      "unsupported": [
-        "FunctionCall 25: abi.encodeWithSignature of a non-literal signature is not supported",
-        "FunctionCall 43: abi.encodeWithSignature of a non-literal signature is not supported",
-        "FunctionCall 120: abi.encodeWithSignature of a non-literal signature is not supported"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 5,
       "reason": null,
       "test": "abicoder/abi_encode_with_signature_v2.sol",
-      "unsupported": [
-        "FunctionCall 25: abi.encodeWithSignature of a non-literal signature is not supported",
-        "FunctionCall 43: abi.encodeWithSignature of a non-literal signature is not supported",
-        "FunctionCall 120: abi.encodeWithSignature of a non-literal signature is not supported",
-        "FunctionCall 180: abi.encodeWithSignature of a non-literal signature is not supported"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -813,40 +556,12 @@
       "unsupported": []
     },
     {
-      "blockers": [
-        "FunctionTypeName 6: external function types are not supported",
-        "FunctionTypeName 44: external function types are not supported",
-        "39: parameter type",
-        "61: parameter type",
-        "FunctionTypeName 100: external function types are not supported",
-        "FunctionTypeName 107: external function types are not supported",
-        "19: length of a non-array",
-        "27: unsupported callee",
-        "31: unsupported callee",
-        "35: unsupported callee",
-        "58: unsupported external call",
-        "58: value count mismatch",
-        "116: not a storage location",
-        "123: not a storage location",
-        "130: not a storage location",
-        "138: unsupported external call",
-        "138: value count mismatch",
-        "142: unsupported external call",
-        "142: value count mismatch"
-      ],
-      "category": "import-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "function types",
-        "length of a non-array",
-        "not a storage location",
-        "parameter type",
-        "unsupported callee",
-        "unsupported external call",
-        "value count mismatch"
-      ],
-      "functions": 0,
-      "reason": "FunctionTypeName 6: external function types are not supported\nFunctionTypeName 44: external function types are not supported\n39: parameter type\n61: parameter type\nFunctionTypeName 100: external function types are not supported\nFunctionTypeName 107: external function types are not supported\n19: length of a non-array\n27: unsupported callee\n31: unsupported callee\n35: unsupported callee\n58: unsupported external call\n58: value count mismatch\n116: not a storage location\n123: not a storage location\n130: not a storage location\n138: unsupported external call\n138: value count mismatch\n142: unsupported external call\n142: value count mismatch",
+      "features": [],
+      "functions": 6,
+      "reason": null,
       "test": "abicoder/calldataDecoding/array/calldata_array_function_types_v2.sol",
       "unsupported": []
     },
@@ -1228,16 +943,13 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 3,
       "reason": null,
       "test": "abicoder/calldataDecoding/struct/member_external_function_v2.sol",
-      "unsupported": [
-        "Identifier 20: external calls only on contract-typed values\n28: unsupported ABI parameter or return type\n28: unsupported memory struct type\n24: unknown struct member",
-        "42: unsupported external call\n41: unsupported struct constructor"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -1460,32 +1172,12 @@
       "unsupported": []
     },
     {
-      "blockers": [
-        "FunctionTypeName 9: external function types are not supported",
-        "17: parameter type",
-        "31: unsupported ABI parameter or return type",
-        "31: unsupported memory struct type",
-        "27: unknown struct member",
-        "50: unsupported struct constructor",
-        "57: unsupported external call",
-        "57: value count mismatch",
-        "56: unknown struct member",
-        "61: unsupported external call"
-      ],
-      "category": "import-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "function types",
-        "parameter type",
-        "unknown struct member",
-        "unsupported ABI parameter or return type",
-        "unsupported external call",
-        "unsupported memory struct type",
-        "unsupported struct constructor",
-        "value count mismatch"
-      ],
-      "functions": 0,
-      "reason": "FunctionTypeName 9: external function types are not supported\n17: parameter type\n31: unsupported ABI parameter or return type\n31: unsupported memory struct type\n27: unknown struct member\n50: unsupported struct constructor\n57: unsupported external call\n57: value count mismatch\n56: unknown struct member\n61: unsupported external call",
+      "features": [],
+      "functions": 4,
+      "reason": null,
       "test": "abicoder/cleanup/function_v2.sol",
       "unsupported": []
     },
@@ -1961,18 +1653,13 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 4,
       "reason": null,
       "test": "array/array_function_pointers.sol",
-      "unsupported": [
-        "22: unsupported type name\n13: unsupported variable type\n27: unsupported callee",
-        "58: unsupported type name\n48: unsupported variable type\n81: unsupported type name\n90: unsupported callee",
-        "FunctionTypeName 104: external function types are not supported\nFunctionTypeName 111: external function types are not supported\n120: unsupported callee",
-        "FunctionTypeName 138: external function types are not supported\nFunctionTypeName 146: external function types are not supported\nFunctionTypeName 170: external function types are not supported\n183: unsupported callee"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -2515,74 +2202,22 @@
       "unsupported": []
     },
     {
-      "blockers": [
-        "FunctionTypeName 15: external function types are not supported",
-        "FunctionTypeName 20: external function types are not supported",
-        "161: storage layout",
-        "161: state variable type",
-        "FunctionTypeName 38: external function types are not supported",
-        "27: unsupported state variable",
-        "32: unsupported state variable",
-        "52: type annotation mismatch",
-        "46: not a storage location",
-        "48: not a storage location",
-        "50: not a storage location",
-        "62: unsupported type name",
-        "69: type annotation mismatch",
-        "124: length of a non-array",
-        "130: length of a non-array",
-        "132: length of a non-array"
-      ],
-      "category": "import-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "function types",
-        "length of a non-array",
-        "not a storage location",
-        "state variable type",
-        "storage layout",
-        "type annotation mismatch",
-        "unsupported state variable",
-        "unsupported type name"
-      ],
-      "functions": 0,
-      "reason": "FunctionTypeName 15: external function types are not supported\nFunctionTypeName 20: external function types are not supported\n161: storage layout\n161: state variable type\nFunctionTypeName 38: external function types are not supported\n27: unsupported state variable\n32: unsupported state variable\n52: type annotation mismatch\n46: not a storage location\n48: not a storage location\n50: not a storage location\n62: unsupported type name\n69: type annotation mismatch\n124: length of a non-array\n130: length of a non-array\n132: length of a non-array",
+      "features": [],
+      "functions": 6,
+      "reason": null,
       "test": "array/copying/array_of_function_external_storage_to_storage_dynamic.sol",
       "unsupported": []
     },
     {
-      "blockers": [
-        "FunctionTypeName 15: external function types are not supported",
-        "FunctionTypeName 20: external function types are not supported",
-        "161: storage layout",
-        "161: state variable type",
-        "FunctionTypeName 38: external function types are not supported",
-        "27: unsupported state variable",
-        "32: unsupported state variable",
-        "52: type annotation mismatch",
-        "46: not a storage location",
-        "48: not a storage location",
-        "50: not a storage location",
-        "62: unsupported type name",
-        "69: type annotation mismatch",
-        "124: length of a non-array",
-        "130: length of a non-array",
-        "132: length of a non-array"
-      ],
-      "category": "import-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "function types",
-        "length of a non-array",
-        "not a storage location",
-        "state variable type",
-        "storage layout",
-        "type annotation mismatch",
-        "unsupported state variable",
-        "unsupported type name"
-      ],
-      "functions": 0,
-      "reason": "FunctionTypeName 15: external function types are not supported\nFunctionTypeName 20: external function types are not supported\n161: storage layout\n161: state variable type\nFunctionTypeName 38: external function types are not supported\n27: unsupported state variable\n32: unsupported state variable\n52: type annotation mismatch\n46: not a storage location\n48: not a storage location\n50: not a storage location\n62: unsupported type name\n69: type annotation mismatch\n124: length of a non-array\n130: length of a non-array\n132: length of a non-array",
+      "features": [],
+      "functions": 6,
+      "reason": null,
       "test": "array/copying/array_of_function_external_storage_to_storage_dynamic_different_mutability.sol",
       "unsupported": []
     },
@@ -2887,47 +2522,22 @@
       "unsupported": []
     },
     {
-      "blockers": [
-        "56: storage layout",
-        "56: state variable type",
-        "7: unsupported state variable",
-        "14: unsupported state variable",
-        "28: unsupported type name",
-        "44: unsupported callee"
-      ],
-      "category": "source-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "state variable type",
-        "storage layout",
-        "unsupported callee",
-        "unsupported state variable",
-        "unsupported type name"
-      ],
-      "functions": 0,
-      "reason": "56: storage layout\n56: state variable type\n7: unsupported state variable\n14: unsupported state variable\n28: unsupported type name\n44: unsupported callee",
+      "features": [],
+      "functions": 2,
+      "reason": null,
       "test": "array/copying/copy_function_internal_storage_array.sol",
       "unsupported": []
     },
     {
-      "blockers": [
-        "55: storage layout",
-        "55: state variable type",
-        "8: unsupported state variable",
-        "22: unsupported variable type",
-        "49: unsupported callee"
-      ],
-      "category": "source-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "state variable type",
-        "storage layout",
-        "unsupported callee",
-        "unsupported state variable",
-        "unsupported variable type"
-      ],
-      "functions": 0,
-      "reason": "55: storage layout\n55: state variable type\n8: unsupported state variable\n22: unsupported variable type\n49: unsupported callee",
+      "features": [],
+      "functions": 2,
+      "reason": null,
       "test": "array/copying/copy_internal_function_array_to_storage.sol",
       "unsupported": []
     },
@@ -3002,48 +2612,12 @@
       "unsupported": []
     },
     {
-      "blockers": [
-        "FunctionTypeName 5: external function types are not supported",
-        "FunctionTypeName 10: external function types are not supported",
-        "FunctionTypeName 41: external function types are not supported",
-        "FunctionTypeName 54: external function types are not supported",
-        "199: storage layout",
-        "51: parameter type",
-        "64: parameter type",
-        "199: state variable type",
-        "FunctionTypeName 75: external function types are not supported",
-        "FunctionTypeName 80: external function types are not supported",
-        "FunctionTypeName 130: external function types are not supported",
-        "FunctionTypeName 135: external function types are not supported",
-        "89: not a storage location",
-        "96: not a storage location",
-        "104: unsupported external call",
-        "104: value count mismatch",
-        "109: unsupported callee",
-        "114: unsupported callee",
-        "144: not a storage location",
-        "151: not a storage location",
-        "157: unsupported parameter type",
-        "162: unsupported callee",
-        "167: unsupported callee",
-        "188: unsupported callee",
-        "193: unsupported callee"
-      ],
-      "category": "import-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "function types",
-        "not a storage location",
-        "parameter type",
-        "state variable type",
-        "storage layout",
-        "unsupported callee",
-        "unsupported external call",
-        "unsupported parameter type",
-        "value count mismatch"
-      ],
-      "functions": 0,
-      "reason": "FunctionTypeName 5: external function types are not supported\nFunctionTypeName 10: external function types are not supported\nFunctionTypeName 41: external function types are not supported\nFunctionTypeName 54: external function types are not supported\n199: storage layout\n51: parameter type\n64: parameter type\n199: state variable type\nFunctionTypeName 75: external function types are not supported\nFunctionTypeName 80: external function types are not supported\nFunctionTypeName 130: external function types are not supported\nFunctionTypeName 135: external function types are not supported\n89: not a storage location\n96: not a storage location\n104: unsupported external call\n104: value count mismatch\n109: unsupported callee\n114: unsupported callee\n144: not a storage location\n151: not a storage location\n157: unsupported parameter type\n162: unsupported callee\n167: unsupported callee\n188: unsupported callee\n193: unsupported callee",
+      "features": [],
+      "functions": 7,
+      "reason": null,
       "test": "array/copying/function_type_array_to_storage.sol",
       "unsupported": []
     },
@@ -3618,55 +3192,24 @@
       "unsupported": []
     },
     {
-      "blockers": [
-        "FunctionTypeName 175: external function types are not supported",
-        "FunctionTypeName 195: external function types are not supported",
-        "189: return type",
-        "202: return type",
-        "FunctionTypeName 68: external function types are not supported",
-        "FunctionTypeName 79: external function types are not supported",
-        "FunctionTypeName 115: external function types are not supported",
-        "FunctionTypeName 9: external function types are not supported",
-        "FunctionTypeName 17: external function types are not supported",
-        "91: length of a non-array",
-        "99: not a storage location",
-        "107: not a storage location",
-        "126: unsupported external call",
-        "126: value count mismatch",
-        "131: unsupported callee",
-        "135: unsupported callee",
-        "139: unsupported callee",
-        "182: not a storage location",
-        "184: not a storage location",
-        "198: not a storage location"
-      ],
-      "category": "import-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "function types",
-        "length of a non-array",
-        "not a storage location",
-        "return type",
-        "unsupported callee",
-        "unsupported external call",
-        "value count mismatch"
-      ],
-      "functions": 0,
-      "reason": "FunctionTypeName 175: external function types are not supported\nFunctionTypeName 195: external function types are not supported\n189: return type\n202: return type\nFunctionTypeName 68: external function types are not supported\nFunctionTypeName 79: external function types are not supported\nFunctionTypeName 115: external function types are not supported\nFunctionTypeName 9: external function types are not supported\nFunctionTypeName 17: external function types are not supported\n91: length of a non-array\n99: not a storage location\n107: not a storage location\n126: unsupported external call\n126: value count mismatch\n131: unsupported callee\n135: unsupported callee\n139: unsupported callee\n182: not a storage location\n184: not a storage location\n198: not a storage location",
+      "features": [],
+      "functions": 6,
+      "reason": null,
       "test": "array/function_array_cross_calls.sol",
       "unsupported": []
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 6,
       "reason": null,
       "test": "array/function_memory_array.sol",
-      "unsupported": [
-        "88: unsupported type name\n77: unsupported variable type\n124: unsupported callee"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -4024,15 +3567,13 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 1,
       "reason": null,
       "test": "array/pop/parenthesized.sol",
-      "unsupported": [
-        "18: unsupported callee"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -4316,17 +3857,13 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 3,
       "reason": null,
       "test": "builtinFunctions/blobhash.sol",
-      "unsupported": [
-        "Identifier 5: unsupported built-in declaration ~29",
-        "Identifier 15: unsupported built-in declaration ~29",
-        "Identifier 25: unsupported built-in declaration ~29"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -4360,16 +3897,13 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 3,
       "reason": null,
       "test": "builtinFunctions/erc7201_equivalent_solidity_spec.sol",
-      "unsupported": [
-        "Identifier 60: unsupported built-in declaration ~30\nIdentifier 67: unsupported built-in declaration ~30",
-        "Identifier 82: unsupported built-in declaration ~30"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -4393,142 +3927,113 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 1,
       "reason": null,
       "test": "builtinFunctions/erc7201_overflow_expression.sol",
-      "unsupported": [
-        "Identifier 5: unsupported built-in declaration ~30\nIdentifier 8: unsupported built-in declaration ~30"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 3,
       "reason": null,
       "test": "builtinFunctions/erc7201_param_abi_encode.sol",
-      "unsupported": [
-        "Identifier 46: unsupported built-in declaration ~30",
-        "Identifier 72: unsupported built-in declaration ~30"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 1,
       "reason": null,
       "test": "builtinFunctions/erc7201_param_array_string_literal.sol",
-      "unsupported": [
-        "Identifier 5: unsupported built-in declaration ~30\nIdentifier 11: unsupported built-in declaration ~30"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 7,
       "reason": null,
       "test": "builtinFunctions/erc7201_param_locations.sol",
-      "unsupported": [
-        "Identifier 52: unsupported built-in declaration ~30",
-        "Identifier 66: unsupported built-in declaration ~30",
-        "Identifier 84: unsupported built-in declaration ~30",
-        "Identifier 100: unsupported built-in declaration ~30",
-        "Identifier 116: unsupported built-in declaration ~30",
-        "Identifier 136: unsupported built-in declaration ~30"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 3,
       "reason": null,
       "test": "builtinFunctions/erc7201_param_pure_function.sol",
-      "unsupported": [
-        "Identifier 54: unsupported built-in declaration ~30"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 2,
       "reason": null,
       "test": "builtinFunctions/erc7201_param_string_concat.sol",
-      "unsupported": [
-        "Identifier 50: unsupported built-in declaration ~30"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 2,
       "reason": null,
       "test": "builtinFunctions/erc7201_param_string_literal_with_escaped_chars.sol",
-      "unsupported": [
-        "Identifier 49: unsupported built-in declaration ~30"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 3,
       "reason": null,
       "test": "builtinFunctions/erc7201_param_ternary_operator.sol",
-      "unsupported": [
-        "Identifier 46: unsupported built-in declaration ~30",
-        "Identifier 67: unsupported built-in declaration ~30"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 2,
       "reason": null,
       "test": "builtinFunctions/erc7201_param_unicode_string_literal.sol",
-      "unsupported": [
-        "Identifier 46: unsupported built-in declaration ~30"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 2,
       "reason": null,
       "test": "builtinFunctions/erc7201_param_unicode_string_variable.sol",
-      "unsupported": [
-        "Identifier 49: unsupported built-in declaration ~30"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 2,
       "reason": null,
       "test": "builtinFunctions/erc7201_param_with_zero_last_byte_of_inner_hash.sol",
-      "unsupported": [
-        "Identifier 70: unsupported built-in declaration ~30\nIdentifier 77: unsupported built-in declaration ~30"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -4542,16 +4047,13 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 4,
       "reason": null,
       "test": "builtinFunctions/function_types_sig.sol",
-      "unsupported": [
-        "FunctionTypeName 21: external function types are not supported\nMemberAccess 27: unsupported selector\n23: not a storage location",
-        "FunctionTypeName 39: external function types are not supported\nMemberAccess 45: unsupported selector\n41: not a storage location"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -4665,39 +4167,33 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 1,
       "reason": null,
       "test": "builtinFunctions/ripemd160.sol",
-      "unsupported": [
-        "Identifier 7: unsupported built-in declaration ~20"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 1,
       "reason": null,
       "test": "builtinFunctions/ripemd160_empty.sol",
-      "unsupported": [
-        "Identifier 5: unsupported built-in declaration ~20"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 1,
       "reason": null,
       "test": "builtinFunctions/ripemd160_packed.sol",
-      "unsupported": [
-        "Identifier 25: unsupported built-in declaration ~20"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -4963,20 +4459,16 @@
     },
     {
       "blockers": [
-        "MemberAccess 12: unsupported contract type member runtimeCode",
         "1: more than one contract",
-        "30: more than one contract",
-        "23: length of a non-array"
+        "30: more than one contract"
       ],
-      "category": "import-rejected",
+      "category": "elaboration-rejected",
       "creation": [],
       "features": [
-        "MemberAccess: unsupported contract type member runtimeCode",
-        "length of a non-array",
         "more than one contract"
       ],
       "functions": 0,
-      "reason": "MemberAccess 12: unsupported contract type member runtimeCode\n1: more than one contract\n30: more than one contract\n23: length of a non-array",
+      "reason": "1: more than one contract\n30: more than one contract",
       "test": "constants/assign_type_info.sol",
       "unsupported": []
     },
@@ -5217,36 +4709,24 @@
       "unsupported": []
     },
     {
-      "blockers": [
-        "FunctionTypeName 5: external function types are not supported",
-        "10: parameter type",
-        "11: unsupported constructor parameters",
-        "11: no supported function or creation"
-      ],
-      "category": "import-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "function types",
-        "no supported function or creation",
-        "parameter type",
-        "unsupported constructor parameters"
-      ],
-      "functions": 0,
-      "reason": "FunctionTypeName 5: external function types are not supported\n10: parameter type\n11: unsupported constructor parameters\n11: no supported function or creation",
+      "features": [],
+      "functions": 1,
+      "reason": null,
       "test": "constructor/constructor_function_argument.sol",
       "unsupported": []
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 2,
       "reason": null,
       "test": "constructor/constructor_function_complex.sol",
-      "unsupported": [
-        "FunctionTypeName 7: external function types are not supported\n31: unsupported contract creation\n29: not a storage location"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -5349,82 +4829,42 @@
       "unsupported": []
     },
     {
-      "blockers": [
-        "51: storage layout",
-        "51: state variable type",
-        "10: unsupported state variable",
-        "45: call of an unsupported function"
-      ],
-      "category": "source-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "call of an unsupported function",
-        "state variable type",
-        "storage layout",
-        "unsupported state variable"
-      ],
-      "functions": 0,
-      "reason": "51: storage layout\n51: state variable type\n10: unsupported state variable\n45: call of an unsupported function",
+      "features": [],
+      "functions": 3,
+      "reason": null,
       "test": "constructor/store_function_in_constructor.sol",
       "unsupported": []
     },
     {
-      "blockers": [
-        "56: storage layout",
-        "56: state variable type",
-        "10: unsupported state variable",
-        "50: call of an unsupported function"
-      ],
-      "category": "source-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "call of an unsupported function",
-        "state variable type",
-        "storage layout",
-        "unsupported state variable"
-      ],
-      "functions": 0,
-      "reason": "56: storage layout\n56: state variable type\n10: unsupported state variable\n50: call of an unsupported function",
+      "features": [],
+      "functions": 3,
+      "reason": null,
       "test": "constructor/store_function_in_constructor_packed.sol",
       "unsupported": []
     },
     {
-      "blockers": [
-        "32: storage layout",
-        "32: state variable type",
-        "6: unsupported state variable",
-        "27: call of an unsupported function"
-      ],
-      "category": "source-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "call of an unsupported function",
-        "state variable type",
-        "storage layout",
-        "unsupported state variable"
-      ],
-      "functions": 0,
-      "reason": "32: storage layout\n32: state variable type\n6: unsupported state variable\n27: call of an unsupported function",
+      "features": [],
+      "functions": 3,
+      "reason": null,
       "test": "constructor/store_internal_unused_function_in_constructor.sol",
       "unsupported": []
     },
     {
-      "blockers": [
-        "34: storage layout",
-        "34: state variable type",
-        "15: unsupported state variable",
-        "29: call of an unsupported function"
-      ],
-      "category": "source-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "call of an unsupported function",
-        "state variable type",
-        "storage layout",
-        "unsupported state variable"
-      ],
-      "functions": 0,
-      "reason": "34: storage layout\n34: state variable type\n15: unsupported state variable\n29: call of an unsupported function",
+      "features": [],
+      "functions": 3,
+      "reason": null,
       "test": "constructor/store_internal_unused_library_function_in_constructor.sol",
       "unsupported": []
     },
@@ -5459,44 +4899,12 @@
       "unsupported": []
     },
     {
-      "blockers": [
-        "FunctionTypeName 5: external function types are not supported",
-        "FunctionTypeName 13: external function types are not supported",
-        "FunctionTypeName 21: external function types are not supported",
-        "184: storage layout",
-        "184: state variable type",
-        "32: unsupported state variable",
-        "40: unsupported state variable",
-        "48: unsupported state variable",
-        "106: type annotation mismatch",
-        "104: not a storage location",
-        "111: type annotation mismatch",
-        "117: unsupported callee",
-        "121: unsupported callee",
-        "135: type annotation mismatch",
-        "133: not a storage location",
-        "140: type annotation mismatch",
-        "146: unsupported callee",
-        "150: unsupported callee",
-        "164: type annotation mismatch",
-        "162: not a storage location",
-        "169: type annotation mismatch",
-        "175: unsupported callee",
-        "179: unsupported callee"
-      ],
-      "category": "import-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "function types",
-        "not a storage location",
-        "state variable type",
-        "storage layout",
-        "type annotation mismatch",
-        "unsupported callee",
-        "unsupported state variable"
-      ],
-      "functions": 0,
-      "reason": "FunctionTypeName 5: external function types are not supported\nFunctionTypeName 13: external function types are not supported\nFunctionTypeName 21: external function types are not supported\n184: storage layout\n184: state variable type\n32: unsupported state variable\n40: unsupported state variable\n48: unsupported state variable\n106: type annotation mismatch\n104: not a storage location\n111: type annotation mismatch\n117: unsupported callee\n121: unsupported callee\n135: type annotation mismatch\n133: not a storage location\n140: type annotation mismatch\n146: unsupported callee\n150: unsupported callee\n164: type annotation mismatch\n162: not a storage location\n169: type annotation mismatch\n175: unsupported callee\n179: unsupported callee",
+      "features": [],
+      "functions": 9,
+      "reason": null,
       "test": "conversions/function_type_array_to_storage.sol",
       "unsupported": []
     },
@@ -5531,22 +4939,12 @@
       "unsupported": []
     },
     {
-      "blockers": [
-        "48: storage layout",
-        "48: state variable type",
-        "17: unsupported state variable",
-        "41: call of an unsupported function"
-      ],
-      "category": "source-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "call of an unsupported function",
-        "state variable type",
-        "storage layout",
-        "unsupported state variable"
-      ],
-      "functions": 0,
-      "reason": "48: storage layout\n48: state variable type\n17: unsupported state variable\n41: call of an unsupported function",
+      "features": [],
+      "functions": 3,
+      "reason": null,
       "test": "deployedCodeExclusion/library_function_deployed.sol",
       "unsupported": []
     },
@@ -5566,23 +4964,15 @@
     },
     {
       "blockers": [
-        "40: storage layout",
-        "40: state variable type",
-        "9: unsupported state variable",
-        "33: call of an unsupported function",
         "50: no contract"
       ],
-      "category": "source-rejected",
+      "category": "elaboration-rejected",
       "creation": [],
       "features": [
-        "call of an unsupported function",
-        "no contract",
-        "state variable type",
-        "storage layout",
-        "unsupported state variable"
+        "no contract"
       ],
       "functions": 0,
-      "reason": "40: storage layout\n40: state variable type\n9: unsupported state variable\n33: call of an unsupported function\n50: no contract",
+      "reason": "50: no contract",
       "test": "deployedCodeExclusion/module_function_deployed.sol",
       "unsupported": []
     },
@@ -5597,26 +4987,16 @@
       "unsupported": []
     },
     {
-      "blockers": [
-        "50: storage layout",
-        "50: state variable type",
-        "19: unsupported state variable",
-        "29: not a storage location",
-        "43: call of an unsupported function"
-      ],
-      "category": "source-rejected",
+      "blockers": [],
+      "category": "partially-admitted",
       "creation": [],
-      "features": [
-        "call of an unsupported function",
-        "not a storage location",
-        "state variable type",
-        "storage layout",
-        "unsupported state variable"
-      ],
-      "functions": 0,
-      "reason": "50: storage layout\n50: state variable type\n19: unsupported state variable\n29: not a storage location\n43: call of an unsupported function",
+      "features": [],
+      "functions": 3,
+      "reason": null,
       "test": "deployedCodeExclusion/static_base_function_deployed.sol",
-      "unsupported": []
+      "unsupported": [
+        "29: not a storage location"
+      ]
     },
     {
       "blockers": [],
@@ -5639,26 +5019,16 @@
       "unsupported": []
     },
     {
-      "blockers": [
-        "50: storage layout",
-        "50: state variable type",
-        "Identifier 29: built-in super is not supported",
-        "19: unsupported state variable",
-        "43: call of an unsupported function"
-      ],
-      "category": "source-rejected",
+      "blockers": [],
+      "category": "partially-admitted",
       "creation": [],
-      "features": [
-        "built-ins",
-        "call of an unsupported function",
-        "state variable type",
-        "storage layout",
-        "unsupported state variable"
-      ],
-      "functions": 0,
-      "reason": "50: storage layout\n50: state variable type\nIdentifier 29: built-in super is not supported\n19: unsupported state variable\n43: call of an unsupported function",
+      "features": [],
+      "functions": 3,
+      "reason": null,
       "test": "deployedCodeExclusion/super_function_deployed.sol",
-      "unsupported": []
+      "unsupported": [
+        "Identifier 29: built-in super is not supported"
+      ]
     },
     {
       "blockers": [],
@@ -5671,26 +5041,16 @@
       "unsupported": []
     },
     {
-      "blockers": [
-        "59: storage layout",
-        "59: state variable type",
-        "Identifier 38: built-in super is not supported",
-        "28: unsupported state variable",
-        "52: call of an unsupported function"
-      ],
-      "category": "source-rejected",
+      "blockers": [],
+      "category": "partially-admitted",
       "creation": [],
-      "features": [
-        "built-ins",
-        "call of an unsupported function",
-        "state variable type",
-        "storage layout",
-        "unsupported state variable"
-      ],
-      "functions": 0,
-      "reason": "59: storage layout\n59: state variable type\nIdentifier 38: built-in super is not supported\n28: unsupported state variable\n52: call of an unsupported function",
+      "features": [],
+      "functions": 3,
+      "reason": null,
       "test": "deployedCodeExclusion/virtual_function_deployed.sol",
-      "unsupported": []
+      "unsupported": [
+        "Identifier 38: built-in super is not supported"
+      ]
     },
     {
       "blockers": [],
@@ -5898,15 +5258,13 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 6,
       "reason": null,
       "test": "errors/errors_by_parameter_type.sol",
-      "unsupported": [
-        "FunctionTypeName 30: external function types are not supported\n105: not a storage location"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -6076,15 +5434,13 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 2,
       "reason": null,
       "test": "errors/require_error_function_pointer_parameter.sol",
-      "unsupported": [
-        "FunctionTypeName 7: external function types are not supported\n31: not a storage location"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -6138,15 +5494,13 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 2,
       "reason": null,
       "test": "errors/require_error_stack_check.sol",
-      "unsupported": [
-        "FunctionTypeName 13: external function types are not supported\n45: not a storage location"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -6583,41 +5937,22 @@
       "unsupported": []
     },
     {
-      "blockers": [
-        "FunctionTypeName 3: external function types are not supported",
-        "18: unsupported event parameter type",
-        "15: not a storage location"
-      ],
-      "category": "import-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "function types",
-        "not a storage location",
-        "unsupported event parameter type"
-      ],
-      "functions": 0,
-      "reason": "FunctionTypeName 3: external function types are not supported\n18: unsupported event parameter type\n15: not a storage location",
+      "features": [],
+      "functions": 1,
+      "reason": null,
       "test": "events/event_indexed_function.sol",
       "unsupported": []
     },
     {
-      "blockers": [
-        "FunctionTypeName 3: external function types are not supported",
-        "FunctionTypeName 11: external function types are not supported",
-        "26: unsupported event parameter type",
-        "23: not a storage location",
-        "42: unsupported event parameter type",
-        "39: not a storage location"
-      ],
-      "category": "import-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "function types",
-        "not a storage location",
-        "unsupported event parameter type"
-      ],
-      "functions": 0,
-      "reason": "FunctionTypeName 3: external function types are not supported\nFunctionTypeName 11: external function types are not supported\n26: unsupported event parameter type\n23: not a storage location\n42: unsupported event parameter type\n39: not a storage location",
+      "features": [],
+      "functions": 2,
+      "reason": null,
       "test": "events/event_indexed_function2.sol",
       "unsupported": []
     },
@@ -7389,20 +6724,16 @@
     },
     {
       "blockers": [
-        "MemberAccess 12: unsupported contract type member runtimeCode",
         "4: more than one contract",
-        "28: more than one contract",
-        "13: length of a non-array"
+        "28: more than one contract"
       ],
       "category": "elaboration-rejected",
       "creation": [],
       "features": [
-        "MemberAccess: unsupported contract type member runtimeCode",
-        "length of a non-array",
         "more than one contract"
       ],
       "functions": 0,
-      "reason": "MemberAccess 12: unsupported contract type member runtimeCode\n4: more than one contract\n28: more than one contract\n13: length of a non-array",
+      "reason": "4: more than one contract\n28: more than one contract",
       "test": "freeFunctions/free_runtimecode.sol",
       "unsupported": []
     },
@@ -7507,15 +6838,13 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 1,
       "reason": null,
       "test": "functionCall/call_attached_library_function_on_storage_variable.sol",
-      "unsupported": [
-        "MemberAccess 41: an attached function is supported only as a callee\nFunctionCall 44: named arguments are not supported here"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -7528,27 +6857,12 @@
       "unsupported": []
     },
     {
-      "blockers": [
-        "36: return type",
-        "56: return type",
-        "31: unsupported variable type",
-        "33: unsupported function value",
-        "51: unsupported variable type",
-        "53: unsupported function value",
-        "78: unsupported variable type",
-        "81: unsupported function value",
-        "88: unsupported callee"
-      ],
-      "category": "source-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "return type",
-        "unsupported callee",
-        "unsupported function value",
-        "unsupported variable type"
-      ],
-      "functions": 0,
-      "reason": "36: return type\n56: return type\n31: unsupported variable type\n33: unsupported function value\n51: unsupported variable type\n53: unsupported function value\n78: unsupported variable type\n81: unsupported function value\n88: unsupported callee",
+      "features": [],
+      "functions": 5,
+      "reason": null,
       "test": "functionCall/call_function_returning_function.sol",
       "unsupported": []
     },
@@ -7573,30 +6887,12 @@
       "unsupported": []
     },
     {
-      "blockers": [
-        "FunctionTypeName 5: external function types are not supported",
-        "FunctionTypeName 11: external function types are not supported",
-        "FunctionTypeName 18: external function types are not supported",
-        "24: parameter type",
-        "24: return type",
-        "85: unsupported function value",
-        "84: unsupported variable type",
-        "93: unsupported callee",
-        "85: unsupported identifier"
-      ],
-      "category": "import-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "function types",
-        "parameter type",
-        "return type",
-        "unsupported callee",
-        "unsupported function value",
-        "unsupported identifier",
-        "unsupported variable type"
-      ],
-      "functions": 0,
-      "reason": "FunctionTypeName 5: external function types are not supported\nFunctionTypeName 11: external function types are not supported\nFunctionTypeName 18: external function types are not supported\n24: parameter type\n24: return type\n85: unsupported function value\n84: unsupported variable type\n93: unsupported callee\n85: unsupported identifier",
+      "features": [],
+      "functions": 4,
+      "reason": null,
       "test": "functionCall/call_internal_function_with_multislot_arguments_via_pointer.sol",
       "unsupported": []
     },
@@ -7742,47 +7038,33 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 2,
       "reason": null,
       "test": "functionCall/calling_uninitialized_function.sol",
-      "unsupported": [
-        "FunctionTypeName 32: external function types are not supported\n35: call of an unsupported function"
-      ]
+      "unsupported": []
     },
     {
-      "blockers": [
-        "30: storage layout",
-        "30: state variable type",
-        "6: unsupported state variable",
-        "23: call of an unsupported function"
-      ],
-      "category": "source-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "call of an unsupported function",
-        "state variable type",
-        "storage layout",
-        "unsupported state variable"
-      ],
-      "functions": 0,
-      "reason": "30: storage layout\n30: state variable type\n6: unsupported state variable\n23: call of an unsupported function",
+      "features": [],
+      "functions": 1,
+      "reason": null,
       "test": "functionCall/calling_uninitialized_function_in_detail.sol",
       "unsupported": []
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 1,
       "reason": null,
       "test": "functionCall/calling_uninitialized_function_through_array.sol",
-      "unsupported": [
-        "24: unsupported variable type\n29: unsupported callee"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -7943,7 +7225,7 @@
       "reason": null,
       "test": "functionCall/failed_create.sol",
       "unsupported": [
-        "FunctionCallOptions 28: unsupported call options",
+        "NewExpression 21: unsupported expression NewExpression\nFunctionCallOptions 28: unsupported call options",
         "calls an unsupported function"
       ]
     },
@@ -8231,47 +7513,21 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 1,
       "reason": null,
       "test": "functionTypes/address_member.sol",
-      "unsupported": [
-        "MemberAccess 15: unsupported built-in member\nMemberAccess 25: unsupported built-in member\nMemberAccess 34: unsupported built-in member\nMemberAccess 47: unsupported built-in member\n13: not a storage location\n23: not a storage location\n32: not a storage location\n45: not a storage location"
-      ]
+      "unsupported": []
     },
     {
-      "blockers": [
-        "FunctionTypeName 34: external function types are not supported",
-        "FunctionTypeName 42: external function types are not supported",
-        "FunctionTypeName 58: external function types are not supported",
-        "91: storage layout",
-        "51: parameter type",
-        "69: parameter type",
-        "91: state variable type",
-        "27: unsupported state variable",
-        "64: call of an unsupported function",
-        "83: unsupported external call",
-        "83: value count mismatch",
-        "80: not a storage location",
-        "85: call of an unsupported function"
-      ],
-      "category": "import-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "call of an unsupported function",
-        "function types",
-        "not a storage location",
-        "parameter type",
-        "state variable type",
-        "storage layout",
-        "unsupported external call",
-        "unsupported state variable",
-        "value count mismatch"
-      ],
-      "functions": 0,
-      "reason": "FunctionTypeName 34: external function types are not supported\nFunctionTypeName 42: external function types are not supported\nFunctionTypeName 58: external function types are not supported\n91: storage layout\n51: parameter type\n69: parameter type\n91: state variable type\n27: unsupported state variable\n64: call of an unsupported function\n83: unsupported external call\n83: value count mismatch\n80: not a storage location\n85: call of an unsupported function",
+      "features": [],
+      "functions": 3,
+      "reason": null,
       "test": "functionTypes/call_to_zero_initialized_function_type_ir.sol",
       "unsupported": []
     },
@@ -8287,28 +7543,23 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 2,
       "reason": null,
       "test": "functionTypes/comparison_operator_for_external_function_cleans_dirty_bits.sol",
-      "unsupported": [
-        "FunctionTypeName 11: external function types are not supported\nInlineAssembly 16: unsupported reference g_ptr_dirty.address\nInlineAssembly 16: unsupported reference g_ptr_dirty.selector\nFunctionTypeName 19: external function types are not supported\n13: not a storage location\n21: not a storage location"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 6,
       "reason": null,
       "test": "functionTypes/comparison_operators_for_external_functions.sol",
-      "unsupported": [
-        "22: not a storage location\n24: not a storage location\n27: not a storage location\n29: not a storage location\n33: not a storage location\n35: not a storage location\n39: not a storage location\n41: not a storage location\n45: not a storage location\n47: not a storage location\n51: not a storage location\n53: not a storage location\n57: not a storage location\n59: not a storage location\n63: not a storage location\n65: not a storage location\n69: not a storage location\n71: not a storage location\n75: not a storage location\n77: not a storage location",
-        "FunctionTypeName 93: external function types are not supported\nFunctionTypeName 100: external function types are not supported\nFunctionTypeName 107: external function types are not supported\nFunctionTypeName 114: external function types are not supported\n95: not a storage location\n102: not a storage location\n109: not a storage location\n116: not a storage location\n121: not a storage location\n125: not a storage location\n130: not a storage location\n135: not a storage location\n140: not a storage location\n145: not a storage location\n150: not a storage location\n155: not a storage location\n160: not a storage location\n165: not a storage location\n170: not a storage location\n175: not a storage location\n180: not a storage location\n185: not a storage location\n190: not a storage location\n195: not a storage location"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -8322,15 +7573,13 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 2,
       "reason": null,
       "test": "functionTypes/external_functions_with_calldata_args_assigned_to_function_pointers_with_memory_type.sol",
-      "unsupported": [
-        "FunctionTypeName 21: external function types are not supported\n23: not a storage location\n26: call of an unsupported function"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -8343,45 +7592,22 @@
       "unsupported": []
     },
     {
-      "blockers": [
-        "48: storage layout",
-        "48: state variable type",
-        "14: unsupported state variable",
-        "23: call of an unsupported function",
-        "43: call of an unsupported function"
-      ],
-      "category": "source-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "call of an unsupported function",
-        "state variable type",
-        "storage layout",
-        "unsupported state variable"
-      ],
-      "functions": 0,
-      "reason": "48: storage layout\n48: state variable type\n14: unsupported state variable\n23: call of an unsupported function\n43: call of an unsupported function",
+      "features": [],
+      "functions": 4,
+      "reason": null,
       "test": "functionTypes/function_delete_storage.sol",
       "unsupported": []
     },
     {
-      "blockers": [
-        "FunctionTypeName 3: external function types are not supported",
-        "51: storage layout",
-        "51: state variable type",
-        "FunctionTypeName 35: external function types are not supported",
-        "12: not a storage location",
-        "23: not a storage location"
-      ],
-      "category": "import-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "function types",
-        "not a storage location",
-        "state variable type",
-        "storage layout"
-      ],
-      "functions": 0,
-      "reason": "FunctionTypeName 3: external function types are not supported\n51: storage layout\n51: state variable type\nFunctionTypeName 35: external function types are not supported\n12: not a storage location\n23: not a storage location",
+      "features": [],
+      "functions": 5,
+      "reason": null,
       "test": "functionTypes/function_external_delete_storage.sol",
       "unsupported": []
     },
@@ -8397,81 +7623,41 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 3,
       "reason": null,
       "test": "functionTypes/inline_array_with_value_call_option.sol",
-      "unsupported": [
-        "IndexAccess 41: unsupported call options"
-      ]
+      "unsupported": []
     },
     {
-      "blockers": [
-        "71: storage layout",
-        "71: state variable type",
-        "8: unsupported state variable",
-        "35: call of an unsupported function"
-      ],
-      "category": "source-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "call of an unsupported function",
-        "state variable type",
-        "storage layout",
-        "unsupported state variable"
-      ],
-      "functions": 0,
-      "reason": "71: storage layout\n71: state variable type\n8: unsupported state variable\n35: call of an unsupported function",
+      "features": [],
+      "functions": 4,
+      "reason": null,
       "test": "functionTypes/internal_function_pointer_with_calldata_args.sol",
       "unsupported": []
     },
     {
-      "blockers": [
-        "64: storage layout",
-        "64: state variable type",
-        "8: unsupported state variable",
-        "58: unsupported callee"
-      ],
-      "category": "source-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "state variable type",
-        "storage layout",
-        "unsupported callee",
-        "unsupported state variable"
-      ],
-      "functions": 0,
-      "reason": "64: storage layout\n64: state variable type\n8: unsupported state variable\n58: unsupported callee",
+      "features": [],
+      "functions": 5,
+      "reason": null,
       "test": "functionTypes/mapping_of_functions.sol",
       "unsupported": []
     },
     {
-      "blockers": [
-        "FunctionTypeName 36: external function types are not supported",
-        "49: parameter type",
-        "12: unsupported external call",
-        "12: value count mismatch",
-        "9: not a storage location",
-        "26: unsupported parameter type",
-        "23: not a storage location",
-        "44: call of an unsupported function",
-        "22: call of an unsupported function"
-      ],
-      "category": "import-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "call of an unsupported function",
-        "function types",
-        "not a storage location",
-        "parameter type",
-        "unsupported external call",
-        "unsupported parameter type",
-        "value count mismatch"
-      ],
-      "functions": 0,
-      "reason": "FunctionTypeName 36: external function types are not supported\n49: parameter type\n12: unsupported external call\n12: value count mismatch\n9: not a storage location\n26: unsupported parameter type\n23: not a storage location\n44: call of an unsupported function\n22: call of an unsupported function",
+      "features": [],
+      "functions": 4,
+      "reason": null,
       "test": "functionTypes/pass_function_types_externally.sol",
       "unsupported": []
     },
@@ -8496,20 +7682,12 @@
       "unsupported": []
     },
     {
-      "blockers": [
-        "41: storage layout",
-        "41: state variable type",
-        "8: unsupported state variable"
-      ],
-      "category": "source-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "state variable type",
-        "storage layout",
-        "unsupported state variable"
-      ],
-      "functions": 0,
-      "reason": "41: storage layout\n41: state variable type\n8: unsupported state variable",
+      "features": [],
+      "functions": 3,
+      "reason": null,
       "test": "functionTypes/same_function_in_construction_and_runtime_equality_check.sol",
       "unsupported": []
     },
@@ -8540,15 +7718,13 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 1,
       "reason": null,
       "test": "functionTypes/selector_assignment_expression.sol",
-      "unsupported": [
-        "MemberAccess 15: selectors of computed values are not supported\n9: not a storage location\n11: not a storage location"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -8562,27 +7738,23 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 3,
       "reason": null,
       "test": "functionTypes/selector_ternary.sol",
-      "unsupported": [
-        "MemberAccess 22: selectors of computed values are not supported\n16: not a storage location\n18: not a storage location"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 2,
       "reason": null,
       "test": "functionTypes/selector_ternary_function_pointer_from_function_call.sol",
-      "unsupported": [
-        "MemberAccess 41: selectors of computed values are not supported\n34: not a storage location\n37: not a storage location"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -8593,93 +7765,36 @@
       "reason": null,
       "test": "functionTypes/stack_height_check_on_adding_gas_variable_to_function.sol",
       "unsupported": [
-        "MemberAccess 16: unsupported built-in member\nMemberAccess 19: unsupported built-in member\nFunctionCallOptions 24: unsupported expression FunctionCallOptions\nMemberAccess 25: unsupported built-in member\nMemberAccess 28: unsupported built-in member\nFunctionCallOptions 34: unsupported expression FunctionCallOptions\nMemberAccess 35: selectors of computed values are not supported\nMemberAccess 46: unsupported built-in member\nMemberAccess 49: unsupported built-in member\nFunctionCallOptions 54: unsupported expression FunctionCallOptions\nMemberAccess 55: unsupported built-in member\nMemberAccess 58: unsupported built-in member\nFunctionCallOptions 64: unsupported expression FunctionCallOptions\nMemberAccess 65: selectors of computed values are not supported\nFunctionCallOptions 78: unsupported expression FunctionCallOptions\nMemberAccess 79: unsupported built-in member\nMemberAccess 82: unsupported built-in member\nFunctionCallOptions 88: unsupported expression FunctionCallOptions\nMemberAccess 89: selectors of computed values are not supported\n14: not a storage location\n17: not a storage location\n21: not a storage location\n26: not a storage location\n31: not a storage location\n44: not a storage location\n47: not a storage location\n51: not a storage location\n56: not a storage location\n61: not a storage location\n74: not a storage location\n80: not a storage location\n84: not a storage location"
+        "FunctionCallOptions 24: unsupported expression FunctionCallOptions\nFunctionCallOptions 34: unsupported expression FunctionCallOptions\nFunctionCallOptions 54: unsupported expression FunctionCallOptions\nFunctionCallOptions 64: unsupported expression FunctionCallOptions\nFunctionCallOptions 78: unsupported expression FunctionCallOptions\nFunctionCallOptions 88: unsupported expression FunctionCallOptions"
       ]
     },
     {
-      "blockers": [
-        "FunctionTypeName 34: external function types are not supported",
-        "FunctionTypeName 42: external function types are not supported",
-        "FunctionTypeName 58: external function types are not supported",
-        "95: storage layout",
-        "51: parameter type",
-        "69: parameter type",
-        "95: state variable type",
-        "27: unsupported state variable",
-        "64: call of an unsupported function",
-        "75: unsupported function value",
-        "87: unsupported external call",
-        "87: value count mismatch",
-        "84: not a storage location",
-        "89: call of an unsupported function"
-      ],
-      "category": "import-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "call of an unsupported function",
-        "function types",
-        "not a storage location",
-        "parameter type",
-        "state variable type",
-        "storage layout",
-        "unsupported external call",
-        "unsupported function value",
-        "unsupported state variable",
-        "value count mismatch"
-      ],
-      "functions": 0,
-      "reason": "FunctionTypeName 34: external function types are not supported\nFunctionTypeName 42: external function types are not supported\nFunctionTypeName 58: external function types are not supported\n95: storage layout\n51: parameter type\n69: parameter type\n95: state variable type\n27: unsupported state variable\n64: call of an unsupported function\n75: unsupported function value\n87: unsupported external call\n87: value count mismatch\n84: not a storage location\n89: call of an unsupported function",
+      "features": [],
+      "functions": 3,
+      "reason": null,
       "test": "functionTypes/store_function.sol",
       "unsupported": []
     },
     {
-      "blockers": [
-        "VariableDeclaration 16: state variable of a struct the core cannot hold",
-        "IndexAccess 89: external calls only on contract-typed values",
-        "IndexAccess 94: external calls only on contract-typed values",
-        "38: unknown struct member",
-        "45: unknown struct member",
-        "53: not a storage location",
-        "52: unknown struct member",
-        "60: unknown struct member",
-        "67: unknown struct member",
-        "75: not a storage location",
-        "74: unknown struct member"
-      ],
-      "category": "import-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "IndexAccess: external calls only on contract-typed values",
-        "VariableDeclaration: state variable of a struct the core cannot hold",
-        "not a storage location",
-        "unknown struct member"
-      ],
-      "functions": 0,
-      "reason": "VariableDeclaration 16: state variable of a struct the core cannot hold\nIndexAccess 89: external calls only on contract-typed values\nIndexAccess 94: external calls only on contract-typed values\n38: unknown struct member\n45: unknown struct member\n53: not a storage location\n52: unknown struct member\n60: unknown struct member\n67: unknown struct member\n75: not a storage location\n74: unknown struct member",
+      "features": [],
+      "functions": 4,
+      "reason": null,
       "test": "functionTypes/struct_with_external_function.sol",
       "unsupported": []
     },
     {
-      "blockers": [
-        "VariableDeclaration 16: state variable of a struct the core cannot hold",
-        "38: unknown struct member",
-        "45: unknown struct member",
-        "52: unknown struct member",
-        "59: unknown struct member",
-        "66: unknown struct member",
-        "73: unknown struct member",
-        "89: unsupported callee",
-        "94: unsupported callee"
-      ],
-      "category": "import-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "VariableDeclaration: state variable of a struct the core cannot hold",
-        "unknown struct member",
-        "unsupported callee"
-      ],
-      "functions": 0,
-      "reason": "VariableDeclaration 16: state variable of a struct the core cannot hold\n38: unknown struct member\n45: unknown struct member\n52: unknown struct member\n59: unknown struct member\n66: unknown struct member\n73: unknown struct member\n89: unsupported callee\n94: unsupported callee",
+      "features": [],
+      "functions": 4,
+      "reason": null,
       "test": "functionTypes/struct_with_functions.sol",
       "unsupported": []
     },
@@ -8720,81 +7835,42 @@
       ]
     },
     {
-      "blockers": [
-        "16: storage layout",
-        "16: state variable type",
-        "4: unsupported state variable",
-        "9: call of an unsupported function"
-      ],
-      "category": "source-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "call of an unsupported function",
-        "state variable type",
-        "storage layout",
-        "unsupported state variable"
-      ],
-      "functions": 0,
-      "reason": "16: storage layout\n16: state variable type\n4: unsupported state variable\n9: call of an unsupported function",
+      "features": [],
+      "functions": 1,
+      "reason": null,
       "test": "functionTypes/uninitialized_internal_storage_function_call.sol",
       "unsupported": []
     },
     {
-      "blockers": [
-        "55: storage layout",
-        "55: state variable type",
-        "7: unsupported state variable",
-        "47: unsupported binary operator"
-      ],
-      "category": "source-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "state variable type",
-        "storage layout",
-        "unsupported binary operator",
-        "unsupported state variable"
-      ],
-      "functions": 0,
-      "reason": "55: storage layout\n55: state variable type\n7: unsupported state variable\n47: unsupported binary operator",
+      "features": [],
+      "functions": 2,
+      "reason": null,
       "test": "functionTypes/uninitialized_internal_storage_function_pointer_comparison.sol",
       "unsupported": []
     },
     {
-      "blockers": [
-        "52: storage layout",
-        "52: state variable type",
-        "4: unsupported state variable",
-        "13: unsupported state variable"
-      ],
-      "category": "source-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "state variable type",
-        "storage layout",
-        "unsupported state variable"
-      ],
-      "functions": 0,
-      "reason": "52: storage layout\n52: state variable type\n4: unsupported state variable\n13: unsupported state variable",
+      "features": [],
+      "functions": 2,
+      "reason": null,
       "test": "functionTypes/uninitialized_internal_storage_function_pointer_slot_edges.sol",
       "unsupported": []
     },
     {
-      "blockers": [
-        "69: storage layout",
-        "69: state variable type",
-        "6: unsupported state variable",
-        "61: unsupported binary operator"
-      ],
-      "category": "source-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "state variable type",
-        "storage layout",
-        "unsupported binary operator",
-        "unsupported state variable"
-      ],
-      "functions": 0,
-      "reason": "69: storage layout\n69: state variable type\n6: unsupported state variable\n61: unsupported binary operator",
+      "features": [],
+      "functions": 2,
+      "reason": null,
       "test": "functionTypes/uninitialized_internal_transient_storage_function_pointer_comparison.sol",
       "unsupported": []
     },
@@ -8990,15 +8066,13 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 1,
       "reason": null,
       "test": "immutable/getter_call_in_constructor.sol",
-      "unsupported": [
-        "NewExpression 23: unsupported call options"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -9141,24 +8215,16 @@
       "unsupported": []
     },
     {
-      "blockers": [
-        "35: storage layout",
-        "35: state variable type",
-        "6: unsupported state variable",
-        "31: static call of an unsupported function"
-      ],
-      "category": "source-rejected",
+      "blockers": [],
+      "category": "partially-admitted",
       "creation": [],
-      "features": [
-        "state variable type",
-        "static call of an unsupported function",
-        "storage layout",
-        "unsupported state variable"
-      ],
-      "functions": 0,
-      "reason": "35: storage layout\n35: state variable type\n6: unsupported state variable\n31: static call of an unsupported function",
+      "features": [],
+      "functions": 3,
+      "reason": null,
       "test": "inheritance/base_access_to_function_type_variables.sol",
-      "unsupported": []
+      "unsupported": [
+        "31: static call of an unsupported function"
+      ]
     },
     {
       "blockers": [],
@@ -9533,7 +8599,7 @@
       "reason": null,
       "test": "inheritance/value_for_constructor.sol",
       "unsupported": [
-        "TupleExpression 47: unsupported call options"
+        "NewExpression 46: unsupported expression NewExpression\nNewExpression 46: unsupported call options"
       ]
     },
     {
@@ -9558,27 +8624,23 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 1,
       "reason": null,
       "test": "inlineAssembly/blobhash.sol",
-      "unsupported": [
-        "InlineAssembly 5: YulFunctionCall: call to blobhash, which is neither a builtin nor a function the object defines"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 1,
       "reason": null,
       "test": "inlineAssembly/blobhash_index_exceeding_blob_count.sol",
-      "unsupported": [
-        "InlineAssembly 5: YulFunctionCall: call to blobhash, which is neither a builtin nor a function the object defines"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -9702,17 +8764,13 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 3,
       "reason": null,
       "test": "inlineAssembly/clz.sol",
-      "unsupported": [
-        "InlineAssembly 5: YulFunctionCall: call to clz, which is neither a builtin nor a function the object defines",
-        "InlineAssembly 12: YulFunctionCall: call to clz, which is neither a builtin nor a function the object defines",
-        "InlineAssembly 19: YulFunctionCall: call to clz, which is neither a builtin nor a function the object defines"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -9756,52 +8814,43 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 3,
       "reason": null,
       "test": "inlineAssembly/external_function_pointer_address.sol",
-      "unsupported": [
-        "FunctionTypeName 11: external function types are not supported\nInlineAssembly 21: unsupported reference fp.address\n18: not a storage location",
-        "MemberAccess 35: unsupported built-in member\n33: not a storage location"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 2,
       "reason": null,
       "test": "inlineAssembly/external_function_pointer_address_assignment.sol",
-      "unsupported": [
-        "FunctionTypeName 13: external function types are not supported\nInlineAssembly 18: unsupported reference fp.address\nMemberAccess 20: unsupported built-in member\n15: not a storage location"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 3,
       "reason": null,
       "test": "inlineAssembly/external_function_pointer_selector.sol",
-      "unsupported": [
-        "FunctionTypeName 11: external function types are not supported\nInlineAssembly 20: unsupported reference fp.selector\n13: not a storage location"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 2,
       "reason": null,
       "test": "inlineAssembly/external_function_pointer_selector_assignment.sol",
-      "unsupported": [
-        "FunctionTypeName 13: external function types are not supported\nInlineAssembly 18: unsupported reference fp.selector\nMemberAccess 22: unsupported selector\n15: not a storage location"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -10347,15 +9396,13 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 3,
       "reason": null,
       "test": "inlineAssembly/tstore_hidden_staticcall.sol",
-      "unsupported": [
-        "19: assembly reference of this type\n19: assembly reference of this type"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -10689,15 +9736,13 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 2,
       "reason": null,
       "test": "libraries/external_call_with_function_pointer_parameter.sol",
-      "unsupported": [
-        "FunctionTypeName 7: external function types are not supported\n45: unsupported external call\n45: value count mismatch\n42: not a storage location"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -10721,15 +9766,13 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 2,
       "reason": null,
       "test": "libraries/internal_call_attached_with_parentheses.sol",
-      "unsupported": [
-        "MemberAccess 55: an attached function is supported only as a callee\n57: unsupported callee"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -10822,25 +9865,12 @@
       "unsupported": []
     },
     {
-      "blockers": [
-        "FunctionTypeName 7: external function types are not supported",
-        "22: parameter type",
-        "53: unsupported parameter type",
-        "49: not a storage location",
-        "15: call of an unsupported function",
-        "51: call of an unsupported function"
-      ],
-      "category": "import-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "call of an unsupported function",
-        "function types",
-        "not a storage location",
-        "parameter type",
-        "unsupported parameter type"
-      ],
-      "functions": 0,
-      "reason": "FunctionTypeName 7: external function types are not supported\n22: parameter type\n53: unsupported parameter type\n49: not a storage location\n15: call of an unsupported function\n51: call of an unsupported function",
+      "features": [],
+      "functions": 3,
+      "reason": null,
       "test": "libraries/internal_library_function_attached_to_external_function_type.sol",
       "unsupported": []
     },
@@ -13033,15 +12063,13 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 2,
       "reason": null,
       "test": "saltedCreate/salted_create.sol",
-      "unsupported": [
-        "FunctionCallOptions 50: unsupported call options"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -13185,15 +12213,13 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 1,
       "reason": null,
       "test": "specialFunctions/abi_encode_with_signature_from_string.sol",
-      "unsupported": [
-        "FunctionCall 24: abi.encodeWithSignature of a non-literal signature is not supported"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -13219,15 +12245,13 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 1,
       "reason": null,
       "test": "state/blobhash.sol",
-      "unsupported": [
-        "Identifier 7: unsupported built-in declaration ~29"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -13241,16 +12265,13 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 2,
       "reason": null,
       "test": "state/block_blobbasefee.sol",
-      "unsupported": [
-        "MemberAccess 6: unsupported built-in member blobbasefee",
-        "InlineAssembly 14: YulFunctionCall: call to blobbasefee, which is neither a builtin nor a function the object defines"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -13434,27 +12455,23 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 1,
       "reason": null,
       "test": "state/uncalled_blobhash.sol",
-      "unsupported": [
-        "Identifier 5: built-in blobhash is not supported\n8: unsupported callee"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 1,
       "reason": null,
       "test": "state/uncalled_blockhash.sol",
-      "unsupported": [
-        "Identifier 5: built-in blockhash is not supported\n11: unsupported callee"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -13687,32 +12704,12 @@
       "unsupported": []
     },
     {
-      "blockers": [
-        "FunctionTypeName 11: external function types are not supported",
-        "FunctionTypeName 17: external function types are not supported",
-        "105: storage layout",
-        "105: state variable type",
-        "6: unsupported state variable",
-        "24: unsupported state variable",
-        "38: not a storage location",
-        "43: not a storage location",
-        "57: call of an unsupported function",
-        "66: call of an unsupported function",
-        "75: call of an unsupported function",
-        "84: call of an unsupported function"
-      ],
-      "category": "import-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "call of an unsupported function",
-        "function types",
-        "not a storage location",
-        "state variable type",
-        "storage layout",
-        "unsupported state variable"
-      ],
-      "functions": 0,
-      "reason": "FunctionTypeName 11: external function types are not supported\nFunctionTypeName 17: external function types are not supported\n105: storage layout\n105: state variable type\n6: unsupported state variable\n24: unsupported state variable\n38: not a storage location\n43: not a storage location\n57: call of an unsupported function\n66: call of an unsupported function\n75: call of an unsupported function\n84: call of an unsupported function",
+      "features": [],
+      "functions": 7,
+      "reason": null,
       "test": "storage/packed_functions.sol",
       "unsupported": []
     },
@@ -14675,15 +13672,13 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 4,
       "reason": null,
       "test": "structs/function_type_copy.sol",
-      "unsupported": [
-        "FunctionTypeName 46: external function types are not supported\nFunctionTypeName 51: external function types are not supported\nFunctionTypeName 10: external function types are not supported\n60: not a storage location\n67: not a storage location\n74: not a storage location\n84: unsupported external call\n84: value count mismatch\n89: length of a non-array\n88: unknown struct member\n96: unknown struct member\n99: not a storage location\n106: unknown struct member\n109: not a storage location\n116: unknown struct member\n119: not a storage location"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -14769,15 +13764,13 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 2,
       "reason": null,
       "test": "structs/multislot_struct_allocation.sol",
-      "unsupported": [
-        "MemberAccess 47: external calls only on contract-typed values\n44: unsupported struct constructor\n47: unknown struct member"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -15032,28 +14025,12 @@
       "unsupported": []
     },
     {
-      "blockers": [
-        "VariableDeclaration 27: state variable of a struct the core cannot hold",
-        "51: unsupported struct constructor",
-        "55: storage copy of this type",
-        "58: unknown struct member",
-        "61: unknown struct member",
-        "64: unknown struct member",
-        "69: unsupported callee",
-        "73: unsupported callee",
-        "83: unknown struct member"
-      ],
-      "category": "import-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "VariableDeclaration: state variable of a struct the core cannot hold",
-        "storage copy of this type",
-        "unknown struct member",
-        "unsupported callee",
-        "unsupported struct constructor"
-      ],
-      "functions": 0,
-      "reason": "VariableDeclaration 27: state variable of a struct the core cannot hold\n51: unsupported struct constructor\n55: storage copy of this type\n58: unknown struct member\n61: unknown struct member\n64: unknown struct member\n69: unsupported callee\n73: unsupported callee\n83: unknown struct member",
+      "features": [],
+      "functions": 2,
+      "reason": null,
       "test": "structs/struct_memory_to_storage_function_ptr.sol",
       "unsupported": []
     },
@@ -15118,29 +14095,12 @@
       "unsupported": []
     },
     {
-      "blockers": [
-        "VariableDeclaration 36: state variable of a struct the core cannot hold",
-        "35: unsupported struct constructor",
-        "53: unsupported declaration",
-        "54: not a storage location",
-        "57: not a storage location",
-        "60: not a storage location",
-        "66: unsupported callee",
-        "70: unsupported callee",
-        "80: unknown struct member"
-      ],
-      "category": "import-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "VariableDeclaration: state variable of a struct the core cannot hold",
-        "not a storage location",
-        "unknown struct member",
-        "unsupported callee",
-        "unsupported declaration",
-        "unsupported struct constructor"
-      ],
-      "functions": 0,
-      "reason": "VariableDeclaration 36: state variable of a struct the core cannot hold\n35: unsupported struct constructor\n53: unsupported declaration\n54: not a storage location\n57: not a storage location\n60: not a storage location\n66: unsupported callee\n70: unsupported callee\n80: unknown struct member",
+      "features": [],
+      "functions": 2,
+      "reason": null,
       "test": "structs/struct_storage_to_memory_function_ptr.sol",
       "unsupported": []
     },
@@ -15186,16 +14146,13 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 2,
       "reason": null,
       "test": "tryCatch/create.sol",
-      "unsupported": [
-        "NewExpression 31: unsupported call options\n41: unsupported identifier\n61: unsupported identifier",
-        "NewExpression 81: unsupported call options\n91: unsupported identifier\n111: unsupported identifier"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -15308,29 +14265,12 @@
       "unsupported": []
     },
     {
-      "blockers": [
-        "FunctionTypeName 6: external function types are not supported",
-        "FunctionTypeName 36: external function types are not supported",
-        "30: return type",
-        "64: return type",
-        "FunctionTypeName 48: external function types are not supported",
-        "21: not a storage location",
-        "43: unsupported external call",
-        "43: value count mismatch",
-        "56: type annotation mismatch"
-      ],
-      "category": "import-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "function types",
-        "not a storage location",
-        "return type",
-        "type annotation mismatch",
-        "unsupported external call",
-        "value count mismatch"
-      ],
-      "functions": 0,
-      "reason": "FunctionTypeName 6: external function types are not supported\nFunctionTypeName 36: external function types are not supported\n30: return type\n64: return type\nFunctionTypeName 48: external function types are not supported\n21: not a storage location\n43: unsupported external call\n43: value count mismatch\n56: type annotation mismatch",
+      "features": [],
+      "functions": 3,
+      "reason": null,
       "test": "tryCatch/return_function.sol",
       "unsupported": []
     },
@@ -15383,8 +14323,8 @@
       "reason": null,
       "test": "tryCatch/try_catch_library_call.sol",
       "unsupported": [
-        "MemberAccess 67: unsupported call options\n74: unsupported identifier\n84: unsupported identifier",
-        "MemberAccess 107: unsupported call options\n113: unsupported identifier\n123: unsupported identifier"
+        "MemberAccess 67: unsupported call options\n67: unsupported identifier\n74: unsupported identifier\n84: unsupported identifier",
+        "MemberAccess 107: an attached function is supported only as a callee\nMemberAccess 107: unsupported call options\n113: unsupported identifier\n123: unsupported identifier"
       ]
     },
     {
@@ -15518,23 +14458,12 @@
       "unsupported": []
     },
     {
-      "blockers": [
-        "FunctionTypeName 18: external function types are not supported",
-        "28: parameter type",
-        "MemberAccess 7: unsupported built-in member",
-        "MemberAccess 25: unsupported built-in member",
-        "5: not a storage location"
-      ],
-      "category": "import-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "built-ins",
-        "function types",
-        "not a storage location",
-        "parameter type"
-      ],
-      "functions": 0,
-      "reason": "FunctionTypeName 18: external function types are not supported\n28: parameter type\nMemberAccess 7: unsupported built-in member\nMemberAccess 25: unsupported built-in member\n5: not a storage location",
+      "features": [],
+      "functions": 2,
+      "reason": null,
       "test": "types/external_function_to_address.sol",
       "unsupported": []
     },
@@ -15787,42 +14716,22 @@
       "unsupported": []
     },
     {
-      "blockers": [
-        "77: storage layout",
-        "77: state variable type",
-        "5: unsupported state variable",
-        "65: call of an unsupported function"
-      ],
-      "category": "source-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "call of an unsupported function",
-        "state variable type",
-        "storage layout",
-        "unsupported state variable"
-      ],
-      "functions": 0,
-      "reason": "77: storage layout\n77: state variable type\n5: unsupported state variable\n65: call of an unsupported function",
+      "features": [],
+      "functions": 3,
+      "reason": null,
       "test": "uninitializedFunctionPointer/store2.sol",
       "unsupported": []
     },
     {
-      "blockers": [
-        "37: storage layout",
-        "37: state variable type",
-        "4: unsupported state variable",
-        "32: call of an unsupported function"
-      ],
-      "category": "source-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "call of an unsupported function",
-        "state variable type",
-        "storage layout",
-        "unsupported state variable"
-      ],
-      "functions": 0,
-      "reason": "37: storage layout\n37: state variable type\n4: unsupported state variable\n32: call of an unsupported function",
+      "features": [],
+      "functions": 2,
+      "reason": null,
       "test": "uninitializedFunctionPointer/storeInConstructor.sol",
       "unsupported": []
     },
@@ -15837,22 +14746,12 @@
       "unsupported": []
     },
     {
-      "blockers": [
-        "29: storage layout",
-        "29: state variable type",
-        "4: unsupported state variable",
-        "18: assembly reference of this type"
-      ],
-      "category": "source-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "assembly reference of this type",
-        "state variable type",
-        "storage layout",
-        "unsupported state variable"
-      ],
-      "functions": 0,
-      "reason": "29: storage layout\n29: state variable type\n4: unsupported state variable\n18: assembly reference of this type",
+      "features": [],
+      "functions": 1,
+      "reason": null,
       "test": "uninitializedFunctionPointer/uninitialized_internal_storage_function_via_yul.sol",
       "unsupported": []
     },
@@ -16475,24 +15374,12 @@
       "unsupported": []
     },
     {
-      "blockers": [
-        "FunctionTypeName 3: external function types are not supported",
-        "32: storage layout",
-        "32: state variable type",
-        "15: not a storage location",
-        "21: not a storage location",
-        "26: not a storage location"
-      ],
-      "category": "import-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "function types",
-        "not a storage location",
-        "state variable type",
-        "storage layout"
-      ],
-      "functions": 0,
-      "reason": "FunctionTypeName 3: external function types are not supported\n32: storage layout\n32: state variable type\n15: not a storage location\n21: not a storage location\n26: not a storage location",
+      "features": [],
+      "functions": 2,
+      "reason": null,
       "test": "variables/transient_function_type_state_variable.sol",
       "unsupported": []
     },
@@ -16638,15 +15525,13 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 2,
       "reason": null,
       "test": "various/code_access_content.sol",
-      "unsupported": [
-        "MemberAccess 34: unsupported contract type member runtimeCode\nMemberAccess 49: unsupported contract type member runtimeCode\n50: length of a non-array"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [
@@ -16665,32 +15550,28 @@
     },
     {
       "blockers": [
-        "MemberAccess 26: unsupported contract type member runtimeCode",
         "9: more than one contract",
         "31: more than one contract"
       ],
       "category": "elaboration-rejected",
       "creation": [],
       "features": [
-        "MemberAccess: unsupported contract type member runtimeCode",
         "more than one contract"
       ],
       "functions": 0,
-      "reason": "MemberAccess 26: unsupported contract type member runtimeCode\n9: more than one contract\n31: more than one contract",
+      "reason": "9: more than one contract\n31: more than one contract",
       "test": "various/code_access_padding.sol",
       "unsupported": []
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 1,
       "reason": null,
       "test": "various/code_access_runtime.sol",
-      "unsupported": [
-        "MemberAccess 42: unsupported contract type member runtimeCode"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -17250,15 +16131,13 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 3,
       "reason": null,
       "test": "various/tuples.sol",
-      "unsupported": [
-        "81: call does not match the function"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -17342,16 +16221,13 @@
     },
     {
       "blockers": [],
-      "category": "partially-admitted",
+      "category": "admitted",
       "creation": [],
       "features": [],
       "functions": 4,
       "reason": null,
       "test": "viaYul/comparison_functions.sol",
-      "unsupported": [
-        "38: unsupported binary operator\n44: unsupported binary operator\n50: unsupported binary operator",
-        "76: unsupported binary operator\n82: unsupported binary operator\n88: unsupported binary operator"
-      ]
+      "unsupported": []
     },
     {
       "blockers": [],
@@ -17446,27 +16322,12 @@
       ]
     },
     {
-      "blockers": [
-        "FunctionTypeName 20: external function types are not supported",
-        "FunctionTypeName 51: external function types are not supported",
-        "FunctionTypeName 59: external function types are not supported",
-        "27: return type",
-        "83: return type",
-        "23: not a storage location",
-        "38: unsupported callee",
-        "68: not a storage location",
-        "78: not a storage location"
-      ],
-      "category": "import-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "function types",
-        "not a storage location",
-        "return type",
-        "unsupported callee"
-      ],
-      "functions": 0,
-      "reason": "FunctionTypeName 20: external function types are not supported\nFunctionTypeName 51: external function types are not supported\nFunctionTypeName 59: external function types are not supported\n27: return type\n83: return type\n23: not a storage location\n38: unsupported callee\n68: not a storage location\n78: not a storage location",
+      "features": [],
+      "functions": 4,
+      "reason": null,
       "test": "viaYul/conversion/function_cast.sol",
       "unsupported": []
     },
@@ -17501,23 +16362,12 @@
       "unsupported": []
     },
     {
-      "blockers": [
-        "VariableDeclaration 9: state variable of a struct the core cannot hold",
-        "IndexAccess 41: external calls only on contract-typed values",
-        "IndexAccess 47: external calls only on contract-typed values",
-        "28: unsupported struct constructor",
-        "37: storage copy of this type"
-      ],
-      "category": "import-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "IndexAccess: external calls only on contract-typed values",
-        "VariableDeclaration: state variable of a struct the core cannot hold",
-        "storage copy of this type",
-        "unsupported struct constructor"
-      ],
-      "functions": 0,
-      "reason": "VariableDeclaration 9: state variable of a struct the core cannot hold\nIndexAccess 41: external calls only on contract-typed values\nIndexAccess 47: external calls only on contract-typed values\n28: unsupported struct constructor\n37: storage copy of this type",
+      "features": [],
+      "functions": 2,
+      "reason": null,
       "test": "viaYul/copy_struct_invalid_ir_bug.sol",
       "unsupported": []
     },
@@ -17772,27 +16622,12 @@
       "unsupported": []
     },
     {
-      "blockers": [
-        "FunctionTypeName 49: external function types are not supported",
-        "59: parameter type",
-        "MemberAccess 12: unsupported built-in member",
-        "MemberAccess 24: unsupported built-in member",
-        "MemberAccess 37: unsupported built-in member",
-        "MemberAccess 56: unsupported built-in member",
-        "10: not a storage location",
-        "22: not a storage location",
-        "35: not a storage location"
-      ],
-      "category": "import-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "built-ins",
-        "function types",
-        "not a storage location",
-        "parameter type"
-      ],
-      "functions": 0,
-      "reason": "FunctionTypeName 49: external function types are not supported\n59: parameter type\nMemberAccess 12: unsupported built-in member\nMemberAccess 24: unsupported built-in member\nMemberAccess 37: unsupported built-in member\nMemberAccess 56: unsupported built-in member\n10: not a storage location\n22: not a storage location\n35: not a storage location",
+      "features": [],
+      "functions": 3,
+      "reason": null,
       "test": "viaYul/function_address.sol",
       "unsupported": []
     },
@@ -17807,41 +16642,22 @@
       "unsupported": []
     },
     {
-      "blockers": [
-        "FunctionTypeName 52: external function types are not supported",
-        "56: return type",
-        "FunctionTypeName 21: external function types are not supported",
-        "24: call of an unsupported function",
-        "61: unsupported callee"
-      ],
-      "category": "import-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "call of an unsupported function",
-        "function types",
-        "return type",
-        "unsupported callee"
-      ],
-      "functions": 0,
-      "reason": "FunctionTypeName 52: external function types are not supported\n56: return type\nFunctionTypeName 21: external function types are not supported\n24: call of an unsupported function\n61: unsupported callee",
+      "features": [],
+      "functions": 6,
+      "reason": null,
       "test": "viaYul/function_pointers.sol",
       "unsupported": []
     },
     {
-      "blockers": [
-        "FunctionTypeName 13: external function types are not supported",
-        "23: parameter type",
-        "MemberAccess 20: unsupported selector"
-      ],
-      "category": "import-rejected",
+      "blockers": [],
+      "category": "admitted",
       "creation": [],
-      "features": [
-        "MemberAccess: unsupported selector",
-        "function types",
-        "parameter type"
-      ],
-      "functions": 0,
-      "reason": "FunctionTypeName 13: external function types are not supported\n23: parameter type\nMemberAccess 20: unsupported selector",
+      "features": [],
+      "functions": 2,
+      "reason": null,
       "test": "viaYul/function_selector.sol",
       "unsupported": []
     },

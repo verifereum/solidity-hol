@@ -448,6 +448,69 @@ Proof
   CONV_TAC cv_eval
 QED
 
+(* Source and Yul selfdestruct share the balance transfer and EIP-6780 queue.
+ * Check both an existing account and one created during this transaction. *)
+Definition self_destruct_existing_state_def:
+  self_destruct_existing_state =
+    initial_state with
+      <| frame := initial_state.frame with self_address := 1w;
+         scopes := [FEMPTY |+ (1, <|
+           binding_type := SingleType (AddressT PayableAddress);
+           binding_value := ScalarValue (AddressValue 2w) |> )];
+         world := initial_state.world with <|
+           accounts := update_account 1w (empty_account_state with balance := 7)
+             (update_account 2w empty_account_state empty_accounts);
+           original := update_account 1w (empty_account_state with balance := 7)
+             (update_account 2w empty_account_state empty_accounts) |> |>
+End
+
+Definition self_destruct_created_state_def:
+  self_destruct_created_state =
+    self_destruct_existing_state with
+      world := self_destruct_existing_state.world with original := empty_accounts
+End
+
+val () = cv_auto_trans self_destruct_existing_state_def;
+val () = cv_auto_trans self_destruct_created_state_def;
+
+Theorem self_destruct_moves_balance_and_halts:
+  let existing = self_destruct_stmt (BoundAtom (AstId 1))
+                    self_destruct_existing_state [] in
+  let created = self_destruct_stmt (BoundAtom (AstId 1))
+                    self_destruct_created_state [] in
+  existing.completion = HaltCompletion [] ∧
+  (lookup_account 1w existing.state.world.accounts).balance = 0 ∧
+  (lookup_account 2w existing.state.world.accounts).balance = 7 ∧
+  existing.state.world.to_delete = [] ∧
+  created.completion = HaltCompletion [] ∧
+  (lookup_account 1w created.state.world.accounts).balance = 0 ∧
+  (lookup_account 2w created.state.world.accounts).balance = 7 ∧
+  created.state.world.to_delete = [1w]
+Proof
+  CONV_TAC cv_eval
+QED
+
+(* Both components use right-aligned Yul words, with no implicit cleanup
+ * of a non-canonical write. *)
+val external_function_assembly_state =
+  “define_binding (AstId 111) (SingleType (FunctionT ExternalFn ViewMut [] []))
+     (ScalarValue (ExternalFunctionValue 0w [0w; 0w; 0w; 0w])) initial_state”;
+
+Theorem asm_external_function_dirty_components:
+  (eval_assembly 20 test_env
+    [YulAssign ["f.address"] (YulLit (LitNumber (n2w (2 ** 160))))]
+    [("f.address", AssemblyFunctionAddress (AstId 111))]
+    ^external_function_assembly_state []).completion =
+    InvalidCompletion "invalid assembly function address write-back" ∧
+  (eval_assembly 20 test_env
+    [YulAssign ["f.selector"] (YulLit (LitNumber (n2w (2 ** 32))))]
+    [("f.selector", AssemblyFunctionSelector (AstId 111))]
+    ^external_function_assembly_state []).completion =
+    InvalidCompletion "invalid assembly function selector write-back"
+Proof
+  CONV_TAC cv_eval
+QED
+
 (* Inline assembly. asm(x) runs code with x bound to the block's "x" and
  * returns x; asm_caller() calls asm(7); halt() stops from a block. *)
 Overload ylit = “λn. YulLit (LitNumber n)”
@@ -1174,11 +1237,38 @@ Proof
   CONV_TAC cv_eval
 QED
 
-(* A halt returns its bytes from a call frame and fails closed in a creation
- * frame. *)
-Theorem asm_halt_in_creation_invalid:
+(* A creation frame's halt: its bytes, or how it failed. *)
+Definition creation_halt_def:
+  creation_halt code =
+    case run_entry 20 (asm_env code) (asm_proc code) [ScalarValue (IntegerValue 7)]
+           initial_state.frame initial_state.world (SOME FEMPTY) 0 NONE
+           CreationEntry of
+      ContractReturned data _ => INL data
+    | ContractAborted w => if w = initial_state.world then INR "aborted"
+                           else INR "aborted with changes"
+    | ContractInvalid reason => INR reason
+    | _ => INR "other outcome"
+End
+
+val () = cv_auto_trans creation_halt_def;
+
+(* A halt returns its bytes from a call frame; in a creation frame they are
+ * the deployed code, unless the EVM refuses them, aborting the creation with
+ * the entry world, the storage write before the halt undone: a first byte
+ * 0xEF, or more than max_code_size bytes. *)
+Theorem asm_halt_in_creation_deploys:
   run_halt CallEntry = ContractReturned [] initial_state.world ∧
-  run_halt CreationEntry = ContractInvalid "assembly halt in a creation frame"
+  creation_halt [YulExprStmt (YulBuiltin YStop [])] = INL [] ∧
+  creation_halt [YulExprStmt (YulBuiltin YMStore [ylit 0w; YulName "x"]);
+                 YulExprStmt (YulBuiltin YReturn [ylit 30w; ylit 2w])] =
+    INL [0w; 7w] ∧
+  creation_halt [store_x;
+                 YulExprStmt (YulBuiltin YMStore [ylit 0w; ylit 0xEFw]);
+                 YulExprStmt (YulBuiltin YReturn [ylit 31w; ylit 1w])] =
+    INR "aborted" ∧
+  creation_halt [YulExprStmt (YulBuiltin YCallDataCopy [ylit 0w; ylit 0w; ylit 0x6001w]);
+                 YulExprStmt (YulBuiltin YReturn [ylit 0w; ylit 0x6001w])] =
+    INR "aborted"
 Proof
   CONV_TAC cv_eval
 QED
@@ -1629,7 +1719,7 @@ End
 Definition rd_high_def:
   rd_high =
     DefineStmt (AstId 133) (SingleType u256)
-      (ExternalCallOperation ExternalCall [1w; 2w; 3w; 4w] [] [u256]
+      (ExternalCallOperation ExternalCall (ConstantAtom (BytesValue [1w; 2w; 3w; 4w])) [] [u256]
          (ConstantAtom (AddressValue 0x5000w)) (k 0) NONE [])
 End
 
@@ -2429,7 +2519,7 @@ Definition encoder_prefix_calls_def:
       [DefineStmt (AstId 2) (SingleType (ContractT (AstId 3)))
          (CreateContractOperation prefix params (k 0) NONE args);
        DefineStmt (AstId 2) (ProductType [SingleType u256])
-         (ExternalCallOperation ExternalCall prefix params [u256]
+         (ExternalCallOperation ExternalCall (ConstantAtom (BytesValue prefix)) params [u256]
             (ConstantAtom (AddressValue 0x5000w)) (k 0) NONE args);
        DefineStmt (AstId 2) (SingleType (LocatedT MemoryLoc BytesT))
          (AbiEncodeOperation (SOME (ConstantAtom (BytesValue prefix))) params args);
@@ -2450,6 +2540,31 @@ Theorem encoder_prefix_rejections_preserve_memory:
   encoder_prefix_rejections =
     REPLICATE 4
       (InvalidCompletion "unsupported: encoder input at or above the free memory pointer", T)
+Proof
+  CONV_TAC cv_eval
+QED
+
+(* The free-pointer read before copying the signature would grow memory to
+ * 96 bytes. A rejected copy must discard that change. *)
+Definition abi_signature_copy_rejection_def:
+  abi_signature_copy_rejection =
+    let st = initial_state with <|
+          memory := FEMPTY; memory_size := 0;
+          world := initial_state.world with accounts := long_bytes_accounts;
+          scopes := [FEMPTY |+ (1, <|
+            binding_type := SingleType (LocatedT StorageLoc StringT);
+            binding_value := ReferenceValue (static_copy_dst 0w StringT) |>)] |> in
+    let r = simple_stmt 10 test_env
+          (DefineStmt (AstId 2) (SingleType (LocatedT MemoryLoc BytesT))
+            (AbiEncodeOperation (SOME (BoundAtom (AstId 1))) [] []))
+          st [] in
+    (r.completion, r.state = st)
+End
+
+val () = cv_auto_trans abi_signature_copy_rejection_def;
+
+Theorem abi_signature_copy_rejection_preserves_state:
+  abi_signature_copy_rejection = (long_storage_unsupported, T)
 Proof
   CONV_TAC cv_eval
 QED

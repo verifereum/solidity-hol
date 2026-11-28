@@ -38,6 +38,33 @@ Definition stored_value_def:
     | _ => NONE
 End
 
+(* Internal function words are dispatch ids. The 24-byte external form is
+ * the address followed by the selector, before memory's left alignment. *)
+Definition scalar_number_def:
+  scalar_number env b s =
+    case s of
+      InternalFunctionValue (INL x) => ALOOKUP env.function_ids x
+    | InternalFunctionValue (INR w) => SOME w
+    | ExternalFunctionValue a selector =>
+        if LENGTH selector = 4 then
+          SOME (w2n a * 2 ** 32 + num_of_be_bytes selector)
+        else NONE
+    | _ => stored_number b s
+End
+
+Definition scalar_of_number_def:
+  scalar_of_number env ty (n : num) =
+    case ty of
+      FunctionT InternalFn _ _ _ =>
+        SOME (InternalFunctionValue
+          (case FILTER (λ(_, id). id = n) env.function_ids of
+             [] => INR n
+           | (x, _) :: _ => INL x))
+    | FunctionT ExternalFn _ _ _ =>
+        SOME (ExternalFunctionValue (n2w (n DIV 2 ** 32)) (num_to_bytes 4 n))
+    | _ => stored_value ty n
+End
+
 (* The bytes of a value of type ty at a byte offset from the low-order end of
  * a slot of an account. Reading keeps only those bytes, as the compiler's
  * storage cleanup does; writing replaces only them.
@@ -46,7 +73,7 @@ Definition read_storage_word_def:
   read_storage_word env (word : bytes32) offset ty =
     case storage_bytes ty of
       SOME b =>
-        (case stored_value ty
+        (case scalar_of_number env ty
           ((w2n word DIV 2 ** (8 * offset)) MOD 2 ** (8 * b)) of
            SOME v => if scalar_has_type env ty v then SOME v else NONE
          | NONE => NONE)
@@ -60,11 +87,11 @@ Definition read_storage_def:
 End
 
 Definition write_storage_word_def:
-  write_storage_word (word : bytes32) offset ty s =
+  write_storage_word env (word : bytes32) offset ty s =
     case storage_bytes ty of
       NONE => NONE
     | SOME b =>
-        case stored_number b s of
+        case scalar_number env b s of
           NONE => NONE
         | SOME v =>
             let w = w2n word in
@@ -75,11 +102,11 @@ Definition write_storage_word_def:
 End
 
 Definition write_storage_def:
-  write_storage accounts addr slot offset ty s =
+  write_storage env accounts addr slot offset ty s =
     let account = lookup_account addr accounts in
     OPTION_MAP (λword. update_account addr
       (account with storage := update_storage slot word account.storage) accounts)
-      (write_storage_word (lookup_storage slot account.storage) offset ty s)
+      (write_storage_word env (lookup_storage slot account.storage) offset ty s)
 End
 
 (* A declaration's concrete location in the executing account. *)
@@ -98,7 +125,7 @@ End
 Definition mapping_key_bytes_def:
   mapping_key_bytes env key s =
     if byte_sequence_type key then (case s of BytesValue bs => SOME bs | _ => NONE)
-    else if ¬(is_stored_scalar_type key ∧ storage_type_ok env key ∧
+    else if ¬(is_stored_scalar_type key ∧ ¬is_function_type key ∧ storage_type_ok env key ∧
               scalar_has_type env key s) then NONE
     else case s of
       BytesValue bs => SOME (bs ++ REPLICATE (32 - LENGTH bs) 0w)
@@ -460,14 +487,23 @@ End
  * compiler's delete does: the length, every element, a long byte sequence's
  * data, and each field of a struct but a mapping. Struct scalar fields
  * clear their whole slots; a directly targeted scalar clears only its bytes.
- * A dynamic length of 2^64 or more cannot be cleared within any gas
- * limit. The fuel bounds the struct nesting. Clearing also gives the slot it
+ * An array is cleared as shrinking it to no elements (shrink_storage_array).
+ * The fuel bounds the struct nesting. Clearing also gives the slot it
  * hashed last: a nonempty dynamic array hashes its slot, then clears its
- * elements in order; an empty one hashes nothing. *)
+ * elements in order; an empty one hashes nothing.
+ *
+ * shrink_storage_array clears the end of the storage array of element type
+ * element at data, shrunk from old to new elements, as the compiler's
+ * cleanup_storage_array_end does, with its arithmetic. Scalar elements count
+ * slots, rounded up modulo 2^256; the last kept slot keeps only its bytes
+ * below the new end, then the old slots past it are cleared. Other elements
+ * count slots as a checked product of the length (Panic 0x11 past 2^256),
+ * and are cleared one by one. Clearing 2^64 slots or more cannot
+ * finish within any gas limit. *)
 Definition clear_storage_value_def:
   (clear_storage_value env (fuel : num) accounts addr slot offset ty =
     if is_stored_scalar_type ty then
-      (case write_storage accounts addr slot offset ty (IntegerValue 0) of
+      (case write_storage env accounts addr slot offset ty (IntegerValue 0) of
          SOME accounts' => INL (accounts', NONE)
        | NONE => INR (InvalidCompletion "bad storage clear"))
     else if offset ≠ 0 then INR (InvalidCompletion "unaligned storage clear")
@@ -486,18 +522,12 @@ Definition clear_storage_value_def:
       ArrayT element l =>
         (case storage_array_data accounts addr slot ty of
            (length, data) =>
-             if 2 ** 64 ≤ length then INR FuelExhausted else
              let accounts1 = if l = NONE then set_storage_word accounts addr slot 0w
                              else accounts in
              let hash = if l = NONE ∧ length ≠ 0 then SOME slot else NONE in
-             if is_stored_scalar_type element then
-               (case fixed_storage_slots env (ArrayT element (SOME length)) of
-                  SOME slots => INL (clear_byte_slots slots accounts1 addr data, hash)
-                | NONE => INL (accounts1, hash))
-             else
-               (case clear_storage_elements env fuel accounts1 addr data element 0 length of
-                  INL (accounts2, scratch) => INL (accounts2, later_scratch hash scratch)
-                | INR c => INR c))
+             case shrink_storage_array env fuel accounts1 addr data element length 0 of
+               INL (accounts2, scratch) => INL (accounts2, later_scratch hash scratch)
+             | INR c => INR c)
     | StructT s =>
         (case (lookup_struct env s, lookup_struct_layout env s) of
            (SOME fields, SOME layout) =>
@@ -531,18 +561,45 @@ Definition clear_storage_value_def:
         | INL (accounts', scratch) =>
             case clear_storage_fields env fuel accounts' addr slot layout fields of
               INL (accounts'', scratch') => INL (accounts'', later_scratch scratch scratch')
-            | INR c => INR c)
+            | INR c => INR c) ∧
+  (shrink_storage_array env fuel accounts addr (data : bytes32) element old new =
+    if old ≤ new then INL (accounts, NONE) else
+    case storage_bytes element of
+      SOME b =>
+        if b = 0 ∨ 32 < b then INR (InvalidCompletion "bad array element type") else
+        let per_slot = 32 DIV b in
+        let old_slots = ((old + per_slot - 1) MOD 2 ** 256) DIV per_slot in
+        let new_slots = (new + per_slot - 1) DIV per_slot in
+        let keep = b * (new MOD per_slot) in
+        let last = data + n2w (new_slots - 1) in
+        let accounts1 =
+          if keep = 0 then accounts
+          else set_storage_word accounts addr last
+                 (n2w (w2n (lookup_storage last (lookup_account addr accounts).storage)
+                       MOD 2 ** (8 * keep))) in
+        let count = (old_slots + 2 ** 256 - new_slots) MOD 2 ** 256 in
+        if 2 ** 64 ≤ count then INR FuelExhausted
+        else INL (clear_byte_slots count accounts1 addr (data + n2w new_slots), NONE)
+    | NONE =>
+        case fixed_storage_slots env element of
+          NONE => INR (InvalidCompletion "bad array element type")
+        | SOME slots =>
+            if 2 ** 256 ≤ old * slots then INR (PanicCompletion 17)
+            else if 2 ** 64 ≤ (old - new) * slots then INR FuelExhausted
+            else clear_storage_elements env fuel accounts addr data element new (old - new))
 Termination
   WF_REL_TAC ‘inv_image ($< LEX $< LEX $<) (λx. case x of
     INL (env, fuel, accounts, addr, slot, offset, ty) => (fuel, sol_type_size ty, 0)
   | INR (INL (env, fuel, accounts, addr, data, element, i, n)) =>
       (fuel, sol_type_size element, n + 1)
-  | INR (INR (env, fuel, accounts, addr, slot, layout, fields)) =>
-      (fuel, list_size (sol_type_size o SND) fields, 1))’ >>
+  | INR (INR (INL (env, fuel, accounts, addr, slot, layout, fields))) =>
+      (fuel, list_size (sol_type_size o SND) fields, 1)
+  | INR (INR (INR (env, fuel, accounts, addr, data, element, old, new))) =>
+      (fuel, sol_type_size element, (old - new) + 2))’ >>
   rw[solidityASTTheory.sol_type_size_def, listTheory.list_size_def]
 End
 
-Theorem clear_storage_fuel_stable:
+Theorem clear_shrink_storage_fuel_stable[local]:
   (∀env fuel accounts addr slot offset ty m.
      clear_storage_value env fuel accounts addr slot offset ty ≠ INR FuelExhausted ∧
      fuel ≤ m ⇒
@@ -557,7 +614,12 @@ Theorem clear_storage_fuel_stable:
      clear_storage_fields env fuel accounts addr slot layout fields ≠ INR FuelExhausted ∧
      fuel ≤ m ⇒
      clear_storage_fields env m accounts addr slot layout fields =
-       clear_storage_fields env fuel accounts addr slot layout fields)
+       clear_storage_fields env fuel accounts addr slot layout fields) ∧
+  (∀env fuel accounts addr data element old new m.
+     shrink_storage_array env fuel accounts addr data element old new ≠ INR FuelExhausted ∧
+     fuel ≤ m ⇒
+     shrink_storage_array env m accounts addr data element old new =
+       shrink_storage_array env fuel accounts addr data element old new)
 Proof
   ho_match_mp_tac clear_storage_value_ind >> rpt strip_tac >>
   qpat_x_assum ‘_ <> INR FuelExhausted’ mp_tac
@@ -572,8 +634,7 @@ Proof
     simp[]
     >~ [‘ArrayT element len’] >-
      (Cases_on ‘storage_array_data accounts addr slot (ArrayT element len)’ >>
-      gvs[] >> Cases_on ‘2 ** 64 <= q’ >> simp[] >>
-      Cases_on ‘is_stored_scalar_type element’ >> simp[] >>
+      gvs[] >>
       BasicProvers.EVERY_CASE_TAC >> gvs[] >>
       rpt strip_tac >> spose_not_then strip_assume_tac >>
       first_x_assum (qspec_then ‘m'’ mp_tac) >> gvs[]) >>
@@ -592,13 +653,50 @@ Proof
     once_rewrite_tac[clear_storage_value_def] >> simp[] >>
     BasicProvers.EVERY_CASE_TAC >> gvs[] >>
     rpt strip_tac >> spose_not_then strip_assume_tac >>
-    rpt (first_x_assum (qspec_then ‘m'’ mp_tac)) >> gvs[]) >>
+    rpt (first_x_assum (qspec_then ‘m'’ mp_tac)) >> gvs[])
+  >~ [‘shrink_storage_array env m accounts addr data element old new = _’] >-
+   (once_rewrite_tac[clear_storage_value_def] >>
+    Cases_on ‘old ≤ new’ >> asm_simp_tac bool_ss [] >>
+    Cases_on ‘storage_bytes element’ >> asm_simp_tac bool_ss [] >>
+    BasicProvers.EVERY_CASE_TAC >> gvs[] >>
+    rpt strip_tac >> spose_not_then strip_assume_tac >>
+    first_x_assum (qspec_then ‘m'’ mp_tac) >> gvs[]) >>
   once_rewrite_tac[clear_storage_value_def] >> simp[] >>
   Cases_on ‘ALOOKUP (MAP (\v. (v.state_id, v)) layout) f’ >> simp[] >>
   Cases_on ‘is_stored_scalar_type ty’ >> gvs[] >>
   BasicProvers.EVERY_CASE_TAC >> gvs[] >>
   rpt strip_tac >> spose_not_then strip_assume_tac >>
   rpt (first_x_assum (qspec_then ‘m’ mp_tac)) >> gvs[]
+QED
+
+Theorem clear_storage_fuel_stable:
+  (∀env fuel accounts addr slot offset ty m.
+     clear_storage_value env fuel accounts addr slot offset ty ≠ INR FuelExhausted ∧
+     fuel ≤ m ⇒
+     clear_storage_value env m accounts addr slot offset ty =
+       clear_storage_value env fuel accounts addr slot offset ty) ∧
+  (∀env fuel accounts addr data element i n m.
+     clear_storage_elements env fuel accounts addr data element i n ≠ INR FuelExhausted ∧
+     fuel ≤ m ⇒
+     clear_storage_elements env m accounts addr data element i n =
+       clear_storage_elements env fuel accounts addr data element i n) ∧
+  (∀env fuel accounts addr slot layout fields m.
+     clear_storage_fields env fuel accounts addr slot layout fields ≠ INR FuelExhausted ∧
+     fuel ≤ m ⇒
+     clear_storage_fields env m accounts addr slot layout fields =
+       clear_storage_fields env fuel accounts addr slot layout fields)
+Proof
+  ACCEPT_TAC (LIST_CONJ (List.take (CONJUNCTS clear_shrink_storage_fuel_stable, 3)))
+QED
+
+Theorem shrink_storage_array_fuel_stable:
+  ∀env fuel accounts addr data element old new m.
+     shrink_storage_array env fuel accounts addr data element old new ≠ INR FuelExhausted ∧
+     fuel ≤ m ⇒
+     shrink_storage_array env m accounts addr data element old new =
+       shrink_storage_array env fuel accounts addr data element old new
+Proof
+  ACCEPT_TAC (last (CONJUNCTS clear_shrink_storage_fuel_stable))
 QED
 
 (* Reading a whole storage value, as a copy to memory and the encoder do: a
@@ -750,6 +848,8 @@ Definition navigate_storage_field_def:
     | _ => ValueAbrupt (InvalidCompletion "bad struct reference")
 End
 
+val () = cv_auto_trans scalar_number_def;
+val () = cv_auto_trans scalar_of_number_def;
 val () = cv_auto_trans read_storage_word_def;
 val () = cv_auto_trans read_storage_def;
 val () = cv_auto_trans write_storage_word_def;
@@ -800,13 +900,16 @@ val () = cv_auto_trans later_scratch_def;
 val () = cv_auto_trans long_bytes_scratch_def;
 
 val clear_storage_value_pre_def = cv_auto_trans_pre_rec
-  "clear_storage_value_pre clear_storage_elements_pre clear_storage_fields_pre" clear_storage_value_def (
+  "clear_storage_value_pre clear_storage_elements_pre clear_storage_fields_pre \
+  \shrink_storage_array_pre" clear_storage_value_def (
   WF_REL_TAC ‘inv_image ($< LEX $< LEX $<) (λx. case x of
     INL (env, fuel, accounts, addr, slot, offset, ty) => (cv$c2n fuel, cv_size ty, 0)
   | INR (INL (env, fuel, accounts, addr, data, element, i, n)) =>
       (cv$c2n fuel, cv_size element, cv$c2n n + 1)
-  | INR (INR (env, fuel, accounts, addr, slot, layout, fields)) =>
-      (cv$c2n fuel, cv_size fields, 1))’ >>
+  | INR (INR (INL (env, fuel, accounts, addr, slot, layout, fields))) =>
+      (cv$c2n fuel, cv_size fields, 1)
+  | INR (INR (INR (env, fuel, accounts, addr, data, element, old, new))) =>
+      (cv$c2n fuel, cv_size element, cv$c2n (cv_sub old new) + 2))’ >>
   cv_termination_tac
 );
 
@@ -815,7 +918,9 @@ Theorem clear_storage_value_pre[cv_pre]:
   (∀env fuel accounts addr data element i n.
      clear_storage_elements_pre env fuel accounts addr data element i n) ∧
   (∀env fuel accounts addr slot layout fields.
-     clear_storage_fields_pre env fuel accounts addr slot layout fields)
+     clear_storage_fields_pre env fuel accounts addr slot layout fields) ∧
+  (∀env fuel accounts addr data element old new.
+     shrink_storage_array_pre env fuel accounts addr data element old new)
 Proof
   ho_match_mp_tac clear_storage_value_ind >> rpt strip_tac >>
   simp[Once clear_storage_value_pre_def] >> rw[] >> gvs[]

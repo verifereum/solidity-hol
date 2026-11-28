@@ -6,6 +6,7 @@ Ancestors
   solidityDifferentialCorpus_abi_decodes
   solidityDifferentialCorpus_abi_encoding
   solidityDifferentialCorpus_abi_parenthesized_types
+  solidityDifferentialCorpus_abi_signatures
   solidityDifferentialCorpus_abi_values
   solidityDifferentialCorpus_abstract_child_unit
   solidityDifferentialCorpus_array_events
@@ -42,6 +43,7 @@ Ancestors
   solidityDifferentialCorpus_constant_array_lengths
   solidityDifferentialCorpus_constant_conversions
   solidityDifferentialCorpus_constants
+  solidityDifferentialCorpus_constructor_halt
   solidityDifferentialCorpus_constructors
   solidityDifferentialCorpus_context
   solidityDifferentialCorpus_contract_creation
@@ -50,6 +52,7 @@ Ancestors
   solidityDifferentialCorpus_contract_types
   solidityDifferentialCorpus_control
   solidityDifferentialCorpus_creation_dispatch
+  solidityDifferentialCorpus_creation_tail
   solidityDifferentialCorpus_dirty_bits
   solidityDifferentialCorpus_dynamic_bytes
   solidityDifferentialCorpus_dynamic_storage_arrays
@@ -64,9 +67,11 @@ Ancestors
   solidityDifferentialCorpus_errors
   solidityDifferentialCorpus_expression_members
   solidityDifferentialCorpus_external
+  solidityDifferentialCorpus_external_function_values
   solidityDifferentialCorpus_fallback
   solidityDifferentialCorpus_function_references
   solidityDifferentialCorpus_function_types
+  solidityDifferentialCorpus_function_values
   solidityDifferentialCorpus_gas_invalid
   solidityDifferentialCorpus_hashes
   solidityDifferentialCorpus_immutable_kinds
@@ -93,6 +98,7 @@ Ancestors
   solidityDifferentialCorpus_memory_forwarding
   solidityDifferentialCorpus_memory_images
   solidityDifferentialCorpus_memory_structs
+  solidityDifferentialCorpus_minor_builtins
   solidityDifferentialCorpus_modifiers
   solidityDifferentialCorpus_modular
   solidityDifferentialCorpus_named_arguments
@@ -112,6 +118,7 @@ Ancestors
   solidityDifferentialCorpus_revert_payloads
   solidityDifferentialCorpus_scalars
   solidityDifferentialCorpus_scratch_copies
+  solidityDifferentialCorpus_selfdestruct_source
   solidityDifferentialCorpus_selfdestructs
   solidityDifferentialCorpus_sha256_blockhash
   solidityDifferentialCorpus_shadowed_builtins
@@ -122,6 +129,7 @@ Ancestors
   solidityDifferentialCorpus_storage_bytes
   solidityDifferentialCorpus_storage_bytes_aliases
   solidityDifferentialCorpus_storage_call_data
+  solidityDifferentialCorpus_storage_copy_order
   solidityDifferentialCorpus_storage_enum_arrays
   solidityDifferentialCorpus_storage_memory_padding
   solidityDifferentialCorpus_storage_pointer_base

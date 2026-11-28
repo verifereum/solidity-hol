@@ -428,14 +428,10 @@ End
  *)
 Definition yul_self_destruct_def:
   yul_self_destruct (m : yul_machine) (beneficiary : address) =
-    let self = lookup_account m.self_address m.accounts;
-        accounts = transfer_value m.self_address beneficiary self.balance
-                     m.accounts in
-      if account_empty (lookup_account m.self_address m.original) then
-        m with <| accounts := update_account m.self_address
-                                (self with balance := 0) accounts;
-                  to_delete := m.to_delete ++ [m.self_address] |>
-      else m with accounts := accounts
+    let (accounts, deletions) =
+          self_destruct_accounts m.self_address beneficiary m.original m.accounts in
+      m with <| accounts := accounts;
+                to_delete := m.to_delete ++ deletions |>
 End
 
 (* returndatacopy: the bytes it reads come from return_data, not from memory,
@@ -475,6 +471,20 @@ Definition block_hash_word_def:
       if n < tx.blockNumber ∧ tx.blockNumber - 256 ≤ n ∧
          index < LENGTH tx.prevHashes
       then EL index tx.prevHashes else 0w
+End
+
+(* CLZ counts all 256 bits when the operand is zero. *)
+Definition clz_word_def:
+  clz_word (x : bytes32) : bytes32 =
+    if x = 0w then 256w else n2w (255 - LOG2 (w2n x))
+End
+
+(* BLOBHASH reads the indexed versioned hash, or zero outside the list. *)
+Definition blob_hash_word_def:
+  blob_hash_word (tx : transaction_parameters) index : bytes32 =
+    case oEL index tx.blobHashes of
+      SOME hash => hash
+    | NONE => 0w
 End
 
 (* An account's code hash, as EXTCODEHASH (verifereum's step_ext_code_hash)
@@ -520,6 +530,7 @@ Definition eval_yul_builtin_def:
     | (YByte, [i; w]) =>
         EvalValues [if w2n i < 32 then n2w ((w2n w DIV 2 ** (8 * (31 - w2n i))) MOD 256)
                     else 0w] m
+    | (YClz, [x]) => EvalValues [clz_word x] m
     | (YKeccak256, [p; s]) =>
         let (m', bs) = yul_memory_region m (w2n p) (w2n s) in
           EvalValues [word_of_bytes_be (Keccak_256_w64 bs)] m'
@@ -564,12 +575,16 @@ Definition eval_yul_builtin_def:
     | (YChainId, []) => EvalValues [n2w m.transaction_parameters.chainId] m
     | (YBaseFee, []) =>
         EvalValues [n2w m.transaction_parameters.baseFeePerGas] m
+    | (YBlobBaseFee, []) =>
+        EvalValues [n2w m.transaction_parameters.baseFeePerBlobGas] m
     | (YGasLimit, []) =>
         EvalValues [n2w m.transaction_parameters.blockGasLimit] m
     | (YNumber, []) =>
         EvalValues [n2w m.transaction_parameters.blockNumber] m
     | (YBlockHash, [n]) =>
         EvalValues [block_hash_word m.transaction_parameters (w2n n)] m
+    | (YBlobHash, [n]) =>
+        EvalValues [blob_hash_word m.transaction_parameters (w2n n)] m
     | (YTimestamp, []) =>
         EvalValues [n2w m.transaction_parameters.blockTimeStamp] m
     | (YCoinbase, []) =>
@@ -1026,6 +1041,14 @@ Theorem block_hash_word_pre[cv_pre]:
 Proof
   simp[block_hash_word_pre_def, cv_stdTheory.EL_pre]
 QED
+val clz_word_pre_def = cv_trans_pre "clz_word_pre" clz_word_def;
+Theorem clz_word_pre[cv_pre]:
+  ∀x. clz_word_pre x
+Proof
+  simp[clz_word_pre_def]
+QED
+
+val () = cv_auto_trans blob_hash_word_def;
 (* Bound left shifts before computing powers, as in the EVM translation. *)
 val () = cv_auto_trans
   (REWRITE_RULE [word_lsl_modexp, modular_word_def] eval_yul_builtin_def);

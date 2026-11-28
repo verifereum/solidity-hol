@@ -5,7 +5,7 @@ Theory solidityPrepareTest
 Ancestors
   solidityElaborate solidityImportTest
 Libs
-  solidityPrepareLib cv_transLib wordsLib
+  solidityPrepareLib solidityImportLib cv_transLib wordsLib
 
 fun holbuild_extra_deps (_ : string list) = ()
 val () = holbuild_extra_deps [
@@ -15,6 +15,7 @@ val () = holbuild_extra_deps [
   "../testdata/frontend/expected/external_library.json",
   "../testdata/differential/expected/contract_creation.json",
   "../testdata/differential/expected/contract_qualified_variables.json",
+  "../testdata/differential/expected/function_values.json",
   "../profiles/solc-0.8.37-via-ir-osaka-optimized.json",
   "../testdata/frontend/expected/stack_depth.json"
 ]
@@ -56,14 +57,20 @@ fun rejects expected work =
   handle solidityPrepareLib.PreparationError (actual, _) =>
     if actual = expected then () else raise Fail "wrong preparation failure category";
 
-(* The source layout contract validates slot identity/type alignment but the
- * complete core checker must reject a uint256 at nonzero byte offset.
- *)
+(* The complete core checker validates that a struct field fits in the
+ * struct's declared space. Move an otherwise valid field past that space. *)
+val layout_unit = solidityImportLib.import_artifact
+  "../testdata/differential/expected/function_values.json"
+  "testdata/differential/function_values.sol";
+
 val invalid_layout = rhs (concl (EVAL
-  “storage_unit with unit_contracts :=
-      [HD storage_unit.unit_contracts with contract_storage :=
-        (HD (HD storage_unit.unit_contracts).contract_storage with storage_offset := 1) ::
-        TL (HD storage_unit.unit_contracts).contract_storage]”));
+  “let c = HD (^layout_unit).unit_contracts in
+   let s = HD c.contract_structs in
+   let (bytes, fields) = THE s.struct_layout in
+   let bad = s with struct_layout :=
+     SOME (bytes, (HD fields with storage_slot := bytes DIV 32) :: TL fields) in
+   ^layout_unit with unit_contracts :=
+     [c with contract_structs := bad :: TL c.contract_structs]”));
 
 Definition invalid_generated_layout_def:
   invalid_generated_layout = ^invalid_layout

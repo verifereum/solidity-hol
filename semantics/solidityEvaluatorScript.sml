@@ -172,6 +172,18 @@ Definition eval_pure_operation_def:
              if src = ty then ValueOk (ReferenceValue r)
              else convert_byte_reference src ty r
          | _ => ValueAbrupt (InvalidCompletion "ill-typed conversion"))
+    | ExternalFunctionOperation target selector =>
+        (case (eval_atom scopes target, eval_atom scopes selector) of
+           (SOME (ScalarValue (AddressValue a)), SOME (ScalarValue (BytesValue bs))) =>
+             if LENGTH bs = 4 then ValueOk (ScalarValue (ExternalFunctionValue a bs))
+             else ValueAbrupt (InvalidCompletion "bad external function selector")
+         | _ => ValueAbrupt (InvalidCompletion "bad external function operands"))
+    | FunctionMemberOperation member a =>
+        (case eval_atom scopes a of
+           SOME (ScalarValue (ExternalFunctionValue addr selector)) =>
+             ValueOk (ScalarValue (case member of FunctionAddress => AddressValue addr
+                                     | FunctionSelector => BytesValue selector))
+         | _ => ValueAbrupt (InvalidCompletion "bad external function value"))
     | TupleOperation atoms =>
         (case eval_atoms scopes atoms of
            SOME vs => ValueOk (TupleValue vs)
@@ -247,6 +259,8 @@ Definition environment_value_def:
     | BlockCoinbase => ValueOk (ScalarValue (AddressValue fr.tx_params.blockCoinBase))
     | BlockBaseFee =>
         ValueOk (ScalarValue (IntegerValue (wrap_integer F 256 (&fr.tx_params.baseFeePerGas))))
+    | BlockBlobBaseFee =>
+        ValueOk (ScalarValue (IntegerValue (wrap_integer F 256 (&fr.tx_params.baseFeePerBlobGas))))
     | BlockGasLimit =>
         ValueOk (ScalarValue (IntegerValue (wrap_integer F 256 (&fr.tx_params.blockGasLimit))))
     | BlockPrevRandao => ValueOk (ScalarValue (IntegerValue (&w2n fr.tx_params.prevRandao)))
@@ -285,11 +299,31 @@ Definition packed_call_data_def:
     | INR c => INR c
 End
 
+(* The gas a high-level call gives its callee. The source does not track gas,
+ * where the bytecode passes all but a 64th of what it has left.
+ *)
+Definition external_call_gas_def:
+  external_call_gas = 10000000n
+End
+
+(* The 32-byte word ERC-7201's runtime helper writes at scratch 0. *)
+Definition erc7201_preimage_def:
+  erc7201_preimage bs =
+    word_to_bytes ((word_of_bytes_be (Keccak_256_w64 bs) : bytes32) - 1w) T
+End
+
+(* The namespace slot for the preimage, with the low byte cleared. *)
+Definition erc7201_slot_def:
+  erc7201_slot preimage =
+    w2n (word_and (word_of_bytes_be (Keccak_256_w64 preimage) : bytes32)
+                 (word_1comp 0xffw))
+End
+
 (* A builtin's value on its operands' values, and the state after it, with
  * the memory the compiler's code uses for it. keccak256 hashes the bytes in
- * place. sha256 and ecrecover call their precompile on an encoding at the
- * free memory pointer, which they do not raise (sha256's by
- * packed_call_data), and read its output from the scratch word at 0:
+ * place. sha256, ripemd160 and ecrecover use precompile output at scratch 0
+ * on an encoding at the unchanged free memory pointer (sha256 and ripemd160
+ * use packed_call_data):
  * ecrecover zeroes it first, as an invalid signature returns nothing, which
  * reads as address(0), and the precompile reads its input from memory after
  * that. a.code allocates memory bytes and copies the code there. *)
@@ -331,6 +365,30 @@ Definition eval_builtin_def:
              let hash = num_to_bytes 32 (w2n (SHA_256_bytes bs)) in
              INL (ScalarValue (BytesValue hash), memory_write 0 hash st1)
          | INR c => INR c)
+    | (Ripemd160Builtin, [v]) =>
+        (case packed_call_data st v of
+           INL (bs, st1) =>
+             (case run_external_call st1.frame.self_address 3w bs 0 T external_call_gas
+                     st1.world.accounts st1.world.original st1.world.transient
+                     st1.frame.tx_params of
+                SOME r =>
+                  if r.call_success ∧ LENGTH r.call_return = 32 then
+                    INL (ScalarValue (BytesValue (DROP 12 r.call_return)),
+                         memory_write 0 r.call_return
+                           (st1 with return_data := SOME r.call_return))
+                  else INR (InvalidCompletion "ripemd160 precompile did not return a digest")
+              | NONE => INR (InvalidCompletion "ripemd160 precompile call outside the model"))
+         | INR c => INR c)
+    | (Erc7201Builtin, [ReferenceValue r]) =>
+        (case byte_contents st r of
+           INL (bs, st1) =>
+             let preimage = erc7201_preimage bs in
+             INL (ScalarValue (IntegerValue (&(erc7201_slot preimage))),
+                  memory_write 0 preimage st1)
+         | INR c => INR c)
+    | (BlobhashBuiltin, [ScalarValue (IntegerValue n)]) =>
+        INL (ScalarValue (BytesValue
+          (word_to_bytes (blob_hash_word st.frame.tx_params (Num n)) T)), st)
     | (BlockhashBuiltin, [ScalarValue (IntegerValue n)]) =>
         INL (ScalarValue (BytesValue (num_to_bytes 32
           (w2n (block_hash_word st.frame.tx_params (Num n))))), st)
@@ -343,8 +401,8 @@ Definition eval_builtin_def:
     | _ => INR (InvalidCompletion "bad builtin operands")
 End
 
-(* The builtins the compiler computes by calling a precompile: ecrecover at
- * address 1 and sha256 at address 2. *)
+(* Builtins whose precompile call is modelled without retaining returndata.
+ * Calls through the external adapter carry their returndata in eval_builtin. *)
 Definition builtin_calls_precompile_def:
   builtin_calls_precompile b ⇔ b = EcrecoverBuiltin ∨ b = Sha256Builtin
 End
@@ -662,7 +720,7 @@ Definition write_target_value_def:
     | (SOME (ValueTarget (StorageReference PersistentStorage addr slot offset
                             ty _)), ScalarValue s) =>
         if st.frame.static_context then NONE else
-        (case write_storage st.world.accounts addr slot offset ty s of
+        (case write_storage env st.world.accounts addr slot offset ty s of
            SOME accounts =>
              SOME (st with world := st.world with accounts := accounts)
          | NONE => NONE)
@@ -670,7 +728,7 @@ Definition write_target_value_def:
                             ty _)), ScalarValue s) =>
         if st.frame.static_context then NONE else
         let storage = lookup_transient_storage addr st.world.transient in
-        (case write_storage_word (lookup_storage slot storage) offset ty s of
+        (case write_storage_word env (lookup_storage slot storage) offset ty s of
            SOME word => SOME (st with world := st.world with transient :=
              update_transient_storage addr (update_storage slot word storage) st.world.transient)
          | NONE => NONE)
@@ -739,7 +797,7 @@ Definition push_storage_array_def:
                 (old_length + 1) layout (&old_length) of
            ValueOk (ReferenceValue
              (StorageReference PersistentStorage _ data_slot offset _ _)) =>
-             (case write_storage st.world.accounts addr slot 0 (UintT 256)
+             (case write_storage env st.world.accounts addr slot 0 (UintT 256)
                      (IntegerValue (&(old_length + 1))) of
                 SOME accounts =>
                   normal_result
@@ -784,7 +842,7 @@ Definition pop_storage_array_def:
              (case clear_storage_value env (n + LENGTH env.type_declarations)
                      st.world.accounts addr data_slot offset element of
                 INL (accounts, scratch) =>
-                  (case write_storage accounts addr slot 0 (UintT 256)
+                  (case write_storage env accounts addr slot 0 (UintT 256)
                           (IntegerValue (&(old_length - 1))) of
                      SOME accounts' =>
                        normal_result
@@ -839,13 +897,6 @@ Definition emit_event_def:
                    world := st2.world with logs := st2.world.logs ++ [e]) gas
         | (INR (c, ws), st1) =>
             abrupt_result c (apply_writes (FST (memory_load 64 st1)) ws st1) gas
-End
-
-(* The gas a high-level call gives its callee. The source does not track gas,
- * where the bytecode passes all but a 64th of what it has left.
- *)
-Definition external_call_gas_def:
-  external_call_gas = 10000000n
 End
 
 (* The gas a call gives its callee with its gas option: the option, capped at
@@ -907,9 +958,12 @@ End
 (* Constructor arguments use the same live-location ABI codec as calls. The
  * compiler copies the creation code to the free memory pointer, Panic(0x41)
  * when its end passes 2^64 - 1, encodes the arguments after it, and does not
- * move the pointer. *)
+ * move the pointer. A catching creation, as in try, binds the success flag,
+ * the new address (zero on failure) and the revert data instead of
+ * forwarding a failed creation's revert. *)
 Definition call_create_def:
-  call_create env x ty code params value salt args (st : source_state) gas =
+  call_create catching env x ty code params value salt args (st : source_state)
+    gas =
     if st.frame.static_context then
       abrupt_result (InvalidCompletion "creation in static frame") st gas else
     case (eval_atom st.scopes value, eval_atoms st.scopes args,
@@ -944,10 +998,23 @@ Definition call_create_def:
                                original := r.create_original;
                                to_delete := st2.world.to_delete ++ r.create_to_delete |> |> in
                  case r.create_address of
-                   NONE => abrupt_result (RevertCompletion r.create_return)
-                             (forward_revert r.create_return st3) gas
+                   NONE =>
+                     if catching then
+                       normal_result (define_binding x ty
+                         (TupleValue [ScalarValue (BoolValue F);
+                                      ScalarValue (AddressValue 0w);
+                                      ScalarValue (BytesValue r.create_return)])
+                         st3) gas
+                     else
+                       abrupt_result (RevertCompletion r.create_return)
+                         (forward_revert r.create_return st3) gas
                  | SOME addr => normal_result
-                     (define_binding x ty (ScalarValue (AddressValue addr)) st3) gas)
+                     (define_binding x ty
+                       (if catching then
+                          TupleValue [ScalarValue (BoolValue T);
+                                      ScalarValue (AddressValue addr);
+                                      ScalarValue (BytesValue [])]
+                        else ScalarValue (AddressValue addr)) st3) gas)
     | _ => abrupt_result (InvalidCompletion "bad creation operands") st gas
 End
 
@@ -1047,8 +1114,12 @@ End
 
 Definition call_external_def:
   call_external env x ty kind selector params rets target value g args st gas =
-    call_external_mode F env x ty kind selector params rets target value g args
-      st gas
+    case eval_atom st.scopes selector of
+      SOME (ScalarValue (BytesValue bs)) =>
+        if LENGTH bs = 4 then
+          call_external_mode F env x ty kind bs params rets target value g args st gas
+        else abrupt_result (InvalidCompletion "bad external call selector") st gas
+    | _ => abrupt_result (InvalidCompletion "bad external call selector") st gas
 End
 
 (* The compiler's extract_returndata: no return data is the zero slot; other
@@ -1184,14 +1255,58 @@ Definition call_low_level_def:
 End
 
 (* The selector an ABI encoding starts with: none, or four bytes. *)
-Definition selector_bytes_def:
-  selector_bytes scopes selector =
+(* A new memory copy of a calldata or storage object, as
+ * CopyToMemoryOperation makes it, with the state it leaves on failure. *)
+Definition copy_to_memory_def:
+  copy_to_memory env v st =
+    case v of
+      ReferenceValue (CalldataReference data n rty) =>
+        (case copy_calldata_array env st.frame.call_data rty data n
+                (FST (memory_load 64 st)) of
+           INL v' =>
+             (case materialize_value env rty v' st of
+                INL r => INL r
+              | INR c => INR (c, st))
+         | INR c => INR (c, st))
+    | ReferenceValue (StorageReference PersistentStorage addr slot 0 rty _) =>
+        materialize_storage env (LENGTH env.type_declarations)
+          st.world.accounts addr slot rty st
+    | _ => INR (InvalidCompletion "bad object copy", st)
+End
+
+(* abi.encodeWithSignature's selector for a signature string r, as the
+ * compiler computes it after the arguments: the free memory pointer p is
+ * read, a calldata or storage string is copied to memory, the first four
+ * bytes of the Keccak-256 hash of the string's bytes are the selector, and
+ * the pointer is set back to p, freeing the copy, whose bytes stay. *)
+Definition signature_selector_def:
+  signature_selector env r st =
+    let (p, st1) = memory_load 64 st in
+    case (case r of
+            MemoryReference _ _ => INL (ReferenceValue r, st1)
+          | _ => copy_to_memory env (ReferenceValue r) st1) of
+      INR (c, st2) => INR (c, if abi_read_failure c then st2 else st)
+    | INL (ReferenceValue (MemoryReference q _), st2) =>
+        let (bs, st3) = memory_bytes q st2 in
+        (case finalize_allocation p 0 st3 of
+           INL st4 => INL (TAKE 4 (Keccak_256_w64 bs), st4)
+         | INR c => INR (c, if abi_read_failure c then st3 else st))
+    | INL _ => INR (InvalidCompletion "bad signature", st)
+End
+
+(* The bytes an encoding starts with: none, a bytes4 selector, or the
+ * selector of a signature string. *)
+Definition encoding_selector_def:
+  encoding_selector env selector st =
     case selector of
-      NONE => SOME []
+      NONE => INL ([], st)
     | SOME s =>
-        case eval_atom scopes s of
-          SOME (ScalarValue (BytesValue bs)) => if LENGTH bs = 4 then SOME bs else NONE
-        | _ => NONE
+        case eval_atom st.scopes s of
+          SOME (ScalarValue (BytesValue bs)) =>
+            if LENGTH bs = 4 then INL (bs, st)
+            else INR (InvalidCompletion "bad abi.encode selector", st)
+        | SOME (ReferenceValue r) => signature_selector env r st
+        | _ => INR (InvalidCompletion "bad abi.encode selector", st)
 End
 
 (* An ABI encoding as a new memory bytes, or string (string.concat), as the
@@ -1215,18 +1330,21 @@ End
 
 Definition abi_encode_def:
   abi_encode env x ty selector tys args st gas =
-    case (selector_bytes st.scopes selector, eval_atoms st.scopes args) of
-      (SOME prefix, SOME vs) =>
-        (case encoded_runtime_values env st tys vs of
-           (INL (bs, spill), st1) => allocate_encoding x ty prefix bs spill st1 gas
-         | (INR (c, ws), st1) =>
-             let p = FST (memory_load 64 st1) in
-             abrupt_result c
-               (if abi_read_failure c then
-                  apply_writes (p + 32 + LENGTH prefix) ws
-                    (write_call_data (p + 32) prefix [] st1)
-                else st) gas)
-    | _ => abrupt_result (InvalidCompletion "bad abi.encode operands") st gas
+    case eval_atoms st.scopes args of
+      NONE => abrupt_result (InvalidCompletion "bad abi.encode operands") st gas
+    | SOME vs =>
+      case encoding_selector env selector st of
+        INR (c, st0) => abrupt_result c (if abi_read_failure c then st0 else st) gas
+      | INL (prefix, st0) =>
+        case encoded_runtime_values env st0 tys vs of
+          (INL (bs, spill), st1) => allocate_encoding x ty prefix bs spill st1 gas
+        | (INR (c, ws), st1) =>
+            let p = FST (memory_load 64 st1) in
+            abrupt_result c
+              (if abi_read_failure c then
+                 apply_writes (p + 32 + LENGTH prefix) ws
+                   (write_call_data (p + 32) prefix [] st1)
+               else st) gas
 End
 
 Definition abi_encode_packed_def:
@@ -1238,6 +1356,23 @@ Definition abi_encode_packed_def:
          | (INR (c, ws), st1) =>
              abrupt_result c (apply_writes (FST (memory_load 64 st1) + 32) ws st1) gas)
     | NONE => abrupt_result (InvalidCompletion "bad abi.encodePacked operands") st gas
+End
+
+(* Source selfdestruct has the same account effect as the Yul builtin. *)
+Definition self_destruct_stmt_def:
+  self_destruct_stmt target (st : source_state) gas =
+    if st.frame.static_context then
+      abrupt_result (InvalidCompletion "selfdestruct in static frame") st gas
+    else
+      case eval_atom st.scopes target of
+        SOME (ScalarValue (AddressValue beneficiary)) =>
+          let (accounts, deletions) = self_destruct_accounts
+                st.frame.self_address beneficiary st.world.original st.world.accounts in
+          abrupt_result (HaltCompletion [])
+            (st with world := st.world with
+              <| accounts := accounts;
+                 to_delete := st.world.to_delete ++ deletions |>) gas
+      | _ => abrupt_result (InvalidCompletion "bad selfdestruct beneficiary") st gas
 End
 
 (* Every statement except internal calls, if and while. *)
@@ -1260,6 +1395,15 @@ Definition simple_stmt_def:
                (memory_write (p + 32)
                   (bs ++ REPLICATE ((LENGTH bs + 31) DIV 32 * 32 - LENGTH bs) 0w)
                   st1)) gas
+         | INR c => abrupt_result c st gas)
+    (* A contract's code is copied as its bytes only (datacopy), the rest of
+     * its last word left as it was. *)
+    | DefineStmt x ty (CodeCopyOperation bs) =>
+        (case allocate_byte_array (LENGTH bs) st of
+           INL (p, st1) =>
+             normal_result (define_binding x ty
+               (ReferenceValue (MemoryReference p BytesT))
+               (memory_write (p + 32) bs st1)) gas
          | INR c => abrupt_result c st gas)
     | DefineStmt x ty (DefaultMemoryOperation element) =>
         (case zero_value env (LENGTH env.type_declarations) element st of
@@ -1293,20 +1437,11 @@ Definition simple_stmt_def:
          | _ => abrupt_result (InvalidCompletion "bad allocation length") st gas)
     | DefineStmt x ty (CopyToMemoryOperation a) =>
         (case eval_atom st.scopes a of
-           SOME (ReferenceValue (CalldataReference data n rty)) =>
-             (case copy_calldata_array env st.frame.call_data rty data n
-                     (FST (memory_load 64 st)) of
-                INL v =>
-                  (case materialize_value env rty v st of
-                     INL (v', st') => normal_result (define_binding x ty v' st') gas
-                   | INR c => abrupt_result c st gas)
-              | INR c => abrupt_result c st gas)
-         | SOME (ReferenceValue (StorageReference PersistentStorage addr slot 0 rty _)) =>
-             (case materialize_storage env (LENGTH env.type_declarations)
-                     st.world.accounts addr slot rty st of
+           SOME v =>
+             (case copy_to_memory env v st of
                 INL (v', st') => normal_result (define_binding x ty v' st') gas
               | INR (c, st') => abrupt_result c st' gas)
-         | _ => abrupt_result (InvalidCompletion "bad object copy") st gas)
+         | NONE => abrupt_result (InvalidCompletion "bad object copy") st gas)
     (* Decoded memory values are allocated, as external call results are. A
      * memory input is decoded in place: only its bytes below the memory size
      * are read, the rest being zeros, as the compiler's decoder reads only
@@ -1368,7 +1503,9 @@ Definition simple_stmt_def:
     | DefineStmt x ty (LowLevelCallOperation kind target value g data) =>
         call_low_level x ty kind target value g data st gas
     | DefineStmt x ty (CreateContractOperation code params value salt args) =>
-        call_create env x ty code params value salt args st gas
+        call_create F env x ty code params value salt args st gas
+    | DefineStmt x ty (TryCreateContractOperation code params value salt args) =>
+        call_create T env x ty code params value salt args st gas
     | DefineStmt x ty (TryDecodeErrorOperation kind a) =>
         (case eval_atom st.scopes a of
            SOME (ScalarValue (BytesValue data)) =>
@@ -1385,12 +1522,13 @@ Definition simple_stmt_def:
          | _ => abrupt_result (InvalidCompletion "bad catch data") st gas)
     | DefineStmt x ty (TransferOperation target value) =>
         call_transfer x ty target value st gas
+    | DefineStmt x ty (SelfDestructOperation target) =>
+        self_destruct_stmt target st gas
     | DefineStmt x ty (TryExternalCallOperation kind selector params rets target
                          value g args) =>
         call_external_mode T env x ty kind selector params rets target value g
           args st gas
-    (* A builtin computed by a precompile call leaves return data the source
-     * computes no bytes for. *)
+    (* Clear return data after precompile builtins that leave it unknown. *)
     | DefineStmt x ty (BuiltinOperation b args) =>
         (case eval_atoms st.scopes args of
            SOME vs =>
@@ -1452,28 +1590,10 @@ Definition simple_stmt_def:
                     | LocatedT _ (StructT s) => SOME (StructT s)
                     | _ => NONE) of
                 SOME cty =>
-                  (* The compiler's storage-to-storage copy returns at once
-                   * when the source is the destination. *)
-                  if (case (src, dst) of
-                        (StorageReference PersistentStorage src_addr src_slot 0 _ _,
-                         StorageReference PersistentStorage dst_addr dst_slot 0 _ _) =>
-                          src_addr = dst_addr ∧ src_slot = dst_slot
-                      | _ => F)
-                  then normal_result st gas else
-                  if st.frame.static_context then
-                    abrupt_result (InvalidCompletion "array copy in static frame") st gas
-                  else
-                  (* A memory source is read as the copy reaches it. *)
-                  (case (case src of
-                           MemoryReference _ _ => (INL (ReferenceValue src), st)
-                         | _ =>
-                             (case array_copy_value env 0 st cty src of
-                                (INL v, _, st1) => (INL v, st1)
-                              | (INR (c, _), _, st1) => (INR c, st1))) of
-                     (INL v, st1) =>
-                       (case copy_to_storage env cty v dst st.frame.static_context st1 of
-                          (INL _, st2) => normal_result st2 gas
-                        | (INR c, st2) => abrupt_result c st2 gas)
+                  (* The source is read as the copy reaches it. *)
+                  (case copy_to_storage env cty (ReferenceValue src) dst
+                          st.frame.static_context st of
+                     (INL _, st1) => normal_result st1 gas
                    | (INR c, st1) => abrupt_result c st1 gas)
               | NONE =>
                 case copy_byte_contents src dst st of
@@ -1554,6 +1674,16 @@ Definition assembly_value_def:
     | _ => NONE
 End
 
+Definition assembly_function_parts_def:
+  assembly_function_parts scopes x =
+    case lookup_binding x scopes of
+      SOME b =>
+        (case b.binding_value of
+           ScalarValue (ExternalFunctionValue addr selector) => SOME (addr, selector)
+         | _ => NONE)
+    | NONE => NONE
+End
+
 Definition assembly_reference_word_def:
   assembly_reference_word env (st : source_state) r =
     case r of
@@ -1561,9 +1691,13 @@ Definition assembly_reference_word_def:
         (case lookup_binding x st.scopes of
            SOME b =>
              (case b.binding_value of
-                ScalarValue s => scalar_word env ty s
+                ScalarValue s => memory_word env ty (ScalarValue s)
               | _ => NONE)
          | NONE => NONE)
+    | AssemblyFunctionAddress x =>
+        OPTION_MAP (w2n o FST) (assembly_function_parts st.scopes x)
+    | AssemblyFunctionSelector x =>
+        OPTION_MAP (num_of_be_bytes o SND) (assembly_function_parts st.scopes x)
     | AssemblySlot x =>
         OPTION_MAP (λv. w2n v.state_slot) (lookup_state_variable env x)
     | AssemblyOffset x =>
@@ -1600,7 +1734,7 @@ Definition assembly_reference_word_def:
          | NONE => NONE)
     | AssemblyConstant a ty =>
         (case eval_atom st.scopes a of
-           SOME (ScalarValue s) => scalar_word env ty s
+           SOME (ScalarValue s) => memory_word env ty (ScalarValue s)
          | _ => NONE)
     | AssemblyMemory x _ =>
         (case lookup_binding x st.scopes of
@@ -1623,6 +1757,8 @@ Definition assembly_inputs_def:
       (SOME w, SOME (scope, literals)) =>
         (case r of
            AssemblyLocal _ _ => SOME (scope |+ (name, n2w w), literals)
+         | AssemblyFunctionAddress _ => SOME (scope |+ (name, n2w w), literals)
+         | AssemblyFunctionSelector _ => SOME (scope |+ (name, n2w w), literals)
          | AssemblyPointerSlot _ => SOME (scope |+ (name, n2w w), literals)
          | AssemblyMemory _ _ => SOME (scope |+ (name, n2w w), literals)
          | AssemblyCalldataOffset _ => SOME (scope |+ (name, n2w w), literals)
@@ -1731,9 +1867,25 @@ Definition assembly_write_one_def:
              case assembly_value env ty (w2n w) of
                NONE => NONE
              | SOME s =>
-                 if scalar_word env ty s = SOME (w2n w) then
+                 if memory_word env ty (ScalarValue s) = SOME (w2n w) then
                    update_binding x (ScalarValue s) scopes
                  else NONE)
+    | AssemblyFunctionAddress x =>
+        (case (yul_lookup name yscopes, assembly_function_parts scopes x) of
+           (SOME w, SOME (_, selector)) =>
+             if w2n w < 2 ** 160 then
+               update_binding x (ScalarValue (ExternalFunctionValue (n2w (w2n w)) selector))
+                 scopes
+             else NONE
+         | _ => NONE)
+    | AssemblyFunctionSelector x =>
+        (case (yul_lookup name yscopes, assembly_function_parts scopes x) of
+           (SOME w, SOME (addr, _)) =>
+             if w2n w < 2 ** 32 then
+               update_binding x (ScalarValue (ExternalFunctionValue addr (num_to_bytes 4 (w2n w))))
+                 scopes
+             else NONE
+         | _ => NONE)
     | AssemblyMemory x ty =>
         (case yul_lookup name yscopes of
            SOME w => update_binding x (ReferenceValue (MemoryReference (w2n w) ty)) scopes
@@ -1809,11 +1961,15 @@ Definition assembly_calldata_ok_def:
 End
 
 Definition assembly_write_back_def:
-  (assembly_write_back env self [] scopes yscopes = SOME scopes) ∧
+  (assembly_write_back env self [] scopes yscopes = INL scopes) ∧
   (assembly_write_back env self (r :: refs) scopes yscopes =
     case assembly_write_one env self r scopes yscopes of
-      NONE => NONE
-    | SOME scopes' => assembly_write_back env self refs scopes' yscopes)
+      SOME scopes' => assembly_write_back env self refs scopes' yscopes
+    | NONE =>
+        INR (case SND r of
+               AssemblyFunctionAddress _ => "invalid assembly function address write-back"
+             | AssemblyFunctionSelector _ => "invalid assembly function selector write-back"
+             | _ => "assembly write-back failed"))
 End
 
 (* The return data after a block that exits normally. A non-empty buffer
@@ -1836,7 +1992,7 @@ Definition assembly_result_def:
       YulNormal =>
         (case assembly_write_back env st.frame.self_address refs st.scopes
                 r.machine.scopes of
-           SOME scopes =>
+           INL scopes =>
              if ¬assembly_calldata_ok env st.frame.call_data scopes refs then
                abrupt_result
                  (InvalidCompletion "assembly left a calldata reference outside the calldata")
@@ -1846,8 +2002,7 @@ Definition assembly_result_def:
                    memory := r.machine.memory;
                    memory_size := r.machine.memory_size;
                    return_data := assembly_return_data st r.machine |>) gas
-         | NONE =>
-             abrupt_result (InvalidCompletion "assembly write-back failed") st gas)
+         | INR reason => abrupt_result (InvalidCompletion reason) st gas)
     | YulReturn data =>
         abrupt_result (HaltCompletion data)
           (st with <| world := world; memory := r.machine.memory;
@@ -2045,6 +2200,7 @@ val () = cv_auto_trans write_target_def;
 val () = cv_auto_trans reset_target_def;
 val () = cv_auto_trans simple_stmt_def;
 val () = cv_auto_trans assembly_value_def;
+val () = cv_auto_trans assembly_function_parts_def;
 val () = cv_auto_trans assembly_reference_word_def;
 val () = cv_auto_trans assembly_inputs_def;
 val yul_substitute_expr_pre_def = cv_auto_trans_pre

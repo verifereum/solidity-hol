@@ -16,23 +16,23 @@ val () = holbuild_extra_deps [
   "../testdata/frontend/expected/fallback_params.json",
   "../testdata/frontend/expected/creation_argument.json",
   "../testdata/frontend/expected/function_type_limits.json",
-  "../testdata/frontend/expected/function_type_refused.json"
+  "../testdata/frontend/expected/external_function_limits.json"
 ]
 
 val prepared = #prepared (solidityPrepareLib.prepare_artifact
   {root = "..", path = "../testdata/frontend/expected/partial.json",
    source = "testdata/frontend/partial.sol"});
 
-(* add is supported; digest and the fallback use ripemd160, as does Mid.twice,
- * which Partial.twice reaches by super, so Partial.twice, digestTwice and
- * callsTwice call unsupported functions; the constructor's halting assembly
- * does not elaborate. Once Partial.twice is unsupported its super calls
+(* add is supported; digest, the fallback and Mid.twice use abi.encodeCall
+ * through a computed receiver. Partial.twice reaches Mid.twice by super,
+ * so Partial.twice, digestTwice and callsTwice call unsupported functions.
+ * The constructor's halting assembly elaborates: it deploys the halt's bytes.
+ * Once Partial.twice is unsupported its super calls
  * reach nothing, so neither Mid.twice nor Base.twice is among the
  * functions calls reach. The constant DIGITS and digits, which reads it,
  * elaborate through the shared fixed-byte indexed access;
  * pointer's assembly assigns a bytes local, which elaborates.
- * hookCount's struct has a function-typed member, so the struct is left out
- * and hookCount's local does not elaborate, while the unit still imports.
+ * hookCount's local struct holds an internal function value.
  * nodeValue's local and nodeCount's new array hold a recursive struct in
  * memory, which the core does not hold, and copyTree copies one in storage.
  * encodePair, emitPair and putPair take a memory struct across an ABI
@@ -59,25 +59,24 @@ fun elaboration_failure r =
   | NONE => false;
 fun elaboration_failure_with tag r =
   elaboration_failure r andalso String.isSubstring tag (valOf r);
-fun imported_failure r =
+fun computed_receiver_failure r =
   case r of
-    SOME m => not (String.isPrefix "calls" m) andalso not (elaboration_failure r)
+    SOME m => String.isSubstring "abi.encodeCall through a computed receiver is not supported" m
   | NONE => false;
 val () =
   if reasons "add" = [NONE] andalso
      reasons "total" = [] andalso
-     List.all imported_failure (reasons "digest") andalso
+     List.all computed_receiver_failure (reasons "digest") andalso
      length (reasons "digest") = 1 andalso
      length (reasons "") = 2 andalso
-     List.exists imported_failure (reasons "") andalso
-     List.exists elaboration_failure (reasons "") andalso
+     List.exists computed_receiver_failure (reasons "") andalso
+     List.exists (fn r => r = NONE) (reasons "") andalso
      reasons "digestTwice" = [calls_unsupported] andalso
      reasons "callsTwice" = [calls_unsupported] andalso
      reasons "twice" = [calls_unsupported] andalso
      reasons "digits" = [NONE] andalso
      reasons "pointer" = [NONE] andalso
-     List.all elaboration_failure (reasons "hookCount") andalso
-     length (reasons "hookCount") = 1 andalso
+     reasons "hookCount" = [NONE] andalso
      List.all elaboration_failure (reasons "nodeValue") andalso
      length (reasons "nodeValue") = 1 andalso
      List.all elaboration_failure (reasons "nodeCount") andalso
@@ -185,12 +184,13 @@ Proof
   CONV_TAC (LAND_CONV cv_eval) >> REFL_TAC
 QED
 
-(* The constructor is unsupported, so creation is refused. *)
-Theorem partial_creation_refused:
-  deploy_contract 1000 partial_program (differential_frame (n2w 0x1212) 0 [])
-    (differential_world empty_accounts) = ContractInvalid "unknown procedure"
+(* The constructor's assembly stop ends the creation with no data, so the
+ * contract deploys empty code. *)
+Theorem partial_creation_deploys_halt:
+  ∃w. deploy_contract 1000 partial_program (differential_frame (n2w 0x1212) 0 [])
+        (differential_world empty_accounts) = ContractReturned [] w
 Proof
-  CONV_TAC (LAND_CONV cv_eval) >> REFL_TAC
+  CONV_TAC (QUANT_CONV (LAND_CONV cv_eval)) >> simp[]
 QED
 
 (* A fallback taking the calldata as bytes and returning bytes
@@ -299,10 +299,8 @@ Proof
   CONV_TAC (QUANT_CONV (LAND_CONV cv_eval)) >> simp[]
 QED
 
-(* Function types the core does not model
- * (testdata/frontend/function_type_limits.sol): a comparison of function
- * values and a function value in inline assembly leave their functions
- * unsupported, while a local internal function value runs. *)
+(* Internal function values support local calls, equality and inline
+ * assembly references. Calldata structs still require ABI-encodable fields. *)
 val limits_prepared = #prepared (solidityPrepareLib.prepare_artifact
   {root = "..", path = "../testdata/frontend/expected/function_type_limits.json",
    source = "testdata/frontend/function_type_limits.sol"});
@@ -314,9 +312,12 @@ fun limits_reasons name =
 val () =
   if limits_reasons "local" = [NONE] andalso
      limits_reasons "inc" = [NONE] andalso
-     List.all elaboration_failure (limits_reasons "compares") andalso
-     List.all elaboration_failure (limits_reasons "inAssembly") andalso
-     length limits_outcomes = 4
+     limits_reasons "compares" = [NONE] andalso
+     limits_reasons "inAssembly" = [NONE] andalso
+     (case limits_reasons "fromCalldata" of
+        [SOME why] => String.isSubstring "unsupported declaration" why
+      | _ => false) andalso
+     length limits_outcomes = 5
   then ()
   else raise Fail ("unexpected function_type_limits outcomes: " ^
     String.concatWith "; " (map (fn (n, r) => n ^ " " ^
@@ -345,24 +346,30 @@ Proof
   CONV_TAC (QUANT_CONV (LAND_CONV cv_eval)) >> simp[] >> EVAL_TAC
 QED
 
-Theorem limits_compares_refused:
-  limits_call ^(listSyntax.mk_list (selector "df6b2ec9", “:word8”)) =
-  ContractInvalid "unknown procedure"
+Theorem limits_compares_runs:
+  ∃w. limits_call ^(listSyntax.mk_list (selector "df6b2ec9", “:word8”)) =
+      ContractReturned (word_to_bytes (1w : bytes32) T) w
 Proof
-  CONV_TAC (LAND_CONV cv_eval) >> REFL_TAC
+  CONV_TAC (QUANT_CONV (LAND_CONV cv_eval)) >> simp[] >> EVAL_TAC
 QED
 
-(* A function value in storage and an external function type parameter
- * (testdata/frontend/function_type_refused.sol) each refuse the whole unit:
- * the core models neither the storage layout nor the function's header. *)
+(* A function value can be called normally, while try/catch needs a named
+ * external declaration. A rejected function leaves the other entries intact. *)
+val external_limits_prepared = #prepared (solidityPrepareLib.prepare_artifact
+  {root = "..", path = "../testdata/frontend/expected/external_function_limits.json",
+   source = "testdata/frontend/external_function_limits.sol"});
+
+val external_limits_outcomes =
+  map (fn {name, reason, ...} => (name, reason)) (#functions external_limits_prepared);
+
 val () =
-  (ignore (solidityPrepareLib.prepare_artifact
-     {root = "..", path = "../testdata/frontend/expected/function_type_refused.json",
-      source = "testdata/frontend/function_type_refused.sol"});
-   raise Fail "function_type_refused unexpectedly prepared")
-  handle solidityPrepareLib.PreparationError
-           (solidityPrepareLib.UnsupportedImport, msg) =>
-    if String.isSubstring "unsupported state variable" msg andalso
-       String.isSubstring "external function types are not supported" msg
-    then ()
-    else raise Fail ("function_type_refused reason missing: " ^ msg);
+  if List.length external_limits_outcomes = 3 andalso
+     List.exists (fn item => item = ("readsStored", NONE)) external_limits_outcomes andalso
+     List.exists (fn item => item = ("callsExternal", NONE)) external_limits_outcomes andalso
+     List.exists (fn ("catchesExternal", SOME why) =>
+                      String.isSubstring "try/catch through an external function value" why
+                   | _ => false) external_limits_outcomes
+  then ()
+  else raise Fail ("unexpected external_function_limits outcomes: " ^
+    String.concatWith "; " (map (fn (n, r) => n ^ " " ^
+      (case r of SOME m => m | NONE => "supported")) external_limits_outcomes));

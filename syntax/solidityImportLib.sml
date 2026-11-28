@@ -169,6 +169,7 @@ val msg_id : IntInf.int = ~15
 val mulmod_id : IntInf.int = ~16
 val require_id : IntInf.int = ~18
 val revert_id : IntInf.int = ~19
+val selfdestruct_id : IntInf.int = ~21
 val tx_id : IntInf.int = ~26
 val this_id : IntInf.int = ~28
 
@@ -178,7 +179,10 @@ val builtin_functions : (IntInf.int * string * int * string) list =
   [(~5, "BlockhashBuiltin", 1, "blockhash takes one argument"),
    (~6, "EcrecoverBuiltin", 4, "ecrecover takes four arguments"),
    (~8, "Keccak256Builtin", 1, "keccak256 takes one argument"),
-   (~22, "Sha256Builtin", 1, "sha256 takes one argument")]
+   (~20, "Ripemd160Builtin", 1, "ripemd160 takes one argument"),
+   (~22, "Sha256Builtin", 1, "sha256 takes one argument"),
+   (~29, "BlobhashBuiltin", 1, "blobhash takes one argument"),
+   (~30, "Erc7201Builtin", 1, "erc7201 takes one argument")]
 
 (* The bytes of a hex string without prefix. *)
 fun hex_bytes v hex =
@@ -209,6 +213,7 @@ fun environment_field v base member =
        ((tx_id, "gasprice"), "TxGasPrice"), ((block_id, "number"), "BlockNumber"),
        ((block_id, "timestamp"), "BlockTimestamp"), ((block_id, "chainid"), "BlockChainId"),
        ((block_id, "coinbase"), "BlockCoinbase"), ((block_id, "basefee"), "BlockBaseFee"),
+       ((block_id, "blobbasefee"), "BlockBlobBaseFee"),
        ((block_id, "gaslimit"), "BlockGasLimit"),
        ((block_id, "prevrandao"), "BlockPrevRandao"),
        ((block_id, "difficulty"), "BlockPrevRandao")]
@@ -450,8 +455,9 @@ fun type_name v = guarded (fn _ => []) unsupported_type_name (fn v => within v (
            con "SrcArrayTypeName"
              [info v, type_name (field v "baseType"), mk_num (array_dimension v length)])
   | "FunctionTypeName" =>
-      (require v (string_field v "visibility" = "internal")
-         "external function types are not supported";
+      (require v (List.exists (fn vis => vis = string_field v "visibility")
+                     ["internal", "external"])
+         "unsupported function type visibility";
        con "SrcFunctionTypeName" [info v, type_id v])
   | other => fail (describe v ^ ": unsupported type name " ^ other))) v
 
@@ -527,11 +533,17 @@ fun error_declaration v id =
            ("error_parameters", #2 (parameter_list (field d "parameters")))])
   | NONE => fail (describe v ^ ": reverts only with errors declared in the compilation")
 
-(* A call of an external function of a contract or interface value. *)
-fun is_external_call callee =
+fun has_external_function_type e =
+  String.isPrefix "t_function_external_" (raw_type_id e)
+
+(* A declared external member of a contract or interface receiver. *)
+fun is_external_member callee =
   node_type callee = "MemberAccess" andalso
-  String.isPrefix "t_function_external_"
-    (string_field (field callee "typeDescriptions") "typeIdentifier")
+  has_external_function_type callee andalso
+  String.isPrefix "t_contract$_" (raw_type_id (field callee "expression"))
+
+fun has_dynamic_selector base =
+  has_external_function_type base andalso not (is_external_member base)
 
 (* a.call, a.staticcall or a.delegatecall, as a callee: the address member,
  * not a function attached to addresses by using for. Its low_level_kind. *)
@@ -609,22 +621,25 @@ fun contract_declaration v id =
     SOME (_, c) => c
   | NONE => fail (describe v ^ ": unknown contract " ^ IntInf.toString id)
 
-(* The creation bytecode of contract id, fully linked and nonempty, as hex. *)
-fun creation_code v id =
+(* The creation ("bytecode") or runtime ("deployedBytecode") code of contract
+ * id, fully linked and nonempty, as hex. *)
+fun contract_code kind v id =
   let
+    val name = if kind = "bytecode" then "creation bytecode" else "runtime bytecode"
     val output = case List.find (fn (i, _) => i = id) (!creation_outputs) of
                    SOME (_, c) => c
-                 | NONE => fail (describe v ^ ": no creation bytecode")
-    val bytecode = field (field output "evm") "bytecode"
+                 | NONE => fail (describe v ^ ": no " ^ name)
+    val bytecode = field (field output "evm") kind
     val () = require v
       (case optional_field bytecode "linkReferences" of
          NONE => true | SOME refs => null (object refs))
-      "creation bytecode has unresolved links"
+      (name ^ " has unresolved links")
     val code = string_field bytecode "object"
-    val () = require v (code <> "") "empty creation bytecode"
+    val () = require v (code <> "") ("empty " ^ name)
   in
     code
   end
+val creation_code = contract_code "bytecode"
 
 (* type(I).interfaceId, which solc has only for an interface or an abstract
  * contract: the XOR of the selectors of the external functions and public
@@ -771,13 +786,12 @@ fun check_using d = within d (fn d =>
               | NONE => false))
     "using directive has no library or nonempty function list")
 
-(* A type-valued expression without its parentheses: (T) is a one-component
- * tuple around T, and denotes T. *)
-fun unparenthesized_type v =
+(* A parenthesized expression is a one-component tuple around its operand. *)
+fun unparenthesized v =
   if node_type v = "TupleExpression" andalso not (bool_field v "isInlineArray") then
     case JSONUtil.arrayMap I (field v "components") of
       [JSON.NULL] => v
-    | [c] => unparenthesized_type c
+    | [c] => unparenthesized c
     | _ => v
   else v
 
@@ -817,7 +831,7 @@ fun operator_call v args =
        ("node_location", location v)]
   in
     con "SrcFunctionCall"
-      [info v, con "SrcIdentifier"
+      [info v, F, con "SrcIdentifier"
          [callee_info, mk_str (string_field f "name"), mk_num id,
           mk_str (normalize_type_id tid)],
        listSyntax.mk_list (args, expr_ty), listSyntax.mk_nil numSyntax.num, type_id v]
@@ -842,16 +856,14 @@ fun is_base_member v =
 
 (* C.v names the variable v through a contract name: it is v itself, as
  * variables are not virtual, and its receiver has no runtime evaluation. *)
-fun is_contract_variable_member v =
-  node_type v = "MemberAccess" andalso
-  String.isPrefix "t_type$_t_contract$_" (raw_type_id (field v "expression")) andalso
-  unevaluated_receiver (field v "expression") andalso
-  (case optional_field v "referencedDeclaration" of
-     SOME d =>
-       (case List.find (fn (i, _) => i = JSONUtil.asIntInf d) (!selector_declarations) of
-          SOME (_, n) => node_type n = "VariableDeclaration"
-        | NONE => false)
-   | NONE => false)
+fun contract_variable_member v id =
+  let val receiver = field v "expression" in
+    if String.isPrefix "t_type$_t_contract$_" (raw_type_id receiver) andalso
+       unevaluated_receiver receiver then
+      Option.map #2 (List.find (fn (i, d) =>
+        i = id andalso node_type d = "VariableDeclaration") (!selector_declarations))
+    else NONE
+  end
 
 fun is_attached v =
   String.isSubstring "_$attached_to$_"
@@ -889,8 +901,9 @@ val expression_kinds =
 fun is_expression v =
   List.exists (fn k => k = node_type v) expression_kinds handle _ => false
 
-(* type(C).interfaceId, a selector; type(C).name and type(C).creationCode, a
- * string or bytes literal converted to memory, as solc copies them there. *)
+(* type(C).interfaceId, a selector; type(C).name, a string literal converted
+ * to memory, as solc copies it there; type(C).creationCode and runtimeCode,
+ * the code. *)
 fun contract_type_member v base arg =
   let
     val id = int_field arg "referencedDeclaration"
@@ -911,8 +924,10 @@ fun contract_type_member v base arg =
         con "SrcSelector" [info v, interface_id v id, mk_opt expr_ty NONE, type_id v]
     | "name" => literal "string" (string_field (contract_declaration v id) "name") "string"
     | "creationCode" =>
-        literal "hexString"
-          (String.implode (map Char.chr (hex_bytes v (creation_code v id)))) "bytes"
+        con "SrcContractCode" [info v, mk_bytes v (creation_code v id), type_id v]
+    | "runtimeCode" =>
+        con "SrcContractCode"
+          [info v, mk_bytes v (contract_code "deployedBytecode" v id), type_id v]
     | member => fail (describe v ^ ": unsupported contract type member " ^ member)
   end
 
@@ -945,18 +960,27 @@ fun expr v = guarded (fn e => [ExprChild e]) unsupported_expr (fn v => within v 
                   [info v, con "SrcEnumTypeName" [info (field v "expression"), mk_num enum],
                    mk_num (IntInf.fromInt index), type_id v]
             | NONE =>
-           if is_library_member v orelse is_contract_variable_member v then
-             (if is_attached v then
-                (ignore (expr (field v "expression"));
-                 fail (describe v ^ ": an attached function is supported only as a callee"))
-              else ();
-              con "SrcIdentifier"
-                [info v, mk_str (string_field v "memberName"),
-                 mk_num (JSONUtil.asIntInf declaration), type_id v])
-           else
-           con "SrcMemberAccess"
-             [info v, expr (field v "expression"),
-              mk_num (JSONUtil.asIntInf declaration), type_id v])
+              let
+                val id = JSONUtil.asIntInf declaration
+                val variable = contract_variable_member v id
+                val () = Option.app (fn d =>
+                  require v (has_external_function_type d = has_external_function_type v)
+                    "contract variable function type annotation mismatch") variable
+              in
+                if is_external_member v then
+                  con "SrcExternalFunction"
+                    [info v, expr (field v "expression"), selector_bytes v v, type_id v]
+                else if is_library_member v orelse isSome variable then
+                  (if is_attached v then
+                     (ignore (expr (field v "expression"));
+                      fail (describe v ^ ": an attached function is supported only as a callee"))
+                   else ();
+                   con "SrcIdentifier"
+                     [info v, mk_str (string_field v "memberName"), mk_num id, type_id v])
+                else
+                  con "SrcMemberAccess"
+                    [info v, expr (field v "expression"), mk_num id, type_id v]
+              end)
        | NONE =>
            let val base = field v "expression" in
            if node_type base = "Identifier" andalso
@@ -971,7 +995,7 @@ fun expr v = guarded (fn e => [ExprChild e]) unsupported_expr (fn v => within v 
                    string_field (field base "expression") "name" = "type" andalso
                    int_field (field base "expression") "referencedDeclaration" < 0
            then
-             (case map unparenthesized_type (JSONUtil.arrayMap I (field base "arguments")) of
+             (case map unparenthesized (JSONUtil.arrayMap I (field base "arguments")) of
                 [arg] =>
                   if String.isPrefix "t_type$_t_contract$_" (raw_type_id arg) then
                     contract_type_member v base arg
@@ -1001,6 +1025,14 @@ fun expr v = guarded (fn e => [ExprChild e]) unsupported_expr (fn v => within v 
            else if String.isPrefix "t_struct$_"
                  (string_field (field (field v "expression") "typeDescriptions") "typeIdentifier")
             then raise MalformedInput (describe v ^ ": missing struct field declaration")
+            else if (string_field v "memberName" = "address" andalso
+                     has_external_function_type base) orelse
+                    (is_selector v andalso has_dynamic_selector base) then
+              con "SrcFunctionMember"
+                [info v, prim_mk_const {Thy = "solidityCore", Name =
+                   if string_field v "memberName" = "address"
+                   then "FunctionAddress" else "FunctionSelector"},
+                 expr base, type_id v]
             else if string_field v "memberName" = "selector" then
               con "SrcSelector"
                 [info v,
@@ -1130,7 +1162,12 @@ fun expr v = guarded (fn e => [ExprChild e]) unsupported_expr (fn v => within v 
       end
   | "FunctionCall" =>
       let
-        val callee = field v "expression"
+        val written_callee = field v "expression"
+        val callee = unparenthesized written_callee
+        (* A parenthesized declaration still resolves the target and names
+         * its parameters, but solc invokes it through the dispatch. *)
+        val through_value =
+          if int_field written_callee "id" = int_field callee "id" then F else T
         val abi_member =
           node_type callee = "MemberAccess" andalso
           node_type (field callee "expression") = "Identifier" andalso
@@ -1188,8 +1225,17 @@ fun expr v = guarded (fn e => [ExprChild e]) unsupported_expr (fn v => within v 
               (positional (); wrap_call v callee args)
             else if is_external_library_call callee then
               library_call v callee args
-            else if is_external_call callee orelse
-               node_type callee = "FunctionCallOptions" then
+            else if is_external_member (unparenthesized (options_target callee)) then
+              external_call v callee args
+            else if has_external_function_type (unparenthesized (options_target callee)) then
+              (positional ();
+               let val options = call_options false callee in
+                 con "SrcExternalFunctionCall"
+                   [info v, expr (unparenthesized (options_target callee)),
+                    listSyntax.mk_list (map #1 options, call_option_ty),
+                    listSyntax.mk_list (map #2 options @ args, expr_ty), type_id v]
+               end)
+            else if node_type callee = "FunctionCallOptions" then
               external_call v callee args
             else if isSome (builtin_function callee) then
               let val (_, name, arity, msg) = valOf (builtin_function callee) in
@@ -1228,6 +1274,15 @@ fun expr v = guarded (fn e => [ExprChild e]) unsupported_expr (fn v => within v 
                   listSyntax.mk_list (args, expr_ty), type_id v])
             else if abi_member then
               (positional (); abi_encode v callee args)
+            else if node_type callee = "Identifier" andalso
+               int_field callee "referencedDeclaration" = selfdestruct_id then
+              (positional ();
+               require v (length args = 1) "selfdestruct takes one argument";
+               con "SrcBuiltinCall"
+                 [info v, info callee,
+                  prim_mk_const {Thy = "solidityImport", Name = "SelfDestructBuiltin"},
+                  optionSyntax.mk_some (hd args),
+                  optionSyntax.mk_none expr_ty, type_id v])
             else if node_type callee = "Identifier" andalso
                int_field callee "referencedDeclaration" = ~7 then
               (positional ();
@@ -1274,13 +1329,13 @@ fun expr v = guarded (fn e => [ExprChild e]) unsupported_expr (fn v => within v 
                 if List.exists (fn x => x = r) (!super_calls) then ()
                 else super_calls := !super_calls @ [r];
                 con "SrcSuperCall"
-                  [info v, mk_num r, listSyntax.mk_list (args, expr_ty),
+                  [info v, through_value, mk_num r, listSyntax.mk_list (args, expr_ty),
                    argument_order v r 0, type_id v]
               end
             else if is_base_member callee then
               let val r = int_field callee "referencedDeclaration" in
                 con "SrcBaseCall"
-                  [info v, mk_num r, listSyntax.mk_list (args, expr_ty),
+                  [info v, through_value, mk_num r, listSyntax.mk_list (args, expr_ty),
                    argument_order v r 0, type_id v]
               end
             else if is_library_member callee andalso is_attached callee then
@@ -1288,7 +1343,7 @@ fun expr v = guarded (fn e => [ExprChild e]) unsupported_expr (fn v => within v 
                * evaluation/conversion schedule after it becomes argument 0. *)
               let val receiver = expr (field callee "expression") in
                 con "SrcFunctionCall"
-                  [info v,
+                  [info v, through_value,
                    con "SrcIdentifier"
                      [info callee, mk_str (string_field callee "memberName"),
                       mk_num (int_field callee "referencedDeclaration"),
@@ -1298,13 +1353,13 @@ fun expr v = guarded (fn e => [ExprChild e]) unsupported_expr (fn v => within v 
                    type_id v]
               end
             else con "SrcFunctionCall"
-              [info v, expr callee, listSyntax.mk_list (args, expr_ty),
+              [info v, through_value, expr callee, listSyntax.mk_list (args, expr_ty),
                case optional_field callee "referencedDeclaration" of
                  SOME _ => argument_order v (int_field callee "referencedDeclaration") 0
                | NONE => (positional (); listSyntax.mk_nil numSyntax.num),
                type_id v]
         | "typeConversion" =>
-            let val callee = unparenthesized_type callee in
+            let val callee = unparenthesized callee in
             (positional ();
              require v (length args = 1) "a conversion takes one argument";
              if String.isPrefix "t_type$_t_contract$_" (raw_type_id callee) then
@@ -1324,7 +1379,7 @@ fun expr v = guarded (fn e => [ExprChild e]) unsupported_expr (fn v => within v 
                    type_id v]))
             end
         | "structConstructorCall" =>
-            let val s = int_field (unparenthesized_type callee) "referencedDeclaration" in
+            let val s = int_field (unparenthesized callee) "referencedDeclaration" in
               con "SrcStructConstructor"
                 [info v, mk_num s, listSyntax.mk_list (args, expr_ty),
                  argument_order v s 0, type_id v]
@@ -1339,7 +1394,7 @@ fun expr v = guarded (fn e => [ExprChild e]) unsupported_expr (fn v => within v 
 and wrap_call v callee args =
   let
     val (nominal, ty) =
-      case value_type_expression (unparenthesized_type (field callee "expression")) of
+      case value_type_expression (unparenthesized (field callee "expression")) of
         SOME pair => pair
       | NONE => fail (describe v ^ ": wrap/unwrap requires a user-defined value type")
     val member = string_field callee "memberName"
@@ -1359,8 +1414,7 @@ and wrap_call v callee args =
   end
 
 (* abi.encode, abi.encodePacked, abi.encodeWithSelector and
- * abi.encodeWithSignature of a literal signature; the signature's bytes are
- * taken from the literal, which is not kept as an argument. *)
+ * abi.encodeWithSignature; the selector or signature is the first argument. *)
 and abi_encode v callee args =
   if string_field callee "memberName" = "encodeCall" then abi_encode_call v callee else
   let
@@ -1369,19 +1423,8 @@ and abi_encode v callee args =
         "encode" => con "AbiPlain" []
       | "encodePacked" => con "AbiPacked" []
       | "encodeWithSelector" => con "AbiWithSelector" []
-      | "encodeWithSignature" =>
-          let
-            val sig_node = hd (JSONUtil.arrayMap I (field v "arguments"))
-              handle Empty => fail (describe v ^ ": encodeWithSignature takes a signature")
-          in
-            require v (node_type sig_node = "Literal" andalso
-                       string_field sig_node "kind" = "string")
-              "abi.encodeWithSignature of a non-literal signature is not supported";
-            con "AbiWithSignature" [mk_bytes sig_node (string_field sig_node "hexValue")]
-          end
+      | "encodeWithSignature" => con "AbiWithSignature" []
       | member => fail (describe v ^ ": unsupported abi." ^ member)
-    val args =
-      if string_field callee "memberName" = "encodeWithSignature" then tl args else args
   in
     con "SrcAbiEncode"
       [info v, info callee, form, listSyntax.mk_list (args, expr_ty), type_id v]
@@ -1405,7 +1448,7 @@ and abi_decode_call v callee args =
       case c of
         JSON.NULL => NONE
       | _ =>
-        let val c = unparenthesized_type c in
+        let val c = unparenthesized c in
         case node_type c of
           "ElementaryTypeNameExpression" => SOME (type_name (field c "typeName"))
         | "IndexAccess" =>
@@ -1568,15 +1611,14 @@ and low_level_call v callee args =
 (* c.f{value: v, gas: g}(args), with c of a contract type. *)
 and external_call v callee args =
   let
-    val member = options_target callee
-    val target = Option.map expr (optional_field member "expression")
+    val member = unparenthesized (options_target callee)
+    val direct = is_external_member member
+    val target = expr (if direct then field member "expression" else member)
     val options = call_options false callee
-    val () = require member (is_external_call member)
-               "unsupported call options"
-    val () =
-      within (field member "expression") (fn b =>
-        require b (String.isPrefix "t_contract$_" (raw_type_id b))
-          "external calls only on contract-typed values")
+    val () = require member direct
+               (if has_external_function_type member andalso bool_field v "tryCall"
+                then "try/catch through an external function value"
+                else "unsupported call options")
   in
     con "SrcExternalCall"
       [info v,
@@ -1586,7 +1628,7 @@ and external_call v callee args =
             SOME (_, d) => d
           | NONE => fail (describe member ^ ": calls only declarations in the compilation")),
        listSyntax.mk_list (map #1 options, call_option_ty),
-       listSyntax.mk_list (valOf target :: map #2 options @ args, expr_ty),
+       listSyntax.mk_list (target :: map #2 options @ args, expr_ty),
        argument_order v (int_field member "referencedDeclaration") 0,
        type_id v]
   end
@@ -1646,8 +1688,7 @@ fun optional_expr v k =
 (* An inline assembly block's code, and the Solidity variables it names. The
  * compiler lists each use of one in externalReferences, by the source range
  * of the identifier naming it, so the name comes from the identifier at that
- * range. A suffix other than slot, offset and length (address, selector) is
- * a reference this semantics does not read.
+ * range.
  *)
 fun yul_identifiers v =
   case v of
@@ -1687,6 +1728,8 @@ fun inline_assembly v =
           | SOME (JSON.STRING "slot") => "SrcAssemblySlot"
           | SOME (JSON.STRING "offset") => "SrcAssemblyOffset"
           | SOME (JSON.STRING "length") => "SrcAssemblyLength"
+          | SOME (JSON.STRING "address") => "SrcAssemblyFunctionAddress"
+          | SOME (JSON.STRING "selector") => "SrcAssemblyFunctionSelector"
           | SOME _ => fail (describe v ^ ": unsupported reference " ^ name)
       in
         (name, con kind [decl])
@@ -1774,7 +1817,12 @@ fun stmt v = guarded (fn st => [StmtChild st]) unsupported_stmt (fn v => within 
             "try supports only external function calls")
         val (imported, call_failure) =
           if isSome try_call
-          then attempt (fn () => external_call call (field call "expression") args)
+          then attempt (fn () =>
+            let val callee = field call "expression" in
+              if node_type (options_target callee) = "NewExpression"
+              then creation_call call callee args
+              else external_call call callee args
+            end)
           else (NONE, [])
         fun clause_parameters c =
           case optional_field c "parameters" of
@@ -2074,9 +2122,11 @@ fun super_members (v as JSON.OBJECT fields) =
 (* Only a call executes a static member; f.selector does not. *)
 fun static_references (v as JSON.OBJECT fields) =
       (if JSONUtil.testField "nodeType"
-            (fn JSON.STRING s => s = "FunctionCall" | _ => false) v andalso
-          is_base_member (field v "expression")
-       then [int_field (field v "expression") "referencedDeclaration"] else []) @
+            (fn JSON.STRING s => s = "FunctionCall" | _ => false) v then
+         let val callee = unparenthesized (field v "expression") in
+           if is_base_member callee then [int_field callee "referencedDeclaration"] else []
+         end
+       else []) @
       List.concat (map (static_references o #2) fields)
   | static_references (JSON.ARRAY vs) = List.concat (map static_references vs)
   | static_references _ = []
@@ -2092,12 +2142,15 @@ fun is_delegate_call_reference v =
 (* The declarations the nodes of v refer to; when internal, without the
  * callee of a delegate call, which runs as the linked library's code. *)
 fun declaration_references internal (v as JSON.OBJECT fields) =
-      (* Only a selector's computed receiver executes, not the function it
-       * names. Include that receiver's helper and constant dependencies. *)
+      (* A function value is evaluated to read its selector. A declared
+       * selector comes from the declaration and only evaluates its receiver. *)
       if is_selector v then
-        (case selector_receiver (field v "expression") of
-           SOME receiver => declaration_references internal receiver
-         | NONE => [])
+        let val base = field v "expression" in
+          if has_dynamic_selector base then declaration_references internal base
+          else case selector_receiver base of
+                 SOME receiver => declaration_references internal receiver
+               | NONE => []
+        end
       else if JSONUtil.testField "nodeType"
            (fn JSON.STRING s => s = "UsingForDirective" | _ => false) v
       then [] else

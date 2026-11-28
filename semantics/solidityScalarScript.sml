@@ -328,7 +328,7 @@ End
  * conversions are big-endian re-encodings between equal sizes. Conversion to
  * an enum panics with 0x21 when out of range, even in unchecked mode.
  * User-defined value types share their underlying representation, and an
- * internal function value is the same under every mutability.
+ * external or internal function value keeps its representation under mutability conversion.
  *)
 Definition convert_scalar_def:
   convert_scalar env dst s =
@@ -353,7 +353,8 @@ Definition convert_scalar_def:
          | NONE => ScalarInvalid)
     | (UserValueT _, _) => ScalarOk s
     | (BoolT, BoolValue _) => ScalarOk s
-    | (FunctionT _ _ _ _, InternalFunctionValue _) => ScalarOk s
+    | (FunctionT InternalFn _ _ _, InternalFunctionValue _) => ScalarOk s
+    | (FunctionT ExternalFn _ _ _, ExternalFunctionValue _ _) => ScalarOk s
     | _ => ScalarInvalid
 End
 

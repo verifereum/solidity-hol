@@ -264,7 +264,7 @@ QED
 Definition external_call_body_def:
   external_call_body kind value = [
     DefineStmt (AstId 82) (SingleType u256)
-      (ExternalCallOperation kind [1w; 2w; 3w; 4w] [u256] [u256]
+      (ExternalCallOperation kind (ConstantAtom (BytesValue [1w; 2w; 3w; 4w])) [u256] [u256]
          (ConstantAtom (AddressValue 0x5000w)) value NONE
          [BoundAtom (AstId 80)])]
 End
@@ -282,7 +282,7 @@ Theorem external_byte_sequence_memory_results_accepted:
   EVERY (λelement.
     wf_core_procedure test_env (with_body [
       DefineStmt (AstId 82) (SingleType (LocatedT MemoryLoc element))
-        (ExternalCallOperation ExternalCall [1w; 2w; 3w; 4w] []
+        (ExternalCallOperation ExternalCall (ConstantAtom (BytesValue [1w; 2w; 3w; 4w])) []
           [LocatedT MemoryLoc element]
           (ConstantAtom (AddressValue 0x5000w))
           (ConstantAtom (IntegerValue 0)) NONE [])])) [BytesT; StringT]
@@ -294,7 +294,7 @@ Theorem external_byte_sequence_calldata_results_rejected:
   EVERY (λelement.
     ¬wf_core_procedure test_env (with_body [
       DefineStmt (AstId 82) (SingleType (LocatedT CalldataLoc element))
-        (ExternalCallOperation ExternalCall [1w; 2w; 3w; 4w] []
+        (ExternalCallOperation ExternalCall (ConstantAtom (BytesValue [1w; 2w; 3w; 4w])) []
           [LocatedT CalldataLoc element]
           (ConstantAtom (AddressValue 0x5000w))
           (ConstantAtom (IntegerValue 0)) NONE [])])) [BytesT; StringT]
@@ -361,7 +361,7 @@ QED
 Theorem external_call_gas_option_accepted:
   wf_core_procedure test_env (with_body [
     DefineStmt (AstId 82) (SingleType u256)
-      (ExternalCallOperation ExternalCall [1w; 2w; 3w; 4w] [u256] [u256]
+      (ExternalCallOperation ExternalCall (ConstantAtom (BytesValue [1w; 2w; 3w; 4w])) [u256] [u256]
          (ConstantAtom (AddressValue 0x5000w)) (ConstantAtom (IntegerValue 0))
          (SOME (BoundAtom (AstId 80))) [BoundAtom (AstId 80)])])
 Proof
@@ -525,9 +525,10 @@ Proof
   EVAL_TAC
 QED
 
-Theorem external_function_parameter_rejected:
-  ¬wf_core_procedure test_env
-     (with_body [] with parameters := [(AstId 80, FunctionT ExternalFn PureMut [] [])])
+Theorem external_function_parameter_accepted:
+  EVERY (λm. wf_core_procedure test_env
+     (with_body [] with parameters := [(AstId 80, FunctionT ExternalFn m [] [])]))
+    [PureMut; ViewMut; NonpayableMut; PayableMut]
 Proof
   EVAL_TAC
 QED
@@ -1398,7 +1399,13 @@ Theorem packed_array_shape_checked:
   packed_type (LocatedT MemoryLoc (ArrayT (IntT 16) (SOME 2))) ∧
   packed_type (LocatedT MemoryLoc (ArrayT (FixedBytesT 2) NONE)) ∧
   ¬packed_type (LocatedT MemoryLoc (ArrayT (UintT 8) (SOME 0))) ∧
+  packed_type (LocatedT MemoryLoc (ArrayT (ArrayT (UintT 8) (SOME 2)) NONE)) ∧
+  packed_type (LocatedT MemoryLoc
+    (ArrayT (ArrayT (ArrayT (FixedBytesT 3) (SOME 2)) (SOME 2)) (SOME 1))) ∧
+  ¬packed_type (LocatedT MemoryLoc (ArrayT (ArrayT (UintT 8) (SOME 0)) NONE)) ∧
   ¬packed_type (LocatedT MemoryLoc (ArrayT (ArrayT (UintT 8) NONE) NONE)) ∧
+  ¬packed_type (LocatedT MemoryLoc (ArrayT (ArrayT (UintT 8) NONE) (SOME 2))) ∧
+  ¬packed_type (LocatedT MemoryLoc (ArrayT (ArrayT (StructT (AstId 1)) (SOME 2)) NONE)) ∧
   ¬packed_type (LocatedT MemoryLoc (ArrayT BytesT NONE)) ∧
   ¬packed_type (LocatedT MemoryLoc (StructT (AstId 1)))
 Proof

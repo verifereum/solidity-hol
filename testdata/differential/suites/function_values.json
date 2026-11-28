@@ -1,0 +1,204 @@
+{
+  "name": "function_values",
+  "source": "testdata/differential/function_values.sol",
+  "contract": "FunctionValues",
+  "artifact": "testdata/differential/expected/function_values.json",
+  "cases": [
+    {
+      "name": "constructor_dispatches_parenthesized_callee_and_packs_id",
+      "deploy": true,
+      "args": [
+        3
+      ],
+      "expect": {
+        "return": []
+      },
+      "final_storage": {
+        "0": "42501298345826806924295"
+      }
+    },
+    {
+      "name": "call_packed_constructor_value",
+      "function": "readPacked",
+      "args": [
+        5
+      ],
+      "expect": {
+        "return": [
+          7,
+          6,
+          9
+        ]
+      },
+      "storage": {
+        "0": "42501298345826806924295"
+      },
+      "final_storage": {
+        "0": "42501298345826806924295"
+      }
+    },
+    {
+      "name": "uninitialized_storage_pointer_panics",
+      "function": "readUnset",
+      "args": [
+        5
+      ],
+      "expect": {
+        "panic": "0x51"
+      }
+    },
+    {
+      "name": "delete_preserves_adjacent_values",
+      "function": "clear",
+      "args": [],
+      "expect": {
+        "return": [
+          7,
+          true,
+          9
+        ]
+      },
+      "storage": {
+        "0": "42501298345826806924295"
+      },
+      "final_storage": {
+        "0": "42501298345826806923271"
+      }
+    },
+    {
+      "name": "storage_struct_array_and_mapping",
+      "function": "writeAggregates",
+      "args": [
+        5
+      ],
+      "expect": {
+        "return": [
+          6,
+          6,
+          10,
+          6
+        ]
+      },
+      "final_storage": {
+        "1": "1027",
+        "2": "2",
+        "29102676481673041902632991033461445430619272659676223336789171408008386403022": "92233720368547758084",
+        "92167397554250848837249875385363347950516434462644014474241869555464797459887": "4"
+      }
+    },
+    {
+      "name": "memory_array_and_struct",
+      "function": "memoryAggregates",
+      "args": [
+        5
+      ],
+      "expect": {
+        "return": [
+          10,
+          6
+        ]
+      }
+    },
+    {
+      "name": "transient_pointer",
+      "function": "transientValue",
+      "args": [
+        5
+      ],
+      "expect": {
+        "return": [
+          10
+        ]
+      },
+      "final_storage": {
+        "0": "0"
+      }
+    },
+    {
+      "name": "higher_order_call_and_equality",
+      "function": "higherOrder",
+      "args": [
+        5
+      ],
+      "expect": {
+        "return": [
+          true,
+          true,
+          false,
+          false,
+          10
+        ]
+      }
+    },
+    {
+      "name": "assembly_round_trips_dispatch_id",
+      "function": "assemblyValue",
+      "args": [
+        5,
+        false
+      ],
+      "expect": {
+        "return": [
+          6
+        ]
+      }
+    },
+    {
+      "name": "assembly_preserves_unassigned_full_word",
+      "function": "assemblyValue",
+      "args": [
+        5,
+        true
+      ],
+      "expect": {
+        "panic": "0x51"
+      }
+    },
+    {
+      "name": "dirty_word_preserves_memory_and_narrows_in_storage",
+      "function": "dirtyWord",
+      "args": [
+        5
+      ],
+      "expect": {
+        "return": [
+          57896044618658097711785492504343953926634992332820282019728792003956564819972,
+          7,
+          6,
+          9
+        ]
+      },
+      "storage": {
+        "0": "42501298345826806924551"
+      },
+      "final_storage": {
+        "0": "42501298345826806924295"
+      }
+    },
+    {
+      "name": "parenthesized_named_base_callee",
+      "function": "qualified",
+      "args": [
+        5
+      ],
+      "expect": {
+        "return": [
+          13,
+          53
+        ]
+      }
+    },
+    {
+      "name": "parenthesized_attached_callee",
+      "function": "attached",
+      "args": [
+        5
+      ],
+      "expect": {
+        "return": [
+          10
+        ]
+      }
+    }
+  ]
+}

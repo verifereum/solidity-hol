@@ -185,9 +185,8 @@ encoding the resulting value reproduces that exact word. Non-canonical
 words are sign-extended and fixed-byte words are left-aligned. An enum local
 is its member's index, and a word past the last member fails closed where
 solc would panic or keep the dirty word; a user-defined value type local is
-its underlying type's word (`assembly_library_forms.sol`). Internal function
-type locals are rejected: their word is a code location the source does not
-have.
+its underlying type's word (`assembly_library_forms.sol`). An internal
+function local holds the full dispatch word (`function_values.sol`).
 
 Inline assembly reads a storage pointer local's `x.slot` and `x.offset` as
 its reference's slot and offset (`assembly_pointers.sol`). Assigning `x.slot`,
@@ -223,20 +222,17 @@ of the words it reads (`bool` normalised, integers and addresses masked or
 sign-extended, `bytesN` high-masked, an out-of-range enum Panic `0x21`).
 Under the pinned profile (via-IR, optimizer off) the free memory pointer
 starts at `0x80`, past a creation frame's reserved immutable words, where the
-model's does; the `memory_images` suite compares it byte for byte. An internal function pointer's word
-is the function's number in the compiler's internal dispatch, which the
-importer reads from `ContractDefinition.internalFunctionIDs` in the analyzed
-AST, and 0 for the zero value. A word no function has reads as itself and
-panics with 0x51 when called, as the compiler's internal dispatch does; a word
-of a function of another type fails closed. The creation code's dispatch
-holds only the functions named as values in the creation code and in every
-function that code calls or names as a value, transitively, whether or not
-that code runs (bare references and discarded tuple components included);
-a function creation only calls directly is not in it. The model's dispatch
-is the same: a constructor calling through a word that assembly set to a
-function outside it panics with 0x51. A constructor keeps the
-immutables only in their reserved words, as the compiled constructor does: it
-reads them from there with the same cleanup, and the created contract's
+model's does; the `memory_images` suite compares it byte for byte. An internal
+function pointer holds the function's number in the compiler's dispatch table,
+read from `ContractDefinition.internalFunctionIDs` in the analyzed AST. The
+zero value holds 0. Persistent and transient storage pack the low eight bytes.
+Memory and inline assembly preserve the full word. An unassigned word is
+preserved and panics with 0x51 when called. A word that names a function with
+a different signature fails closed. The creation dispatch includes functions
+named as values by creation code or any function it reaches, including bare
+references, discarded tuple components and parenthesized declaration callees.
+Calling through a word outside that dispatch during creation panics with 0x51.
+A constructor keeps the immutables in their reserved words. It reads them from there with the same cleanup, and the created contract's
 immutables are those words when it ends; a word its immutable's type cannot
 hold (one assembly left dirty) fails closed.
 
@@ -411,7 +407,10 @@ constructor may read it and assign it, as the compiler allows. Creation
 reserves 32 bytes of memory per immutable above the free-memory pointer, as
 the compiler's creation code does, and `deploy_contract` returns the final
 table; `call_contract` takes the table, which with the program stands for the
-deployed code. The differential harness compares a creation's table with the
+deployed code. A constructor whose inline assembly halts (`return`, `stop`)
+instead returns the halt's bytes, which are the deployed code, as the EVM
+installs a creation's output; bytes the EVM refuses (a first byte `0xEF`, or
+more than its code size limit) abort the creation. The differential harness compares a creation's table with the
 words the compiler's created code holds at its `immutableReferences` offsets,
 and patches a call case's immutables into the runtime bytecode there. The
 harness encodes no internal function values, so a fixture's function
@@ -423,9 +422,13 @@ run time, stored and ABI encoded as one: in type names, in the type
 identifiers of expressions and in storage layouts. `I(a)` is a conversion to
 `address`, `this` is the contract's own address, and an external call
 `c.f{value: v, gas: g}(args)` may name any contract-typed `c`; a gas option
-caps the callee's gas as it does for `a.call`, below. `new C`, `type(C)`
-other than `type(I).interfaceId` (below), external calls to getters and the
-members of external functions other than `selector` (below) are rejected.
+caps the callee's gas as it does for `a.call`, below. `type(C).name` is a
+memory literal of the contract's name. `type(C).creationCode` and
+`type(C).runtimeCode` are new memory `bytes` holding C's creation and runtime
+bytecode from the compiler's output, copied as solc's `datacopy` does: the
+code's bytes only, the rest of the last word left as memory held it.
+`type(I).interfaceId` is below. External calls admit public getters and
+function values with the same argument and return codec.
 Nominal parameter type identifiers keep overloads distinct for `super`
 lookup even when their runtime representations agree.
 
@@ -475,9 +478,14 @@ its effects and failures; the selector still comes from the declaration.
 the interface `I` declares itself, not those it inherits, nor its `fallback`
 or `receive`; `I` must name an interface directly, not through a module, and
 an abstract contract's `interfaceId` is rejected. A selector of any other
-function-typed value is rejected, and so is `ripemd160`. `sha256(b)` hashes
-bytes in memory, as the precompile at address 2 does, and `blockhash(n)` is
-the hash of one of the 256 blocks before the current one, or 0.
+function-typed value is rejected. `sha256(b)` and `ripemd160(b)` hash bytes
+as the precompiles at addresses 2 and 3 do. The RIPEMD-160 call returns a
+`bytes20` digest and leaves the padded return word in scratch memory and in
+returndata. `blockhash(n)` is the hash of one of the 256 blocks before the
+current one, or 0. `blobhash(i)` reads the transaction's versioned blob hash
+at index `i`, or 0 if the index is out of range. `block.blobbasefee` reads
+the blob base fee. `erc7201(s)` computes the ERC-7201 namespace slot as a
+`uint256`. The compiler folds a literal argument without touching memory.
 
 `c ? a : b` evaluates `c`, then only the operand it chooses, converted to the
 type the compiler gives the whole expression, which must be a value type,
@@ -492,14 +500,23 @@ its most derived override. Its type keeps the declared mutability, and a
 pure function converts implicitly to view and nonpayable function types, a
 view one to nonpayable. A call through a value evaluates the callee
 expression first and copies its value, then the arguments in order; the zero
-value, held by a local or named return never assigned, and any other word
-no function has panic with 0x51 after the arguments, as the compiler's
-internal dispatch does. Parameters
-and returns of a function type are value types other than function types, or
-storage, memory or calldata references. External function values, function values in storage, arrays,
-structs, events, the ABI or inline assembly, and comparisons of function
-values are rejected; a function-typed state variable, or an external
-function type in a function's header, rejects the whole unit.
+value and any other unassigned word panic with 0x51 after the arguments.
+Internal function values can be parameters, returns, state variables, struct
+fields, array elements and mapping values. They support `delete`, `==` and
+`!=`. Mapping keys exclude function types. ABI encodings exclude internal
+function types. Calldata objects require an ABI representation for every
+field and array element, including when a local calldata reference is set
+in assembly.
+
+External function values store an address followed by a four-byte selector.
+`c.f` and `this.f` construct values. The `.address` and `.selector` members
+read their components, and inline assembly can also assign either component
+on a local function value. Non-canonical assembly writes fail closed.
+Indirect calls capture both components before evaluating the options and
+arguments, using the same external call as a direct member call. The
+function type controls payability and whether the call is static. The ABI
+encodes the value as `bytes24`, including when a getter returns it or an
+event indexes it. `try` requires a named external member or creation.
 
 `abi.encode`, `abi.encodePacked`, `abi.encodeWithSelector` and
 `abi.encodeWithSignature` give a new memory `bytes`, allocated as the
@@ -509,14 +526,20 @@ and string and hex literals; `abi.encode` also takes integer literals, encoded a
 their smallest type, which has the encoding of `int256` or `uint256`.
 `abi.encode` gives the standard ABI encoding of the arguments, after the four
 bytes of a `bytes4` selector for `encodeWithSelector`, or of the Keccak-256
-hash of a literal signature for `encodeWithSignature`; `abi.encodePacked`
-gives each scalar in its own width, a `bytesN` as its N bytes, and a byte
-sequence as its contents. Unpacked encoding also accepts arrays and structs
-of any nesting in memory, calldata or storage, retaining the reference until
-all arguments have been evaluated.
+hash of the signature for `encodeWithSignature`; `abi.encodePacked`
+gives each scalar in its own width, a `bytesN` as its N bytes, a byte
+sequence as its contents, and an array of scalars, or of fixed-length arrays
+of them, as each scalar in a full word, with no length. Unpacked encoding
+also accepts arrays and structs of any nesting in memory, calldata or storage,
+retaining the reference until all arguments have been evaluated.
 A selector converts implicitly to `bytes4`, as a hex literal such as
-`0xa9059cbb` does. Packed arrays and structs, a selector that does not, and a
-signature that is not a plain string literal are rejected.
+`0xa9059cbb` does. A literal signature's hash is a constant. Any other
+signature string is hashed after the arguments are evaluated, as the compiler
+does: a calldata or storage one is first copied to memory at the free memory
+pointer, and the pointer is set back afterwards, so the encoding is allocated
+where the copy was. A selector that does not convert, a signature that is not
+a string, and packed structs and arrays of structs or of dynamic arrays (which
+the compiler rejects too) are rejected.
 
 `abi.encodeCall(f, (a, b))` gives `f`'s selector followed by the standard ABI
 encoding of the arguments, each converted to its parameter's type as an
@@ -600,8 +623,9 @@ cannot be used as a source value without materialization.
 Only failure of the external call selects a catch body; argument evaluation,
 missing-code checks, return decoding and the success/catch bodies keep their
 ordinary failure behavior. Returns are decoded as a high-level call's are,
-arrays and structs included. Contract creation in a try statement remains
-unsupported.
+arrays and structs included. `try new C(...)` catches only a failed
+creation, which yields no address: the success clause binds the new contract,
+and the catch clauses read the creation's return data as a call's.
 
 Internal and private library functions, their modifiers, and library
 constants come with the contracts that use them, also through each other,
@@ -681,21 +705,23 @@ read, so a dirty element reverts when it is indexed, copied or re-encoded.
 Storage arrays of the same element types are values too: they copy to memory
 (reading every element, panic `0x41` past the allocation limit), are assigned
 from memory, calldata or another storage array, and are ABI-encoded in place as
-return values and external call arguments. An assignment from memory walks
-the source as the compiled copy does: it resizes the destination, then reads
-each element as it writes it, so the slot hashes the copy leaves in the
-scratch word are what a later element at that address reads. An assignment
-from calldata or another storage array reads the source first, which reads no
-memory. Either clears the destination (shrinking it, nested
-data included) and writes the elements, converting them as the compiler's
-implicit conversions allow (`uint8[]` to `uint16[]`, `bytes8` to `bytes10`,
-static to dynamic, a static array into a longer static one, whose remaining
-elements are cleared); a self-assignment returns at once, as the compiler's
-copy does. Reading the whole source before clearing the destination differs from the
-compiler, which resizes the destination and then copies slot by slot, only
-under storage forged with inline assembly: two distinct arrays that alias
-through a wrapped-around length, or which failure comes first when a corrupt
-header meets malformed calldata. `T storage` locals of arrays are still
+return values and external call arguments. An assignment walks the source as
+the compiled copy does, whether it is in memory, calldata or storage: it
+resizes the destination (clearing a shrunk tail, nested data included, with
+the compiler's slot-count arithmetic, which wraps for packed elements and
+panics with `0x11` on overflow for multi-slot ones), then reads each element as it writes
+it, against storage as the earlier writes left it. A storage source of scalar
+elements is read a slot at a time, the next slot as soon as the last element
+of the one before is taken, and each destination slot is built from zero and
+stored whole. So a source that overlaps its destination (two arrays that
+alias through a forged length) reads what the copy already wrote, the slot
+hashes the copy leaves in the scratch word are what a later element at that
+address reads, and a corrupt destination header panics before a later
+malformed calldata element is reached. Elements are converted as the
+compiler's implicit conversions allow (`uint8[]` to `uint16[]`, `bytes8` to
+`bytes10`, static to dynamic, a static array into a longer static one, whose
+remaining elements are cleared); a self-assignment returns at once, as the
+compiler's copy does. `T storage` locals of arrays are still
 rejected.
 
 Struct declarations may be file-level or contract members. User-defined type

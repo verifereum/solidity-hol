@@ -292,7 +292,15 @@ Theorem computed_struct_layouts_match_solc:
   elab_struct_layouts (REVERSE (HD missing_struct_layout_unit.unit_contracts).contract_structs) =
     OPTION_MAP REVERSE (elab_struct_layouts (HD struct_unit.unit_contracts).contract_structs)
 Proof
-  conj_tac >- CONV_TAC cv_eval >> EVAL_TAC
+  conj_tac >- CONV_TAC cv_eval >>
+  (* CV needs the fixture to have a head contract. *)
+  ‘missing_struct_layout_unit.unit_contracts ≠ []’ by
+    (REWRITE_TAC [GSYM listTheory.NULL_EQ] >> CONV_TAC cv_eval) >>
+  pop_assum (fn nonempty =>
+    CONV_TAC (LAND_CONV (fn tm => MP (cv_eval tm) nonempty))) >>
+  EVAL_TAC >>
+  simp[solidityCoreTheory.core_struct_layout_component_equality,
+       solidityCoreTheory.core_state_variable_component_equality]
 QED
 
 Definition unlayoutable_structs_def:
@@ -351,28 +359,16 @@ Proof
   CONV_TAC cv_eval
 QED
 
-(* A block a constructor runs may not halt, since the source installs no
- * runtime code from the returned bytes; elsewhere it may. *)
-Theorem asm_halt_rejected_in_constructor:
-  ∀info.
-    ISL (elab_stmt
-      <| functions := []; static_functions := []; supers := []; structs := []; enums := []; events := [];
-         variables := []; state := []; locations := []; immutables := [];
-         constants := []; returns := []; placeholder := NONE;
-         mode := CheckedArithmetic; creation := F; scope := 0;
-         returns_id := 0; in_loop := F; bad_ids := [] |> 0
-      (SrcInlineAssembly info [YulExprStmt (YulBuiltin YStop [])] [])) ∧
-    elab_stmt
-      <| functions := []; static_functions := []; supers := []; structs := []; enums := []; events := [];
-         variables := []; state := []; locations := []; immutables := [];
-         constants := []; returns := []; placeholder := NONE;
-         mode := CheckedArithmetic; creation := T; scope := 0;
-         returns_id := 0; in_loop := F; bad_ids := [] |> 0
-      (SrcInlineAssembly info [YulExprStmt (YulBuiltin YStop [])] []) =
-    INR [(info.node_id, "assembly halt in a constructor")]
-Proof
-  gen_tac >> EVAL_TAC
-QED
+val info0 = “<| node_id := 0;
+                node_location := <| loc_start := 0; loc_length := 0;
+                                    loc_source := 0 |> |>”;
+fun at id = “^info0 with node_id := ^(numSyntax.term_of_int id)”;
+val ctx0 = “<| functions := []; static_functions := [];
+               supers := []; structs := []; enums := [];
+               events := []; variables := []; state := []; locations := [];
+               immutables := []; constants := []; returns := [];
+               placeholder := NONE; mode := CheckedArithmetic;
+               scope := 0; returns_id := 0; in_loop := F; bad_ids := [] |>”;
 
 Theorem no_exponent_assignment:
   compound_operator (SOME SrcExp) = NONE ∧
@@ -381,49 +377,41 @@ Proof
   EVAL_TAC
 QED
 
+val local_declaration =
+  “SrcVariableDeclarationStatement ^info0 [SOME 1]
+     [SOME <| var_info := ^(at 1); var_name := "x"; var_scope := 0;
+              var_type_name := SrcElementaryTypeName ^info0 "uint256" NONE;
+              var_type_id := "t_uint256"; var_transient := F; var_location := NONE |>]
+     NONE”;
+val true_condition = “SrcLiteral ^info0 BoolLiteral "true" "t_bool"”;
+
 (* Statements the compiler does not produce: a declaration as the body of an
  * if or a loop (it must be a statement of a block), and a fractional literal
  * in a tuple, even at a hole. *)
 Theorem declaration_body_and_tuple_fraction_rejected:
-  let info = <| node_id := 0;
-                node_location := <| loc_start := 0; loc_length := 0;
-                                    loc_source := 0 |> |>;
-      x = <| var_info := info with node_id := 1; var_name := "x"; var_scope := 0;
-             var_type_name := SrcElementaryTypeName info "uint256" NONE;
-             var_type_id := "t_uint256"; var_transient := F; var_location := NONE |>;
-      d = SrcVariableDeclarationStatement info [SOME 1] [SOME x] NONE;
-      c = SrcLiteral info BoolLiteral "true" "t_bool";
-      half = SrcLiteral info NumberLiteral "" "t_rational_1_by_2";
-      ctx = <| functions := []; static_functions := []; supers := []; structs := []; enums := [];
-               events := []; variables := []; state := []; locations := [];
-               immutables := []; constants := []; returns := [];
-               placeholder := NONE; mode := CheckedArithmetic; creation := F;
-               scope := 0; returns_id := 0; in_loop := F; bad_ids := [] |> in
-    ISL (elab_stmt ctx 2 d) ∧
-    elab_stmt ctx 2 (SrcIfStatement info c d NONE) = INR [(0, "declaration as a body")] ∧
-    elab_stmt ctx 2 (SrcWhileStatement info c d) = INR [(0, "declaration as a body")] ∧
-    elab_stmt ctx 2 (SrcVariableDeclarationStatement info [NONE] [NONE] (SOME half)) =
+  ISL (elab_stmt ^ctx0 2 ^local_declaration) ∧
+  elab_stmt ^ctx0 2 (SrcIfStatement ^info0 ^true_condition ^local_declaration NONE) =
+    INR [(0, "declaration as a body")] ∧
+  elab_stmt ^ctx0 2 (SrcWhileStatement ^info0 ^true_condition ^local_declaration) =
+    INR [(0, "declaration as a body")] ∧
+  elab_stmt ^ctx0 2 (SrcVariableDeclarationStatement ^info0 [NONE] [NONE]
+    (SOME (SrcLiteral ^info0 NumberLiteral "" "t_rational_1_by_2"))) =
     INR [(0, "rational number value")]
 Proof
   EVAL_TAC
 QED
 
+val bytes_context =
+  “^ctx0 with variables := [(1, LocatedT MemoryLoc BytesT); (2, FixedBytesT 32)]”;
+fun to_bytes16 e =
+  “SrcTypeConversion ^info0 (SrcElementaryTypeName ^info0 "bytes16" NONE) ^e "t_bytes16"”;
+
 (* Dynamic bytes and fixed bytes both convert to a fixed-size prefix. *)
 Theorem bytes_to_fixed_bytes_admitted:
-  let info = <| node_id := 0;
-                node_location := <| loc_start := 0; loc_length := 0;
-                                    loc_source := 0 |> |>;
-      to16 e = SrcTypeConversion info
-                 (SrcElementaryTypeName info "bytes16" NONE) e "t_bytes16";
-      ctx = <| functions := []; static_functions := []; supers := []; structs := []; enums := [];
-               events := [];
-               variables := [(1, LocatedT MemoryLoc BytesT); (2, FixedBytesT 32)];
-               state := []; locations := [];
-               immutables := []; constants := []; returns := [];
-               placeholder := NONE; mode := CheckedArithmetic; creation := F;
-               scope := 0; returns_id := 0; in_loop := F; bad_ids := [] |> in
-    ISL (elab_expr ctx 3 (to16 (SrcIdentifier info "b" 1 "t_bytes_memory_ptr"))) ∧
-    ISL (elab_expr ctx 3 (to16 (SrcIdentifier info "w" 2 "t_bytes32")))
+  ISL (elab_expr ^bytes_context 3
+    ^(to_bytes16 “SrcIdentifier ^info0 "b" 1 "t_bytes_memory_ptr"”)) ∧
+  ISL (elab_expr ^bytes_context 3
+    ^(to_bytes16 “SrcIdentifier ^info0 "w" 2 "t_bytes32"”))
 Proof
   EVAL_TAC
 QED
@@ -432,15 +420,6 @@ QED
  * fails, and a statement after a failed declaration only its own blockers.
  * The declared variable is bound if its type is supported, and otherwise
  * a reference to it adds no blocker, the declaration having reported it. *)
-val info0 = “<| node_id := 0;
-                node_location := <| loc_start := 0; loc_length := 0;
-                                    loc_source := 0 |> |>”;
-fun at id = “^info0 with node_id := ^(numSyntax.term_of_int id)”;
-val ctx0 = “<| functions := []; static_functions := []; supers := []; structs := []; enums := [];
-               events := []; variables := []; state := []; locations := [];
-               immutables := []; constants := []; returns := [];
-               placeholder := NONE; mode := CheckedArithmetic; creation := F;
-               scope := 0; returns_id := 0; in_loop := F; bad_ids := [] |>”;
 fun local_y tn = “<| var_info := ^(at 4); var_name := "y"; var_scope := 0;
                      var_type_name := ^tn; var_type_id := "t_uint256";
                      var_transient := F; var_location := NONE |>”;
@@ -655,6 +634,60 @@ Proof
   EVAL_TAC
 QED
 
+Theorem abi_encode_function_array_refused:
+  elab_expr (^ctx0 with variables :=
+      [(40, LocatedT MemoryLoc (ArrayT
+             (FunctionT InternalFn PureMut [UintT 256] [UintT 256]) NONE))]) 10
+    (SrcAbiEncode ^(at 30) ^(at 31) AbiPlain
+      [SrcIdentifier ^(at 32) "fns" 40
+         "t_array$_t_function_internal_pure$_t_uint256_$returns$_t_uint256_$_$dyn_memory_ptr"]
+      "t_bytes_memory_ptr") =
+  INR [(30, "abi encoding of this type")]
+Proof
+  EVAL_TAC
+QED
+
+Theorem abi_encode_function_fixed_array_packed_refused:
+  elab_expr (^ctx0 with variables :=
+      [(40, LocatedT MemoryLoc (ArrayT
+             (FunctionT InternalFn PureMut [UintT 256] [UintT 256]) (SOME 2)))]) 10
+    (SrcAbiEncode ^(at 30) ^(at 31) AbiPacked
+      [SrcIdentifier ^(at 32) "fns" 40
+         "t_array$_t_function_internal_pure$_t_uint256_$returns$_t_uint256_$_$2_memory_ptr"]
+      "t_bytes_memory_ptr") =
+  INR [(32, "abi encoding of this type")]
+Proof
+  EVAL_TAC
+QED
+
+(* A recursive memory object is unsupported even when referenced only by a
+ * function signature in a struct field. A signature pointing back to its
+ * own struct does not make the struct's memory layout recursive. *)
+Theorem struct_function_signatures_checked:
+  contract_type_blockers
+    [(AstId 40, StructDeclaration [(AstId 41, ArrayT (StructT (AstId 40)) NONE)]);
+     (AstId 42, StructDeclaration [(AstId 43,
+       FunctionT InternalFn PureMut [LocatedT MemoryLoc (StructT (AstId 40))] [])]);
+     (AstId 44, StructDeclaration [(AstId 45,
+       FunctionT InternalFn PureMut [LocatedT MemoryLoc (StructT (AstId 44))] [])])]
+    [] [] [] = [(42, "unsupported type declaration")]
+Proof
+  EVAL_TAC
+QED
+
+val uses_missing_struct =
+  “"t_function_external_view$_t_struct$_S_$40_memory_ptr_$returns$__$"”;
+
+Theorem external_function_value_signature_checked:
+  IS_SOME (function_type_identifier ^uses_missing_struct) ∧
+  elab_expr ^ctx0 10
+    (SrcExternalFunction ^(at 30) (SrcEnvironment ^(at 31) SelfAddress "t_address")
+       [1w; 2w; 3w; 4w] ^uses_missing_struct) =
+  INR [(30, "unsupported external function signature")]
+Proof
+  EVAL_TAC
+QED
+
 Theorem binary_operands_all_report:
   ^(reports “elab_expr ^ctx0 10
                (SrcBinaryOperation ^(at 30) SrcAdd ^(string_at 32) ^(string_at 33)
@@ -681,7 +714,7 @@ val two_parameters = function_of “[^supported_y; ^supported_y]” “[] : src_
 
 Theorem internal_call_operands_all_report:
   ^(reports “elab_expr (^ctx0 with functions := [(1, ^two_parameters)]) 10
-               (SrcFunctionCall ^(at 30) (SrcIdentifier ^(at 31) "f" 1 "t_function")
+               (SrcFunctionCall ^(at 30) F (SrcIdentifier ^(at 31) "f" 1 "t_function")
                   [^(string_at 32); ^(string_at 33)] [] "t_tuple$__$")”
      string_32_33)
 Proof
@@ -765,6 +798,35 @@ Proof
   EVAL_TAC
 QED
 
+(* A literal signature's selector is computed when elaborating, as the
+ * compiler does; a signature that is not a string is reported with the
+ * arguments' blockers, and one that is missing is reported on the node. *)
+Theorem abi_signature_literal_is_constant_selector:
+  elab_expr ^ctx0 10
+    (SrcAbiEncode ^(at 30) ^(at 31) AbiWithSignature
+       [SrcLiteral ^(at 32) StringLiteral "f()" "t_stringliteral_f"]
+       "t_bytes_memory_ptr") =
+  INL (([DefineStmt (AstId 10) (SingleType (LocatedT MemoryLoc BytesT))
+           (AbiEncodeOperation
+              (SOME (ConstantAtom (BytesValue (TAKE 4 (Keccak_256_w64
+                 (MAP (n2w o ORD) "f()")))))) [] [])],
+        BoundAtom (AstId 10), ElabType (LocatedT MemoryLoc BytesT)), 11)
+Proof
+  CONV_TAC (computeLib.RESTR_EVAL_CONV [“Keccak_256_w64”])
+QED
+
+Theorem abi_signature_not_string_reports:
+  ^(reports “elab_expr ^ctx0 10
+               (SrcAbiEncode ^(at 30) ^(at 31) AbiWithSignature
+                  [^(one_at 32); ^(bad_at 33)] "t_bytes_memory_ptr")”
+     [“(32, "signature not a string")”, “(33, "bad")”]) ∧
+  ^(reports “elab_expr ^ctx0 10
+               (SrcAbiEncode ^(at 30) ^(at 31) AbiWithSignature [] "t_bytes_memory_ptr")”
+     [“(30, "missing signature")”])
+Proof
+  EVAL_TAC
+QED
+
 (* A selector that fails to elaborate next to an argument that fails to
  * convert: both are reported. *)
 Theorem abi_selector_failure_reports_arguments:
@@ -843,7 +905,7 @@ QED
 
 Theorem internal_call_mixed_operands_report:
   ^(reports “elab_expr (^ctx0 with functions := [(1, ^two_parameters)]) 10
-               (SrcFunctionCall ^(at 30) (SrcIdentifier ^(at 31) "f" 1 "t_function")
+               (SrcFunctionCall ^(at 30) F (SrcIdentifier ^(at 31) "f" 1 "t_function")
                   [^(string_at 32); ^(bad_at 33)] [] "t_tuple$__$")”
      mixed_string)
 Proof
@@ -865,7 +927,7 @@ QED
  * still report their arguments. *)
 val array_ctx = “^ctx0 with state := [(5, ArrayT (UintT 256) NONE)]”;
 fun array_call member args order =
-  “SrcFunctionCall ^(at 30)
+  “SrcFunctionCall ^(at 30) F
      (SrcArrayMember ^(at 31) ^member
         (SrcIdentifier ^(at 35) "a" 5 "t_array$_t_uint256_$dyn_storage") "t_function")
      ^args ^order "t_tuple$__$"”;

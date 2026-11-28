@@ -112,7 +112,7 @@ Datatype:
   environment_field
   = MsgSender | MsgValue | MsgData | MsgSig | SelfAddress | TxOrigin | TxGasPrice
   | BlockNumber | BlockTimestamp | BlockChainId | BlockCoinbase
-  | BlockBaseFee | BlockGasLimit | BlockPrevRandao | GasLeft
+  | BlockBaseFee | BlockBlobBaseFee | BlockGasLimit | BlockPrevRandao | GasLeft
 End
 
 (* The builtin functions that compute a value from their operands and the
@@ -121,14 +121,16 @@ End
  * hash h recovers, or address(0) if it is invalid; a.code.length, the
  * account's code size, without a memory bytes allocation; a.balance;
  * a.codehash, the account's code hash as EXTCODEHASH reads it, 0 for an
- * empty account; sha256(a), the SHA-256 hash of the memory bytes a;
- * blockhash(n), the hash of block n if it is one of the 256 before the
- * current one, else 0; and a.code, the account's code as new memory bytes.
+ * empty account; sha256(a) and ripemd160(a), hashes of the bytes a;
+ * blockhash(n) and blobhash(n), the block or versioned blob hash read by
+ * the corresponding opcode; erc7201(s), the namespace slot for string s;
+ * and a.code, the account's code as new memory bytes.
  *)
 Datatype:
   builtin_op
   = Keccak256Builtin | EcrecoverBuiltin | CodeLengthBuiltin | BalanceBuiltin
   | CodeHashBuiltin | Sha256Builtin | BlockhashBuiltin | CodeBuiltin
+  | BlobhashBuiltin | Ripemd160Builtin | Erc7201Builtin
 End
 
 (* DefaultReferenceOperation loc ty: a placeholder reference that a source
@@ -161,6 +163,10 @@ End
  * giving whether it succeeded and its return data as a new memory bytes.
  *)
 Datatype:
+  function_member = FunctionAddress | FunctionSelector
+End
+
+Datatype:
   core_operation
   = ScalarOperation sol_type arithmetic_mode core_operator (core_atom list)
   | ConvertOperation sol_type core_atom
@@ -175,6 +181,9 @@ Datatype:
   | DefaultMemoryOperation sol_type
   | DefaultReferenceOperation data_location sol_type
   | BytesLiteralOperation sol_type (byte list)
+  (* a contract's code (type(C).creationCode, runtimeCode), copied to new
+   * memory bytes as the code's bytes only *)
+  | CodeCopyOperation (byte list)
   | AllocateMemoryOperation sol_type core_atom
   | BytesToFixedOperation num core_atom
   | ArrayIndexOperation core_atom core_atom
@@ -195,15 +204,25 @@ Datatype:
   | InternalCallOperation ast_id (core_atom list)
   (* a call of the procedure an internal function value names *)
   | FunctionValueCallOperation core_atom (core_atom list)
-  | ExternalCallOperation external_kind (byte list) (sol_type list)
+  | ExternalFunctionOperation core_atom core_atom
+  | FunctionMemberOperation function_member core_atom
+  | ExternalCallOperation external_kind core_atom (sol_type list)
       (sol_type list) core_atom core_atom (core_atom option) (core_atom list)
   | LowLevelCallOperation external_kind core_atom core_atom (core_atom option)
       core_atom
   | CreateContractOperation (byte list) (sol_type list) core_atom
       (core_atom option) (core_atom list)
+  (* success flag, the new address, RevertDataType; only a failed creation
+   * is caught. Operand failures still propagate. *)
+  | TryCreateContractOperation (byte list) (sol_type list) core_atom
+      (core_atom option) (core_atom list)
   (* target.transfer(value): exact stipend, failure bytes forwarded, no
    * return-data allocation. *)
   | TransferOperation core_atom core_atom
+  (* selfdestruct(beneficiary): transfers the executing account's balance,
+   * queues EIP-6780 deletion when it was created in this transaction, and
+   * halts the frame. *)
+  | SelfDestructOperation core_atom
   (* success flag, scalar returns, RevertDataType; only a failed EVM call
    * is caught. Operand and return-decoding failures still propagate. *)
   | TryExternalCallOperation external_kind (byte list) (sol_type list)
@@ -219,12 +238,15 @@ End
  * and x.length of a byte sequence or dynamic array, the plain name of a
  * static array; assigning either rebinds the local), the value of a constant
  * of value type, held in an atom, or the memory address of a local holding a
- * memory byte sequence of the given type (bytes or string). Only locals,
- * storage pointer slots and calldata offsets and lengths are assignable.
+ * memory byte sequence of the given type (bytes or string). An external
+ * function local has two assignable Yul words, its address and selector.
+ * Locals, storage pointer slots and calldata offsets and lengths are assignable.
  *)
 Datatype:
   assembly_reference
   = AssemblyLocal ast_id sol_type
+  | AssemblyFunctionAddress ast_id
+  | AssemblyFunctionSelector ast_id
   | AssemblySlot ast_id
   | AssemblyOffset ast_id
   | AssemblyPointerSlot ast_id

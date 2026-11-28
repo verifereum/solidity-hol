@@ -1,0 +1,1302 @@
+{
+  "compiler": {
+    "pin": "f401782df49be312ea4ef52a2d467cf5183b5906",
+    "reportedVersion": "solc, the solidity compiler commandline interface\nVersion: 0.8.37+commit.f401782d.Linux.g++"
+  },
+  "format": "solidity-hol-solc-artifact-v1",
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "debug": {
+        "revertStrings": "default"
+      },
+      "evmVersion": "osaka",
+      "metadata": {
+        "appendCBOR": false,
+        "bytecodeHash": "none"
+      },
+      "optimizer": {
+        "enabled": false,
+        "runs": 200
+      },
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "storageLayout",
+            "transientStorageLayout",
+            "evm.bytecode.object",
+            "evm.deployedBytecode.object",
+            "evm.deployedBytecode.immutableReferences",
+            "evm.methodIdentifiers"
+          ]
+        }
+      },
+      "viaIR": true
+    },
+    "sources": {
+      "testdata/differential/selfdestruct_source.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity 0.8.37;\n\ncontract SelfDestructSource {\n    event Halted(uint256 marker);\n\n    uint256 public x;\n\n    constructor(uint8 mode) payable {\n        x = 1;\n        if (mode == 1) {\n            selfdestruct(payable(msg.sender));\n            emit Halted(1);\n        }\n        if (mode == 2) {\n            assembly { selfdestruct(caller()) }\n            emit Halted(2);\n        }\n    }\n\n    function sourceDestroy() external payable {\n        x = 2;\n        selfdestruct(payable(msg.sender));\n        emit Halted(3);\n    }\n\n    function assemblyDestroy() external payable {\n        x = 3;\n        assembly { selfdestruct(caller()) }\n        emit Halted(4);\n    }\n}\n"
+      }
+    }
+  },
+  "output": {
+    "contracts": {
+      "testdata/differential/selfdestruct_source.sol": {
+        "SelfDestructSource": {
+          "abi": [
+            {
+              "inputs": [
+                {
+                  "internalType": "uint8",
+                  "name": "mode",
+                  "type": "uint8"
+                }
+              ],
+              "stateMutability": "payable",
+              "type": "constructor"
+            },
+            {
+              "anonymous": false,
+              "inputs": [
+                {
+                  "indexed": false,
+                  "internalType": "uint256",
+                  "name": "marker",
+                  "type": "uint256"
+                }
+              ],
+              "name": "Halted",
+              "type": "event"
+            },
+            {
+              "inputs": [],
+              "name": "assemblyDestroy",
+              "outputs": [],
+              "stateMutability": "payable",
+              "type": "function"
+            },
+            {
+              "inputs": [],
+              "name": "sourceDestroy",
+              "outputs": [],
+              "stateMutability": "payable",
+              "type": "function"
+            },
+            {
+              "inputs": [],
+              "name": "x",
+              "outputs": [
+                {
+                  "internalType": "uint256",
+                  "name": "",
+                  "type": "uint256"
+                }
+              ],
+              "stateMutability": "view",
+              "type": "function"
+            }
+          ],
+          "evm": {
+            "bytecode": {
+              "object": "608060405261001461000f6100d5565b6101ef565b61001c61002a565b610236610244823961023690f35b60405190565b601f801991011690565b634e487b7160e01b5f52604160045260245ffd5b9061005890610030565b810190811060018060401b0382111761007057604052565b61003a565b9061008861008161002a565b928361004e565b565b5f80fd5b60ff1690565b61009d8161008e565b036100a457565b5f80fd5b905051906100b582610094565b565b906020828203126100d0576100cd915f016100a8565b90565b61008a565b6100f361047a803803806100e881610075565b9283398101906100b7565b90565b90565b90565b90565b61011361010e610118926100f6565b6100fc565b6100f9565b90565b5f1b90565b9061012c5f199161011b565b9181191691161790565b61014a61014561014f926100f9565b6100fc565b6100f9565b90565b90565b9061016a61016561017192610136565b610152565b8254610120565b9055565b61018961018461018e926100f6565b6100fc565b61008e565b90565b60018060a01b031690565b6101b06101ab6101b592610191565b6100fc565b610191565b90565b6101c19061019c565b90565b6101cd906101b8565b90565b90565b6101e76101e26101ec926101d0565b6100fc565b61008e565b90565b6102026101fc60016100ff565b5f610155565b806102166102106001610175565b9161008e565b146102385761022e61022860026101d3565b9161008e565b1461023557565b33ff5b610241336101c4565bfffe60806040526004361015610013575b610124565b61001d5f3561004c565b80630c55699c1461004757806364b2d974146100425763e6a2e8590361000e57610114565b610104565b6100cf565b60e01c90565b60405190565b5f80fd5b5f80fd5b5f91031261006a57565b61005c565b1c90565b90565b61008690600861008b930261006f565b610073565b90565b906100999154610076565b90565b6100a75f5f9061008e565b90565b90565b6100b6906100aa565b9052565b91906100cd905f602085019401906100ad565b565b346100ff576100df366004610060565b6100fb6100ea61009c565b6100f2610052565b918291826100ba565b0390f35b610058565b61010f366004610060565b610202565b61011f366004610060565b610220565b5f80fd5b90565b90565b61014261013d61014792610128565b61012b565b6100aa565b90565b5f1b90565b9061015b5f199161014a565b9181191691161790565b61017961017461017e926100aa565b61012b565b6100aa565b90565b90565b906101996101946101a092610165565b610181565b825461014f565b9055565b60018060a01b031690565b6101c36101be6101c8926101a4565b61012b565b6101a4565b90565b6101d4906101af565b90565b6101e0906101cb565b90565b90565b6101fa6101f56101ff926101e3565b61012b565b6100aa565b90565b61021561020f600261012e565b5f610184565b61021e336101d7565bff5b61023361022d60036101e6565b5f610184565b33ff"
+            },
+            "deployedBytecode": {
+              "immutableReferences": {},
+              "object": "60806040526004361015610013575b610124565b61001d5f3561004c565b80630c55699c1461004757806364b2d974146100425763e6a2e8590361000e57610114565b610104565b6100cf565b60e01c90565b60405190565b5f80fd5b5f80fd5b5f91031261006a57565b61005c565b1c90565b90565b61008690600861008b930261006f565b610073565b90565b906100999154610076565b90565b6100a75f5f9061008e565b90565b90565b6100b6906100aa565b9052565b91906100cd905f602085019401906100ad565b565b346100ff576100df366004610060565b6100fb6100ea61009c565b6100f2610052565b918291826100ba565b0390f35b610058565b61010f366004610060565b610202565b61011f366004610060565b610220565b5f80fd5b90565b90565b61014261013d61014792610128565b61012b565b6100aa565b90565b5f1b90565b9061015b5f199161014a565b9181191691161790565b61017961017461017e926100aa565b61012b565b6100aa565b90565b90565b906101996101946101a092610165565b610181565b825461014f565b9055565b60018060a01b031690565b6101c36101be6101c8926101a4565b61012b565b6101a4565b90565b6101d4906101af565b90565b6101e0906101cb565b90565b90565b6101fa6101f56101ff926101e3565b61012b565b6100aa565b90565b61021561020f600261012e565b5f610184565b61021e336101d7565bff5b61023361022d60036101e6565b5f610184565b33ff"
+            },
+            "methodIdentifiers": {
+              "assemblyDestroy()": "e6a2e859",
+              "sourceDestroy()": "64b2d974",
+              "x()": "0c55699c"
+            }
+          },
+          "storageLayout": {
+            "storage": [
+              {
+                "astId": 7,
+                "contract": "testdata/differential/selfdestruct_source.sol:SelfDestructSource",
+                "label": "x",
+                "offset": 0,
+                "slot": "0",
+                "type": "t_uint256"
+              }
+            ],
+            "types": {
+              "t_uint256": {
+                "encoding": "inplace",
+                "label": "uint256",
+                "numberOfBytes": "32"
+              }
+            }
+          },
+          "transientStorageLayout": {
+            "storage": [],
+            "types": null
+          }
+        }
+      }
+    },
+    "errors": [
+      {
+        "component": "general",
+        "errorCode": "5159",
+        "formattedMessage": "Warning: \"selfdestruct\" has been deprecated. Note that, starting from the Cancun hard fork, the underlying opcode no longer deletes the code and data associated with an account and only transfers its Ether to the beneficiary, unless executed in the same transaction in which the contract was created (see EIP-6780). Any use in newly deployed contracts is strongly discouraged even if the new behavior is taken into account. Future changes to the EVM might further reduce the functionality of the opcode.\n  --> testdata/differential/selfdestruct_source.sol:12:13:\n   |\n12 |             selfdestruct(payable(msg.sender));\n   |             ^^^^^^^^^^^^\n\n",
+        "message": "\"selfdestruct\" has been deprecated. Note that, starting from the Cancun hard fork, the underlying opcode no longer deletes the code and data associated with an account and only transfers its Ether to the beneficiary, unless executed in the same transaction in which the contract was created (see EIP-6780). Any use in newly deployed contracts is strongly discouraged even if the new behavior is taken into account. Future changes to the EVM might further reduce the functionality of the opcode.",
+        "severity": "warning",
+        "sourceLocation": {
+          "end": 247,
+          "file": "testdata/differential/selfdestruct_source.sol",
+          "start": 235
+        },
+        "type": "Warning"
+      },
+      {
+        "component": "general",
+        "errorCode": "1699",
+        "formattedMessage": "Warning: \"selfdestruct\" has been deprecated. Note that, starting from the Cancun hard fork, the underlying opcode no longer deletes the code and data associated with an account and only transfers its Ether to the beneficiary, unless executed in the same transaction in which the contract was created (see EIP-6780). Any use in newly deployed contracts is strongly discouraged even if the new behavior is taken into account. Future changes to the EVM might further reduce the functionality of the opcode.\n  --> testdata/differential/selfdestruct_source.sol:16:24:\n   |\n16 |             assembly { selfdestruct(caller()) }\n   |                        ^^^^^^^^^^^^\n\n",
+        "message": "\"selfdestruct\" has been deprecated. Note that, starting from the Cancun hard fork, the underlying opcode no longer deletes the code and data associated with an account and only transfers its Ether to the beneficiary, unless executed in the same transaction in which the contract was created (see EIP-6780). Any use in newly deployed contracts is strongly discouraged even if the new behavior is taken into account. Future changes to the EVM might further reduce the functionality of the opcode.",
+        "severity": "warning",
+        "sourceLocation": {
+          "end": 368,
+          "file": "testdata/differential/selfdestruct_source.sol",
+          "start": 356
+        },
+        "type": "Warning"
+      },
+      {
+        "component": "general",
+        "errorCode": "5159",
+        "formattedMessage": "Warning: \"selfdestruct\" has been deprecated. Note that, starting from the Cancun hard fork, the underlying opcode no longer deletes the code and data associated with an account and only transfers its Ether to the beneficiary, unless executed in the same transaction in which the contract was created (see EIP-6780). Any use in newly deployed contracts is strongly discouraged even if the new behavior is taken into account. Future changes to the EVM might further reduce the functionality of the opcode.\n  --> testdata/differential/selfdestruct_source.sol:23:9:\n   |\n23 |         selfdestruct(payable(msg.sender));\n   |         ^^^^^^^^^^^^\n\n",
+        "message": "\"selfdestruct\" has been deprecated. Note that, starting from the Cancun hard fork, the underlying opcode no longer deletes the code and data associated with an account and only transfers its Ether to the beneficiary, unless executed in the same transaction in which the contract was created (see EIP-6780). Any use in newly deployed contracts is strongly discouraged even if the new behavior is taken into account. Future changes to the EVM might further reduce the functionality of the opcode.",
+        "severity": "warning",
+        "sourceLocation": {
+          "end": 509,
+          "file": "testdata/differential/selfdestruct_source.sol",
+          "start": 497
+        },
+        "type": "Warning"
+      },
+      {
+        "component": "general",
+        "errorCode": "1699",
+        "formattedMessage": "Warning: \"selfdestruct\" has been deprecated. Note that, starting from the Cancun hard fork, the underlying opcode no longer deletes the code and data associated with an account and only transfers its Ether to the beneficiary, unless executed in the same transaction in which the contract was created (see EIP-6780). Any use in newly deployed contracts is strongly discouraged even if the new behavior is taken into account. Future changes to the EVM might further reduce the functionality of the opcode.\n  --> testdata/differential/selfdestruct_source.sol:29:20:\n   |\n29 |         assembly { selfdestruct(caller()) }\n   |                    ^^^^^^^^^^^^\n\n",
+        "message": "\"selfdestruct\" has been deprecated. Note that, starting from the Cancun hard fork, the underlying opcode no longer deletes the code and data associated with an account and only transfers its Ether to the beneficiary, unless executed in the same transaction in which the contract was created (see EIP-6780). Any use in newly deployed contracts is strongly discouraged even if the new behavior is taken into account. Future changes to the EVM might further reduce the functionality of the opcode.",
+        "severity": "warning",
+        "sourceLocation": {
+          "end": 659,
+          "file": "testdata/differential/selfdestruct_source.sol",
+          "start": 647
+        },
+        "type": "Warning"
+      },
+      {
+        "component": "general",
+        "errorCode": "5740",
+        "formattedMessage": "Warning: Unreachable code.\n  --> testdata/differential/selfdestruct_source.sol:17:13:\n   |\n17 |             emit Halted(2);\n   |             ^^^^^^^^^^^^^^\n\n",
+        "message": "Unreachable code.",
+        "severity": "warning",
+        "sourceLocation": {
+          "end": 407,
+          "file": "testdata/differential/selfdestruct_source.sol",
+          "start": 393
+        },
+        "type": "Warning"
+      },
+      {
+        "component": "general",
+        "errorCode": "5740",
+        "formattedMessage": "Warning: Unreachable code.\n  --> testdata/differential/selfdestruct_source.sol:30:9:\n   |\n30 |         emit Halted(4);\n   |         ^^^^^^^^^^^^^^\n\n",
+        "message": "Unreachable code.",
+        "severity": "warning",
+        "sourceLocation": {
+          "end": 694,
+          "file": "testdata/differential/selfdestruct_source.sol",
+          "start": 680
+        },
+        "type": "Warning"
+      }
+    ],
+    "sources": {
+      "testdata/differential/selfdestruct_source.sol": {
+        "ast": {
+          "absolutePath": "testdata/differential/selfdestruct_source.sol",
+          "exportedSymbols": {
+            "SelfDestructSource": [
+              78
+            ]
+          },
+          "id": 79,
+          "license": "MIT",
+          "nodeType": "SourceUnit",
+          "nodes": [
+            {
+              "id": 1,
+              "literals": [
+                "solidity",
+                "0.8",
+                ".37"
+              ],
+              "nodeType": "PragmaDirective",
+              "src": "32:23:0"
+            },
+            {
+              "abstract": false,
+              "baseContracts": [],
+              "canonicalName": "SelfDestructSource",
+              "contractDependencies": [],
+              "contractKind": "contract",
+              "fullyImplemented": true,
+              "id": 78,
+              "linearizedBaseContracts": [
+                78
+              ],
+              "name": "SelfDestructSource",
+              "nameLocation": "66:18:0",
+              "nodeType": "ContractDefinition",
+              "nodes": [
+                {
+                  "anonymous": false,
+                  "eventSelector": "14a94dbc2f7e9418dbda76b366e946fd5e17923e5cc43d07703095c162035b97",
+                  "id": 5,
+                  "name": "Halted",
+                  "nameLocation": "97:6:0",
+                  "nodeType": "EventDefinition",
+                  "parameters": {
+                    "id": 4,
+                    "nodeType": "ParameterList",
+                    "parameters": [
+                      {
+                        "constant": false,
+                        "id": 3,
+                        "indexed": false,
+                        "mutability": "mutable",
+                        "name": "marker",
+                        "nameLocation": "112:6:0",
+                        "nodeType": "VariableDeclaration",
+                        "scope": 5,
+                        "src": "104:14:0",
+                        "stateVariable": false,
+                        "storageLocation": "default",
+                        "typeDescriptions": {
+                          "typeIdentifier": "t_uint256",
+                          "typeString": "uint256"
+                        },
+                        "typeName": {
+                          "id": 2,
+                          "name": "uint256",
+                          "nodeType": "ElementaryTypeName",
+                          "src": "104:7:0",
+                          "typeDescriptions": {
+                            "typeIdentifier": "t_uint256",
+                            "typeString": "uint256"
+                          }
+                        },
+                        "visibility": "internal"
+                      }
+                    ],
+                    "src": "103:16:0"
+                  },
+                  "src": "91:29:0"
+                },
+                {
+                  "constant": false,
+                  "functionSelector": "0c55699c",
+                  "id": 7,
+                  "mutability": "mutable",
+                  "name": "x",
+                  "nameLocation": "141:1:0",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 78,
+                  "src": "126:16:0",
+                  "stateVariable": true,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_uint256",
+                    "typeString": "uint256"
+                  },
+                  "typeName": {
+                    "id": 6,
+                    "name": "uint256",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "126:7:0",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_uint256",
+                      "typeString": "uint256"
+                    }
+                  },
+                  "visibility": "public"
+                },
+                {
+                  "body": {
+                    "id": 43,
+                    "nodeType": "Block",
+                    "src": "181:243:0",
+                    "statements": [
+                      {
+                        "expression": {
+                          "id": 14,
+                          "isConstant": false,
+                          "isLValue": false,
+                          "isPure": false,
+                          "lValueRequested": false,
+                          "leftHandSide": {
+                            "id": 12,
+                            "name": "x",
+                            "nodeType": "Identifier",
+                            "overloadedDeclarations": [],
+                            "referencedDeclaration": 7,
+                            "src": "191:1:0",
+                            "typeDescriptions": {
+                              "typeIdentifier": "t_uint256",
+                              "typeString": "uint256"
+                            }
+                          },
+                          "nodeType": "Assignment",
+                          "operator": "=",
+                          "rightHandSide": {
+                            "hexValue": "31",
+                            "id": 13,
+                            "isConstant": false,
+                            "isLValue": false,
+                            "isPure": true,
+                            "kind": "number",
+                            "lValueRequested": false,
+                            "nodeType": "Literal",
+                            "src": "195:1:0",
+                            "typeDescriptions": {
+                              "typeIdentifier": "t_rational_1_by_1",
+                              "typeString": "int_const 1"
+                            },
+                            "value": "1"
+                          },
+                          "src": "191:5:0",
+                          "typeDescriptions": {
+                            "typeIdentifier": "t_uint256",
+                            "typeString": "uint256"
+                          }
+                        },
+                        "id": 15,
+                        "nodeType": "ExpressionStatement",
+                        "src": "191:5:0"
+                      },
+                      {
+                        "condition": {
+                          "commonType": {
+                            "typeIdentifier": "t_uint8",
+                            "typeString": "uint8"
+                          },
+                          "id": 18,
+                          "isConstant": false,
+                          "isLValue": false,
+                          "isPure": false,
+                          "lValueRequested": false,
+                          "leftExpression": {
+                            "id": 16,
+                            "name": "mode",
+                            "nodeType": "Identifier",
+                            "overloadedDeclarations": [],
+                            "referencedDeclaration": 9,
+                            "src": "210:4:0",
+                            "typeDescriptions": {
+                              "typeIdentifier": "t_uint8",
+                              "typeString": "uint8"
+                            }
+                          },
+                          "nodeType": "BinaryOperation",
+                          "operator": "==",
+                          "rightExpression": {
+                            "hexValue": "31",
+                            "id": 17,
+                            "isConstant": false,
+                            "isLValue": false,
+                            "isPure": true,
+                            "kind": "number",
+                            "lValueRequested": false,
+                            "nodeType": "Literal",
+                            "src": "218:1:0",
+                            "typeDescriptions": {
+                              "typeIdentifier": "t_rational_1_by_1",
+                              "typeString": "int_const 1"
+                            },
+                            "value": "1"
+                          },
+                          "src": "210:9:0",
+                          "typeDescriptions": {
+                            "typeIdentifier": "t_bool",
+                            "typeString": "bool"
+                          }
+                        },
+                        "id": 32,
+                        "nodeType": "IfStatement",
+                        "src": "206:101:0",
+                        "trueBody": {
+                          "id": 31,
+                          "nodeType": "Block",
+                          "src": "221:86:0",
+                          "statements": [
+                            {
+                              "expression": {
+                                "arguments": [
+                                  {
+                                    "arguments": [
+                                      {
+                                        "expression": {
+                                          "id": 22,
+                                          "name": "msg",
+                                          "nodeType": "Identifier",
+                                          "overloadedDeclarations": [],
+                                          "referencedDeclaration": -15,
+                                          "src": "256:3:0",
+                                          "typeDescriptions": {
+                                            "typeIdentifier": "t_magic_message",
+                                            "typeString": "msg"
+                                          }
+                                        },
+                                        "id": 23,
+                                        "isConstant": false,
+                                        "isLValue": false,
+                                        "isPure": false,
+                                        "lValueRequested": false,
+                                        "memberLocation": "260:6:0",
+                                        "memberName": "sender",
+                                        "nodeType": "MemberAccess",
+                                        "src": "256:10:0",
+                                        "typeDescriptions": {
+                                          "typeIdentifier": "t_address",
+                                          "typeString": "address"
+                                        }
+                                      }
+                                    ],
+                                    "expression": {
+                                      "argumentTypes": [
+                                        {
+                                          "typeIdentifier": "t_address",
+                                          "typeString": "address"
+                                        }
+                                      ],
+                                      "id": 21,
+                                      "isConstant": false,
+                                      "isLValue": false,
+                                      "isPure": true,
+                                      "lValueRequested": false,
+                                      "nodeType": "ElementaryTypeNameExpression",
+                                      "src": "248:8:0",
+                                      "typeDescriptions": {
+                                        "typeIdentifier": "t_type$_t_address_payable_$",
+                                        "typeString": "type(address payable)"
+                                      },
+                                      "typeName": {
+                                        "id": 20,
+                                        "name": "address",
+                                        "nodeType": "ElementaryTypeName",
+                                        "src": "248:8:0",
+                                        "stateMutability": "payable",
+                                        "typeDescriptions": {}
+                                      }
+                                    },
+                                    "id": 24,
+                                    "isConstant": false,
+                                    "isLValue": false,
+                                    "isPure": false,
+                                    "kind": "typeConversion",
+                                    "lValueRequested": false,
+                                    "nameLocations": [],
+                                    "names": [],
+                                    "nodeType": "FunctionCall",
+                                    "src": "248:19:0",
+                                    "tryCall": false,
+                                    "typeDescriptions": {
+                                      "typeIdentifier": "t_address_payable",
+                                      "typeString": "address payable"
+                                    }
+                                  }
+                                ],
+                                "expression": {
+                                  "argumentTypes": [
+                                    {
+                                      "typeIdentifier": "t_address_payable",
+                                      "typeString": "address payable"
+                                    }
+                                  ],
+                                  "id": 19,
+                                  "name": "selfdestruct",
+                                  "nodeType": "Identifier",
+                                  "overloadedDeclarations": [],
+                                  "referencedDeclaration": -21,
+                                  "src": "235:12:0",
+                                  "typeDescriptions": {
+                                    "typeIdentifier": "t_function_selfdestruct_nonpayable$_t_address_payable_$returns$__$",
+                                    "typeString": "function (address payable)"
+                                  }
+                                },
+                                "id": 25,
+                                "isConstant": false,
+                                "isLValue": false,
+                                "isPure": false,
+                                "kind": "functionCall",
+                                "lValueRequested": false,
+                                "nameLocations": [],
+                                "names": [],
+                                "nodeType": "FunctionCall",
+                                "src": "235:33:0",
+                                "tryCall": false,
+                                "typeDescriptions": {
+                                  "typeIdentifier": "t_tuple$__$",
+                                  "typeString": "tuple()"
+                                }
+                              },
+                              "id": 26,
+                              "nodeType": "ExpressionStatement",
+                              "src": "235:33:0"
+                            },
+                            {
+                              "eventCall": {
+                                "arguments": [
+                                  {
+                                    "hexValue": "31",
+                                    "id": 28,
+                                    "isConstant": false,
+                                    "isLValue": false,
+                                    "isPure": true,
+                                    "kind": "number",
+                                    "lValueRequested": false,
+                                    "nodeType": "Literal",
+                                    "src": "294:1:0",
+                                    "typeDescriptions": {
+                                      "typeIdentifier": "t_rational_1_by_1",
+                                      "typeString": "int_const 1"
+                                    },
+                                    "value": "1"
+                                  }
+                                ],
+                                "expression": {
+                                  "argumentTypes": [
+                                    {
+                                      "typeIdentifier": "t_rational_1_by_1",
+                                      "typeString": "int_const 1"
+                                    }
+                                  ],
+                                  "id": 27,
+                                  "name": "Halted",
+                                  "nodeType": "Identifier",
+                                  "overloadedDeclarations": [],
+                                  "referencedDeclaration": 5,
+                                  "src": "287:6:0",
+                                  "typeDescriptions": {
+                                    "typeIdentifier": "t_function_event_nonpayable$_t_uint256_$returns$__$",
+                                    "typeString": "function (uint256)"
+                                  }
+                                },
+                                "id": 29,
+                                "isConstant": false,
+                                "isLValue": false,
+                                "isPure": false,
+                                "kind": "functionCall",
+                                "lValueRequested": false,
+                                "nameLocations": [],
+                                "names": [],
+                                "nodeType": "FunctionCall",
+                                "src": "287:9:0",
+                                "tryCall": false,
+                                "typeDescriptions": {
+                                  "typeIdentifier": "t_tuple$__$",
+                                  "typeString": "tuple()"
+                                }
+                              },
+                              "id": 30,
+                              "nodeType": "EmitStatement",
+                              "src": "282:14:0"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "condition": {
+                          "commonType": {
+                            "typeIdentifier": "t_uint8",
+                            "typeString": "uint8"
+                          },
+                          "id": 35,
+                          "isConstant": false,
+                          "isLValue": false,
+                          "isPure": false,
+                          "lValueRequested": false,
+                          "leftExpression": {
+                            "id": 33,
+                            "name": "mode",
+                            "nodeType": "Identifier",
+                            "overloadedDeclarations": [],
+                            "referencedDeclaration": 9,
+                            "src": "320:4:0",
+                            "typeDescriptions": {
+                              "typeIdentifier": "t_uint8",
+                              "typeString": "uint8"
+                            }
+                          },
+                          "nodeType": "BinaryOperation",
+                          "operator": "==",
+                          "rightExpression": {
+                            "hexValue": "32",
+                            "id": 34,
+                            "isConstant": false,
+                            "isLValue": false,
+                            "isPure": true,
+                            "kind": "number",
+                            "lValueRequested": false,
+                            "nodeType": "Literal",
+                            "src": "328:1:0",
+                            "typeDescriptions": {
+                              "typeIdentifier": "t_rational_2_by_1",
+                              "typeString": "int_const 2"
+                            },
+                            "value": "2"
+                          },
+                          "src": "320:9:0",
+                          "typeDescriptions": {
+                            "typeIdentifier": "t_bool",
+                            "typeString": "bool"
+                          }
+                        },
+                        "id": 42,
+                        "nodeType": "IfStatement",
+                        "src": "316:102:0",
+                        "trueBody": {
+                          "id": 41,
+                          "nodeType": "Block",
+                          "src": "331:87:0",
+                          "statements": [
+                            {
+                              "AST": {
+                                "nativeSrc": "354:26:0",
+                                "nodeType": "YulBlock",
+                                "src": "354:26:0",
+                                "statements": [
+                                  {
+                                    "expression": {
+                                      "arguments": [
+                                        {
+                                          "arguments": [],
+                                          "functionName": {
+                                            "name": "caller",
+                                            "nativeSrc": "369:6:0",
+                                            "nodeType": "YulIdentifier",
+                                            "src": "369:6:0"
+                                          },
+                                          "nativeSrc": "369:8:0",
+                                          "nodeType": "YulFunctionCall",
+                                          "src": "369:8:0"
+                                        }
+                                      ],
+                                      "functionName": {
+                                        "name": "selfdestruct",
+                                        "nativeSrc": "356:12:0",
+                                        "nodeType": "YulIdentifier",
+                                        "src": "356:12:0"
+                                      },
+                                      "nativeSrc": "356:22:0",
+                                      "nodeType": "YulFunctionCall",
+                                      "src": "356:22:0"
+                                    },
+                                    "nativeSrc": "356:22:0",
+                                    "nodeType": "YulExpressionStatement",
+                                    "src": "356:22:0"
+                                  }
+                                ]
+                              },
+                              "evmVersion": "osaka",
+                              "externalReferences": [],
+                              "id": 36,
+                              "nodeType": "InlineAssembly",
+                              "src": "345:35:0"
+                            },
+                            {
+                              "eventCall": {
+                                "arguments": [
+                                  {
+                                    "hexValue": "32",
+                                    "id": 38,
+                                    "isConstant": false,
+                                    "isLValue": false,
+                                    "isPure": true,
+                                    "kind": "number",
+                                    "lValueRequested": false,
+                                    "nodeType": "Literal",
+                                    "src": "405:1:0",
+                                    "typeDescriptions": {
+                                      "typeIdentifier": "t_rational_2_by_1",
+                                      "typeString": "int_const 2"
+                                    },
+                                    "value": "2"
+                                  }
+                                ],
+                                "expression": {
+                                  "argumentTypes": [
+                                    {
+                                      "typeIdentifier": "t_rational_2_by_1",
+                                      "typeString": "int_const 2"
+                                    }
+                                  ],
+                                  "id": 37,
+                                  "name": "Halted",
+                                  "nodeType": "Identifier",
+                                  "overloadedDeclarations": [],
+                                  "referencedDeclaration": 5,
+                                  "src": "398:6:0",
+                                  "typeDescriptions": {
+                                    "typeIdentifier": "t_function_event_nonpayable$_t_uint256_$returns$__$",
+                                    "typeString": "function (uint256)"
+                                  }
+                                },
+                                "id": 39,
+                                "isConstant": false,
+                                "isLValue": false,
+                                "isPure": false,
+                                "kind": "functionCall",
+                                "lValueRequested": false,
+                                "nameLocations": [],
+                                "names": [],
+                                "nodeType": "FunctionCall",
+                                "src": "398:9:0",
+                                "tryCall": false,
+                                "typeDescriptions": {
+                                  "typeIdentifier": "t_tuple$__$",
+                                  "typeString": "tuple()"
+                                }
+                              },
+                              "id": 40,
+                              "nodeType": "EmitStatement",
+                              "src": "393:14:0"
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  },
+                  "id": 44,
+                  "implemented": true,
+                  "kind": "constructor",
+                  "modifiers": [],
+                  "name": "",
+                  "nameLocation": "-1:-1:-1",
+                  "nodeType": "FunctionDefinition",
+                  "parameters": {
+                    "id": 10,
+                    "nodeType": "ParameterList",
+                    "parameters": [
+                      {
+                        "constant": false,
+                        "id": 9,
+                        "mutability": "mutable",
+                        "name": "mode",
+                        "nameLocation": "167:4:0",
+                        "nodeType": "VariableDeclaration",
+                        "scope": 44,
+                        "src": "161:10:0",
+                        "stateVariable": false,
+                        "storageLocation": "default",
+                        "typeDescriptions": {
+                          "typeIdentifier": "t_uint8",
+                          "typeString": "uint8"
+                        },
+                        "typeName": {
+                          "id": 8,
+                          "name": "uint8",
+                          "nodeType": "ElementaryTypeName",
+                          "src": "161:5:0",
+                          "typeDescriptions": {
+                            "typeIdentifier": "t_uint8",
+                            "typeString": "uint8"
+                          }
+                        },
+                        "visibility": "internal"
+                      }
+                    ],
+                    "src": "160:12:0"
+                  },
+                  "returnParameters": {
+                    "id": 11,
+                    "nodeType": "ParameterList",
+                    "parameters": [],
+                    "src": "181:0:0"
+                  },
+                  "scope": 78,
+                  "src": "149:275:0",
+                  "stateMutability": "payable",
+                  "virtual": false,
+                  "visibility": "public"
+                },
+                {
+                  "body": {
+                    "id": 63,
+                    "nodeType": "Block",
+                    "src": "472:89:0",
+                    "statements": [
+                      {
+                        "expression": {
+                          "id": 49,
+                          "isConstant": false,
+                          "isLValue": false,
+                          "isPure": false,
+                          "lValueRequested": false,
+                          "leftHandSide": {
+                            "id": 47,
+                            "name": "x",
+                            "nodeType": "Identifier",
+                            "overloadedDeclarations": [],
+                            "referencedDeclaration": 7,
+                            "src": "482:1:0",
+                            "typeDescriptions": {
+                              "typeIdentifier": "t_uint256",
+                              "typeString": "uint256"
+                            }
+                          },
+                          "nodeType": "Assignment",
+                          "operator": "=",
+                          "rightHandSide": {
+                            "hexValue": "32",
+                            "id": 48,
+                            "isConstant": false,
+                            "isLValue": false,
+                            "isPure": true,
+                            "kind": "number",
+                            "lValueRequested": false,
+                            "nodeType": "Literal",
+                            "src": "486:1:0",
+                            "typeDescriptions": {
+                              "typeIdentifier": "t_rational_2_by_1",
+                              "typeString": "int_const 2"
+                            },
+                            "value": "2"
+                          },
+                          "src": "482:5:0",
+                          "typeDescriptions": {
+                            "typeIdentifier": "t_uint256",
+                            "typeString": "uint256"
+                          }
+                        },
+                        "id": 50,
+                        "nodeType": "ExpressionStatement",
+                        "src": "482:5:0"
+                      },
+                      {
+                        "expression": {
+                          "arguments": [
+                            {
+                              "arguments": [
+                                {
+                                  "expression": {
+                                    "id": 54,
+                                    "name": "msg",
+                                    "nodeType": "Identifier",
+                                    "overloadedDeclarations": [],
+                                    "referencedDeclaration": -15,
+                                    "src": "518:3:0",
+                                    "typeDescriptions": {
+                                      "typeIdentifier": "t_magic_message",
+                                      "typeString": "msg"
+                                    }
+                                  },
+                                  "id": 55,
+                                  "isConstant": false,
+                                  "isLValue": false,
+                                  "isPure": false,
+                                  "lValueRequested": false,
+                                  "memberLocation": "522:6:0",
+                                  "memberName": "sender",
+                                  "nodeType": "MemberAccess",
+                                  "src": "518:10:0",
+                                  "typeDescriptions": {
+                                    "typeIdentifier": "t_address",
+                                    "typeString": "address"
+                                  }
+                                }
+                              ],
+                              "expression": {
+                                "argumentTypes": [
+                                  {
+                                    "typeIdentifier": "t_address",
+                                    "typeString": "address"
+                                  }
+                                ],
+                                "id": 53,
+                                "isConstant": false,
+                                "isLValue": false,
+                                "isPure": true,
+                                "lValueRequested": false,
+                                "nodeType": "ElementaryTypeNameExpression",
+                                "src": "510:8:0",
+                                "typeDescriptions": {
+                                  "typeIdentifier": "t_type$_t_address_payable_$",
+                                  "typeString": "type(address payable)"
+                                },
+                                "typeName": {
+                                  "id": 52,
+                                  "name": "address",
+                                  "nodeType": "ElementaryTypeName",
+                                  "src": "510:8:0",
+                                  "stateMutability": "payable",
+                                  "typeDescriptions": {}
+                                }
+                              },
+                              "id": 56,
+                              "isConstant": false,
+                              "isLValue": false,
+                              "isPure": false,
+                              "kind": "typeConversion",
+                              "lValueRequested": false,
+                              "nameLocations": [],
+                              "names": [],
+                              "nodeType": "FunctionCall",
+                              "src": "510:19:0",
+                              "tryCall": false,
+                              "typeDescriptions": {
+                                "typeIdentifier": "t_address_payable",
+                                "typeString": "address payable"
+                              }
+                            }
+                          ],
+                          "expression": {
+                            "argumentTypes": [
+                              {
+                                "typeIdentifier": "t_address_payable",
+                                "typeString": "address payable"
+                              }
+                            ],
+                            "id": 51,
+                            "name": "selfdestruct",
+                            "nodeType": "Identifier",
+                            "overloadedDeclarations": [],
+                            "referencedDeclaration": -21,
+                            "src": "497:12:0",
+                            "typeDescriptions": {
+                              "typeIdentifier": "t_function_selfdestruct_nonpayable$_t_address_payable_$returns$__$",
+                              "typeString": "function (address payable)"
+                            }
+                          },
+                          "id": 57,
+                          "isConstant": false,
+                          "isLValue": false,
+                          "isPure": false,
+                          "kind": "functionCall",
+                          "lValueRequested": false,
+                          "nameLocations": [],
+                          "names": [],
+                          "nodeType": "FunctionCall",
+                          "src": "497:33:0",
+                          "tryCall": false,
+                          "typeDescriptions": {
+                            "typeIdentifier": "t_tuple$__$",
+                            "typeString": "tuple()"
+                          }
+                        },
+                        "id": 58,
+                        "nodeType": "ExpressionStatement",
+                        "src": "497:33:0"
+                      },
+                      {
+                        "eventCall": {
+                          "arguments": [
+                            {
+                              "hexValue": "33",
+                              "id": 60,
+                              "isConstant": false,
+                              "isLValue": false,
+                              "isPure": true,
+                              "kind": "number",
+                              "lValueRequested": false,
+                              "nodeType": "Literal",
+                              "src": "552:1:0",
+                              "typeDescriptions": {
+                                "typeIdentifier": "t_rational_3_by_1",
+                                "typeString": "int_const 3"
+                              },
+                              "value": "3"
+                            }
+                          ],
+                          "expression": {
+                            "argumentTypes": [
+                              {
+                                "typeIdentifier": "t_rational_3_by_1",
+                                "typeString": "int_const 3"
+                              }
+                            ],
+                            "id": 59,
+                            "name": "Halted",
+                            "nodeType": "Identifier",
+                            "overloadedDeclarations": [],
+                            "referencedDeclaration": 5,
+                            "src": "545:6:0",
+                            "typeDescriptions": {
+                              "typeIdentifier": "t_function_event_nonpayable$_t_uint256_$returns$__$",
+                              "typeString": "function (uint256)"
+                            }
+                          },
+                          "id": 61,
+                          "isConstant": false,
+                          "isLValue": false,
+                          "isPure": false,
+                          "kind": "functionCall",
+                          "lValueRequested": false,
+                          "nameLocations": [],
+                          "names": [],
+                          "nodeType": "FunctionCall",
+                          "src": "545:9:0",
+                          "tryCall": false,
+                          "typeDescriptions": {
+                            "typeIdentifier": "t_tuple$__$",
+                            "typeString": "tuple()"
+                          }
+                        },
+                        "id": 62,
+                        "nodeType": "EmitStatement",
+                        "src": "540:14:0"
+                      }
+                    ]
+                  },
+                  "functionSelector": "64b2d974",
+                  "id": 64,
+                  "implemented": true,
+                  "kind": "function",
+                  "modifiers": [],
+                  "name": "sourceDestroy",
+                  "nameLocation": "439:13:0",
+                  "nodeType": "FunctionDefinition",
+                  "parameters": {
+                    "id": 45,
+                    "nodeType": "ParameterList",
+                    "parameters": [],
+                    "src": "452:2:0"
+                  },
+                  "returnParameters": {
+                    "id": 46,
+                    "nodeType": "ParameterList",
+                    "parameters": [],
+                    "src": "472:0:0"
+                  },
+                  "scope": 78,
+                  "src": "430:131:0",
+                  "stateMutability": "payable",
+                  "virtual": false,
+                  "visibility": "external"
+                },
+                {
+                  "body": {
+                    "id": 76,
+                    "nodeType": "Block",
+                    "src": "611:90:0",
+                    "statements": [
+                      {
+                        "expression": {
+                          "id": 69,
+                          "isConstant": false,
+                          "isLValue": false,
+                          "isPure": false,
+                          "lValueRequested": false,
+                          "leftHandSide": {
+                            "id": 67,
+                            "name": "x",
+                            "nodeType": "Identifier",
+                            "overloadedDeclarations": [],
+                            "referencedDeclaration": 7,
+                            "src": "621:1:0",
+                            "typeDescriptions": {
+                              "typeIdentifier": "t_uint256",
+                              "typeString": "uint256"
+                            }
+                          },
+                          "nodeType": "Assignment",
+                          "operator": "=",
+                          "rightHandSide": {
+                            "hexValue": "33",
+                            "id": 68,
+                            "isConstant": false,
+                            "isLValue": false,
+                            "isPure": true,
+                            "kind": "number",
+                            "lValueRequested": false,
+                            "nodeType": "Literal",
+                            "src": "625:1:0",
+                            "typeDescriptions": {
+                              "typeIdentifier": "t_rational_3_by_1",
+                              "typeString": "int_const 3"
+                            },
+                            "value": "3"
+                          },
+                          "src": "621:5:0",
+                          "typeDescriptions": {
+                            "typeIdentifier": "t_uint256",
+                            "typeString": "uint256"
+                          }
+                        },
+                        "id": 70,
+                        "nodeType": "ExpressionStatement",
+                        "src": "621:5:0"
+                      },
+                      {
+                        "AST": {
+                          "nativeSrc": "645:26:0",
+                          "nodeType": "YulBlock",
+                          "src": "645:26:0",
+                          "statements": [
+                            {
+                              "expression": {
+                                "arguments": [
+                                  {
+                                    "arguments": [],
+                                    "functionName": {
+                                      "name": "caller",
+                                      "nativeSrc": "660:6:0",
+                                      "nodeType": "YulIdentifier",
+                                      "src": "660:6:0"
+                                    },
+                                    "nativeSrc": "660:8:0",
+                                    "nodeType": "YulFunctionCall",
+                                    "src": "660:8:0"
+                                  }
+                                ],
+                                "functionName": {
+                                  "name": "selfdestruct",
+                                  "nativeSrc": "647:12:0",
+                                  "nodeType": "YulIdentifier",
+                                  "src": "647:12:0"
+                                },
+                                "nativeSrc": "647:22:0",
+                                "nodeType": "YulFunctionCall",
+                                "src": "647:22:0"
+                              },
+                              "nativeSrc": "647:22:0",
+                              "nodeType": "YulExpressionStatement",
+                              "src": "647:22:0"
+                            }
+                          ]
+                        },
+                        "evmVersion": "osaka",
+                        "externalReferences": [],
+                        "id": 71,
+                        "nodeType": "InlineAssembly",
+                        "src": "636:35:0"
+                      },
+                      {
+                        "eventCall": {
+                          "arguments": [
+                            {
+                              "hexValue": "34",
+                              "id": 73,
+                              "isConstant": false,
+                              "isLValue": false,
+                              "isPure": true,
+                              "kind": "number",
+                              "lValueRequested": false,
+                              "nodeType": "Literal",
+                              "src": "692:1:0",
+                              "typeDescriptions": {
+                                "typeIdentifier": "t_rational_4_by_1",
+                                "typeString": "int_const 4"
+                              },
+                              "value": "4"
+                            }
+                          ],
+                          "expression": {
+                            "argumentTypes": [
+                              {
+                                "typeIdentifier": "t_rational_4_by_1",
+                                "typeString": "int_const 4"
+                              }
+                            ],
+                            "id": 72,
+                            "name": "Halted",
+                            "nodeType": "Identifier",
+                            "overloadedDeclarations": [],
+                            "referencedDeclaration": 5,
+                            "src": "685:6:0",
+                            "typeDescriptions": {
+                              "typeIdentifier": "t_function_event_nonpayable$_t_uint256_$returns$__$",
+                              "typeString": "function (uint256)"
+                            }
+                          },
+                          "id": 74,
+                          "isConstant": false,
+                          "isLValue": false,
+                          "isPure": false,
+                          "kind": "functionCall",
+                          "lValueRequested": false,
+                          "nameLocations": [],
+                          "names": [],
+                          "nodeType": "FunctionCall",
+                          "src": "685:9:0",
+                          "tryCall": false,
+                          "typeDescriptions": {
+                            "typeIdentifier": "t_tuple$__$",
+                            "typeString": "tuple()"
+                          }
+                        },
+                        "id": 75,
+                        "nodeType": "EmitStatement",
+                        "src": "680:14:0"
+                      }
+                    ]
+                  },
+                  "functionSelector": "e6a2e859",
+                  "id": 77,
+                  "implemented": true,
+                  "kind": "function",
+                  "modifiers": [],
+                  "name": "assemblyDestroy",
+                  "nameLocation": "576:15:0",
+                  "nodeType": "FunctionDefinition",
+                  "parameters": {
+                    "id": 65,
+                    "nodeType": "ParameterList",
+                    "parameters": [],
+                    "src": "591:2:0"
+                  },
+                  "returnParameters": {
+                    "id": 66,
+                    "nodeType": "ParameterList",
+                    "parameters": [],
+                    "src": "611:0:0"
+                  },
+                  "scope": 78,
+                  "src": "567:134:0",
+                  "stateMutability": "payable",
+                  "virtual": false,
+                  "visibility": "external"
+                }
+              ],
+              "scope": 79,
+              "src": "57:646:0",
+              "usedErrors": [],
+              "usedEvents": [
+                5
+              ]
+            }
+          ],
+          "src": "32:672:0"
+        },
+        "id": 0
+      }
+    }
+  },
+  "profile": {
+    "compilerVersion": "0.8.37",
+    "settings": {
+      "debug": {
+        "revertStrings": "default"
+      },
+      "evmVersion": "osaka",
+      "metadata": {
+        "appendCBOR": false,
+        "bytecodeHash": "none"
+      },
+      "optimizer": {
+        "enabled": false,
+        "runs": 200
+      },
+      "viaIR": true
+    }
+  }
+}
