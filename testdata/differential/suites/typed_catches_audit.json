@@ -1,0 +1,29 @@
+{
+  "name": "typed_catches_audit",
+  "source": "testdata/differential/typed_catches_audit.sol",
+  "contract": "TypedCatchesAudit",
+  "artifact": "testdata/differential/expected/typed_catches_audit.json",
+  "cases": [
+    {
+      "name": "catch_zero_pointer",
+      "calldata": "0x26121ff0",
+      "expect": {
+        "returned": "0x0000000000000000000000000000000000000000000000000000000000000003"
+      }
+    },
+    {
+      "name": "catch_zero_pointer_memory",
+      "calldata": "0x20028990",
+      "expect": {
+        "returned": "0x0000000000000000000000000000000000000000000000000000000000000020"
+      }
+    },
+    {
+      "name": "selector_write_once",
+      "calldata": "0x0a419840",
+      "expect": {
+        "returned": "0x112233445566778899aabbccddeeff00112233445566778899aabbccddeeff00"
+      }
+    }
+  ]
+}

@@ -1247,7 +1247,7 @@ QED
 Theorem array_push_missing_binding_rejected:
   ¬wf_core_operation test_env
     <| bindings := []; targets := []; returns := []; in_loop := F |>
-    (ReferenceType (UintT 8)) (ArrayPushOperation (BoundAtom (AstId 1)))
+    (ReferenceType (UintT 8)) (ArrayPushOperation F (BoundAtom (AstId 1)))
 Proof
   CONV_TAC cv_eval
 QED

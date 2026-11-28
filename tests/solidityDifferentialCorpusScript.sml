@@ -131,9 +131,11 @@ Ancestors
   solidityDifferentialCorpus_storage_arrays
   solidityDifferentialCorpus_storage_bytes
   solidityDifferentialCorpus_storage_bytes_aliases
+  solidityDifferentialCorpus_storage_bytes_audit
   solidityDifferentialCorpus_storage_call_data
   solidityDifferentialCorpus_storage_copy_order
   solidityDifferentialCorpus_storage_enum_arrays
+  solidityDifferentialCorpus_storage_mapping_audit
   solidityDifferentialCorpus_storage_memory_padding
   solidityDifferentialCorpus_storage_pointer_base
   solidityDifferentialCorpus_storage_pointers
@@ -152,6 +154,7 @@ Ancestors
   solidityDifferentialCorpus_type_bounds
   solidityDifferentialCorpus_type_members
   solidityDifferentialCorpus_typed_catches
+  solidityDifferentialCorpus_typed_catches_audit
   solidityDifferentialCorpus_udvt
   solidityDifferentialCorpus_uninitialized_storage_pointers
   solidityDifferentialCorpus_using_for

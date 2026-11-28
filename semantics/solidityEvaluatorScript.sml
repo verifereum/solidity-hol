@@ -797,7 +797,7 @@ End
  * collisions; pop clears the element before updating length. A byte array
  * pushes and pops as solc's byte array functions do (solidityStorage). *)
 Definition push_storage_array_def:
-  push_storage_array env x annotation a (st : source_state) gas =
+  push_storage_array clear_tail env x annotation a (st : source_state) gas =
     if st.frame.static_context then
       abrupt_result (InvalidCompletion "array push in static frame") st gas
     else case eval_atom st.scopes a of
@@ -823,7 +823,7 @@ Definition push_storage_array_def:
          | _ => abrupt_result (InvalidCompletion "bad array push element") st gas)
     | SOME (ReferenceValue
         (StorageReference PersistentStorage addr slot 0 BytesT layout)) =>
-        (case push_storage_bytes st.world.accounts addr slot of
+        (case push_storage_bytes clear_tail st.world.accounts addr slot of
            INL (accounts, data_slot, offset) =>
              normal_result
                (define_binding x annotation
@@ -1146,14 +1146,15 @@ Definition materialize_revert_data_def:
     | INR c => INR c
 End
 
-(* The compiler's catch decoders. Both first copy the selector to the scratch
- * space when there is one. Panic copies its code word to the scratch space.
+(* The compiler's catch decoders. The first typed clause copies the selector
+ * to the scratch space when there is one. Panic copies its code word there.
  * Error copies the data after the selector to the free memory pointer, where
  * the string stays: the decoder does not require canonical offsets or
  * padding, and only a successful decode moves the free memory pointer. *)
 Definition try_decode_error_def:
-  try_decode_error kind data st =
-    let st0 = if 3 < LENGTH data then memory_write 0 (TAKE 4 data) st else st in
+  try_decode_error kind write_selector data st =
+    let st0 = if write_selector ∧ 3 < LENGTH data
+              then memory_write 0 (TAKE 4 data) st else st in
     case kind of
       PanicCatch =>
         if 36 ≤ LENGTH data ∧ TAKE 4 data = [0x4ew; 0x48w; 0x7bw; 0x71w] then
@@ -1176,6 +1177,7 @@ Definition try_decode_error_def:
           INL (missing, st2) else
         (case finalize_allocation p (offset + 32 + length) st2 of
            INL st3 =>
+             if p + offset = 0 then INL (missing, st3) else
              INL (TupleValue [ScalarValue (BoolValue T);
                     ReferenceValue (MemoryReference (p + offset) StringT)], st3)
          | INR c => INR c)
@@ -1506,8 +1508,8 @@ Definition simple_stmt_def:
         abi_encode env x ty selector tys args st gas
     | DefineStmt x ty (AbiEncodePackedOperation tys args) =>
         abi_encode_packed env x ty tys args st gas
-    | DefineStmt x ty (ArrayPushOperation a) =>
-        push_storage_array env x ty a st gas
+    | DefineStmt x ty (ArrayPushOperation clear_tail a) =>
+        push_storage_array clear_tail env x ty a st gas
     | DefineStmt x ty (ArrayPopOperation a) =>
         pop_storage_array n env x ty a st gas
     | DefineStmt x ty (ExternalCallOperation kind selector params rets target
@@ -1519,10 +1521,10 @@ Definition simple_stmt_def:
         call_create F env x ty code params value salt args st gas
     | DefineStmt x ty (TryCreateContractOperation code params value salt args) =>
         call_create T env x ty code params value salt args st gas
-    | DefineStmt x ty (TryDecodeErrorOperation kind a) =>
+    | DefineStmt x ty (TryDecodeErrorOperation kind write_selector a) =>
         (case eval_atom st.scopes a of
            SOME (ScalarValue (BytesValue data)) =>
-             (case try_decode_error kind data st of
+             (case try_decode_error kind write_selector data st of
                 INL (v, st1) => normal_result (define_binding x ty v st1) gas
               | INR c => abrupt_result c st gas)
          | _ => abrupt_result (InvalidCompletion "bad catch data") st gas)
